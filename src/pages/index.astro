@@ -361,7 +361,7 @@ const skills = ["Astro", "Markdown", "AI 工具", "持续学习"];
           </div>
           <div class="latest-posts">
             {posts.length > 0 ? posts.map((post) => (
-              <a class="post-preview" href={`/blog/${post.slug}/`}>
+              <a class="post-preview" href={`/blog/${post.id}/`}>
                 <span class="post-date">
                   {post.data.pubDate.toLocaleDateString("zh-CN", {
                     year: "numeric",
