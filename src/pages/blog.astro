@@ -1,15 +1,10 @@
+
 ---
 import Layout from "../layouts/Layout.astro";
+import { getCollection } from "astro:content";
 
-const posts = [
-  {
-    title: "我的第一篇博客",
-    description: "记录个人网站搭建的开始。",
-    date: "2026-10-29",
-    tags: ["随笔", "建站"],
-    slug: "hello-world",
-  },
-];
+const posts = (await getCollection("blog"))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 ---
 
 <Layout>
@@ -22,13 +17,18 @@ const posts = [
     <div class="posts">
       {posts.map((post) => (
         <article class="post">
-          <p class="date">{post.date}</p>
-          <h2><a href={`/blog/${post.slug}/`}>{post.title}</a></h2>
-          <p class="description">{post.description}</p>
-          <div class="tags">
-            {post.tags.map((tag) => <span>{tag}</span>)}
-          </div>
-          <a class="read" href={`/blog/${post.slug}/`}>阅读全文 →</a>
+          <p class="date">
+            {post.data.pubDate.toLocaleDateString("zh-CN")}
+          </p>
+          <h2>
+            <a href={`/blog/${post.id.replace(/\.md$/, "")}/`}>
+              {post.data.title}
+            </a>
+          </h2>
+          <p class="description">{post.data.description}</p>
+          <a class="read" href={`/blog/${post.id.replace(/\.md$/, "")}/`}>
+            阅读全文 →
+          </a>
         </article>
       ))}
     </div>
@@ -47,7 +47,5 @@ const posts = [
   h2 { font-size: 24px; margin: 12px 0; }
   h2 a { color: #20221f; text-decoration: none; }
   h2 a:hover { color: #54745b; }
-  .tags { display: flex; gap: 8px; margin: 18px 0; }
-  .tags span { border: 1px solid #e5e6df; padding: 5px 10px; border-radius: 20px; font-size: 12px; }
   .read { color: #54745b; font-size: 14px; text-decoration: none; }
 </style>
