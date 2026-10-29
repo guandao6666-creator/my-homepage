@@ -1,0 +1,51 @@
+
+---
+import Layout from "../layouts/Layout.astro";
+import { getCollection } from "astro:content";
+
+const posts = (await getCollection("blog"))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<Layout>
+  <main class="container">
+    <a class="back" href="/">← 返回首页</a>
+    <p class="eyebrow">MY JOURNAL</p>
+    <h1>博客文章</h1>
+    <p class="intro">记录学习、创作与生活中的点滴。</p>
+
+    <div class="posts">
+      {posts.map((post) => (
+        <article class="post">
+          <p class="date">
+            {post.data.pubDate.toLocaleDateString("zh-CN")}
+          </p>
+          <h2>
+            <a href={`/blog/${post.id.replace(/\.md$/, "")}/`}>
+              {post.data.title}
+            </a>
+          </h2>
+          <p class="description">{post.data.description}</p>
+          <a class="read" href={`/blog/${post.id.replace(/\.md$/, "")}/`}>
+            阅读全文 →
+          </a>
+        </article>
+      ))}
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .container { max-width: 760px; margin: 0 auto; padding: 64px 24px 100px; }
+  .back { color: #54745b; text-decoration: none; font-size: 14px; }
+  .eyebrow { margin-top: 60px; color: #54745b; letter-spacing: 2px; font-size: 12px; font-weight: 700; }
+  h1 { font-size: clamp(36px, 6vw, 54px); margin: 12px 0; letter-spacing: -2px; }
+  .intro, .description { color: #777b72; line-height: 1.9; }
+  .posts { margin-top: 42px; }
+  .post { padding: 28px 0; border-top: 1px solid #e5e6df; }
+  .date { font-size: 12px; color: #777b72; }
+  h2 { font-size: 24px; margin: 12px 0; }
+  h2 a { color: #20221f; text-decoration: none; }
+  h2 a:hover { color: #54745b; }
+  .read { color: #54745b; font-size: 14px; text-decoration: none; }
+</style>

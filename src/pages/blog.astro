@@ -1,4 +1,4 @@
-
+﻿
 ---
 import Layout from "../layouts/Layout.astro";
 import { getCollection } from "astro:content";
@@ -7,7 +7,11 @@ const posts = (await getCollection("blog"))
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 ---
 
-<Layout>
+<Layout
+  title="博客文章 | 管道的个人博客"
+  description="浏览管道的个人博客文章，记录学习笔记、技术探索、创作实践与生活思考。"
+  canonical="/blog/"
+>
   <main class="container">
     <a class="back" href="/">← 返回首页</a>
     <p class="eyebrow">MY JOURNAL</p>
@@ -49,3 +53,4 @@ const posts = (await getCollection("blog"))
   h2 a:hover { color: #54745b; }
   .read { color: #54745b; font-size: 14px; text-decoration: none; }
 </style>
+

@@ -1,0 +1,97 @@
+
+---
+import Layout from "../../layouts/Layout.astro";
+import { getCollection, render } from "astro:content";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog");
+
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+
+<Layout>
+  <main class="article">
+    <a class="back" href="/blog/">← 返回博客列表</a>
+
+    <header>
+      <p class="eyebrow">JOURNAL / 随笔</p>
+      <h1>{post.data.title}</h1>
+      <p class="description">{post.data.description}</p>
+      <p class="date">
+        发布于 {post.data.pubDate.toLocaleDateString("zh-CN")}
+      </p>
+    </header>
+
+    <article class="content">
+      <Content />
+    </article>
+  </main>
+</Layout>
+
+<style>
+  .article {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 64px 24px 100px;
+  }
+
+  .back {
+    color: #54745b;
+    text-decoration: none;
+    font-size: 14px;
+  }
+
+  header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid #e5e6df;
+  }
+
+  .eyebrow {
+    color: #54745b;
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+
+  h1 {
+    font-size: clamp(34px, 6vw, 52px);
+    line-height: 1.25;
+    letter-spacing: -1.5px;
+  }
+
+  .description,
+  .date {
+    color: #777b72;
+    line-height: 1.8;
+  }
+
+  .date {
+    font-size: 13px;
+  }
+
+  .content {
+    padding-top: 24px;
+    font-size: 16px;
+    line-height: 2;
+    overflow-wrap: anywhere;
+  }
+
+  .content :global(h2) {
+    margin-top: 36px;
+    font-size: 23px;
+  }
+
+  .content :global(li) {
+    padding: 3px 0;
+  }
+
+  .content :global(a) {
+    color: #54745b;
+  }
+</style>

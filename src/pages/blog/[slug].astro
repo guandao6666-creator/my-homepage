@@ -1,4 +1,4 @@
-
+﻿
 ---
 import Layout from "../../layouts/Layout.astro";
 import { getCollection, render } from "astro:content";
@@ -16,7 +16,12 @@ const { post } = Astro.props;
 const { Content } = await render(post);
 ---
 
-<Layout>
+<Layout
+  title={`${post.data.title} | 管道的个人博客`}
+  description={post.data.description}
+  canonical={`/blog/${post.id.replace(/\.md$/, "")}/`}
+  type="article"
+>
   <main class="article">
     <a class="back" href="/blog/">← 返回博客列表</a>
 
@@ -95,3 +100,4 @@ const { Content } = await render(post);
     color: #54745b;
   }
 </style>
+
