@@ -11,7 +11,7 @@ export const SITE = {
     "管道的个人博客 —— 大连理工大学学生，河南固始人。记录日常、学习与思考，也记录骑过的路。",
   url: "https://guandao.xin",
   locale: "zh-CN",
-  email: "hi@guandao.xin",
+  email: "guandao6666@gmail.com",
   startYear: 2024,
   nav: [
     { href: "/blog/", label: "文章" },
@@ -21,7 +21,7 @@ export const SITE = {
   ],
   socials: [
     { href: "https://github.com/", label: "GitHub", icon: "github" },
-    { href: "mailto:hi@guandao.xin", label: "Email", icon: "mail" },
+    { href: "mailto:guandao6666@gmail.com", label: "Email", icon: "mail" },
   ],
 } as const;
 

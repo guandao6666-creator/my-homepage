@@ -265,6 +265,12 @@ a.pill:hover,
   color: var(--ink-2);
 }
 
+/* 统一清掉各级元素的默认外边距，再用相邻选择器给段落间距；
+   注意不要在子选择器里再写 margin: 0，否则会盖掉下面这条。 */
+.prose > * {
+  margin-block: 0;
+}
+
 .prose > * + * {
   margin-top: 1.35em;
 }
@@ -303,10 +309,6 @@ a.pill:hover,
   margin-top: 1.8em;
 }
 
-.prose p {
-  margin: 0;
-}
-
 .prose a {
   color: var(--accent-ink);
   text-decoration: none;
@@ -328,7 +330,6 @@ a.pill:hover,
 .prose ul,
 .prose ol {
   padding-left: 1.35em;
-  margin: 0;
 }
 
 .prose li {
@@ -364,7 +365,6 @@ a.pill:hover,
 }
 
 .prose pre {
-  margin: 0;
   padding: 20px 22px;
   border-radius: var(--radius);
   border: 1px solid var(--line);

@@ -96,7 +96,7 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
         <div class="section-head">
           <div>
             <span class="eyebrow">精选</span>
-            <h2>值得先读的两篇</h2>
+            <h2>{hero.length > 1 ? "值得先读的两篇" : "值得先读的"}</h2>
           </div>
           <a class="more" href="/blog/">
             全部文章
