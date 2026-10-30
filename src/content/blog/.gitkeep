@@ -1,0 +1,2 @@
+# 这个目录存放文章 Markdown。
+# 云端文章会由 scripts/sync-content.mjs 在构建前同步到这里。

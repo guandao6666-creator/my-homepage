@@ -81,14 +81,24 @@ const jsonLd = {
     </div>
 
     <div class="empty-state" id="empty-state" hidden>
-      <p>没有匹配的文章。</p>
-      <button class="btn" id="clear-filters" type="button">清除筛选条件</button>
+      {posts.length === 0 ? (
+        <>
+          <p>这里还没有文章。第一篇正在路上，可以先看看 <a href="/about/">关于我</a>。</p>
+        </>
+      ) : (
+        <>
+          <p>没有匹配的文章。</p>
+          <button class="btn" id="clear-filters" type="button">清除筛选条件</button>
+        </>
+      )}
     </div>
 
-    <div class="year-note">
-      <span>归档年份</span>
-      {years.map((year) => <em>{year}</em>)}
-    </div>
+    {years.length > 0 && (
+      <div class="year-note">
+        <span>归档年份</span>
+        {years.map((year) => <em>{year}</em>)}
+      </div>
+    )}
   </div>
 
 
@@ -157,6 +167,9 @@ const jsonLd = {
         input.focus();
       }
     });
+
+    // 首次进入就先算一遍：没有文章时直接显示空状态
+    apply();
   })();
 </script>
 

@@ -2,44 +2,43 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Icon from "../components/Icon.astro";
 import { SITE } from "../lib/site";
-import { getAllPosts, collectTags } from "../lib/posts";
 
-const posts = await getAllPosts();
-const tags = collectTags(posts);
+const routes = [
+  { no: "01", from: "固始", to: "合肥" },
+  { no: "02", from: "固始", to: "南京" },
+  { no: "03", from: "大连", to: "沈阳" },
+];
 
-const timeline = [
+const topics = [
   {
-    year: "2026",
-    title: "把博客重写了一遍",
-    text: "从最简的静态页面换成 Astro 内容层 + Supabase 云端存储，补上标签、搜索和写作后台。",
+    title: "日常",
+    text: "有趣的、好玩的、好吃的，还有路上好看的风景。生活里那些值得停一下的瞬间。",
   },
   {
-    year: "2025",
-    title: "第一次独立上线产品",
-    text: "从需求、设计到部署一个人做完，学会了在没有掌声的阶段继续迭代。",
+    title: "学习",
+    text: "学习的过程和感悟，包括踩过的坑。写下来是为了让自己下次少走一遍。",
   },
   {
-    year: "2024",
-    title: "开始认真写东西",
-    text: "发现「写下来」是检验理解最便宜的方式，于是有了这个站点。",
+    title: "思考",
+    text: "关于人生的一些还不成熟的想法。不一定对，但都是当时认真想过的。",
   },
 ];
 
-const stack = [
-  { group: "前端", items: ["Astro", "TypeScript", "React", "CSS / Tailwind"] },
-  { group: "后端与数据", items: ["Node.js", "PostgreSQL", "Supabase", "REST"] },
-  { group: "工具", items: ["Git / GitHub", "Vite", "Figma", "Cloudflare"] },
+const now = [
+  { label: "在做", text: "用 AI 搭自己的博客和各种网站，边做边学。" },
+  { label: "在学", text: "AI，还在很前面的阶段，欢迎指导。" },
+  { label: "在骑", text: "只要有整块的时间，就想找一条没走过的路线。" },
 ];
 ---
 
 <BaseLayout
   title="关于"
-  description={`${SITE.author}，${SITE.role}。这里是关于他、这个博客以及正在做的事。`}
+  description={`${SITE.author}，大连理工大学学生，河南固始人。喜欢骑行，正在用 AI 搭自己的网站。`}
   canonical="/about/"
   jsonLd={{
     "@type": "Person",
     name: SITE.author,
-    jobTitle: SITE.role,
+    jobTitle: "学生",
     url: `${SITE.url}/about/`,
     email: SITE.email,
     description: SITE.description,
@@ -49,11 +48,11 @@ const stack = [
     <div class="wrap hero-grid">
       <div>
         <span class="eyebrow">About</span>
-        <h1>一个把手弄脏的<br /><em>长期主义者</em></h1>
+        <h1>Hi，这里是<br /><em>管道</em></h1>
       </div>
       <div class="hero-side">
         <p class="hang">管</p>
-        <p class="sig">写代码，也写句子。</p>
+        <p class="sig">学生 · 骑行者 · 正在学 AI</p>
       </div>
     </div>
   </section>
@@ -61,88 +60,94 @@ const stack = [
   <div class="wrap">
     <section class="intro">
       <p class="lead">
-        我是{SITE.author}，{SITE.role}。目前最在意的事，是能不能把一件小事做到让自己满意。
+        大连理工大学的学生，2008 年 4 月 30 日出生，河南固始人。这里是我的博客，喜欢您来。
       </p>
       <p>
-        我习惯用项目来学习：想做的东西先动手做出来，卡住了再回去补理论。这个博客就是其中一个项目——
-        它既是我的笔记本，也是我的练习场。这里的文章大多来自真实的踩坑记录，
-        偶尔也有一些不成熟的观察，我都尽量写清楚当时的判断依据。
+        我在豫南的固始长大，现在在大连读书。两地隔着一千多公里，后来我真的用车轮把其中的一段段路量过一遍。
       </p>
       <p>
-        我不追求更新频率，也不追热点。比起「写得多」，我更在意「写得准」：
-        一篇文章如果三年后自己回看还能用，那它就值得存在。
+        这个博客是我用 AI 一点一点搭起来的。除了写点东西，它也是我学习新事物的练习场——
+        想做什么就先动手做出来，卡住了再回头补课。
       </p>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <span class="eyebrow">路径</span>
-        <h2>几句话讲完的经历</h2>
-      </div>
-      <ol class="timeline">
-        {timeline.map((item) => (
-          <li>
-            <span class="year">{item.year}</span>
-            <div>
-              <h3>{item.title}</h3>
-              <p>{item.text}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </section>
-
-    <section class="block">
-      <div class="block-head">
-        <span class="eyebrow">工具</span>
-        <h2>常用的技术栈</h2>
-      </div>
-      <div class="stack">
-        {stack.map((group) => (
-          <div class="stack-group">
-            <h3>{group.group}</h3>
-            <ul>
-              {group.items.map((item) => <li>{item}</li>)}
-            </ul>
-          </div>
-        ))}
-      </div>
     </section>
 
     <section class="block split">
       <div>
         <div class="block-head">
-          <span class="eyebrow">此刻</span>
-          <h2>现在的状态</h2>
+          <span class="eyebrow">车轮</span>
+          <h2>四千公里，是骑出来的</h2>
         </div>
-        <ul class="now">
-          <li><strong>在做</strong>把这个博客做成可以长期维护的写作系统。</li>
-          <li><strong>在学</strong>数据库设计与类型系统，试着写出更少惊喜的代码。</li>
-          <li><strong>在读</strong>《重构》《写作这回事》，一本技术一本非技术。</li>
-          <li><strong>在找</strong>愿意一起做产品的伙伴。</li>
-        </ul>
+
+        <ol class="routes">
+          {routes.map((route) => (
+            <li class="route">
+              <span class="route-no">{route.no}</span>
+              <span class="route-path">
+                <span>{route.from}</span>
+                <span class="route-arrow" aria-hidden="true">→</span>
+                <span>{route.to}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        <p class="note">
+          喜欢长途骑行。截至目前，骑行总里程已经突破 4000 公里。
+          骑长途最好的部分是：路只有一条，你只需要一直往前。
+        </p>
       </div>
 
       <div class="stat-card">
         <div class="stat">
-          <span>写下的文章</span>
-          <strong>{posts.length}</strong>
+          <span>长途线路</span>
+          <strong>3 条</strong>
         </div>
         <div class="stat">
-          <span>涉及主题</span>
-          <strong>{tags.length}</strong>
+          <span>累计里程</span>
+          <strong>4000<em>+</em></strong>
         </div>
         <div class="stat">
-          <span>开始于</span>
-          <strong>{SITE.startYear}</strong>
+          <span>出发地</span>
+          <strong class="stat-text">河南固始</strong>
         </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <span class="eyebrow">此刻</span>
+        <h2>现在在做什么</h2>
+      </div>
+      <ul class="now">
+        {now.map((item) => (
+          <li>
+            <strong>{item.label}</strong>
+            {item.text}
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <span class="eyebrow">内容</span>
+        <h2>你会在这里看到</h2>
+      </div>
+      <div class="topics">
+        {topics.map((topic, index) => (
+          <article class="topic">
+            <span class="topic-no">{String(index + 1).padStart(2, "0")}</span>
+            <h3>{topic.title}</h3>
+            <p>{topic.text}</p>
+          </article>
+        ))}
       </div>
     </section>
 
     <section class="contact">
       <div>
         <h2>有想法，欢迎来信</h2>
-        <p>无论是文章里的错误、合作的可能，还是单纯想聊聊，我都会认真回复。</p>
+        <p>不管是纠正一个错误、约一次骑行，还是单纯想聊两句，我都会认真回复。</p>
       </div>
       <div class="contact-actions">
         <a class="btn btn--solid" href={`mailto:${SITE.email}`}>
@@ -210,7 +215,7 @@ const stack = [
   }
 
   .intro {
-    max-width: 42em;
+    max-width: 40em;
     padding: 40px 0 10px;
   }
 
@@ -239,114 +244,65 @@ const stack = [
     font-size: 24px;
   }
 
-  .timeline {
-    list-style: none;
-    margin: 28px 0 0;
-    padding: 0;
-    display: grid;
-    gap: 4px;
-  }
-
-  .timeline li {
-    display: grid;
-    grid-template-columns: 74px 1fr;
-    gap: 20px;
-    padding: 16px 0;
-    border-bottom: 1px dashed var(--line);
-  }
-
-  .timeline .year {
-    font-family: var(--font-mono);
-    font-size: 12.5px;
-    color: var(--accent-ink);
-    padding-top: 4px;
-  }
-
-  .timeline h3 {
-    font-size: 16.5px;
-  }
-
-  .timeline p {
-    margin: 6px 0 0;
-    color: var(--muted);
-    font-size: 13.5px;
-    line-height: 1.85;
-    max-width: 40em;
-  }
-
-  .stack {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 18px;
-    margin-top: 26px;
-  }
-
-  .stack-group {
-    padding: 20px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface);
-  }
-
-  .stack-group h3 {
-    font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
-
-  .stack-group ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 8px;
-    font-size: 13.5px;
-    color: var(--ink-2);
-  }
+  /* ---------- 骑行路线 ---------- */
 
   .split {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 260px;
-    gap: 40px;
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 44px;
     align-items: start;
   }
 
-  .now {
+  .routes {
     list-style: none;
-    margin: 24px 0 0;
+    margin: 26px 0 0;
     padding: 0;
     display: grid;
+    gap: 2px;
+  }
+
+  .route {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  .route:first-child {
+    border-top: 1px dashed var(--line);
+  }
+
+  .route-no {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--accent-ink);
+    opacity: 0.85;
+  }
+
+  .route-path {
+    display: flex;
+    align-items: center;
     gap: 12px;
-  }
-
-  .now li {
-    font-size: 13.5px;
-    line-height: 1.85;
-    color: var(--ink-2);
-    padding-left: 18px;
-    position: relative;
-  }
-
-  .now li::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0.62em;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--accent);
-    opacity: 0.55;
-  }
-
-  .now strong {
+    font-family: var(--font-serif);
+    font-size: 18px;
     color: var(--ink);
-    margin-right: 8px;
-    font-weight: 600;
+  }
+
+  .route-arrow {
+    color: var(--accent);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    opacity: 0.7;
+  }
+
+  .note {
+    margin: 20px 0 0;
+    font-size: 13.5px;
+    line-height: 1.95;
+    color: var(--muted);
+    max-width: 40em;
   }
 
   .stat-card {
@@ -362,6 +318,7 @@ const stack = [
     display: flex;
     align-items: baseline;
     justify-content: space-between;
+    gap: 12px;
     padding: 16px 18px;
     background: var(--surface);
   }
@@ -376,7 +333,93 @@ const stack = [
     font-family: var(--font-serif);
     font-size: 24px;
     font-weight: 600;
+    white-space: nowrap;
   }
+
+  .stat strong em {
+    font-style: normal;
+    font-size: 14px;
+    color: var(--accent);
+    margin-left: 1px;
+  }
+
+  .stat strong.stat-text {
+    font-size: 17px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- 现在 / 内容 ---------- */
+
+  .now {
+    list-style: none;
+    margin: 24px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+    max-width: 42em;
+  }
+
+  .now li {
+    font-size: 13.5px;
+    line-height: 1.9;
+    color: var(--ink-2);
+    padding-left: 18px;
+    position: relative;
+  }
+
+  .now li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.72em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.55;
+  }
+
+  .now strong {
+    color: var(--ink);
+    margin-right: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .topics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 26px;
+  }
+
+  .topic {
+    padding: 22px 22px 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .topic-no {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    opacity: 0.7;
+  }
+
+  .topic h3 {
+    margin: 10px 0 0;
+    font-size: 17px;
+  }
+
+  .topic p {
+    margin: 10px 0 0;
+    font-size: 13px;
+    line-height: 1.9;
+    color: var(--muted);
+  }
+
+  /* ---------- 联系 ---------- */
 
   .contact {
     display: flex;
@@ -384,7 +427,7 @@ const stack = [
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    margin-top: 20px;
+    margin-top: 8px;
     padding: 36px 38px;
     border-radius: 20px;
     border: 1px solid var(--line);
@@ -427,9 +470,12 @@ const stack = [
     .hero-side {
       display: none;
     }
-    .stack,
-    .split {
+    .split,
+    .topics {
       grid-template-columns: 1fr;
+    }
+    .stat-card {
+      margin-top: 6px;
     }
     .contact {
       padding: 26px 22px;

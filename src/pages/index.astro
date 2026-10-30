@@ -25,8 +25,8 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
           <em>才算真的想清楚。</em>
         </h1>
         <p class="lede">
-          你好，我是{SITE.author}，{SITE.role}。这里存放我对技术的追问、做过的项目，
-          以及那些反复咀嚼后仍觉得值得记录的想法。
+          你好，我是{SITE.author}，大连理工大学的学生，河南固始人。
+          喜欢骑行，正在用 AI 搭自己的网站——这里记录我的日常、学习，和一些还没想透的问题。
         </p>
 
         <div class="hero-actions">
@@ -37,20 +37,26 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
           <a class="btn" href="/about/">关于我</a>
         </div>
 
-        <dl class="stats">
-          <div>
-            <dt>文章</dt>
-            <dd>{posts.length}<span>篇</span></dd>
-          </div>
-          <div>
-            <dt>标签</dt>
-            <dd>{collectTags(posts).length}<span>个</span></dd>
-          </div>
-          <div>
-            <dt>阅读时长</dt>
-            <dd>{totalMinutes}<span>分钟</span></dd>
-          </div>
-        </dl>
+        {posts.length > 0 ? (
+          <dl class="stats">
+            <div>
+              <dt>文章</dt>
+              <dd>{posts.length}<span>篇</span></dd>
+            </div>
+            <div>
+              <dt>标签</dt>
+              <dd>{collectTags(posts).length}<span>个</span></dd>
+            </div>
+            <div>
+              <dt>阅读时长</dt>
+              <dd>{totalMinutes}<span>分钟</span></dd>
+            </div>
+          </dl>
+        ) : (
+          <p class="hero-hint">
+            第一批文章正在路上。想先认识我，可以看 <a href="/about/">关于我</a>。
+          </p>
+        )}
       </div>
 
       <aside class="hero-aside rise" style="animation-delay:.12s">
@@ -61,16 +67,16 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
           </div>
           <ul class="now-list">
             <li>
-              <span class="now-tag">学习</span>
-              用 Astro 重写这个站点，把内容层和渲染层拆开。
+              <span class="now-tag">在做</span>
+              用 AI 搭自己的博客和各种网站，边做边学。
             </li>
             <li>
-              <span class="now-tag">阅读</span>
-              《重构》第三遍，这次配合真实项目做笔记。
+              <span class="now-tag">在学</span>
+              AI，还在很前面的阶段，欢迎指导。
             </li>
             <li>
-              <span class="now-tag">习惯</span>
-              每周至少写一篇，不为流量，只为把想法钉住。
+              <span class="now-tag">在骑</span>
+              骑行总里程已过 4000 公里，有空就想找条新路线。
             </li>
           </ul>
           {lastUpdated && (
@@ -126,7 +132,13 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
           <PostCard post={post} index={i} />
         ))}
         {latest.length === 0 && (
-          <p class="empty">还没有更多文章，去 <a href="/blog/">文章归档</a> 看看。</p>
+          <p class="empty">
+            {posts.length === 0 ? (
+              "还没有文章。第一篇正在路上，写完就会出现在这里。"
+            ) : (
+              <>还没有更多文章，去 <a href="/blog/">文章归档</a> 看看。</>
+            )}
+          </p>
         )}
       </div>
     </div>
@@ -166,15 +178,15 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
           <span class="eyebrow">关于</span>
           <h2>一个喜欢把东西做出来的人</h2>
           <p>
-            我在意两件事：把复杂的问题讲清楚，和把想做的事情真正做完。
-            这个博客是我的工作台角落——不追热点，只记录那些经得起回看的思考。
+            在豫南的固始长大，现在在大连读书。喜欢长途骑行，也在研究 AI——
+            喜欢亲手做过之后才真正理解的感觉。
           </p>
           <a class="btn" href="/about/">读完整介绍 <Icon name="arrow-right" size={14} /></a>
         </div>
         <ul class="about-facts">
-          <li><span>坐标</span>中国 · 在校学生</li>
-          <li><span>在做</span>独立开发 / 前端工程</li>
-          <li><span>工具</span>Astro · TypeScript · Supabase</li>
+          <li><span>坐标</span>大连 · 在校学生</li>
+          <li><span>家乡</span>河南固始</li>
+          <li><span>爱好</span>骑行 · AI 建站</li>
           <li><span>邮箱</span>{SITE.email}</li>
         </ul>
       </div>
@@ -257,6 +269,23 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
     margin: 42px 0 0;
     padding-top: 24px;
     border-top: 1px solid var(--line);
+  }
+
+  .hero-hint {
+    margin: 38px 0 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+    line-height: 1.9;
+    color: var(--muted);
+    max-width: 34em;
+  }
+
+  .hero-hint a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
   }
 
   .stats dt {

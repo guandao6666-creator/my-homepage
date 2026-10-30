@@ -5,10 +5,10 @@ export const SITE = {
   name: "管道的博客",
   author: "管道",
   handle: "guandao",
-  role: "学生 · 独立开发者",
+  role: "大连理工大学 · 学生",
   tagline: "记录好奇，持续创造。",
   description:
-    "管道的个人博客 —— 记录技术探索、学习笔记、独立开发与生活中的长期思考。",
+    "管道的个人博客 —— 大连理工大学学生，河南固始人。记录日常、学习与思考，也记录骑过的路。",
   url: "https://guandao.xin",
   locale: "zh-CN",
   email: "hi@guandao.xin",
