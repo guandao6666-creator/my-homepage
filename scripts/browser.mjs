@@ -210,6 +210,35 @@ if (cmd === "shot") {
     awaitPromise: true,
   });
   console.log(JSON.stringify(result.value ?? result.description ?? null));
+} else if (cmd === "realtype") {
+  // 真实点击 + 真实键盘输入：有些受控表单（React）不认直接改 value，
+  // 只认真正的输入事件。用法：realtype "<selector>" "<text>"
+  const selector = args[0];
+  const value = args.slice(1).join(" ");
+  const box = await cdp.send("Runtime.evaluate", {
+    expression: `(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) return null;
+      el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    })()`,
+    returnByValue: true,
+  });
+  if (!box.result?.value) {
+    console.log("not found:", selector);
+  } else {
+    const { x, y } = box.result.value;
+    for (const type of ["mousePressed", "mouseReleased"]) {
+      await cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+    }
+    await sleep(150);
+    // 清空已有内容
+    await cdp.send("Runtime.evaluate", { expression: "document.execCommand('selectAll')" });
+    await cdp.send("Input.insertText", { text: value });
+    await sleep(200);
+    console.log("realtyped:", selector, "->", value);
+  }
 } else if (cmd === "key") {
   // 发送真实键盘事件，例如 key "Control+Enter"
   const combo = args[0] || "";

@@ -1004,7 +1004,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
         toast("已创建");
       }
       renderRows();
-      toast("保存成功，重新构建站点即可发布");
+      toast(payload.published ? "已保存，约 10 分钟内自动上线" : "已保存为草稿");
     } catch (error) {
       editorError.textContent = (error as Error).message;
       editorError.hidden = false;

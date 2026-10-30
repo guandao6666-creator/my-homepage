@@ -1,0 +1,48 @@
+name: Auto publish
+
+# 后台保存文章 → 数据库变化 → 这里自动同步并提交 → Cloudflare 收到推送后构建上线。
+# 之所以不让浏览器直接触发构建：Cloudflare 的静态资源型 Worker 不支持 Deploy Hook。
+
+on:
+  schedule:
+    # 每 10 分钟检查一次云端是否有新内容（GitHub 的定时任务可能延迟几分钟）
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-publish
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # 同步脚本只用 Node 内置模块，不需要 npm ci
+      - name: 从云端同步文章
+        env:
+          SUPABASE_URL: https://mkcnftjhftpiofnhenjf.supabase.co
+          SUPABASE_ANON_KEY: sb_publishable_swd8og5pj-HV_AvGD087Ag_AIaWr5Yn
+        run: node scripts/sync-content.mjs --soft
+
+      - name: 有变化就提交
+        run: |
+          git config user.name "guandao-publisher"
+          git config user.email "guandao6666@gmail.com"
+          # 新文章是未跟踪文件、下架文章是删除，都要纳入
+          git add -A -- src/content/blog
+          if git diff --cached --quiet; then
+            echo "云端内容无变化，跳过"
+            exit 0
+          fi
+          git commit -m "chore: 自动同步云端文章"
+          git push
+          echo "已提交并推送，Cloudflare 将据此重新构建"
