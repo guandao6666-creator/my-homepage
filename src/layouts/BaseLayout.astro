@@ -1,8 +1,11 @@
 ---
 import "../styles/global.css";
 import { SITE } from "../lib/site";
+import { cloudConfig } from "../lib/cloud";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
+
+const cloud = cloudConfig();
 
 interface Props {
   title?: string;
@@ -43,7 +46,12 @@ const fullJsonLd = jsonLd
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-theme="light">
+<html
+  lang="zh-CN"
+  data-theme="light"
+  data-sb-url={cloud?.url ?? ""}
+  data-sb-key={cloud?.anonKey ?? ""}
+>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -117,6 +125,34 @@ const fullJsonLd = jsonLd
           } catch {}
           sync();
         });
+      })();
+    </script>
+
+    <script>
+      // 给文章卡片补上「N 条留言」：评论存在云端，构建期拿不到，只能运行时补齐
+      (() => {
+        const targets = document.querySelectorAll("[data-cmt]");
+        if (!targets.length) return;
+        const root = document.documentElement;
+        const url = (root.dataset.sbUrl || "").replace(/\/$/, "");
+        const key = root.dataset.sbKey || "";
+        if (!url || !key) return;
+
+        fetch(`${url}/rest/v1/comments?select=post_slug&limit=2000`, { headers: { apikey: key } })
+          .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+          .then((rows) => {
+            const counts = new Map();
+            for (const row of rows) {
+              counts.set(row.post_slug, (counts.get(row.post_slug) ?? 0) + 1);
+            }
+            for (const el of targets) {
+              const n = counts.get(el.dataset.cmt ?? "") ?? 0;
+              if (!n) continue;
+              el.textContent = `${n} 条留言`;
+              el.hidden = false;
+            }
+          })
+          .catch(() => undefined);
       })();
     </script>
   </body>
