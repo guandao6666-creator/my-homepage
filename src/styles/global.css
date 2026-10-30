@@ -383,9 +383,12 @@ a.pill:hover,
 }
 
 .prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  margin-inline: auto;
+  margin: 1.8em auto;
 }
 
 .prose hr {
