@@ -1,0 +1,59 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Icon from "../components/Icon.astro";
+---
+
+<BaseLayout title="页面走丢了" description="你访问的页面不存在。" noindex>
+  <section class="notfound">
+    <div class="wrap">
+      <p class="code" aria-hidden="true">404</p>
+      <h1>这页还没有被写出来</h1>
+      <p class="desc">
+        链接可能已经失效，或者我还没把这篇写完。要不回到起点，重新找找？
+      </p>
+      <div class="actions">
+        <a class="btn btn--solid" href="/">回到首页 <Icon name="arrow-right" size={14} /></a>
+        <a class="btn" href="/blog/">浏览文章</a>
+        <a class="btn" href="/tags/">标签归档</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .notfound {
+    padding: 110px 0 80px;
+    text-align: center;
+  }
+
+  .code {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(80px, 16vw, 150px);
+    line-height: 1;
+    color: var(--accent);
+    opacity: 0.18;
+    letter-spacing: -0.04em;
+  }
+
+  h1 {
+    margin: 8px 0 0;
+    font-size: clamp(26px, 4vw, 34px);
+  }
+
+  .desc {
+    max-width: 30em;
+    margin: 16px auto 0;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.9;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 32px;
+  }
+</style>

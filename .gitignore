@@ -22,3 +22,15 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# 本地视觉质检产物
+.shots/
+
+# 本地 npm 缓存（受限于本机沙箱，安装依赖时指定到项目内）
+.npm-cache/
+
+# 本地助手工作数据
+.learnbuddy/
+
+# 内容同步清单（由 scripts/sync-content.mjs 生成）
+src/content/blog/.sync-manifest.json

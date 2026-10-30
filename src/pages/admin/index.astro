@@ -1,0 +1,1077 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Icon from "../../components/Icon.astro";
+---
+
+<BaseLayout title="写作后台" description="文章管理后台" noindex>
+  <div class="admin wrap">
+    <header class="admin-bar">
+      <div class="admin-id">
+        <span class="admin-mark" aria-hidden="true">管</span>
+        <div>
+          <h1>写作后台</h1>
+          <p id="who">正在检查会话…</p>
+        </div>
+      </div>
+      <div class="admin-actions">
+        <a class="btn" href="/">查看站点</a>
+        <button class="btn" id="logout" type="button" hidden>退出登录</button>
+      </div>
+    </header>
+
+    <!-- ========== 未配置 ========== -->
+    <section class="panel setup" id="panel-setup" hidden>
+      <div class="setup-head">
+        <span class="tag-warn">未连接云端</span>
+        <h2>先配置 Supabase，后台才会解锁</h2>
+        <p>
+          本站的「云端数据库 + 云端存储 + 登录认证」全部基于 Supabase（Postgres / Auth / Storage）。
+          在项目根目录创建 <code>.env</code>，填入下面三项后重新启动开发服务器或重新构建：
+        </p>
+      </div>
+
+      <pre class="code"><code>PUBLIC_SUPABASE_URL=https://你的项目.supabase.co
+PUBLIC_SUPABASE_ANON_KEY=你的_anon_key
+PUBLIC_SUPABASE_BUCKET=blog-media
+SUPABASE_URL=https://你的项目.supabase.co
+SUPABASE_ANON_KEY=你的_anon_key</code></pre>
+
+      <p class="setup-note">
+        <Icon name="layers" size={14} />
+        建表 SQL 与 Storage 策略已放在 <code>supabase/schema.sql</code>，在 Supabase SQL Editor 中执行一次即可。
+      </p>
+      <p class="setup-note">
+        <Icon name="lock" size={14} />
+        数据库已开启 RLS：匿名用户只能读已发布文章，写操作必须登录通过认证。
+      </p>
+    </section>
+
+    <!-- ========== 登录 ========== -->
+    <section class="panel login" id="panel-login" hidden>
+      <form id="login-form" novalidate>
+        <span class="eyebrow">Sign in</span>
+        <h2>登录后开始写作</h2>
+        <p class="login-sub">使用 Supabase Auth 中创建的账号登录，会话保存在本地。</p>
+
+        <label>
+          <span>邮箱</span>
+          <input type="email" id="email" name="email" autocomplete="username" required placeholder="you@example.com" />
+        </label>
+
+        <label>
+          <span>密码</span>
+          <input type="password" id="password" name="password" autocomplete="current-password" required placeholder="••••••••" />
+        </label>
+
+        <p class="form-error" id="login-error" role="alert" hidden></p>
+
+        <button class="btn btn--solid submit" type="submit" id="login-submit">
+          <Icon name="lock" size={14} />
+          登录
+        </button>
+      </form>
+    </section>
+
+    <!-- ========== 控制台 ========== -->
+    <section class="panel dash" id="panel-dash" hidden>
+      <div class="dash-grid">
+        <aside class="list-pane">
+          <div class="list-head">
+            <span>文章 <em id="post-count">0</em></span>
+            <button class="mini" id="new-post" type="button">+ 新建</button>
+          </div>
+          <div class="list-body" id="post-rows">
+            <p class="list-empty">加载中…</p>
+          </div>
+        </aside>
+
+        <div class="editor-pane">
+          <form id="editor" autocomplete="off">
+            <div class="editor-head">
+              <span class="state" id="editor-state">新建文章</span>
+              <div class="editor-tools">
+                <button class="mini" type="button" id="toggle-preview">预览</button>
+                <button class="mini" type="button" id="insert-media">插入图片/附件</button>
+              </div>
+            </div>
+
+            <input class="title-input" id="f-title" placeholder="在这里写下标题…" required />
+
+            <div class="field-row">
+              <label class="field">
+                <span>Slug（URL 标识）</span>
+                <input id="f-slug" placeholder="my-first-post" />
+              </label>
+              <label class="field">
+                <span>发布日期</span>
+                <input id="f-date" type="date" />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>摘要（用于列表与 SEO）</span>
+              <textarea id="f-desc" rows="2" placeholder="一句话说清这篇在讲什么…"></textarea>
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>标签（逗号分隔）</span>
+                <input id="f-tags" placeholder="技术, Astro, 随笔" />
+              </label>
+              <div class="field switches">
+                <span>状态</span>
+                <label class="switch"><input type="checkbox" id="f-published" /> 已发布</label>
+                <label class="switch"><input type="checkbox" id="f-featured" /> 精选</label>
+              </div>
+            </div>
+
+            <div class="markdown-wrap">
+              <textarea id="f-content" class="markdown" rows="18" placeholder="支持 Markdown：# 标题、**加粗**、`代码`、- 列表、> 引用、```代码块```"></textarea>
+              <div class="preview" id="preview" hidden></div>
+            </div>
+
+            <p class="form-error" id="editor-error" role="alert" hidden></p>
+
+            <div class="editor-foot">
+              <span class="hint" id="save-hint">⌘/Ctrl + S 保存</span>
+              <div class="foot-actions">
+                <button class="mini danger" type="button" id="delete-post" hidden>删除</button>
+                <button class="btn btn--solid" type="submit" id="save-post">
+                  <Icon name="check" size={14} />
+                  保存文章
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <input type="file" id="file-input" hidden />
+  </div>
+
+
+<style>
+  .admin {
+    padding-block: 34px 60px;
+  }
+
+  .admin-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .admin-id {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .admin-mark {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-serif);
+    font-size: 18px;
+  }
+
+  .admin-bar h1 {
+    font-size: 18px;
+    font-family: var(--font-sans);
+    font-weight: 650;
+    letter-spacing: 0;
+  }
+
+  .admin-bar p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .admin-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ---------------- panels ---------------- */
+  .panel {
+    margin-top: 30px;
+  }
+
+  /* setup */
+  .setup {
+    max-width: 720px;
+    padding: 30px 32px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .tag-warn {
+    display: inline-block;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #a4552c;
+    background: #fdf1e7;
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+
+  [data-theme="dark"] .tag-warn {
+    background: #3a2618;
+    color: #e8b58a;
+  }
+
+  .setup h2 {
+    margin: 14px 0 10px;
+    font-size: 22px;
+  }
+
+  .setup p {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.9;
+    color: var(--ink-2);
+  }
+
+  .code {
+    margin: 18px 0;
+    padding: 16px 18px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.9;
+    overflow-x: auto;
+    color: var(--accent-ink);
+  }
+
+  .setup-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 12px !important;
+    color: var(--muted) !important;
+    font-size: 12.5px !important;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--surface-sunk);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* login */
+  .login {
+    display: grid;
+    place-items: center;
+    padding: 40px 0;
+  }
+
+  .login form {
+    width: 100%;
+    max-width: 380px;
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .login h2 {
+    margin: 12px 0 6px;
+    font-size: 22px;
+  }
+
+  .login-sub {
+    margin: 0 0 22px;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  label {
+    display: block;
+  }
+
+  .login label span,
+  .field > span {
+    display: block;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 7px;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="date"],
+  input:not([type]),
+  textarea {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  }
+
+  input:focus,
+  textarea:focus {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .login label + label {
+    margin-top: 14px;
+  }
+
+  .submit {
+    width: 100%;
+    justify-content: center;
+    margin-top: 20px;
+  }
+
+  .form-error {
+    margin: 14px 0 0;
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: #fdeeee;
+    color: #a33232;
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+
+  [data-theme="dark"] .form-error {
+    background: #3a1e1e;
+    color: #f0a5a5;
+  }
+
+  /* dash */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 26px;
+    align-items: start;
+  }
+
+  .list-pane {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .list-head em {
+    font-style: normal;
+    font-family: var(--font-mono);
+  }
+
+  .list-body {
+    max-height: 620px;
+    overflow-y: auto;
+  }
+
+  .list-empty {
+    padding: 22px 14px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .post-row {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    border: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    transition: background-color 0.18s var(--ease);
+  }
+
+  .post-row:hover {
+    background: var(--surface-sunk);
+  }
+
+  .post-row.active {
+    background: var(--accent-wash);
+  }
+
+  .post-row strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 1.5;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .post-row span {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+
+  .dot-status {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    margin-right: 5px;
+    background: #45a06a;
+  }
+
+  .dot-status.draft {
+    background: var(--line-strong);
+  }
+
+  .mini {
+    padding: 4px 9px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--paper);
+    font-size: 11.5px;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all 0.18s var(--ease);
+  }
+
+  .mini:hover {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .mini.danger {
+    color: #a33232;
+    border-color: color-mix(in srgb, #a33232 30%, var(--line));
+  }
+
+  .editor-pane form {
+    padding: 22px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .state {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .editor-tools {
+    display: flex;
+    gap: 6px;
+  }
+
+  .title-input {
+    border: 0 !important;
+    border-bottom: 1px solid var(--line) !important;
+    border-radius: 0 !important;
+    padding: 6px 0 12px !important;
+    font-family: var(--font-serif) !important;
+    font-size: 26px !important;
+    font-weight: 600;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .title-input::placeholder {
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .field {
+    margin-top: 16px;
+  }
+
+  .field-row .field {
+    margin-top: 0;
+  }
+
+  .field textarea {
+    resize: vertical;
+  }
+
+  .switches {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .switches > span {
+    display: block;
+    width: 100%;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0;
+  }
+
+  .switch {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+
+  .switch input {
+    accent-color: var(--accent);
+  }
+
+  .markdown-wrap {
+    margin-top: 18px;
+  }
+
+  .markdown {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.85;
+    resize: vertical;
+    min-height: 320px;
+  }
+
+  .preview {
+    min-height: 320px;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    font-size: 14px;
+    line-height: 1.9;
+    overflow-y: auto;
+    max-height: 520px;
+  }
+
+  .preview h1,
+  .preview h2,
+  .preview h3 {
+    margin: 1.2em 0 0.5em;
+  }
+
+  .preview h1 { font-size: 1.5em; }
+  .preview h2 { font-size: 1.3em; }
+  .preview h3 { font-size: 1.1em; }
+
+  .preview pre {
+    background: var(--surface-sunk);
+    padding: 12px 14px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 12.5px;
+  }
+
+  .preview code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  .preview blockquote {
+    margin: 1em 0;
+    padding-left: 14px;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+  }
+
+  .preview img {
+    border-radius: 8px;
+  }
+
+  .editor-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .hint {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .foot-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .busy {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 13px;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+    z-index: 200;
+    pointer-events: none;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+
+  @media (max-width: 860px) {
+    .dash-grid {
+      grid-template-columns: 1fr;
+    }
+    .list-body {
+      max-height: 240px;
+    }
+    .field-row {
+      grid-template-columns: 1fr;
+    }
+    .title-input {
+      font-size: 21px !important;
+    }
+  }
+</style>
+
+<script>
+  import {
+    cloudConfig,
+    signIn,
+    signOut,
+    loadSession,
+    listCloudPosts,
+    createCloudPost,
+    updateCloudPost,
+    deleteCloudPost,
+    uploadToCloud,
+    type CloudPost,
+  } from "../../lib/cloud";
+
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  const panels = {
+    setup: $("panel-setup"),
+    login: $("panel-login"),
+    dash: $("panel-dash"),
+  };
+
+  const who = $("who");
+  const logoutBtn = $<HTMLButtonElement>("logout");
+  const rows = $("post-rows");
+  const postCount = $("post-count");
+
+  let posts: CloudPost[] = [];
+  let editingId: string | null = null;
+  let previewing = false;
+
+  function show(name: keyof typeof panels) {
+    for (const [key, el] of Object.entries(panels)) {
+      el.hidden = key !== name;
+    }
+  }
+
+  function toast(message: string) {
+    let el = document.querySelector(".toast") as HTMLElement | null;
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "toast";
+      document.body.appendChild(el);
+    }
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout((el as any)._timer);
+    (el as any)._timer = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+
+  function slugify(input: string) {
+    return input
+      .trim()
+      .toLowerCase()
+      .replace(/[^\w\u4e00-\u9fa5-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  /* ---------------------------- boot ---------------------------- */
+
+  function boot() {
+    if (!cloudConfig()) {
+      show("setup");
+      who.textContent = "未连接云端数据库";
+      return;
+    }
+    const session = loadSession();
+    if (!session) {
+      show("login");
+      who.textContent = "请先登录";
+      return;
+    }
+    who.textContent = session.email;
+    logoutBtn.hidden = false;
+    show("dash");
+    void refresh();
+  }
+
+  /* ---------------------------- login --------------------------- */
+
+  const loginForm = $<HTMLFormElement>("login-form");
+  const loginError = $("login-error");
+  const loginSubmit = $<HTMLButtonElement>("login-submit");
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    loginError.hidden = true;
+    loginSubmit.classList.add("busy");
+    loginSubmit.textContent = "登录中…";
+    try {
+      const session = await signIn(
+        $<HTMLInputElement>("email").value.trim(),
+        $<HTMLInputElement>("password").value,
+      );
+      who.textContent = session.email;
+      logoutBtn.hidden = false;
+      show("dash");
+      await refresh();
+    } catch (error) {
+      loginError.textContent = (error as Error).message;
+      loginError.hidden = false;
+    } finally {
+      loginSubmit.classList.remove("busy");
+      loginSubmit.textContent = "登录";
+    }
+  });
+
+  logoutBtn.addEventListener("click", async () => {
+    await signOut();
+    location.reload();
+  });
+
+  /* --------------------------- post list ------------------------ */
+
+  async function refresh() {
+    rows.innerHTML = '<p class="list-empty">加载中…</p>';
+    try {
+      posts = await listCloudPosts();
+      renderRows();
+    } catch (error) {
+      rows.innerHTML = `<p class="list-empty">加载失败：${(error as Error).message}</p>`;
+    }
+  }
+
+  function renderRows() {
+    postCount.textContent = String(posts.length);
+    if (!posts.length) {
+      rows.innerHTML = '<p class="list-empty">还没有文章，点「新建」写第一篇。</p>';
+      return;
+    }
+    rows.innerHTML = posts
+      .map(
+        (post) => `
+        <button class="post-row ${post.id === editingId ? "active" : ""}" data-id="${post.id}" type="button">
+          <strong>${escapeHtml(post.title || "（无标题）")}</strong>
+          <span><i class="dot-status ${post.published ? "" : "draft"}"></i>${post.published ? "已发布" : "草稿"} · ${(post.pub_date || "").slice(0, 10)}</span>
+        </button>`,
+      )
+      .join("");
+
+    for (const button of rows.querySelectorAll<HTMLButtonElement>(".post-row")) {
+      button.addEventListener("click", () => {
+        const post = posts.find((item) => item.id === button.dataset.id);
+        if (post) loadIntoEditor(post);
+      });
+    }
+  }
+
+  function escapeHtml(text: string) {
+    return String(text).replace(/[&<>"]/g, (ch) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string,
+    );
+  }
+
+  /* ---------------------------- editor -------------------------- */
+
+  const fields = {
+    title: $<HTMLInputElement>("f-title"),
+    slug: $<HTMLInputElement>("f-slug"),
+    date: $<HTMLInputElement>("f-date"),
+    desc: $<HTMLTextAreaElement>("f-desc"),
+    tags: $<HTMLInputElement>("f-tags"),
+    published: $<HTMLInputElement>("f-published"),
+    featured: $<HTMLInputElement>("f-featured"),
+    content: $<HTMLTextAreaElement>("f-content"),
+  };
+
+  const editorState = $("editor-state");
+  const deleteBtn = $<HTMLButtonElement>("delete-post");
+  const previewBox = $("preview");
+  const editorError = $("editor-error");
+
+  function resetForm() {
+    editingId = null;
+    fields.title.value = "";
+    fields.slug.value = "";
+    fields.date.value = new Date().toISOString().slice(0, 10);
+    fields.desc.value = "";
+    fields.tags.value = "";
+    fields.published.checked = false;
+    fields.featured.checked = false;
+    fields.content.value = "";
+    editorState.textContent = "新建文章";
+    deleteBtn.hidden = true;
+    editorError.hidden = true;
+    renderRows();
+    fields.title.focus();
+  }
+
+  function loadIntoEditor(post: CloudPost) {
+    editingId = post.id;
+    fields.title.value = post.title ?? "";
+    fields.slug.value = post.slug ?? "";
+    fields.date.value = (post.pub_date ?? "").slice(0, 10);
+    fields.desc.value = post.description ?? "";
+    fields.tags.value = (post.tags ?? []).join(", ");
+    fields.published.checked = Boolean(post.published);
+    fields.featured.checked = Boolean(post.featured);
+    fields.content.value = post.content ?? "";
+    editorState.textContent = "编辑文章";
+    deleteBtn.hidden = false;
+    editorError.hidden = true;
+    renderRows();
+  }
+
+  $("new-post").addEventListener("click", resetForm);
+
+  fields.title.addEventListener("input", () => {
+    if (!editingId && !fields.slug.dataset.touched) {
+      fields.slug.value = slugify(fields.title.value);
+    }
+  });
+  fields.slug.addEventListener("input", () => {
+    fields.slug.dataset.touched = "1";
+  });
+
+  /* ---------------------------- preview ------------------------- */
+
+  $("toggle-preview").addEventListener("click", () => {
+    previewing = !previewing;
+    previewBox.hidden = !previewing;
+    fields.content.style.display = previewing ? "none" : "block";
+    if (previewing) previewBox.innerHTML = miniMarkdown(fields.content.value);
+    $("toggle-preview").textContent = previewing ? "编辑" : "预览";
+  });
+
+  function miniMarkdown(source: string): string {
+    const blocks = source.replace(/\r\n/g, "\n").split(/\n{2,}/);
+    const inline = (text: string) =>
+      escapeHtml(text)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />');
+
+    return blocks
+      .map((block) => {
+        const trimmed = block.trim();
+        if (!trimmed) return "";
+        if (trimmed.startsWith("```")) {
+          const body = trimmed.replace(/^```[a-z]*\n?/, "").replace(/```$/, "");
+          return `<pre><code>${escapeHtml(body)}</code></pre>`;
+        }
+        if (/^###\s/.test(trimmed)) return `<h3>${inline(trimmed.slice(4))}</h3>`;
+        if (/^##\s/.test(trimmed)) return `<h2>${inline(trimmed.slice(3))}</h2>`;
+        if (/^#\s/.test(trimmed)) return `<h1>${inline(trimmed.slice(2))}</h1>`;
+        if (/^>\s?/.test(trimmed)) {
+          const body = trimmed.split("\n").map((line) => inline(line.replace(/^>\s?/, ""))).join("<br />");
+          return `<blockquote>${body}</blockquote>`;
+        }
+        if (/^[-*]\s/.test(trimmed)) {
+          const items = trimmed.split("\n").map((line) => `<li>${inline(line.replace(/^[-*]\s/, ""))}</li>`).join("");
+          return `<ul>${items}</ul>`;
+        }
+        if (/^\d+\.\s/.test(trimmed)) {
+          const items = trimmed.split("\n").map((line) => `<li>${inline(line.replace(/^\d+\.\s/, ""))}</li>`).join("");
+          return `<ol>${items}</ol>`;
+        }
+        return `<p>${inline(trimmed).replace(/\n/g, "<br />")}</p>`;
+      })
+      .join("\n");
+  }
+
+  /* ---------------------------- save ---------------------------- */
+
+  const editorForm = $<HTMLFormElement>("editor");
+  const saveBtn = $<HTMLButtonElement>("save-post");
+
+  async function save() {
+    editorError.hidden = true;
+    if (!fields.title.value.trim()) {
+      editorError.textContent = "标题不能为空。";
+      editorError.hidden = false;
+      fields.title.focus();
+      return;
+    }
+
+    const payload = {
+      title: fields.title.value.trim(),
+      slug: (fields.slug.value.trim() || slugify(fields.title.value)) as string,
+      description: fields.desc.value.trim(),
+      content: fields.content.value,
+      tags: fields.tags.value
+        .split(/[,，]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      published: fields.published.checked,
+      featured: fields.featured.checked,
+      pub_date: fields.date.value ? `${fields.date.value}T09:00:00+08:00` : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    saveBtn.classList.add("busy");
+    saveBtn.textContent = "保存中…";
+    try {
+      if (editingId) {
+        const [updated] = await updateCloudPost(editingId, payload);
+        posts = posts.map((post) => (post.id === editingId ? { ...post, ...updated } : post));
+        toast("已更新");
+      } else {
+        const [created] = await createCloudPost(payload);
+        posts = [created, ...posts];
+        editingId = created.id;
+        deleteBtn.hidden = false;
+        editorState.textContent = "编辑文章";
+        toast("已创建");
+      }
+      renderRows();
+      toast("保存成功，重新构建站点即可发布");
+    } catch (error) {
+      editorError.textContent = (error as Error).message;
+      editorError.hidden = false;
+    } finally {
+      saveBtn.classList.remove("busy");
+      saveBtn.textContent = "保存文章";
+    }
+  }
+
+  editorForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void save();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      void save();
+    }
+  });
+
+  deleteBtn.addEventListener("click", async () => {
+    if (!editingId) return;
+    if (!confirm("确定删除这篇文章？该操作不可撤销。")) return;
+    try {
+      await deleteCloudPost(editingId);
+      posts = posts.filter((post) => post.id !== editingId);
+      resetForm();
+      toast("已删除");
+    } catch (error) {
+      editorError.textContent = (error as Error).message;
+      editorError.hidden = false;
+    }
+  });
+
+  /* ---------------------------- upload -------------------------- */
+
+  const fileInput = $<HTMLInputElement>("file-input");
+
+  $("insert-media").addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const hint = $("save-hint");
+    const original = hint.textContent;
+    hint.textContent = `正在上传 ${file.name}…`;
+    try {
+      const { url } = await uploadToCloud(file, "uploads");
+      const isImage = file.type.startsWith("image/");
+      const snippet = isImage
+        ? `![${file.name.replace(/\.[^.]+$/, "")}](${url})`
+        : `[${file.name}](${url})`;
+      const textarea = fields.content;
+      const start = textarea.selectionStart ?? textarea.value.length;
+      textarea.value = `${textarea.value.slice(0, start)}\n${snippet}\n${textarea.value.slice(start)}`;
+      if (previewing) previewBox.innerHTML = miniMarkdown(textarea.value);
+      toast("已插入，记得保存文章");
+    } catch (error) {
+      editorError.textContent = (error as Error).message;
+      editorError.hidden = false;
+    } finally {
+      hint.textContent = original;
+      fileInput.value = "";
+    }
+  });
+
+  boot();
+</script>
+</BaseLayout>

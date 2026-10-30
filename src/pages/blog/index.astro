@@ -1,0 +1,347 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PostCard from "../../components/PostCard.astro";
+import Icon from "../../components/Icon.astro";
+import { getAllPosts, collectTags } from "../../lib/posts";
+import { SITE } from "../../lib/site";
+
+const posts = await getAllPosts();
+const tags = collectTags(posts);
+const years = [...new Set(posts.map((p) => new Date(p.pubDate).getUTCFullYear()))].sort((a, b) => b - a);
+
+const jsonLd = {
+  "@type": "Blog",
+  name: `${SITE.name} · 文章归档`,
+  url: `${SITE.url}/blog/`,
+  blogPost: posts.slice(0, 20).map((post) => ({
+    "@type": "BlogPosting",
+    headline: post.title,
+    datePublished: new Date(post.pubDate).toISOString(),
+    url: `${SITE.url}/blog/${post.slug}/`,
+  })),
+};
+---
+
+<BaseLayout
+  title="文章归档"
+  description={`${SITE.author}的全部文章，共 ${posts.length} 篇，涵盖技术实践、学习笔记与生活思考。`}
+  canonical="/blog/"
+  jsonLd={jsonLd}
+>
+  <section class="page-head">
+    <div class="wrap">
+      <span class="eyebrow">Archive · {posts.length} 篇</span>
+      <h1>全部文章</h1>
+      <p class="page-lede">
+        按时间倒序排列。可以用关键词搜索，或者用标签快速缩小范围。
+      </p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="toolbar">
+      <label class="search">
+        <Icon name="search" size={16} />
+        <input
+          type="search"
+          id="post-search"
+          placeholder="搜索标题、摘要或标签…"
+          autocomplete="off"
+          aria-label="搜索文章"
+        />
+        <kbd>/</kbd>
+      </label>
+
+      <div class="filters" id="tag-filters" role="group" aria-label="按标签筛选">
+        <button class="filter is-active" data-tag="" type="button">全部</button>
+        {tags.map((tag) => (
+          <button class="filter" data-tag={tag.tag} type="button">
+            {tag.tag}
+            <em>{tag.count}</em>
+          </button>
+        ))}
+      </div>
+    </div>
+
+    <p class="result-line">
+      <span id="result-count">{posts.length}</span> 篇文章
+      <span class="hint" id="filter-hint"></span>
+    </p>
+
+    <div class="post-list" id="post-list">
+      {posts.map((post, i) => (
+        <div
+          class="post-item"
+          data-search={`${post.title} ${post.description} ${post.tags.join(" ")}`.toLowerCase()}
+          data-tags={post.tags.join("|")}
+        >
+          <PostCard post={post} index={i} />
+        </div>
+      ))}
+    </div>
+
+    <div class="empty-state" id="empty-state" hidden>
+      <p>没有匹配的文章。</p>
+      <button class="btn" id="clear-filters" type="button">清除筛选条件</button>
+    </div>
+
+    <div class="year-note">
+      <span>归档年份</span>
+      {years.map((year) => <em>{year}</em>)}
+    </div>
+  </div>
+
+
+<script is:inline>
+  (() => {
+    const input = document.getElementById("post-search");
+    const filters = document.getElementById("tag-filters");
+    const items = [...document.querySelectorAll(".post-item")];
+    const counter = document.getElementById("result-count");
+    const hint = document.getElementById("filter-hint");
+    const empty = document.getElementById("empty-state");
+    const clear = document.getElementById("clear-filters");
+    if (!input || !filters) return;
+
+    let activeTag = "";
+    let query = "";
+
+    const apply = () => {
+      let visible = 0;
+      for (const item of items) {
+        const haystack = item.dataset.search || "";
+        const tags = (item.dataset.tags || "").split("|").filter(Boolean);
+        const matchQuery = !query || haystack.includes(query);
+        const matchTag = !activeTag || tags.includes(activeTag);
+        const show = matchQuery && matchTag;
+        item.hidden = !show;
+        if (show) visible += 1;
+      }
+      counter.textContent = String(visible);
+      empty.hidden = visible !== 0;
+      hint.textContent =
+        activeTag || query
+          ? `· 已筛选${activeTag ? `「${activeTag}」` : ""}${query ? ` 关键词「${query}」` : ""}`
+          : "";
+    };
+
+    input.addEventListener("input", () => {
+      query = input.value.trim().toLowerCase();
+      apply();
+    });
+
+    filters.addEventListener("click", (event) => {
+      const button = event.target.closest(".filter");
+      if (!button) return;
+      activeTag = button.dataset.tag || "";
+      for (const chip of filters.querySelectorAll(".filter")) {
+        chip.classList.toggle("is-active", chip === button);
+      }
+      apply();
+    });
+
+    clear?.addEventListener("click", () => {
+      input.value = "";
+      query = "";
+      activeTag = "";
+      for (const chip of filters.querySelectorAll(".filter")) {
+        chip.classList.toggle("is-active", chip.dataset.tag === "");
+      }
+      apply();
+      input.focus();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "/" && document.activeElement !== input) {
+        event.preventDefault();
+        input.focus();
+      }
+    });
+  })();
+</script>
+
+<style>
+  .page-head {
+    padding: 58px 0 34px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .page-head h1 {
+    margin: 14px 0 12px;
+    font-size: clamp(34px, 5vw, 46px);
+    letter-spacing: -0.03em;
+  }
+
+  .page-lede {
+    margin: 0;
+    max-width: 40em;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.9;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 26px 0 4px;
+  }
+
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex: 1 1 260px;
+    max-width: 340px;
+    padding: 0 12px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  }
+
+  .search:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--ink);
+    outline: none;
+    padding: 0;
+  }
+
+  .search input::placeholder {
+    color: var(--muted);
+  }
+
+  .search kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 5px;
+    color: var(--muted);
+    background: var(--surface-sunk);
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    flex: 1 1 auto;
+  }
+
+  .filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+  }
+
+  .filter em {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+    padding: 3px 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 9%, transparent);
+    opacity: 0.8;
+  }
+
+  .filter:hover {
+    color: var(--ink);
+    background: var(--surface-sunk);
+  }
+
+  .filter.is-active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+
+  [data-theme="dark"] .filter.is-active {
+    background: var(--accent-wash);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--accent-ink);
+  }
+
+  .result-line {
+    margin: 18px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  .result-line .hint {
+    margin-left: 6px;
+    color: var(--accent-ink);
+  }
+
+  .post-list {
+    margin-top: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .empty-state {
+    padding: 48px 0;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .empty-state p {
+    margin: 0 0 16px;
+  }
+
+  .year-note {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 34px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  .year-note span {
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+  }
+
+  .year-note em {
+    font-style: normal;
+    font-family: var(--font-mono);
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+
+  @media (max-width: 640px) {
+    .page-head {
+      padding-top: 40px;
+    }
+    .search {
+      max-width: none;
+      flex-basis: 100%;
+    }
+  }
+</style>
+</BaseLayout>

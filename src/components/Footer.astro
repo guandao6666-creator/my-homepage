@@ -1,0 +1,167 @@
+---
+import { SITE } from "../lib/site";
+import Icon from "./Icon.astro";
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">管</span>
+        <span>{SITE.name}</span>
+      </a>
+      <p>{SITE.tagline}<br />用长期主义，记录每一次微小的进步。</p>
+    </div>
+
+    <nav class="footer-links" aria-label="页脚导航">
+      <div>
+        <h3>导航</h3>
+        <a href="/blog/">全部文章</a>
+        <a href="/tags/">标签归档</a>
+        <a href="/about/">关于我</a>
+      </div>
+      <div>
+        <h3>订阅</h3>
+        <a href="/rss.xml">RSS 订阅</a>
+        <a href="/sitemap-index.xml">站点地图</a>
+        <a href="/admin/">写作后台</a>
+      </div>
+      <div>
+        <h3>联系</h3>
+        <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
+        {SITE.socials.map((item) => (
+          <a href={item.href} rel="noopener" target="_blank">{item.label}</a>
+        ))}
+      </div>
+    </nav>
+  </div>
+
+  <div class="wrap footer-bottom">
+    <p>© {SITE.startYear}–{year} {SITE.author} · 保留所有权利</p>
+    <p class="meta">
+      由 Astro 构建 · 内容存于 Supabase
+      <span class="dot">·</span>
+      <a href="/rss.xml">RSS</a>
+    </p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    margin-top: 88px;
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface-sunk) 55%, transparent);
+  }
+
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    padding-block: 52px 40px;
+    justify-content: space-between;
+  }
+
+  .footer-brand {
+    max-width: 340px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-serif);
+    font-size: 14px;
+    padding-bottom: 2px;
+  }
+
+  .footer-brand p {
+    margin: 16px 0 0;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.9;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 56px;
+    flex-wrap: wrap;
+  }
+
+  .footer-links h3 {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .footer-links div {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .footer-links a {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    transition: color 0.2s var(--ease);
+  }
+
+  .footer-links a:hover {
+    color: var(--accent);
+  }
+
+  .footer-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    padding-block: 18px 26px;
+    border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  }
+
+  .footer-bottom p {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .footer-bottom .meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .footer-bottom a:hover {
+    color: var(--accent);
+  }
+
+  .dot {
+    opacity: 0.5;
+  }
+
+  @media (max-width: 720px) {
+    .footer-links {
+      gap: 34px;
+    }
+    .site-footer {
+      margin-top: 60px;
+    }
+  }
+</style>

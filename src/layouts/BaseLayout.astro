@@ -1,0 +1,140 @@
+---
+import "../styles/global.css";
+import { SITE } from "../lib/site";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  type?: "website" | "article";
+  image?: string;
+  noindex?: boolean;
+  jsonLd?: Record<string, unknown>;
+  /** 文章页隐藏页脚留白 */
+  bare?: boolean;
+}
+
+const {
+  title,
+  description = SITE.description,
+  canonical,
+  type = "website",
+  image,
+  noindex = false,
+  jsonLd,
+  bare = false,
+} = Astro.props;
+
+const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
+const canonicalUrl = new URL(canonical ?? Astro.url.pathname, SITE.url).href;
+const imageUrl = image ? new URL(image, SITE.url).href : `${SITE.url}/og-default.svg`;
+const fullJsonLd = jsonLd
+  ? { "@context": "https://schema.org", ...jsonLd }
+  : {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: SITE.name,
+      url: SITE.url,
+      description: SITE.description,
+      author: { "@type": "Person", name: SITE.author },
+    };
+---
+
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE.name} RSS`} href="/rss.xml" />
+    <meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#121410" media="(prefers-color-scheme: dark)" />
+
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <meta name="author" content={SITE.author} />
+
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:locale" content="zh_CN" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(fullJsonLd)} />
+    <slot name="head" />
+
+    <script is:inline>
+      (() => {
+        try {
+          const saved = localStorage.getItem("guandao.theme");
+          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.dataset.theme =
+            saved === "dark" || (!saved && prefersDark) ? "dark" : "light";
+        } catch {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+  </head>
+
+  <body class={bare ? "bare" : ""}>
+    <a class="skip" href="#main">跳到正文</a>
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+
+    <script is:inline>
+      (() => {
+        const root = document.documentElement;
+        const toggle = document.getElementById("theme-toggle");
+        if (!toggle) return;
+        const sync = () => {
+          const dark = root.dataset.theme === "dark";
+          toggle.setAttribute("aria-label", dark ? "切换到浅色模式" : "切换到深色模式");
+        };
+        sync();
+        toggle.addEventListener("click", () => {
+          const next = root.dataset.theme === "dark" ? "light" : "dark";
+          root.dataset.theme = next;
+          try {
+            localStorage.setItem("guandao.theme", next);
+          } catch {}
+          sync();
+        });
+      })();
+    </script>
+  </body>
+</html>
+
+<style>
+  .skip {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    padding: 10px 16px;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 0 0 8px 0;
+  }
+
+  .skip:focus {
+    left: 0;
+  }
+</style>

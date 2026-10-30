@@ -1,0 +1,438 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Icon from "../components/Icon.astro";
+import { SITE } from "../lib/site";
+import { getAllPosts, collectTags } from "../lib/posts";
+
+const posts = await getAllPosts();
+const tags = collectTags(posts);
+
+const timeline = [
+  {
+    year: "2026",
+    title: "把博客重写了一遍",
+    text: "从最简的静态页面换成 Astro 内容层 + Supabase 云端存储，补上标签、搜索和写作后台。",
+  },
+  {
+    year: "2025",
+    title: "第一次独立上线产品",
+    text: "从需求、设计到部署一个人做完，学会了在没有掌声的阶段继续迭代。",
+  },
+  {
+    year: "2024",
+    title: "开始认真写东西",
+    text: "发现「写下来」是检验理解最便宜的方式，于是有了这个站点。",
+  },
+];
+
+const stack = [
+  { group: "前端", items: ["Astro", "TypeScript", "React", "CSS / Tailwind"] },
+  { group: "后端与数据", items: ["Node.js", "PostgreSQL", "Supabase", "REST"] },
+  { group: "工具", items: ["Git / GitHub", "Vite", "Figma", "Cloudflare"] },
+];
+---
+
+<BaseLayout
+  title="关于"
+  description={`${SITE.author}，${SITE.role}。这里是关于他、这个博客以及正在做的事。`}
+  canonical="/about/"
+  jsonLd={{
+    "@type": "Person",
+    name: SITE.author,
+    jobTitle: SITE.role,
+    url: `${SITE.url}/about/`,
+    email: SITE.email,
+    description: SITE.description,
+  }}
+>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">About</span>
+        <h1>一个把手弄脏的<br /><em>长期主义者</em></h1>
+      </div>
+      <div class="hero-side">
+        <p class="hang">管</p>
+        <p class="sig">写代码，也写句子。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <section class="intro">
+      <p class="lead">
+        我是{SITE.author}，{SITE.role}。目前最在意的事，是能不能把一件小事做到让自己满意。
+      </p>
+      <p>
+        我习惯用项目来学习：想做的东西先动手做出来，卡住了再回去补理论。这个博客就是其中一个项目——
+        它既是我的笔记本，也是我的练习场。这里的文章大多来自真实的踩坑记录，
+        偶尔也有一些不成熟的观察，我都尽量写清楚当时的判断依据。
+      </p>
+      <p>
+        我不追求更新频率，也不追热点。比起「写得多」，我更在意「写得准」：
+        一篇文章如果三年后自己回看还能用，那它就值得存在。
+      </p>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <span class="eyebrow">路径</span>
+        <h2>几句话讲完的经历</h2>
+      </div>
+      <ol class="timeline">
+        {timeline.map((item) => (
+          <li>
+            <span class="year">{item.year}</span>
+            <div>
+              <h3>{item.title}</h3>
+              <p>{item.text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <span class="eyebrow">工具</span>
+        <h2>常用的技术栈</h2>
+      </div>
+      <div class="stack">
+        {stack.map((group) => (
+          <div class="stack-group">
+            <h3>{group.group}</h3>
+            <ul>
+              {group.items.map((item) => <li>{item}</li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="block split">
+      <div>
+        <div class="block-head">
+          <span class="eyebrow">此刻</span>
+          <h2>现在的状态</h2>
+        </div>
+        <ul class="now">
+          <li><strong>在做</strong>把这个博客做成可以长期维护的写作系统。</li>
+          <li><strong>在学</strong>数据库设计与类型系统，试着写出更少惊喜的代码。</li>
+          <li><strong>在读</strong>《重构》《写作这回事》，一本技术一本非技术。</li>
+          <li><strong>在找</strong>愿意一起做产品的伙伴。</li>
+        </ul>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat">
+          <span>写下的文章</span>
+          <strong>{posts.length}</strong>
+        </div>
+        <div class="stat">
+          <span>涉及主题</span>
+          <strong>{tags.length}</strong>
+        </div>
+        <div class="stat">
+          <span>开始于</span>
+          <strong>{SITE.startYear}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="contact">
+      <div>
+        <h2>有想法，欢迎来信</h2>
+        <p>无论是文章里的错误、合作的可能，还是单纯想聊聊，我都会认真回复。</p>
+      </div>
+      <div class="contact-actions">
+        <a class="btn btn--solid" href={`mailto:${SITE.email}`}>
+          <Icon name="mail" size={15} />
+          {SITE.email}
+        </a>
+        <a class="btn" href="/rss.xml">
+          <Icon name="rss" size={14} />
+          订阅 RSS
+        </a>
+      </div>
+    </section>
+
+    <p class="colophon">
+      本站使用 <strong>Astro</strong> 构建，文章数据存储在 <strong>Supabase</strong>（PostgreSQL），
+      图片托管于对象存储，样式为手写 CSS，无前端框架运行时。
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding: 62px 0 44px;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 40px;
+    align-items: end;
+    padding-bottom: 34px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .hero h1 {
+    margin-top: 16px;
+    font-size: clamp(36px, 5.4vw, 58px);
+    line-height: 1.2;
+    letter-spacing: -0.03em;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .hero-side {
+    text-align: right;
+  }
+
+  .hang {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 76px;
+    line-height: 0.9;
+    color: var(--accent);
+    opacity: 0.22;
+  }
+
+  .sig {
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .intro {
+    max-width: 42em;
+    padding: 40px 0 10px;
+  }
+
+  .intro p {
+    margin: 0 0 1.15em;
+    font-size: 15.5px;
+    line-height: 2;
+    color: var(--ink-2);
+  }
+
+  .intro .lead {
+    font-family: var(--font-serif);
+    font-size: 21px;
+    line-height: 1.85;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+
+  .block {
+    padding: 44px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .block-head h2 {
+    margin-top: 10px;
+    font-size: 24px;
+  }
+
+  .timeline {
+    list-style: none;
+    margin: 28px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .timeline li {
+    display: grid;
+    grid-template-columns: 74px 1fr;
+    gap: 20px;
+    padding: 16px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  .timeline .year {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--accent-ink);
+    padding-top: 4px;
+  }
+
+  .timeline h3 {
+    font-size: 16.5px;
+  }
+
+  .timeline p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.85;
+    max-width: 40em;
+  }
+
+  .stack {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 26px;
+  }
+
+  .stack-group {
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .stack-group h3 {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .stack-group ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 40px;
+    align-items: start;
+  }
+
+  .now {
+    list-style: none;
+    margin: 24px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+
+  .now li {
+    font-size: 13.5px;
+    line-height: 1.85;
+    color: var(--ink-2);
+    padding-left: 18px;
+    position: relative;
+  }
+
+  .now li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.55;
+  }
+
+  .now strong {
+    color: var(--ink);
+    margin-right: 8px;
+    font-weight: 600;
+  }
+
+  .stat-card {
+    display: grid;
+    gap: 2px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--line);
+  }
+
+  .stat {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 16px 18px;
+    background: var(--surface);
+  }
+
+  .stat span {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .stat strong {
+    font-family: var(--font-serif);
+    font-size: 24px;
+    font-weight: 600;
+  }
+
+  .contact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 20px;
+    padding: 36px 38px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: linear-gradient(135deg, var(--surface) 0%, var(--accent-wash) 130%);
+  }
+
+  .contact h2 {
+    font-size: 24px;
+  }
+
+  .contact p {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+
+  .contact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .colophon {
+    margin: 28px 0 0;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--muted);
+  }
+
+  .colophon strong {
+    color: var(--ink-2);
+    font-weight: 600;
+  }
+
+  @media (max-width: 820px) {
+    .hero-grid {
+      grid-template-columns: 1fr;
+      align-items: start;
+    }
+    .hero-side {
+      display: none;
+    }
+    .stack,
+    .split {
+      grid-template-columns: 1fr;
+    }
+    .contact {
+      padding: 26px 22px;
+    }
+  }
+</style>

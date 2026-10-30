@@ -1,0 +1,93 @@
+-- ============================================================
+--  博客云端数据结构（Supabase / PostgreSQL）
+--  在 Supabase 控制台 → SQL Editor 中执行一次即可。
+-- ============================================================
+
+-- 1) 文章表 ---------------------------------------------------
+create table if not exists public.posts (
+  id          uuid primary key default gen_random_uuid(),
+  slug        text not null unique,
+  title       text not null,
+  description text not null default '',
+  content     text not null default '',
+  tags        text[] not null default '{}',
+  published   boolean not null default false,
+  featured    boolean not null default false,
+  cover_url   text,
+  pub_date    timestamptz not null default now(),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  author_id   uuid references auth.users (id) on delete set null
+);
+
+create index if not exists posts_pub_date_idx on public.posts (pub_date desc);
+create index if not exists posts_tags_idx on public.posts using gin (tags);
+
+-- 自动维护 updated_at
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists posts_touch_updated_at on public.posts;
+create trigger posts_touch_updated_at
+  before update on public.posts
+  for each row execute function public.touch_updated_at();
+
+-- 2) 行级安全（RLS） ------------------------------------------
+-- 公开站点只能读「已发布」的文章；写操作只允许已登录用户。
+alter table public.posts enable row level security;
+
+drop policy if exists "posts_public_read" on public.posts;
+create policy "posts_public_read"
+  on public.posts for select
+  to anon, authenticated
+  using (published = true or auth.role() = 'authenticated');
+
+drop policy if exists "posts_author_write" on public.posts;
+create policy "posts_author_write"
+  on public.posts for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- 3) 对象存储（图片 / 附件） ----------------------------------
+insert into storage.buckets (id, name, public)
+values ('blog-media', 'blog-media', true)
+on conflict (id) do nothing;
+
+drop policy if exists "media_public_read" on storage.objects;
+create policy "media_public_read"
+  on storage.objects for select
+  to anon, authenticated
+  using (bucket_id = 'blog-media');
+
+drop policy if exists "media_auth_write" on storage.objects;
+create policy "media_auth_write"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'blog-media');
+
+drop policy if exists "media_auth_update" on storage.objects;
+create policy "media_auth_update"
+  on storage.objects for update
+  to authenticated
+  using (bucket_id = 'blog-media');
+
+drop policy if exists "media_auth_delete" on storage.objects;
+create policy "media_auth_delete"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'blog-media');
+
+-- ============================================================
+--  使用说明
+--  1. Authentication → Users → Add user 创建一个账号（关闭邮箱验证更方便）。
+--  2. 把项目 URL / anon key 写进 .env（见 .env.example）。
+--  3. npm run dev 打开 /admin 登录写作；npm run build 会自动从云端同步文章。
+-- ============================================================

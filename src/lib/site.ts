@@ -1,0 +1,60 @@
+/**
+ * 站点全局配置：改这里就能改整站文案与信息。
+ */
+export const SITE = {
+  name: "管道的博客",
+  author: "管道",
+  handle: "guandao",
+  role: "学生 · 独立开发者",
+  tagline: "记录好奇，持续创造。",
+  description:
+    "管道的个人博客 —— 记录技术探索、学习笔记、独立开发与生活中的长期思考。",
+  url: "https://guandao.xin",
+  locale: "zh-CN",
+  email: "hi@guandao.xin",
+  startYear: 2024,
+  nav: [
+    { href: "/blog/", label: "文章" },
+    { href: "/tags/", label: "标签" },
+    { href: "/about/", label: "关于" },
+    { href: "/rss.xml", label: "RSS", external: true },
+  ],
+  socials: [
+    { href: "https://github.com/", label: "GitHub", icon: "github" },
+    { href: "mailto:hi@guandao.xin", label: "Email", icon: "mail" },
+  ],
+} as const;
+
+export const POSTS_PER_PAGE = 8;
+
+/** 每页文章数之外，首页展示的最新文章数量 */
+export const HOME_LATEST = 4;
+
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Shanghai",
+  }).format(date);
+}
+
+export function formatShortDate(date: Date): string {
+  const d = new Date(date);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}.${m}.${day}`;
+}
+
+export function isoDate(date: Date): string {
+  return new Date(date).toISOString();
+}
+
+/** 中文阅读时长：约 350 字/分钟 */
+export function readingTime(text: string): number {
+  const chars = text.replace(/\s+/g, "").length;
+  const codeBlocks = (text.match(/```/g) || []).length / 2;
+  const minutes = chars / 350 + codeBlocks * 0.6;
+  return Math.max(1, Math.round(minutes));
+}

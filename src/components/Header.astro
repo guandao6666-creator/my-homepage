@@ -1,0 +1,199 @@
+---
+import { SITE } from "../lib/site";
+import Icon from "./Icon.astro";
+
+const path = Astro.url.pathname.replace(/\/+$/, "") || "/";
+const isActive = (href: string) => {
+  const clean = href.replace(/\/+$/, "");
+  return clean === "/blog" ? path === "/blog" || path.startsWith("/blog/") : path === clean;
+};
+---
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="/" aria-label={`${SITE.name} 首页`}>
+      <span class="brand-mark" aria-hidden="true">管</span>
+      <span class="brand-text">
+        <strong>{SITE.author}</strong>
+        <em>/ blog</em>
+      </span>
+    </a>
+
+    <nav class="main-nav" aria-label="主导航">
+      {SITE.nav.map((item) => (
+        <a
+          href={item.href}
+          class:list={["nav-link", { active: isActive(item.href) }]}
+          aria-current={isActive(item.href) ? "page" : undefined}
+        >
+          {item.label}
+        </a>
+      ))}
+    </nav>
+
+    <div class="header-actions">
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换深色模式">
+        <span class="theme-icon theme-icon--sun"><Icon name="sun" size={15} /></span>
+        <span class="theme-icon theme-icon--moon"><Icon name="moon" size={15} /></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--paper) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    height: 66px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: auto;
+  }
+
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-serif);
+    font-size: 15px;
+    line-height: 1;
+    padding-bottom: 2px;
+    transition: transform 0.3s var(--ease), background-color 0.3s var(--ease);
+  }
+
+  .brand:hover .brand-mark {
+    transform: rotate(-6deg);
+    background: var(--accent-ink);
+  }
+
+  .brand-text {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+  }
+
+  .brand-text strong {
+    font-weight: 650;
+  }
+
+  .brand-text em {
+    font-style: normal;
+    color: var(--muted);
+    font-size: 12.5px;
+    letter-spacing: 0.06em;
+  }
+
+  .main-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .nav-link {
+    position: relative;
+    padding: 7px 12px;
+    font-size: 14px;
+    color: var(--ink-2);
+    border-radius: 8px;
+    transition: color 0.2s var(--ease), background-color 0.2s var(--ease);
+  }
+
+  .nav-link:hover {
+    color: var(--ink);
+    background: var(--surface-sunk);
+  }
+
+  .nav-link.active {
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+
+  .nav-link.active::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 1px;
+    height: 1.5px;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.55;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .theme-toggle {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    cursor: pointer;
+    color: var(--ink-2);
+    transition: color 0.2s var(--ease), border-color 0.2s var(--ease), transform 0.3s var(--ease);
+  }
+
+  .theme-toggle:hover {
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    transform: rotate(12deg);
+  }
+
+  .theme-icon {
+    grid-area: 1 / 1;
+    display: grid;
+    place-items: center;
+    transition: opacity 0.25s var(--ease), transform 0.35s var(--ease);
+  }
+
+  [data-theme="dark"] .theme-icon--sun {
+    opacity: 0;
+    transform: scale(0.5) rotate(-90deg);
+  }
+
+  [data-theme="light"] .theme-icon--moon {
+    opacity: 0;
+    transform: scale(0.5) rotate(90deg);
+  }
+
+  @media (max-width: 560px) {
+    .header-inner {
+      gap: 10px;
+      height: 60px;
+    }
+    .brand-text em {
+      display: none;
+    }
+    .nav-link {
+      padding: 7px 8px;
+      font-size: 13.5px;
+    }
+  }
+</style>
