@@ -85,9 +85,52 @@ create policy "media_auth_delete"
   to authenticated
   using (bucket_id = 'blog-media');
 
+-- 4) 文章评论（互动栏） ---------------------------------------
+-- 访客不用注册，填个昵称就能留言；站长登录后可以删除/隐藏。
+create table if not exists public.comments (
+  id         uuid primary key default gen_random_uuid(),
+  post_slug  text not null,
+  author     text not null,
+  body       text not null,
+  created_at timestamptz not null default now(),
+  visible    boolean not null default true
+);
+
+create index if not exists comments_slug_idx
+  on public.comments (post_slug, created_at desc);
+
+alter table public.comments enable row level security;
+
+-- 所有人都能读到可见评论（隐藏的只有登录用户能取到）
+drop policy if exists "comments_read" on public.comments;
+create policy "comments_read"
+  on public.comments for select
+  to anon, authenticated
+  using (visible = true);
+
+-- 任何人可留言，但不能自己塞隐藏状态，长度也有硬限制
+drop policy if exists "comments_insert" on public.comments;
+create policy "comments_insert"
+  on public.comments for insert
+  to anon, authenticated
+  with check (
+    visible = true
+    and char_length(btrim(author)) between 1 and 24
+    and char_length(btrim(body)) between 1 and 800
+  );
+
+-- 站长（登录用户）可以改和删
+drop policy if exists "comments_admin" on public.comments;
+create policy "comments_admin"
+  on public.comments for all
+  to authenticated
+  using (true)
+  with check (true);
+
 -- ============================================================
 --  使用说明
 --  1. Authentication → Users → Add user 创建一个账号（关闭邮箱验证更方便）。
 --  2. 把项目 URL / anon key 写进 .env（见 .env.example）。
 --  3. npm run dev 打开 /admin 登录写作；npm run build 会自动从云端同步文章。
+--  4. 删除垃圾评论：Table Editor → comments → 删行，或把 visible 关掉。
 -- ============================================================

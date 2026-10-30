@@ -1,0 +1,384 @@
+---
+import { cloudConfig } from "../lib/cloud";
+
+interface Props {
+  slug: string;
+}
+
+const { slug } = Astro.props;
+const cloud = cloudConfig();
+---
+
+<section
+  class="comments"
+  id="comments"
+  data-slug={slug}
+  data-url={cloud?.url ?? ""}
+  data-key={cloud?.anonKey ?? ""}
+>
+  <div class="comments-head">
+    <div>
+      <span class="eyebrow">留言</span>
+      <h2>说点什么</h2>
+    </div>
+    <span class="comments-count" id="comments-count"></span>
+  </div>
+
+  {cloud ? (
+    <form class="comment-form" id="comment-form" novalidate>
+      <div class="comment-fields">
+        <input
+          class="comment-author"
+          id="c-author"
+          name="author"
+          maxlength="24"
+          placeholder="你的昵称"
+          autocomplete="nickname"
+          required
+        />
+        <textarea
+          class="comment-body"
+          id="c-body"
+          name="body"
+          rows="3"
+          maxlength="800"
+          placeholder="想到什么就说什么，不用注册，也不填邮箱。"
+          required
+        ></textarea>
+      </div>
+
+      <div class="comment-actions">
+        <span class="comment-hint" id="comment-hint">最多 800 字，留言会直接公开</span>
+        <button class="btn btn--solid" id="comment-submit" type="submit">发送</button>
+      </div>
+
+      <!-- 蜜罐：正常人看不见，填了就当成机器人 -->
+      <div class="comment-hp" aria-hidden="true">
+        <label for="c-website">网站</label>
+        <input id="c-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+      </div>
+    </form>
+  ) : (
+    <p class="comments-note">还没有连接云端数据库，留言功能暂不可用。</p>
+  )}
+
+  <ul class="comment-list" id="comment-list"></ul>
+  <p class="comments-empty" id="comments-empty" hidden>还没有留言，来说第一句吧。</p>
+</section>
+
+<!-- 评论项由 JS 动态创建，拿不到 Astro 的 scoped 属性，所以这里必须用全局样式 -->
+<style is:global>
+  .comments {
+    max-width: 700px;
+    margin: 0;
+    padding: 44px 0 8px;
+    border-top: 1px solid var(--line);
+  }
+
+  .comments-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .comments-head h2 {
+    margin-top: 8px;
+    font-size: 22px;
+  }
+
+  .comments-count {
+    font-size: 12.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .comment-form {
+    margin-top: 22px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .comment-fields {
+    display: grid;
+    gap: 10px;
+  }
+
+  .comment-author,
+  .comment-body {
+    width: 100%;
+    font: inherit;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .comment-author {
+    max-width: 220px;
+    font-size: 13.5px;
+  }
+
+  .comment-body {
+    font-size: 14px;
+    line-height: 1.85;
+    resize: vertical;
+    min-height: 88px;
+  }
+
+  .comment-author:focus,
+  .comment-body:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
+  .comment-author::placeholder,
+  .comment-body::placeholder {
+    color: var(--muted);
+  }
+
+  .comment-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 12px;
+  }
+
+  .comment-hint {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .comment-hint[data-tone="error"] {
+    color: #a4443a;
+  }
+
+  .comment-hint[data-tone="ok"] {
+    color: var(--accent-ink);
+  }
+
+  .comment-btn[disabled],
+  #comment-submit:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .comment-hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  .comment-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+  }
+
+  .comment-item {
+    padding: 20px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  .comment-meta-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .comment-name {
+    font-family: var(--font-serif);
+    font-size: 15px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .comment-time {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .comment-text {
+    margin: 8px 0 0;
+    font-size: 14.5px;
+    line-height: 1.9;
+    color: var(--ink-2);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .comments-empty,
+  .comments-note {
+    margin: 18px 0 0;
+    font-size: 13.5px;
+    line-height: 1.9;
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    .comment-author {
+      max-width: 100%;
+    }
+    .comment-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .comment-actions .btn {
+      justify-content: center;
+    }
+  }
+</style>
+
+<script>
+  (() => {
+    const root = document.getElementById("comments");
+    if (!root) return;
+
+    const slug = root.dataset.slug || "";
+    const base = (root.dataset.url || "").replace(/\/$/, "");
+    const key = root.dataset.key || "";
+    if (!base || !key) return;
+
+    const form = document.getElementById("comment-form");
+    const list = document.getElementById("comment-list");
+    const empty = document.getElementById("comments-empty");
+    const countEl = document.getElementById("comments-count");
+    const hint = document.getElementById("comment-hint");
+    const submitBtn = document.getElementById("comment-submit");
+    const authorInput = document.getElementById("c-author");
+    const bodyInput = document.getElementById("c-body");
+    if (!form || !list || !authorInput || !bodyInput) return;
+
+    const headers = { apikey: key, "Content-Type": "application/json" };
+    let items = [];
+
+    const setHint = (text, tone) => {
+      if (!hint) return;
+      hint.textContent = text;
+      if (tone) hint.dataset.tone = tone;
+      else delete hint.dataset.tone;
+    };
+
+    // 只写文本，永远不拼 HTML —— 防止留言里的标签被执行
+    const timeLabel = (iso) => {
+      const then = new Date(iso).getTime();
+      const diff = Date.now() - then;
+      const min = Math.floor(diff / 60000);
+      if (min < 1) return "刚刚";
+      if (min < 60) return `${min} 分钟前`;
+      const hour = Math.floor(min / 60);
+      if (hour < 24) return `${hour} 小时前`;
+      const day = Math.floor(hour / 24);
+      if (day < 30) return `${day} 天前`;
+      const d = new Date(iso);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+    };
+
+    const render = () => {
+      list.textContent = "";
+      for (const item of items) {
+        const li = document.createElement("li");
+        li.className = "comment-item";
+
+        const meta = document.createElement("div");
+        meta.className = "comment-meta-row";
+
+        const name = document.createElement("span");
+        name.className = "comment-name";
+        name.textContent = item.author;
+
+        const time = document.createElement("span");
+        time.className = "comment-time";
+        time.textContent = timeLabel(item.created_at);
+        time.title = new Date(item.created_at).toLocaleString("zh-CN");
+
+        meta.append(name, time);
+
+        const text = document.createElement("p");
+        text.className = "comment-text";
+        text.textContent = item.body;
+
+        li.append(meta, text);
+        list.append(li);
+      }
+
+      if (empty) empty.hidden = items.length > 0;
+      if (countEl) countEl.textContent = items.length ? `${items.length} 条` : "";
+    };
+
+    const load = async () => {
+      try {
+        const query = `?post_slug=eq.${encodeURIComponent(slug)}&select=author,body,created_at&order=created_at.desc&limit=100`;
+        const res = await fetch(`${base}/rest/v1/comments${query}`, { headers });
+        if (!res.ok) throw new Error(String(res.status));
+        items = await res.json();
+        render();
+      } catch {
+        setHint("留言加载失败，刷新试试", "error");
+      }
+    };
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const author = authorInput.value.trim();
+      const body = bodyInput.value.trim();
+      const trap = document.getElementById("c-website");
+
+      // 蜜罐被填 = 机器人，假装成功
+      if (trap && trap.value) {
+        form.reset();
+        setHint("已发送", "ok");
+        return;
+      }
+      if (!author || !body) {
+        setHint("昵称和内容都要填一下", "error");
+        (!author ? authorInput : bodyInput).focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      setHint("发送中…");
+      try {
+        const res = await fetch(`${base}/rest/v1/comments`, {
+          method: "POST",
+          headers: { ...headers, Prefer: "return=representation" },
+          body: JSON.stringify([{ post_slug: slug, author, body }]),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const [created] = await res.json();
+        items = [created, ...items];
+        render();
+        bodyInput.value = "";
+        setHint("已发送，谢谢留言", "ok");
+        try {
+          localStorage.setItem("comment-author", author);
+        } catch {
+          /* 忽略 */
+        }
+      } catch {
+        setHint("没发出去，稍后再试", "error");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    try {
+      const saved = localStorage.getItem("comment-author");
+      if (saved) authorInput.value = saved;
+    } catch {
+      /* 忽略 */
+    }
+
+    load();
+  })();
+</script>

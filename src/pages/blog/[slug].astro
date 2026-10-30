@@ -1,6 +1,7 @@
 ﻿---
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import Icon from "../../components/Icon.astro";
+import Comments from "../../components/Comments.astro";
 import { getCollection, render } from "astro:content";
 import { getAllPosts, toPost, neighbours, relatedPosts, slugOf } from "../../lib/posts";
 import { SITE, formatDate, isoDate, formatShortDate } from "../../lib/site";
@@ -150,6 +151,8 @@ const jsonLd = {
           )}
         </nav>
       </footer>
+
+      <Comments slug={post.slug} />
     </div>
   </article>
 
