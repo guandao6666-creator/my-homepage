@@ -97,12 +97,25 @@ anon key 会出现在前端代码里，这是设计如此——**密钥公开不
 ## 部署
 
 构建产物是纯静态的，任何静态托管都能用（Cloudflare Pages / Vercel / Netlify / 对象存储）。
-以 Cloudflare Pages 为例：
 
-- 构建命令：`npm run build`
-- 输出目录：`dist`
-- 环境变量：上面的四个 Supabase 变量
-- Node 版本：>= 22.23.4（Astro 7 要求）
+### Cloudflare Pages
+
+1. Cloudflare Dashboard → Workers & Pages → Create → Pages → Connect to Git，选中本仓库；
+2. 构建设置：
+
+   | 项 | 值 |
+   | --- | --- |
+   | Framework preset | Astro |
+   | Build command | `npm run build` |
+   | Build output directory | `dist` |
+   | Node version | `22.23.4`（仓库根目录已有 `.nvmrc`，也可再加环境变量 `NODE_VERSION=22.23.4`） |
+
+3. 环境变量：填 `PUBLIC_SUPABASE_URL`、`PUBLIC_SUPABASE_ANON_KEY`、`PUBLIC_SUPABASE_BUCKET`，
+   以及构建期同步用的 `SUPABASE_URL`、`SUPABASE_ANON_KEY`（不填则用本地 Markdown 构建）；
+4. Custom domains 里绑定 `guandao.xin`，Cloudflare 会自动签发证书。
+
+之后每次 push 到 `main` 都会自动构建发布。注意 `scripts/sync-content.mjs` 在 `prebuild`
+里跑，云端拉取失败时会**静默跳过**（`--soft` 模式），不会阻断发布。
 
 ## 内容约定
 
