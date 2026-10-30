@@ -77,10 +77,21 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
       <div class="dash-grid">
         <aside class="list-pane">
           <div class="list-head">
-            <span>文章 <em id="post-count">0</em></span>
+            <div class="list-tabs">
+              <button class="list-tab is-active" id="tab-posts" type="button">
+                文章 <em id="post-count">0</em>
+              </button>
+              <button class="list-tab" id="tab-comments" type="button">
+                留言 <em id="comment-count">0</em>
+                <span class="dot" id="comment-dot" hidden aria-label="有新留言"></span>
+              </button>
+            </div>
             <button class="mini" id="new-post" type="button">+ 新建</button>
           </div>
           <div class="list-body" id="post-rows">
+            <p class="list-empty">加载中…</p>
+          </div>
+          <div class="list-body" id="comment-rows" hidden>
             <p class="list-empty">加载中…</p>
           </div>
         </aside>
@@ -396,6 +407,137 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     font-family: var(--font-mono);
   }
 
+  .list-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .list-tab {
+    position: relative;
+    padding: 4px 9px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    font: inherit;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+  }
+
+  .list-tab:hover {
+    color: var(--ink-2);
+    background: var(--surface-sunk);
+  }
+
+  .list-tab.is-active {
+    color: var(--accent-ink);
+    background: var(--accent-wash);
+  }
+
+  .list-tab .dot {
+    position: absolute;
+    top: 2px;
+    right: 1px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* ---------- 留言行 ---------- */
+
+  .comment-row {
+    padding: 14px 14px 13px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .comment-row.is-hidden {
+    opacity: 0.5;
+  }
+
+  .comment-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .comment-top strong {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .comment-body {
+    margin: 7px 0 0;
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: var(--ink-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    letter-spacing: 0;
+  }
+
+  .comment-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 9px;
+    font-size: 11px;
+    letter-spacing: 0;
+    color: var(--muted);
+  }
+
+  .comment-foot a {
+    color: var(--muted);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .comment-foot a:hover {
+    color: var(--accent-ink);
+  }
+
+  .comment-ops {
+    display: flex;
+    gap: 6px;
+    flex: none;
+  }
+
+  .comment-ops button {
+    padding: 2px 7px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: none;
+    font: inherit;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .comment-ops button:hover {
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+
+  .comment-ops button[data-act="del"]:hover {
+    color: #a4443a;
+    border-color: #a4443a55;
+  }
+
   .list-body {
     max-height: 620px;
     overflow-y: auto;
@@ -705,7 +847,11 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     updateCloudPost,
     deleteCloudPost,
     uploadToCloud,
+    listCloudComments,
+    deleteCloudComment,
+    setCloudCommentVisible,
     type CloudPost,
+    type CloudComment,
   } from "../../lib/cloud";
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -720,8 +866,14 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
   const logoutBtn = $<HTMLButtonElement>("logout");
   const rows = $("post-rows");
   const postCount = $("post-count");
+  const tabPosts = $<HTMLButtonElement>("tab-posts");
+  const tabComments = $<HTMLButtonElement>("tab-comments");
+  const commentRows = $("comment-rows");
+  const commentCount = $("comment-count");
+  const commentDot = $("comment-dot");
 
   let posts: CloudPost[] = [];
+  let comments: CloudComment[] = [];
   let editingId: string | null = null;
   let previewing = false;
 
@@ -771,6 +923,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     logoutBtn.hidden = false;
     show("dash");
     void refresh();
+    void loadComments();
   }
 
   /* ---------------------------- login --------------------------- */
@@ -793,6 +946,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
       logoutBtn.hidden = false;
       show("dash");
       await refresh();
+      void loadComments();
     } catch (error) {
       loginError.textContent = (error as Error).message;
       loginError.hidden = false;
@@ -818,6 +972,127 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
       rows.innerHTML = `<p class="list-empty">加载失败：${(error as Error).message}</p>`;
     }
   }
+
+  /* --------------------------- comments ------------------------- */
+
+  const SEEN_KEY = "guandao.comments.seen";
+
+  function timeAgo(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "刚刚";
+    if (min < 60) return `${min} 分钟前`;
+    const hour = Math.floor(min / 60);
+    if (hour < 24) return `${hour} 小时前`;
+    const day = Math.floor(hour / 24);
+    if (day < 30) return `${day} 天前`;
+    const d = new Date(iso);
+    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function markSeen() {
+    try {
+      localStorage.setItem(SEEN_KEY, String(Date.now()));
+    } catch {
+      /* 忽略 */
+    }
+    commentDot.hidden = true;
+  }
+
+  function syncCommentBadge() {
+    commentCount.textContent = String(comments.filter((c) => c.visible).length);
+    let seen = 0;
+    try {
+      seen = Number(localStorage.getItem(SEEN_KEY) || 0);
+    } catch {
+      /* 忽略 */
+    }
+    const fresh = comments.some((c) => c.visible && new Date(c.created_at).getTime() > seen);
+    // 只在「文章」标签下提示，避免当前正在看留言还闪红点
+    commentDot.hidden = !fresh || !tabPosts.classList.contains("is-active");
+  }
+
+  async function loadComments() {
+    commentRows.innerHTML = '<p class="list-empty">加载中…</p>';
+    try {
+      comments = await listCloudComments();
+      renderComments();
+    } catch (error) {
+      commentRows.innerHTML = `<p class="list-empty">加载失败：${escapeHtml((error as Error).message)}</p>`;
+    }
+  }
+
+  function renderComments() {
+    syncCommentBadge();
+    if (!comments.length) {
+      commentRows.innerHTML = '<p class="list-empty">还没有留言。</p>';
+      return;
+    }
+    commentRows.innerHTML = comments
+      .map(
+        (c) => `
+      <article class="comment-row${c.visible ? "" : " is-hidden"}" data-id="${c.id}">
+        <div class="comment-top">
+          <strong>${escapeHtml(c.author)}</strong>
+          <span class="comment-ops">
+            <button type="button" data-act="toggle">${c.visible ? "隐藏" : "恢复"}</button>
+            <button type="button" data-act="del">删除</button>
+          </span>
+        </div>
+        <p class="comment-body">${escapeHtml(c.body)}</p>
+        <div class="comment-foot">
+          <a href="/blog/${encodeURIComponent(c.post_slug)}/" target="_blank" rel="noopener">${escapeHtml(c.post_slug)}</a>
+          <span>${timeAgo(c.created_at)}</span>
+        </div>
+      </article>`,
+      )
+      .join("");
+  }
+
+  function switchList(name: "posts" | "comments") {
+    const isPosts = name === "posts";
+    tabPosts.classList.toggle("is-active", isPosts);
+    tabComments.classList.toggle("is-active", !isPosts);
+    rows.hidden = !isPosts;
+    commentRows.hidden = isPosts;
+    $("new-post").hidden = !isPosts;
+    if (!isPosts) markSeen();
+    syncCommentBadge();
+  }
+
+  tabPosts.addEventListener("click", () => switchList("posts"));
+  tabComments.addEventListener("click", () => switchList("comments"));
+
+  commentRows.addEventListener("click", async (event) => {
+    const btn = (event.target as HTMLElement).closest("button[data-act]") as HTMLButtonElement | null;
+    if (!btn) return;
+    const row = btn.closest(".comment-row") as HTMLElement | null;
+    const id = row?.dataset.id;
+    const item = comments.find((c) => c.id === id);
+    if (!id || !item) return;
+
+    btn.disabled = true;
+    try {
+      if (btn.dataset.act === "del") {
+        if (!window.confirm(`删除「${item.author}」的这条留言？`)) {
+          btn.disabled = false;
+          return;
+        }
+        await deleteCloudComment(id);
+        comments = comments.filter((c) => c.id !== id);
+        toast("留言已删除");
+      } else {
+        const [updated] = await setCloudCommentVisible(id, !item.visible);
+        const next = updated?.visible ?? !item.visible;
+        comments = comments.map((c) => (c.id === id ? { ...c, visible: next } : c));
+        toast(next ? "已恢复显示" : "已隐藏，访客看不到");
+      }
+      renderComments();
+    } catch (error) {
+      toast((error as Error).message);
+      btn.disabled = false;
+    }
+  });
 
   function renderRows() {
     postCount.textContent = String(posts.length);

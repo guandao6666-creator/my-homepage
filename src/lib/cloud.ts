@@ -190,6 +190,36 @@ export function deleteCloudPost(id: string) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Comments                                                            */
+/* ------------------------------------------------------------------ */
+
+export interface CloudComment {
+  id: string;
+  post_slug: string;
+  author: string;
+  body: string;
+  created_at: string;
+  visible: boolean;
+}
+
+/** 登录状态下能拿到全部留言（含被隐藏的） */
+export function listCloudComments(): Promise<CloudComment[]> {
+  return rest<CloudComment[]>("comments?select=*&order=created_at.desc&limit=200");
+}
+
+export function deleteCloudComment(id: string) {
+  return rest<void>(`comments?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function setCloudCommentVisible(id: string, visible: boolean) {
+  return rest<CloudComment[]>(`comments?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ visible }),
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* Storage                                                             */
 /* ------------------------------------------------------------------ */
 
