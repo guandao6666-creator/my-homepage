@@ -29,12 +29,12 @@ import Icon from "../../components/Icon.astro";
         </div>
       </div>
 
-      <div class="overlay" id="overlay">
+      <div class="overlay is-open" id="overlay">
         <div class="panel">
           <span class="eyebrow" id="over-eyebrow">怎么玩</span>
           <h2 id="over-title">按住，然后松开</h2>
           <p id="over-text">
-            按得越久跳得越远。落在方块中心得两分，普通落地得一分。
+            按得越久跳得越远。落在中心得两分，边缘得一分。
           </p>
           <button class="btn" id="start-btn" type="button">开始</button>
           <p class="kbd">也可以按住空格键</p>
@@ -544,12 +544,13 @@ import Icon from "../../components/Icon.astro";
     bestEl.textContent = `最高 ${best}`;
     resize();
     reset();
-    phase = "ready";
 
-    // /games/jump/#play 可直接开局，跳过开始遮罩
+    // 默认停在开始遮罩；#play 直接开局
     if (location.hash === "#play") {
       overlay.classList.remove("is-open");
       reset();
+    } else {
+      phase = "ready";
     }
 
     window.addEventListener("resize", () => resize());
@@ -652,7 +653,7 @@ import Icon from "../../components/Icon.astro";
 
   .panel {
     width: 100%;
-    max-width: 340px;
+    max-width: 360px;
     text-align: center;
   }
 
