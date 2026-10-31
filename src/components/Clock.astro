@@ -1,0 +1,131 @@
+---
+/**
+ * 动态时钟：小时分钟 + 日期，下面一条按秒推进的细线。
+ *
+ * 时间在客户端每秒刷新，服务端先渲染占位，避免构建时间被缓存。
+ */
+---
+
+<div class="clock">
+  <div class="clock-row">
+    <time class="clock-time" id="clock-time">
+      <span id="clock-h">--</span><span class="clock-colon">:</span><span id="clock-m">--</span>
+    </time>
+    <span class="clock-date" id="clock-date"></span>
+  </div>
+  <div class="clock-track" aria-hidden="true">
+    <span class="clock-bar" id="clock-bar"></span>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const hEl = document.getElementById("clock-h");
+    const mEl = document.getElementById("clock-m");
+    const dateEl = document.getElementById("clock-date");
+    const barEl = document.getElementById("clock-bar");
+    if (!hEl || !mEl || !dateEl || !barEl) return;
+
+    const WEEK = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    let lastMinute = "";
+
+    const tick = () => {
+      const now = new Date();
+      const hh = pad(now.getHours());
+      const mm = pad(now.getMinutes());
+      const key = `${hh}${mm}`;
+
+      if (key !== lastMinute) {
+        hEl.textContent = hh;
+        mEl.textContent = mm;
+        dateEl.textContent = `${now.getMonth() + 1} 月 ${now.getDate()} 日 · ${WEEK[now.getDay()]}`;
+        lastMinute = key;
+      }
+
+      barEl.style.width = `${((now.getSeconds() + now.getMilliseconds() / 1000) / 60) * 100}%`;
+    };
+
+    tick();
+    window.setInterval(tick, 1000);
+
+    // 从后台切回来时立刻校准一次
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) tick();
+    });
+  })();
+</script>
+
+<style>
+  .clock {
+    margin-bottom: 18px;
+  }
+
+  .clock-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .clock-time {
+    font-family: var(--font-serif);
+    font-size: 30px;
+    line-height: 1;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .clock-colon {
+    display: inline-block;
+    margin: 0 1px;
+    animation: clockBlink 2s steps(1, end) infinite;
+  }
+
+  .clock-date {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  .clock-track {
+    position: relative;
+    height: 2px;
+    margin-top: 13px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--line) 70%, transparent);
+    overflow: hidden;
+  }
+
+  .clock-bar {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    opacity: 0.55;
+    transition: width 1s linear;
+  }
+
+  @keyframes clockBlink {
+    0%,
+    50% {
+      opacity: 1;
+    }
+    50.01%,
+    100% {
+      opacity: 0.28;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .clock-colon {
+      animation: none;
+    }
+    .clock-bar {
+      transition: none;
+    }
+  }
+</style>

@@ -2,6 +2,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import PostCard from "../components/PostCard.astro";
 import Icon from "../components/Icon.astro";
+import Clock from "../components/Clock.astro";
 import { SITE, HOME_LATEST, formatShortDate } from "../lib/site";
 import { getAllPosts, collectTags } from "../lib/posts";
 
@@ -61,6 +62,8 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
 
       <aside class="hero-aside rise" style="animation-delay:.12s">
         <div class="now-card">
+          <Clock />
+
           <div class="now-head">
             <span class="dot-live" aria-hidden="true"></span>
             此刻在做
