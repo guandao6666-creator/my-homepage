@@ -172,6 +172,25 @@ create policy "likes_admin"
   using (true)
   with check (true);
 
+-- 删留言时顺手清掉它身上的赞，避免留下指向已删留言的孤儿记录
+create or replace function public.drop_comment_likes()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.likes
+   where target_type = 'comment' and target_id = old.id::text;
+  return old;
+end;
+$$;
+
+drop trigger if exists comments_clean_likes on public.comments;
+create trigger comments_clean_likes
+  after delete on public.comments
+  for each row execute function public.drop_comment_likes();
+
 -- ============================================================
 --  使用说明
 --  1. Authentication → Users → Add user 创建一个账号（关闭邮箱验证更方便）。
