@@ -34,3 +34,6 @@ pnpm-debug.log*
 
 # 内容同步清单（由 scripts/sync-content.mjs 生成）
 src/content/blog/.sync-manifest.json
+
+# 本地工作区数据（记忆、截图等）
+.workbuddy/
