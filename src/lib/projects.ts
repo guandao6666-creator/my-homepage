@@ -26,6 +26,15 @@ export const PROJECTS: Project[] = [
     status: "在线",
   },
   {
+    title: "跳一跳",
+    summary:
+      "按住蓄力、松开起跳的小游戏。等距视角用 Canvas 2D 手绘，没有游戏引擎；方块间距会随分数慢慢变宽。",
+    tags: ["Canvas", "游戏", "JavaScript"],
+    year: 2026,
+    href: "/games/jump/",
+    status: "在线",
+  },
+  {
     title: "AI 学习 Skill",
     summary:
       "给 Codex 写的一套学习用 Skill，覆盖多个学科，按「先讲清原理再给例子」的顺序组织回答，避免只丢结论。",

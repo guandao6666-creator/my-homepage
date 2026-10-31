@@ -1,0 +1,744 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Icon from "../../components/Icon.astro";
+---
+
+<BaseLayout
+  title="跳一跳"
+  description="按住蓄力、松开起跳的小游戏。落在方块中心能拿双倍分。"
+  canonical="/games/jump/"
+>
+  <section class="page-head">
+    <div class="wrap">
+      <span class="eyebrow">Game · Canvas 2D</span>
+      <h1>跳一跳</h1>
+      <p class="page-lede">
+        按住蓄力，松开起跳。落在方块中心算两个，边缘就只有一个。
+      </p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="stage" id="stage">
+      <canvas id="game" aria-label="跳一跳游戏画面"></canvas>
+
+      <div class="hud">
+        <div class="score-wrap">
+          <span class="score" id="score">0</span>
+          <span class="best" id="best">最高 0</span>
+        </div>
+      </div>
+
+      <div class="overlay" id="overlay">
+        <div class="panel">
+          <span class="eyebrow" id="over-eyebrow">怎么玩</span>
+          <h2 id="over-title">按住，然后松开</h2>
+          <p id="over-text">
+            按得越久跳得越远。落在方块中心得两分，普通落地得一分。
+          </p>
+          <button class="btn" id="start-btn" type="button">开始</button>
+          <p class="kbd">也可以按住空格键</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <p class="foot-note">
+        用 Canvas 2D 画的等距视角，没有任何游戏引擎。方块的间距按分数逐步变宽，
+        蓄力超过上限会自动封顶。
+      </p>
+      <a class="back" href="/projects/">
+        <Icon name="arrow-right" size={13} />
+        回到作品
+      </a>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  (() => {
+    const canvas = document.getElementById("game") as HTMLCanvasElement | null;
+    const stage = document.getElementById("stage");
+    const scoreEl = document.getElementById("score");
+    const bestEl = document.getElementById("best");
+    const overlay = document.getElementById("overlay");
+    const startBtn = document.getElementById("start-btn");
+    const overEyebrow = document.getElementById("over-eyebrow");
+    const overTitle = document.getElementById("over-title");
+    const overText = document.getElementById("over-text");
+    if (!canvas || !stage || !scoreEl || !bestEl || !overlay || !startBtn) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    /* ---------------- 参数 ---------------- */
+
+    const TILE_W = 108;
+    const TILE_H = 54;
+    const BLOCK_H = 26;
+    const CHARGE_MS = 900;
+    /** 蓄力能跳出的距离范围（单位是半块宽） */
+    const MIN_JUMP = 1.1;
+    const MAX_JUMP = 2.35;
+    /** 方块之间的实际间距：下限要大于半块宽，否则两块会叠在一起 */
+    const MIN_GAP = 1.35;
+    const MAX_GAP = 2.2;
+    const BEST_KEY = "guandao.jump.best";
+
+    const LIGHT = {
+      bg: "#f7f6f1",
+      figure: "#2f3a30",
+      shadow: "rgba(24, 30, 24, 0.14)",
+      ring: "rgba(63, 107, 78, 0.9)",
+      hud: "#5d655b",
+      palettes: [
+        ["#e6e0d0", "#cec5ad", "#b8ae95"],
+        ["#d8e4d7", "#bccdbc", "#a3b6a2"],
+        ["#e0dcea", "#c6c1d6", "#ada7c1"],
+        ["#ebdfd0", "#d6c5b0", "#c0ad96"],
+      ],
+    };
+
+    const DARK = {
+      bg: "#14171a",
+      figure: "#d9ded3",
+      shadow: "rgba(0, 0, 0, 0.36)",
+      ring: "rgba(126, 178, 140, 0.9)",
+      hud: "#8b948a",
+      palettes: [
+        ["#343a33", "#282d27", "#1e231d"],
+        ["#333a36", "#272d29", "#1d221f"],
+        ["#35323c", "#292730", "#1f1d25"],
+        ["#3a342c", "#2e2922", "#242019"],
+      ],
+    };
+
+    let T = document.documentElement.dataset.theme === "dark" ? DARK : LIGHT;
+
+    /* ---------------- 状态 ---------------- */
+
+    interface Block {
+      x: number;
+      y: number;
+      /** 调色板索引，切换主题时按它换色，避免方块随机跳色 */
+      pi: number;
+      top: string;
+      left: string;
+      right: string;
+    }
+
+    interface Particle {
+      x: number;
+      y: number;
+      r: number;
+      alpha: number;
+    }
+
+    let W = 0;
+    let H = 0;
+    let dpr = 1;
+
+    let phase: "ready" | "idle" | "charging" | "jumping" | "over" = "ready";
+    let blocks: Block[] = [];
+    let current = 0;
+    let score = 0;
+    let best = Number(localStorage.getItem(BEST_KEY) || 0) || 0;
+
+    let chargeStart = 0;
+    let power = 0;
+
+    const figure = { x: 0, y: 0, z: 0 };
+    const cam = { x: 0, y: 0, tx: 0, ty: 0 };
+
+    let jump: { t: number; dur: number; fromX: number; fromY: number; toX: number; toY: number; lift: number } | null =
+      null;
+    let particles: Particle[] = [];
+
+    /* ---------------- 尺寸 ---------------- */
+
+    function resize() {
+      const rect = stage!.getBoundingClientRect();
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = rect.width;
+      H = rect.height;
+      canvas!.width = Math.round(W * dpr);
+      canvas!.height = Math.round(H * dpr);
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (blocks.length) focusCurrent(true);
+    }
+
+    /* ---------------- 生成 ---------------- */
+
+    function makeBlock(x: number, y: number): Block {
+      const pi = Math.floor(Math.random() * T.palettes.length);
+      const p = T.palettes[pi];
+      return { x, y, pi, top: p[0], left: p[1], right: p[2] };
+    }
+
+    /** 跟随站点主题换色：只改变现有方块的颜色，不重开游戏 */
+    function applyTheme() {
+      T = document.documentElement.dataset.theme === "dark" ? DARK : LIGHT;
+      for (const b of blocks) {
+        const p = T.palettes[b.pi % T.palettes.length];
+        b.top = p[0];
+        b.left = p[1];
+        b.right = p[2];
+      }
+    }
+
+    function difficulty() {
+      // 0 → 1，分数越高间距越大
+      return Math.min(score / 24, 1);
+    }
+
+    function spawn() {
+      const last = blocks[blocks.length - 1];
+      const span = (MAX_GAP - MIN_GAP) * (0.45 + difficulty() * 0.55);
+      const spread = MIN_GAP + Math.random() * span;
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      // y 取负：新方块出现在上方（远处），镜头随着向上推进
+      const block = makeBlock(last.x + (dir * TILE_W * spread) / 2, last.y - (TILE_H * spread) / 2);
+      blocks.push(block);
+    }
+
+    /** 让当前方块停在屏幕下方的锚点上 */
+    function focusCurrent(instant = false) {
+      const cur = blocks[current];
+      if (!cur) return;
+      cam.tx = W / 2 - cur.x;
+      cam.ty = H * 0.62 - cur.y;
+      if (instant) {
+        cam.x = cam.tx;
+        cam.y = cam.ty;
+      }
+    }
+
+    function reset() {
+      blocks = [];
+      current = 0;
+      score = 0;
+      power = 0;
+      particles = [];
+      jump = null;
+
+      const first = makeBlock(0, 0);
+      blocks.push(first);
+      figure.x = first.x;
+      figure.y = first.y;
+      figure.z = 0;
+
+      spawn();
+      cam.x = cam.tx;
+      cam.y = cam.ty;
+      focusCurrent(true);
+      updateScore();
+      phase = "idle";
+    }
+
+    function updateScore() {
+      scoreEl.textContent = String(score);
+      bestEl.textContent = `最高 ${best}`;
+    }
+
+    /* ---------------- 跳跃 ---------------- */
+
+    function startCharge() {
+      if (phase !== "idle") return;
+      phase = "charging";
+      chargeStart = performance.now();
+      power = 0;
+    }
+
+    function release() {
+      if (phase !== "charging") return;
+
+      const held = (performance.now() - chargeStart) / CHARGE_MS;
+      power = Math.min(Math.max(held, 0), 1);
+
+      const cur = blocks[current];
+      const next = blocks[current + 1];
+      if (!cur || !next) {
+        phase = "idle";
+        return;
+      }
+
+      const dist = MIN_JUMP + power * (MAX_JUMP - MIN_JUMP);
+      const dirX = next.x >= cur.x ? 1 : -1;
+
+      jump = {
+        t: 0,
+        dur: 0.34 + power * 0.16,
+        fromX: figure.x,
+        fromY: figure.y,
+        toX: cur.x + (dirX * TILE_W * dist) / 2,
+        toY: cur.y - (TILE_H * dist) / 2,
+        lift: 44 + power * 52,
+      };
+
+      phase = "jumping";
+      // 镜头提前移到落点所在方块，飞行过程更顺
+      current += 1;
+      focusCurrent(false);
+      current -= 1;
+    }
+
+    function land() {
+      const target = blocks[current + 1];
+      const j = jump;
+      if (!target || !j) return;
+
+      const dx = j.toX - target.x;
+      const dy = j.toY - target.y;
+      const inside = Math.abs(dx) / (TILE_W / 2) + Math.abs(dy) / (TILE_H / 2) <= 1;
+
+      jump = null;
+      figure.z = 0;
+
+      if (!inside) {
+        phase = "over";
+        figure.x = j.toX;
+        figure.y = j.toY;
+        if (score > best) {
+          best = score;
+          localStorage.setItem(BEST_KEY, String(best));
+        }
+        updateScore();
+        showOver();
+        return;
+      }
+
+      current += 1;
+      const offset = Math.hypot(dx, dy);
+      const perfect = offset < 14;
+
+      score += perfect ? 2 : 1;
+      figure.x = j.toX;
+      figure.y = j.toY;
+      if (score > best) {
+        best = score;
+        localStorage.setItem(BEST_KEY, String(best));
+      }
+      updateScore();
+
+      if (perfect) {
+        particles.push({ x: target.x, y: target.y, r: 8, alpha: 1 });
+        particles.push({ x: target.x, y: target.y, r: 2, alpha: 0.9 });
+      }
+
+      spawn();
+      phase = "idle";
+      focusCurrent(false);
+    }
+
+    /* ---------------- 遮罩 ---------------- */
+
+    function showOver() {
+      overEyebrow!.textContent = "本局结束";
+      overTitle!.textContent = `得了 ${score} 分`;
+      overText!.textContent =
+        score >= 20
+          ? "手感相当稳。再来一局，看看能不能破纪录。"
+          : score >= 10
+            ? "不错，再练几局就能摸到节奏了。"
+            : "刚起步，先试着让蓄力停在差不多的位置。";
+      startBtn!.textContent = "再来一次";
+      overlay!.classList.add("is-open");
+    }
+
+    /* ---------------- 输入 ---------------- */
+
+    startBtn.addEventListener("click", () => {
+      overlay.classList.remove("is-open");
+      reset();
+    });
+
+    stage.addEventListener("pointerdown", (event) => {
+      if (phase === "ready" || phase === "over") return;
+      event.preventDefault();
+      startCharge();
+    });
+
+    window.addEventListener("pointerup", () => {
+      if (phase === "charging") release();
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.code !== "Space") return;
+      if (phase === "idle") {
+        event.preventDefault();
+        startCharge();
+      }
+    });
+
+    window.addEventListener("keyup", (event) => {
+      if (event.code !== "Space") return;
+      if (phase === "charging") {
+        event.preventDefault();
+        release();
+      }
+    });
+
+    /* ---------------- 更新 ---------------- */
+
+    function update(dt: number) {
+      if (phase === "charging") {
+        power = Math.min((performance.now() - chargeStart) / CHARGE_MS, 1);
+      }
+
+      if (phase === "jumping" && jump) {
+        jump.t += dt / jump.dur;
+        if (jump.t >= 1) {
+          figure.x = jump.toX;
+          figure.y = jump.toY;
+          figure.z = 0;
+          land();
+        } else {
+          const t = jump.t;
+          figure.x = jump.fromX + (jump.toX - jump.fromX) * t;
+          figure.y = jump.fromY + (jump.toY - jump.fromY) * t;
+          figure.z = Math.sin(Math.PI * t) * jump.lift;
+        }
+      }
+
+      cam.x += (cam.tx - cam.x) * Math.min(dt * 7, 1);
+      cam.y += (cam.ty - cam.y) * Math.min(dt * 7, 1);
+
+      for (const p of particles) {
+        p.r += dt * 70;
+        p.alpha -= dt * 1.6;
+      }
+      particles = particles.filter((p) => p.alpha > 0);
+    }
+
+    /* ---------------- 绘制 ---------------- */
+
+    function drawBlock(b: Block) {
+      const cx = b.x + cam.x;
+      const cy = b.y + cam.y;
+      const hw = TILE_W / 2;
+      const hh = TILE_H / 2;
+
+      if (cx < -140 || cx > W + 140 || cy < -140 || cy > H + 160) return;
+
+      // 左侧面
+      ctx!.fillStyle = b.left;
+      ctx!.beginPath();
+      ctx!.moveTo(cx - hw, cy);
+      ctx!.lineTo(cx, cy + hh);
+      ctx!.lineTo(cx, cy + hh + BLOCK_H);
+      ctx!.lineTo(cx - hw, cy + BLOCK_H);
+      ctx!.closePath();
+      ctx!.fill();
+
+      // 右侧面
+      ctx!.fillStyle = b.right;
+      ctx!.beginPath();
+      ctx!.moveTo(cx + hw, cy);
+      ctx!.lineTo(cx, cy + hh);
+      ctx!.lineTo(cx, cy + hh + BLOCK_H);
+      ctx!.lineTo(cx + hw, cy + BLOCK_H);
+      ctx!.closePath();
+      ctx!.fill();
+
+      // 顶面
+      ctx!.fillStyle = b.top;
+      ctx!.beginPath();
+      ctx!.moveTo(cx, cy - hh);
+      ctx!.lineTo(cx + hw, cy);
+      ctx!.lineTo(cx, cy + hh);
+      ctx!.lineTo(cx - hw, cy);
+      ctx!.closePath();
+      ctx!.fill();
+    }
+
+    function roundRect(x: number, y: number, w: number, h: number, r: number) {
+      ctx!.beginPath();
+      ctx!.moveTo(x + r, y);
+      ctx!.lineTo(x + w - r, y);
+      ctx!.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx!.lineTo(x + w, y + h - r);
+      ctx!.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx!.lineTo(x + r, y + h);
+      ctx!.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx!.lineTo(x, y + r);
+      ctx!.quadraticCurveTo(x, y, x + r, y);
+      ctx!.closePath();
+    }
+
+    function drawFigure() {
+      const fx = figure.x + cam.x;
+      const fy = figure.y + cam.y - figure.z;
+
+      // 地面阴影：跳得越高越淡
+      const shadowScale = 1 - Math.min(figure.z / 200, 0.55);
+      ctx!.fillStyle = T.shadow;
+      ctx!.beginPath();
+      ctx!.ellipse(fx, fy, 16 * shadowScale, 7 * shadowScale, 0, 0, Math.PI * 2);
+      ctx!.fill();
+
+      const squash = phase === "charging" ? 1 - power * 0.34 : 1;
+      const bodyW = 21;
+      const bodyH = 24 * squash;
+      const headR = 12.5;
+
+      ctx!.fillStyle = T.figure;
+
+      // 身体：矮胖一点，整体才像棋子而不是柱子
+      roundRect(fx - bodyW / 2, fy - bodyH, bodyW, bodyH, 7);
+      ctx!.fill();
+
+      // 头：略微嵌进身体，避免中间出现缝
+      ctx!.beginPath();
+      ctx!.arc(fx, fy - bodyH - headR * 0.9, headR, 0, Math.PI * 2);
+      ctx!.fill();
+
+      // 蓄力条
+      if (phase === "charging") {
+        const w = 54;
+        const x = fx - w / 2;
+        const y = fy - bodyH - headR * 2 - 18;
+        ctx!.fillStyle = "rgba(127, 127, 127, 0.24)";
+        roundRect(x, y, w, 5, 2.5);
+        ctx!.fill();
+        ctx!.fillStyle = T.ring;
+        roundRect(x, y, Math.max(w * power, 5), 5, 2.5);
+        ctx!.fill();
+      }
+    }
+
+    function draw() {
+      ctx!.fillStyle = T.bg;
+      ctx!.fillRect(0, 0, W, H);
+
+      // 由远及近：y 小的先画
+      const sorted = [...blocks].sort((a, b) => a.y - b.y);
+      for (const b of sorted) drawBlock(b);
+
+      drawFigure();
+
+      for (const p of particles) {
+        ctx!.strokeStyle = T.ring;
+        ctx!.globalAlpha = Math.max(p.alpha, 0);
+        ctx!.lineWidth = 2;
+        ctx!.beginPath();
+        ctx!.ellipse(p.x + cam.x, p.y + cam.y, p.r, p.r / 2, 0, 0, Math.PI * 2);
+        ctx!.stroke();
+        ctx!.globalAlpha = 1;
+      }
+    }
+
+    /* ---------------- 主循环 ---------------- */
+
+    let last = performance.now();
+
+    function loop(now: number) {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      if (phase !== "ready") update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    /* ---------------- 启动 ---------------- */
+
+    bestEl.textContent = `最高 ${best}`;
+    resize();
+    reset();
+    phase = "ready";
+
+    // /games/jump/#play 可直接开局，跳过开始遮罩
+    if (location.hash === "#play") {
+      overlay.classList.remove("is-open");
+      reset();
+    }
+
+    window.addEventListener("resize", () => resize());
+
+    // 站点主题切换只改 data-theme，不发事件，这里直接观察属性
+    new MutationObserver(() => applyTheme()).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+
+    requestAnimationFrame(loop);
+  })();
+</script>
+
+<style>
+  .page-head {
+    padding: 52px 0 30px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .page-head h1 {
+    margin: 14px 0 12px;
+    font-size: clamp(34px, 5vw, 46px);
+    letter-spacing: -0.03em;
+  }
+
+  .page-lede {
+    margin: 0;
+    max-width: 36em;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.9;
+  }
+
+  .stage {
+    position: relative;
+    height: 470px;
+    max-width: 720px;
+    margin: 30px auto 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-sunk);
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    cursor: pointer;
+  }
+
+  #game {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .hud {
+    position: absolute;
+    top: 16px;
+    left: 18px;
+    pointer-events: none;
+  }
+
+  .score-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .score {
+    font-family: var(--font-serif);
+    font-size: 38px;
+    line-height: 1;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .best {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: color-mix(in srgb, var(--paper) 78%, transparent);
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s var(--ease);
+  }
+
+  .overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+  }
+
+  .panel h2 {
+    margin: 12px 0 10px;
+    font-size: 24px;
+  }
+
+  .panel p {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.85;
+    color: var(--muted);
+  }
+
+  .btn {
+    margin-top: 20px;
+    padding: 10px 26px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s var(--ease), transform 0.2s var(--ease);
+  }
+
+  .btn:hover {
+    background: var(--accent-ink);
+    transform: translateY(-1px);
+  }
+
+  .kbd {
+    margin-top: 12px !important;
+    font-size: 11.5px !important;
+    opacity: 0.7;
+  }
+
+  .foot {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 26px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+
+  .foot-note {
+    margin: 0;
+    max-width: 42em;
+    font-size: 13px;
+    line-height: 1.85;
+    color: var(--muted);
+  }
+
+  .back {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+    transition: color 0.2s var(--ease);
+  }
+
+  .back svg {
+    transform: rotate(180deg);
+  }
+
+  .back:hover {
+    color: var(--accent-ink);
+  }
+
+  @media (max-width: 640px) {
+    .stage {
+      height: 440px;
+    }
+    .score {
+      font-size: 30px;
+    }
+    .foot {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 14px;
+    }
+  }
+</style>

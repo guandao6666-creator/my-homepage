@@ -33,12 +33,14 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
     <div class="grid">
       {PROJECTS.map((item) => {
         const Wrapper = item.href ? "a" : "div";
+        // 站内作品直接跳转，站外才新开标签
+        const isExternal = Boolean(item.href && /^https?:/i.test(item.href));
         return (
           <Wrapper
             class:list={["card", { "card--link": Boolean(item.href) }]}
             href={item.href}
-            target={item.href ? "_blank" : undefined}
-            rel={item.href ? "noopener" : undefined}
+            target={isExternal ? "_blank" : undefined}
+            rel={isExternal ? "noopener" : undefined}
           >
             <div class="card-top">
               <span class="year">{item.year}</span>
