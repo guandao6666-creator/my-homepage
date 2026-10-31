@@ -98,8 +98,12 @@ dist/**/index.html  →  CDN / 静态托管
 
 写作在云端进行，发布仍然是一份纯静态产物。所以：
 
-- 后台保存文章后，需要重新构建一次站点（CI 里推送代码即触发）；
+- 后台保存已发布的文章后，会主动调 `trigger_sync()` 触发一次 GitHub Actions 同步，**约 2 分钟上线**；
+- `auto-publish.yml` 的定时任务每 10 分钟检查一次，但 GitHub 的 schedule 实际常被延迟到 30 分钟以上，只作兜底；
 - 渲染管线只有一条，本地写 Markdown 和云端写作最终都走同一套逻辑。
+
+触发同步需要一个 GitHub 细粒度令牌（只勾 `Actions: Read and write`），
+填法见 `supabase/notify.sql` 末尾；后台左侧也有「同步上线」按钮可以手动触发。
 
 ### 权限模型
 
