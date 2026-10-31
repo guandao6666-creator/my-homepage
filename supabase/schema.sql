@@ -164,6 +164,14 @@ create policy "likes_insert"
     and char_length(target_id) between 1 and 80
   );
 
+-- 站长可以清理异常点赞（访客仍然删不了）
+drop policy if exists "likes_admin" on public.likes;
+create policy "likes_admin"
+  on public.likes for all
+  to authenticated
+  using (true)
+  with check (true);
+
 -- ============================================================
 --  使用说明
 --  1. Authentication → Users → Add user 创建一个账号（关闭邮箱验证更方便）。
