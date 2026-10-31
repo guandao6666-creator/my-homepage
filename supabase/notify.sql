@@ -32,8 +32,16 @@ create table if not exists public.notify_config (
   resend_key     text,
   mail_to        text,
   mail_from      text default 'onboarding@resend.dev',
+  github_token   text,
+  github_repo    text default 'guandao6666-creator/my-homepage',
+  github_branch  text default 'main',
   updated_at     timestamptz not null default now()
 );
+
+-- 老库补列
+alter table public.notify_config add column if not exists github_token text;
+alter table public.notify_config add column if not exists github_repo text default 'guandao6666-creator/my-homepage';
+alter table public.notify_config add column if not exists github_branch text default 'main';
 
 alter table public.notify_config enable row level security;
 
@@ -127,6 +135,52 @@ create trigger comments_notify
   when (new.visible)
   execute function public.notify_new_comment();
 
+
+-- ============================================================
+--  发布后立即同步（可选，需要 GitHub 令牌）
+--
+--  GitHub 的 schedule 实际会被限流，10 分钟的任务常常 35 分钟才跑一次。
+--  这个函数让后台保存文章后主动触发一次 auto-publish，约 2 分钟上线。
+--
+--  1. GitHub → Settings → Developer settings → Fine-grained tokens
+--     只选这个仓库，权限勾 Actions: Read and write
+--  2. update public.notify_config set github_token = 'github_pat_xxx' where id = 1;
+-- ============================================================
+create or replace function public.trigger_sync()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions, net
+as $$
+declare
+  cfg public.notify_config;
+begin
+  select * into cfg from public.notify_config where id = 1;
+  if not found or cfg.github_token is null or length(cfg.github_token) = 0 then
+    return jsonb_build_object('ok', false, 'reason', 'no_token');
+  end if;
+
+  perform net.http_post(
+    url := 'https://api.github.com/repos/' || cfg.github_repo ||
+           '/actions/workflows/auto-publish.yml/dispatches',
+    body := jsonb_build_object('ref', coalesce(cfg.github_branch, 'main')),
+    headers := jsonb_build_object(
+      'Accept', 'application/vnd.github+json',
+      'Authorization', 'Bearer ' || cfg.github_token,
+      'Content-Type', 'application/json',
+      'User-Agent', 'guandao-blog'
+    )
+  );
+
+  return jsonb_build_object('ok', true);
+exception when others then
+  return jsonb_build_object('ok', false, 'reason', sqlerrm);
+end;
+$$;
+
+revoke all on function public.trigger_sync() from public;
+revoke all on function public.trigger_sync() from anon;
+grant execute on function public.trigger_sync() to authenticated;
 
 -- ============================================================
 --  填 token（把下面的值换成自己的，然后取消注释执行）

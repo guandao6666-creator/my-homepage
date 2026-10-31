@@ -214,6 +214,40 @@ export function deleteCloudPost(id: string) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 发布触发                                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 让 GitHub 立刻跑一次 auto-publish 工作流，而不是等定时任务。
+ *
+ * token 存在数据库里，由服务端函数读取，前端不接触凭据。
+ * 没配 token 时返回 { ok: false, reason: "no_token" }，不抛错。
+ */
+export async function triggerSync(): Promise<{ ok: boolean; reason?: string }> {
+  const config = cloudConfig();
+  if (!config) throw new Error("尚未配置云端环境变量");
+  const session = loadSession();
+  if (!session) throw new Error("请先登录");
+
+  const res = await fetch(`${config.url}/rest/v1/rpc/trigger_sync`, {
+    method: "POST",
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${session.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`触发同步失败（${res.status}）${detail ? `: ${detail.slice(0, 120)}` : ""}`);
+  }
+
+  return (await res.json()) as { ok: boolean; reason?: string };
+}
+
+/* ------------------------------------------------------------------ */
 /* Comments                                                            */
 /* ------------------------------------------------------------------ */
 

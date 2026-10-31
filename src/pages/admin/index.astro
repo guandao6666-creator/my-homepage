@@ -89,7 +89,10 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
                 <span class="dot" id="comment-dot" hidden aria-label="有新留言"></span>
               </button>
             </div>
-            <button class="mini" id="new-post" type="button">+ 新建</button>
+            <div class="list-actions">
+              <button class="mini" id="sync-now" type="button">同步上线</button>
+              <button class="mini" id="new-post" type="button">+ 新建</button>
+            </div>
           </div>
           <div class="list-body" id="post-rows">
             <p class="list-empty">加载中…</p>
@@ -669,6 +672,12 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     border-color: color-mix(in srgb, #a33232 30%, var(--line));
   }
 
+  .list-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   /* ---------------- 笔记 ---------------- */
 
   .note-pane {
@@ -989,6 +998,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     listCloudNotes,
     createCloudNote,
     deleteCloudNote,
+    triggerSync,
     type CloudPost,
     type CloudComment,
     type CloudNote,
@@ -1436,6 +1446,26 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
 
   $("new-post").addEventListener("click", resetForm);
 
+  $("sync-now").addEventListener("click", async () => {
+    const btn = $("sync-now");
+    if (btn.classList.contains("busy")) return;
+    btn.classList.add("busy");
+    try {
+      const result = await triggerSync();
+      if (result.ok) {
+        toast("已触发同步，约 2 分钟后上线");
+      } else if (result.reason === "no_token") {
+        toast("还没配置 GitHub 令牌，见 supabase/notify.sql 末尾说明");
+      } else {
+        toast(`触发失败：${result.reason ?? "未知原因"}`);
+      }
+    } catch (error) {
+      toast((error as Error).message);
+    } finally {
+      btn.classList.remove("busy");
+    }
+  });
+
   fields.title.addEventListener("input", () => {
     if (!editingId && !fields.slug.dataset.touched) {
       fields.slug.value = slugify(fields.title.value);
@@ -1557,7 +1587,21 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
         toast("已创建");
       }
       renderRows();
-      toast(payload.published ? "已保存，约 10 分钟内自动上线" : "已保存为草稿");
+
+      if (payload.published) {
+        // 已发布：立刻让 GitHub 跑一次同步，不必等定时任务
+        toast("已保存，正在触发同步…");
+        const result = await triggerSync().catch(() => ({ ok: false, reason: "error" }));
+        toast(
+          result.ok
+            ? "已同步，约 2 分钟后上线"
+            : result.reason === "no_token"
+              ? "已保存。未配置 GitHub 令牌，只能等定时任务"
+              : "已保存。触发同步失败，可在左侧手动同步",
+        );
+      } else {
+        toast("已保存为草稿");
+      }
     } catch (error) {
       editorError.textContent = (error as Error).message;
       editorError.hidden = false;
