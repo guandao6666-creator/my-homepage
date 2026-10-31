@@ -1,0 +1,410 @@
+---
+/**
+ * 角落里的鲸鲸。
+ *
+ * 形象取自 DeepSeek 蓝鲸 logo 的社区共识（圆胖、爱吃白饭、嘴硬），
+ * 但整体是原创的 Q 版造型，不使用官方素材，也不复刻他人的鲸鱼娘二创。
+ */
+---
+
+<div class="pet" id="pet" aria-hidden="false">
+  <p class="pet-bubble" id="pet-bubble" role="status" aria-live="polite"></p>
+
+  <button class="pet-btn" id="pet-btn" type="button" aria-label="摸摸鲸鲸">
+    <svg viewBox="0 0 100 100" class="pet-svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="petBody" x1="0" y1="0" x2="0.2" y2="1">
+          <stop offset="0" stop-color="#6280FF" />
+          <stop offset="1" stop-color="#3450CE" />
+        </linearGradient>
+        <linearGradient id="petBelly" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#F2F5FF" />
+          <stop offset="1" stop-color="#DCE4FF" />
+        </linearGradient>
+      </defs>
+
+      <!-- 尾鳍：从右下探出来，是鲸鱼最好认的特征 -->
+      <g class="pet-tail">
+        <path d="M70 68 C 82 79, 96 73, 97 57 C 93 68, 82 69, 70 59 Z" fill="#3450CE" />
+        <path
+          d="M87 62.5 L 93.5 67.5"
+          stroke="#2A44BE"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          opacity="0.65"
+        />
+      </g>
+
+      <!-- 身体 -->
+      <path
+        d="M50 23 C 69 23, 84 38, 84 58 C 84 77, 69 91, 50 91 C 31 91, 16 77, 16 58 C 16 38, 31 23, 50 23 Z"
+        fill="url(#petBody)"
+      />
+
+      <!-- 头顶高光 -->
+      <ellipse
+        cx="37"
+        cy="39"
+        rx="12"
+        ry="7.5"
+        fill="#FFFFFF"
+        opacity="0.16"
+        transform="rotate(-22 37 39)"
+      />
+
+      <!-- 肚子 -->
+      <ellipse cx="50" cy="75" rx="24" ry="14.5" fill="url(#petBelly)" opacity="0.95" />
+
+      <!-- 眼睛（外层跟随鼠标，内层负责眨眼） -->
+      <g class="pet-eye-track">
+        <g class="pet-eye-lid">
+          <circle cx="39" cy="53" r="6.6" fill="#141B33" />
+          <circle cx="41.2" cy="50.6" r="2.3" fill="#FFFFFF" />
+        </g>
+      </g>
+      <g class="pet-eye-track">
+        <g class="pet-eye-lid">
+          <circle cx="61" cy="53" r="6.6" fill="#141B33" />
+          <circle cx="63.2" cy="50.6" r="2.3" fill="#FFFFFF" />
+        </g>
+      </g>
+
+      <!-- 腮红 -->
+      <ellipse cx="30" cy="63" rx="5.2" ry="3.1" fill="#FF9BC2" opacity="0.42" />
+      <ellipse cx="70" cy="63" rx="5.2" ry="3.1" fill="#FF9BC2" opacity="0.42" />
+
+      <!-- 嘴 -->
+      <path
+        d="M45.5 65 Q 50 69.4 54.5 65"
+        fill="none"
+        stroke="#141B33"
+        stroke-width="1.9"
+        stroke-linecap="round"
+      />
+
+      <!-- 喷水孔 -->
+      <ellipse cx="50" cy="26" rx="3.4" ry="1.9" fill="#2B44BE" opacity="0.6" />
+
+      <!-- 喷出来的水花 -->
+      <g class="pet-spout">
+        <circle cx="50" cy="18" r="2.6" fill="#8FA6FF" />
+        <circle cx="42.5" cy="12.5" r="1.9" fill="#8FA6FF" opacity="0.8" />
+        <circle cx="57.5" cy="12.5" r="1.9" fill="#8FA6FF" opacity="0.8" />
+      </g>
+    </svg>
+  </button>
+</div>
+
+<script>
+  (() => {
+    const pet = document.getElementById("pet");
+    const btn = document.getElementById("pet-btn");
+    const bubble = document.getElementById("pet-bubble");
+    if (!pet || !btn || !bubble) return;
+
+    const LINES = [
+      "别戳，在摸鱼",
+      "叫我鲸鲸就好",
+      "今天吃白饭了吗",
+      "我不是胖，是圆",
+      "写完再来找我玩",
+      "困了，眯一会儿",
+      "又摸鱼？带我一个",
+    ];
+
+    let bubbleTimer: number | undefined;
+    let clickCount = 0;
+    let clickTimer: number | undefined;
+    let idleTimer: number | undefined;
+
+    const say = (text: string, ms = 2400) => {
+      bubble.textContent = text;
+      bubble.classList.add("show");
+      window.clearTimeout(bubbleTimer);
+      bubbleTimer = window.setTimeout(() => bubble.classList.remove("show"), ms);
+    };
+
+    const popBubbles = (count = 7) => {
+      for (let i = 0; i < count; i += 1) {
+        const dot = document.createElement("span");
+        dot.className = "pet-particle";
+        dot.style.left = `${26 + Math.random() * 48}%`;
+        dot.style.setProperty("--dx", `${(Math.random() - 0.5) * 54}px`);
+        dot.style.setProperty("--dur", `${0.7 + Math.random() * 0.6}s`);
+        dot.style.setProperty("--delay", `${Math.random() * 0.12}s`);
+        pet.appendChild(dot);
+        window.setTimeout(() => dot.remove(), 1600);
+      }
+    };
+
+    btn.addEventListener("click", () => {
+      pet.classList.add("is-happy");
+      window.setTimeout(() => pet.classList.remove("is-happy"), 640);
+      popBubbles();
+
+      // 连着戳会被"凶"
+      clickCount += 1;
+      window.clearTimeout(clickTimer);
+      clickTimer = window.setTimeout(() => {
+        clickCount = 0;
+      }, 2600);
+
+      if (clickCount >= 5) {
+        clickCount = 0;
+        say("再戳就吃掉你的白饭");
+        return;
+      }
+
+      const line = LINES[Math.floor(Math.random() * LINES.length)];
+      say(line);
+    });
+
+    // 眼睛跟着鼠标转，位移控制在 2px 内
+    window.addEventListener(
+      "mousemove",
+      (event) => {
+        const rect = btn.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const dx = Math.max(-2.2, Math.min(2.2, (event.clientX - cx) / 60));
+        const dy = Math.max(-1.6, Math.min(1.6, (event.clientY - cy) / 60));
+        pet.style.setProperty("--eye-x", `${dx}px`);
+        pet.style.setProperty("--eye-y", `${dy}px`);
+      },
+      { passive: true },
+    );
+
+    // 一分钟没人理就打瞌睡
+    const resetIdle = () => {
+      pet.classList.remove("is-sleepy");
+      window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(() => {
+        pet.classList.add("is-sleepy");
+        say("Zzz…", 3200);
+      }, 60_000);
+    };
+
+    ["mousemove", "scroll", "keydown", "touchstart"].forEach((name) =>
+      window.addEventListener(name, resetIdle, { passive: true }),
+    );
+    resetIdle();
+  })();
+</script>
+
+<style>
+  .pet {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    z-index: 60;
+    width: 78px;
+    height: 78px;
+    --eye-x: 0px;
+    --eye-y: 0px;
+  }
+
+  .pet-btn {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    animation: petFloat 4.2s ease-in-out infinite;
+    filter: drop-shadow(0 8px 14px rgba(28, 40, 92, 0.2));
+    transition: filter 0.3s var(--ease);
+  }
+
+  .pet-btn:hover {
+    filter: drop-shadow(0 11px 20px rgba(28, 40, 92, 0.28));
+  }
+
+  .pet-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .pet-tail {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: petTail 3.2s ease-in-out infinite;
+  }
+
+  .pet-spout {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+    animation: petSpout 3.6s ease-out infinite;
+  }
+
+  .pet-eye-track {
+    transform: translate(var(--eye-x), var(--eye-y));
+    transition: transform 0.18s ease-out;
+  }
+
+  .pet-eye-lid {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: petBlink 5.4s infinite;
+  }
+
+  .pet-bubble {
+    position: absolute;
+    right: 4px;
+    bottom: calc(100% + 8px);
+    max-width: 168px;
+    margin: 0;
+    padding: 7px 11px;
+    border: 1px solid var(--line);
+    border-radius: 12px 12px 2px 12px;
+    background: var(--surface);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(5px) scale(0.96);
+    transform-origin: bottom right;
+    transition: opacity 0.22s var(--ease), transform 0.22s var(--ease);
+    pointer-events: none;
+  }
+
+  .pet-bubble.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  /* 粒子由脚本创建，拿不到 scoped 属性 */
+  :global(.pet-particle) {
+    position: absolute;
+    bottom: 42%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(98, 128, 255, 0.5);
+    pointer-events: none;
+    animation: petPop var(--dur, 0.8s) ease-out var(--delay, 0s) forwards;
+  }
+
+  .pet.is-happy .pet-btn {
+    animation: petHappy 0.64s var(--ease);
+  }
+
+  .pet.is-sleepy .pet-btn {
+    animation: petFloat 6.4s ease-in-out infinite;
+    filter: drop-shadow(0 6px 12px rgba(28, 40, 92, 0.14)) saturate(0.9);
+  }
+
+  .pet.is-sleepy .pet-eye-lid {
+    animation: petSleep 1.6s ease-in-out infinite;
+  }
+
+  @keyframes petSpout {
+    0%,
+    62% {
+      opacity: 0;
+      transform: translateY(3px) scale(0.6);
+    }
+    72% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    90% {
+      opacity: 0.85;
+      transform: translateY(-6px) scale(1.05);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-10px) scale(1.1);
+    }
+  }
+
+  @keyframes petFloat {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes petHappy {
+    0% {
+      transform: translateY(0) scale(1);
+    }
+    28% {
+      transform: translateY(-11px) scale(1.07, 0.93);
+    }
+    58% {
+      transform: translateY(0) scale(0.96, 1.04);
+    }
+    100% {
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes petTail {
+    0%,
+    100% {
+      transform: rotate(-7deg);
+    }
+    50% {
+      transform: rotate(7deg);
+    }
+  }
+
+  @keyframes petBlink {
+    0%,
+    93%,
+    100% {
+      transform: scaleY(1);
+    }
+    96% {
+      transform: scaleY(0.1);
+    }
+  }
+
+  @keyframes petSleep {
+    0%,
+    100% {
+      transform: scaleY(0.12);
+    }
+    50% {
+      transform: scaleY(0.24);
+    }
+  }
+
+  @keyframes petPop {
+    0% {
+      transform: translate(0, 0) scale(1);
+      opacity: 0.75;
+    }
+    100% {
+      transform: translate(var(--dx, 0), -48px) scale(0.3);
+      opacity: 0;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .pet {
+      right: 13px;
+      bottom: 13px;
+      width: 62px;
+      height: 62px;
+    }
+    .pet-bubble {
+      font-size: 11.5px;
+      max-width: 140px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pet-btn,
+    .pet-tail,
+    .pet-ahoge,
+    .pet-eye-lid {
+      animation: none;
+    }
+  }
+</style>

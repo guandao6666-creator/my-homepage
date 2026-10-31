@@ -4,6 +4,7 @@ import { SITE } from "../lib/site";
 import { cloudConfig } from "../lib/cloud";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
+import Pet from "../components/Pet.astro";
 
 const cloud = cloudConfig();
 
@@ -125,6 +126,7 @@ const fullJsonLd = jsonLd
       <slot />
     </main>
     <Footer />
+    <Pet />
 
     <script is:inline>
       (() => {
