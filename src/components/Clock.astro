@@ -1,131 +1,198 @@
 ---
 /**
- * 动态时钟：小时分钟 + 日期，下面一条按秒推进的细线。
+ * 模拟表盘 + 数字读数。
  *
- * 时间在客户端每秒刷新，服务端先渲染占位，避免构建时间被缓存。
+ * 三根指针用 CSS animation 走：靠负的 animation-delay 把初始角度
+ * 对齐到当前时刻，之后纯 CSS 旋转，几乎没有 JS 开销。
  */
 ---
 
 <div class="clock">
-  <div class="clock-row">
-    <time class="clock-time" id="clock-time">
-      <span id="clock-h">--</span><span class="clock-colon">:</span><span id="clock-m">--</span>
-    </time>
-    <span class="clock-date" id="clock-date"></span>
-  </div>
-  <div class="clock-track" aria-hidden="true">
-    <span class="clock-bar" id="clock-bar"></span>
+  <svg class="dial" id="dial" viewBox="0 0 120 120" aria-hidden="true">
+    <circle class="dial-rim" cx="60" cy="60" r="56" />
+    <circle class="dial-inner" cx="60" cy="60" r="48" />
+
+    <g class="dial-ticks">
+      <circle cx="60" cy="9" r="1.4" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(30 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(60 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(90 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(120 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(150 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(180 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(210 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(240 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(270 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(300 60 60)" />
+      <circle cx="60" cy="9" r="1.4" transform="rotate(330 60 60)" />
+    </g>
+
+    <line class="hand hand-hour" x1="60" y1="60" x2="60" y2="38" />
+    <line class="hand hand-minute" x1="60" y1="60" x2="60" y2="24" />
+    <line class="hand hand-second" x1="60" y1="70" x2="60" y2="16" />
+
+    <circle class="dial-center" cx="60" cy="60" r="2.6" />
+  </svg>
+
+  <div class="readout">
+    <span class="digital" id="clock-digital">--:--:--</span>
+    <span class="date" id="clock-date"></span>
   </div>
 </div>
 
 <script>
   (() => {
-    const hEl = document.getElementById("clock-h");
-    const mEl = document.getElementById("clock-m");
+    const dial = document.getElementById("dial");
+    const digital = document.getElementById("clock-digital");
     const dateEl = document.getElementById("clock-date");
-    const barEl = document.getElementById("clock-bar");
-    if (!hEl || !mEl || !dateEl || !barEl) return;
+    if (!dial || !digital || !dateEl) return;
+
+    const hourHand = dial.querySelector(".hand-hour") as SVGLineElement | null;
+    const minuteHand = dial.querySelector(".hand-minute") as SVGLineElement | null;
+    const secondHand = dial.querySelector(".hand-second") as SVGLineElement | null;
+    if (!hourHand || !minuteHand || !secondHand) return;
 
     const WEEK = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
     const pad = (n: number) => String(n).padStart(2, "0");
 
-    let lastMinute = "";
+    /** 用负延迟把指针拨到当前角度，之后交给 CSS 自己转 */
+    const syncHands = () => {
+      const now = new Date();
+      const seconds = now.getSeconds() + now.getMilliseconds() / 1000;
+      const minutes = now.getMinutes() + seconds / 60;
+      const hours = (now.getHours() % 12) + minutes / 60;
+
+      secondHand.style.animationDelay = `-${seconds}s`;
+      minuteHand.style.animationDelay = `-${minutes * 60}s`;
+      hourHand.style.animationDelay = `-${hours * 3600}s`;
+    };
+
+    let lastSecond = -1;
 
     const tick = () => {
       const now = new Date();
-      const hh = pad(now.getHours());
-      const mm = pad(now.getMinutes());
-      const key = `${hh}${mm}`;
+      if (now.getSeconds() === lastSecond) return;
+      lastSecond = now.getSeconds();
 
-      if (key !== lastMinute) {
-        hEl.textContent = hh;
-        mEl.textContent = mm;
-        dateEl.textContent = `${now.getMonth() + 1} 月 ${now.getDate()} 日 · ${WEEK[now.getDay()]}`;
-        lastMinute = key;
-      }
-
-      barEl.style.width = `${((now.getSeconds() + now.getMilliseconds() / 1000) / 60) * 100}%`;
+      digital.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      dateEl.textContent = `${now.getMonth() + 1} 月 ${now.getDate()} 日 · ${WEEK[now.getDay()]}`;
     };
 
+    syncHands();
     tick();
     window.setInterval(tick, 1000);
 
-    // 从后台切回来时立刻校准一次
+    // 切回页面时，指针和数字都重新对齐
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) tick();
+      if (document.hidden) return;
+      lastSecond = -1;
+      syncHands();
+      tick();
     });
   })();
 </script>
 
 <style>
   .clock {
-    margin-bottom: 18px;
-  }
-
-  .clock-row {
     display: flex;
-    align-items: baseline;
-    gap: 10px;
+    align-items: center;
+    gap: 18px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px dashed var(--line);
   }
 
-  .clock-time {
+  .dial {
+    flex: none;
+    width: 88px;
+    height: 88px;
+  }
+
+  .dial-rim {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  .dial-inner {
+    fill: none;
+    stroke: color-mix(in srgb, var(--line) 55%, transparent);
+    stroke-width: 0.8;
+  }
+
+  .dial-ticks circle {
+    fill: color-mix(in srgb, var(--muted) 80%, transparent);
+  }
+
+  .hand {
+    stroke-linecap: round;
+    transform-box: view-box;
+    transform-origin: 60px 60px;
+  }
+
+  .hand-hour {
+    stroke: var(--ink);
+    stroke-width: 3.4;
+    animation: dial-spin 43200s linear infinite;
+  }
+
+  .hand-minute {
+    stroke: var(--ink-2);
+    stroke-width: 2;
+    animation: dial-spin 3600s linear infinite;
+  }
+
+  .hand-second {
+    stroke: var(--accent);
+    stroke-width: 1.1;
+    animation: dial-spin 60s linear infinite;
+  }
+
+  .dial-center {
+    fill: var(--ink);
+  }
+
+  .readout {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .digital {
     font-family: var(--font-serif);
-    font-size: 30px;
+    font-size: 22px;
     line-height: 1;
-    letter-spacing: 0.01em;
     color: var(--ink);
+    letter-spacing: 0.005em;
     font-variant-numeric: tabular-nums;
   }
 
-  .clock-colon {
-    display: inline-block;
-    margin: 0 1px;
-    animation: clockBlink 2s steps(1, end) infinite;
-  }
-
-  .clock-date {
-    margin-left: auto;
+  .date {
     font-size: 11.5px;
     color: var(--muted);
     letter-spacing: 0.02em;
   }
 
-  .clock-track {
-    position: relative;
-    height: 2px;
-    margin-top: 13px;
-    border-radius: 2px;
-    background: color-mix(in srgb, var(--line) 70%, transparent);
-    overflow: hidden;
-  }
-
-  .clock-bar {
-    display: block;
-    width: 0;
-    height: 100%;
-    border-radius: 2px;
-    background: var(--accent);
-    opacity: 0.55;
-    transition: width 1s linear;
-  }
-
-  @keyframes clockBlink {
-    0%,
-    50% {
-      opacity: 1;
+  @keyframes dial-spin {
+    to {
+      transform: rotate(360deg);
     }
-    50.01%,
-    100% {
-      opacity: 0.28;
+  }
+
+  @media (max-width: 480px) {
+    .dial {
+      width: 84px;
+      height: 84px;
+    }
+    .digital {
+      font-size: 22px;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .clock-colon {
+    .hand {
       animation: none;
-    }
-    .clock-bar {
-      transition: none;
     }
   }
 </style>
