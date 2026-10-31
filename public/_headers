@@ -1,0 +1,20 @@
+# Cloudflare 静态资源响应头
+#
+# 关键点：404 不要被边缘缓存。默认策略下不存在的路径会被 CDN 记住，
+# 部署前访问过 /os/ 的人之后会一直拿到缓存的 404。
+
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/404.html
+  Cache-Control: no-store
+
+# Astro 产出的带哈希资源，内容一变文件名就变，可以长期缓存
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/pet/*
+  Cache-Control: public, max-age=604800
