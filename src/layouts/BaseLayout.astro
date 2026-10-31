@@ -129,30 +129,51 @@ const fullJsonLd = jsonLd
     </script>
 
     <script>
-      // 给文章卡片补上「N 条留言」：评论存在云端，构建期拿不到，只能运行时补齐
+      // 给文章卡片补上「N 条留言」「N 喜欢」：数据在云端，构建期拿不到，只能运行时补齐
       (() => {
-        const targets = document.querySelectorAll("[data-cmt]");
-        if (!targets.length) return;
+        const cmtEls = document.querySelectorAll("[data-cmt]");
+        const likeEls = document.querySelectorAll("[data-likes]");
+        if (!cmtEls.length && !likeEls.length) return;
         const root = document.documentElement;
         const url = (root.dataset.sbUrl || "").replace(/\/$/, "");
         const key = root.dataset.sbKey || "";
         if (!url || !key) return;
 
-        fetch(`${url}/rest/v1/comments?select=post_slug&limit=2000`, { headers: { apikey: key } })
-          .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-          .then((rows) => {
-            const counts = new Map();
-            for (const row of rows) {
-              counts.set(row.post_slug, (counts.get(row.post_slug) ?? 0) + 1);
-            }
-            for (const el of targets) {
-              const n = counts.get(el.dataset.cmt ?? "") ?? 0;
-              if (!n) continue;
-              el.textContent = `${n} 条留言`;
-              el.hidden = false;
-            }
-          })
-          .catch(() => undefined);
+        const fill = (counts, els, attr, suffix) => {
+          for (const el of els) {
+            const n = counts.get(el.dataset[attr] ?? "") ?? 0;
+            if (!n) continue;
+            el.textContent = `${n} ${suffix}`;
+            el.hidden = false;
+          }
+        };
+
+        if (cmtEls.length) {
+          fetch(`${url}/rest/v1/comments?select=post_slug&limit=2000`, { headers: { apikey: key } })
+            .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+            .then((rows) => {
+              const counts = new Map();
+              for (const row of rows) {
+                counts.set(row.post_slug, (counts.get(row.post_slug) ?? 0) + 1);
+              }
+              fill(counts, cmtEls, "cmt", "条留言");
+            })
+            .catch(() => undefined);
+        }
+
+        if (likeEls.length) {
+          fetch(`${url}/rest/v1/likes?select=target_type,target_id&limit=5000`, { headers: { apikey: key } })
+            .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+            .then((rows) => {
+              const counts = new Map();
+              for (const row of rows) {
+                if (row.target_type !== "post") continue;
+                counts.set(row.target_id, (counts.get(row.target_id) ?? 0) + 1);
+              }
+              fill(counts, likeEls, "likes", "喜欢");
+            })
+            .catch(() => undefined);
+        }
       })();
     </script>
   </body>

@@ -34,6 +34,7 @@ const gradient = coverGradient(post);
             <span class="sep" />
             <span>{post.minutes} 分钟</span>
             <span class="cmt" data-cmt={post.slug} hidden></span>
+            <span class="lks" data-likes={post.slug} hidden></span>
           </div>
           <h3>{post.title}</h3>
           <p>{post.description}</p>
@@ -54,6 +55,7 @@ const gradient = coverGradient(post);
             <span class="sep" />
             <span>{post.minutes} 分钟</span>
             <span class="cmt" data-cmt={post.slug} hidden></span>
+            <span class="lks" data-likes={post.slug} hidden></span>
             {post.featured && <span class="pin">推荐</span>}
           </div>
           <h3>{post.title}</h3>
@@ -130,15 +132,17 @@ const gradient = coverGradient(post);
     letter-spacing: 0.04em;
   }
 
-  /* 留言数：由 BaseLayout 的脚本填充，0 条时保持 hidden */
-  .cmt {
+  /* 留言数 / 点赞数：由 BaseLayout 的脚本填充，0 时保持 hidden */
+  .cmt,
+  .lks {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     color: var(--muted);
   }
 
-  .cmt::before {
+  .cmt::before,
+  .lks::before {
     content: "";
     width: 3px;
     height: 3px;
