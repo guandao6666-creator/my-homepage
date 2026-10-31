@@ -12,6 +12,8 @@ export const SITE = {
   url: "https://guandao.xin",
   locale: "zh-CN",
   email: "guandao6666@gmail.com",
+  /** Supabase 里站长账号的 user id —— 留言标「站长」而不是「成员」 */
+  ownerUserId: "52b489c6-3be5-4f29-8e49-4cb8020560de",
   startYear: 2024,
   nav: [
     { href: "/blog/", label: "文章" },

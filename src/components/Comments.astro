@@ -246,6 +246,11 @@ const cloud = cloudConfig();
     vertical-align: 1px;
   }
 
+  .comment-badge.is-owner {
+    background: var(--accent);
+    color: #fff;
+  }
+
   .comment-author,
   .comment-body,
   .reply-author,
@@ -530,6 +535,10 @@ const cloud = cloudConfig();
 
 <script>
   import { loadSession, signIn, signUp, signOut, type Session } from "../lib/cloud";
+  import { SITE } from "../lib/site";
+
+  /** 站长自己的留言标「站长」，其他登录用户标「成员」 */
+  const OWNER_ID = SITE.ownerUserId;
 
   (() => {
     const root = document.getElementById("comments");
@@ -732,9 +741,10 @@ const cloud = cloudConfig();
       name.className = "comment-name";
       name.textContent = c.author;
       if (c.user_id) {
+        const isOwner = c.user_id === OWNER_ID;
         const badge = document.createElement("em");
-        badge.className = "comment-badge";
-        badge.textContent = "成员";
+        badge.className = isOwner ? "comment-badge is-owner" : "comment-badge";
+        badge.textContent = isOwner ? "站长" : "成员";
         name.append(badge);
       }
       const time = document.createElement("span");
