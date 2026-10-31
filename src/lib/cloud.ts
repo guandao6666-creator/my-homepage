@@ -42,6 +42,7 @@ export interface Session {
   refreshToken: string;
   email: string;
   expiresAt: number;
+  userId?: string;
 }
 
 const STORAGE_KEY = "guandao.blog.session";
@@ -88,7 +89,8 @@ interface TokenResponse {
   access_token: string;
   refresh_token: string;
   expires_in: number;
-  user?: { email?: string };
+  user?: { id?: string; email?: string };
+  session?: { access_token: string; refresh_token: string; expires_in: number };
 }
 
 export async function signIn(email: string, password: string): Promise<Session> {
@@ -98,6 +100,24 @@ export async function signIn(email: string, password: string): Promise<Session> 
     refreshToken: data.refresh_token,
     email: data.user?.email ?? email,
     expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+    userId: data.user?.id,
+  };
+  saveSession(session);
+  return session;
+}
+
+/** 注册即登录（项目里已关闭邮箱验证） */
+export async function signUp(email: string, password: string): Promise<Session> {
+  const data = await authRequest<TokenResponse>("signup", { email, password });
+  const access = data.access_token ?? data.session?.access_token;
+  const refresh = data.refresh_token ?? data.session?.refresh_token;
+  if (!access) throw new Error("注册成功，但还需要去邮箱点确认链接");
+  const session: Session = {
+    accessToken: access,
+    refreshToken: refresh ?? "",
+    email: data.user?.email ?? email,
+    expiresAt: Date.now() + (data.expires_in ?? data.session?.expires_in ?? 3600) * 1000,
+    userId: data.user?.id,
   };
   saveSession(session);
   return session;

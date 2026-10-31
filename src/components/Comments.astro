@@ -26,6 +26,25 @@ const cloud = cloudConfig();
 
   {cloud ? (
     <form class="comment-form" id="comment-form" novalidate>
+      <div class="comment-identity" id="comment-identity">
+        <span class="comment-who" id="comment-who">游客留言 · 不用注册</span>
+        <button class="comment-link" id="comment-auth-toggle" type="button">登录</button>
+      </div>
+
+      <div class="login-box" id="login-box" hidden>
+        <div class="login-fields">
+          <input id="login-email" type="email" placeholder="邮箱" autocomplete="email" />
+          <input id="login-pass" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
+        </div>
+        <div class="login-actions">
+          <span class="login-hint" id="login-hint">没有账号就点「注册」，不用去邮箱验证</span>
+          <span class="login-tools">
+            <button type="button" id="login-do">登录</button>
+            <button type="button" id="login-signup">注册</button>
+          </span>
+        </div>
+      </div>
+
       <div class="comment-fields">
         <input
           class="comment-author"
@@ -104,6 +123,127 @@ const cloud = cloudConfig();
   .comment-fields {
     display: grid;
     gap: 10px;
+  }
+
+  /* ---------- 身份 / 登录 ---------- */
+
+  .comment-identity {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .comment-who em {
+    font-style: normal;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .comment-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    color: var(--accent-ink);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
+  .login-box {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 10px;
+    background: var(--paper);
+  }
+
+  .login-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .login-fields input {
+    flex: 1 1 160px;
+    min-width: 0;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .login-fields input:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
+  .login-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 9px;
+  }
+
+  .login-hint {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .login-hint[data-tone="error"] {
+    color: #a4443a;
+  }
+
+  .login-tools {
+    display: flex;
+    gap: 7px;
+    flex: none;
+  }
+
+  .login-tools button {
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .login-tools button:first-child {
+    border-color: transparent;
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .login-tools button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* 登录用户留言的名片标记 */
+  .comment-badge {
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: var(--accent-wash);
+    color: var(--accent-ink);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 500;
+    vertical-align: 1px;
   }
 
   .comment-author,
@@ -389,6 +529,8 @@ const cloud = cloudConfig();
 </style>
 
 <script>
+  import { loadSession, signIn, signUp, signOut, type Session } from "../lib/cloud";
+
   (() => {
     const root = document.getElementById("comments");
     if (!root) return;
@@ -408,6 +550,9 @@ const cloud = cloudConfig();
     const bodyInput = document.getElementById("c-body");
 
     const headers = { apikey: key, "Content-Type": "application/json" };
+    // 写操作要带登录凭证，否则 RLS 里 auth.uid() 是空的，带 user_id 的留言会被拒
+    const writeHeaders = () =>
+      session ? { ...headers, Authorization: `Bearer ${session.accessToken}` } : headers;
     const enc = (v) => encodeURIComponent(v);
 
     const VISITOR_KEY = "guandao.visitor";
@@ -419,6 +564,105 @@ const cloud = cloudConfig();
 
     let items = [];
     const likeCount = new Map();
+
+    /* --------------------------- 登录状态 --------------------------- */
+
+    const whoEl = document.getElementById("comment-who");
+    const authToggle = document.getElementById("comment-auth-toggle");
+    const loginBox = document.getElementById("login-box");
+    const loginEmail = document.getElementById("login-email") as HTMLInputElement | null;
+    const loginPass = document.getElementById("login-pass") as HTMLInputElement | null;
+    const loginHint = document.getElementById("login-hint");
+    const loginDo = document.getElementById("login-do") as HTMLButtonElement | null;
+    const loginSignup = document.getElementById("login-signup") as HTMLButtonElement | null;
+
+    let session: Session | null = loadSession();
+
+    const nameFromSession = () => (session?.email ?? "").split("@")[0] ?? "";
+
+    const setLoginHint = (text: string, tone?: string) => {
+      if (!loginHint) return;
+      loginHint.textContent = text;
+      if (tone) loginHint.dataset.tone = tone;
+      else delete loginHint.dataset.tone;
+    };
+
+    function renderIdentity() {
+      if (!whoEl || !authToggle) return;
+      whoEl.textContent = "";
+      if (session) {
+        const em = document.createElement("em");
+        em.textContent = nameFromSession();
+        whoEl.append("已登录 ", em, " · 留言带身份标记");
+        authToggle.textContent = "退出";
+        if (authorInput && !authorInput.value) authorInput.value = nameFromSession();
+      } else {
+        whoEl.textContent = "游客留言 · 不用注册";
+        authToggle.textContent = "登录";
+      }
+    }
+
+    async function doAuth(mode: "in" | "up") {
+      const email = loginEmail?.value.trim() ?? "";
+      const pass = loginPass?.value ?? "";
+      if (!email || !pass) {
+        setLoginHint("邮箱和密码都要填", "error");
+        return;
+      }
+      if (passwordTooShort(pass)) {
+        setLoginHint("密码至少 6 位", "error");
+        return;
+      }
+      if (loginDo) loginDo.disabled = true;
+      if (loginSignup) loginSignup.disabled = true;
+      setLoginHint(mode === "in" ? "登录中…" : "注册中…");
+      try {
+        session = mode === "in" ? await signIn(email, pass) : await signUp(email, pass);
+        if (loginBox) loginBox.hidden = true;
+        if (loginPass) loginPass.value = "";
+        setLoginHint("");
+        renderIdentity();
+      } catch (error) {
+        setLoginHint(humanizeAuthError((error as Error).message), "error");
+      } finally {
+        if (loginDo) loginDo.disabled = false;
+        if (loginSignup) loginSignup.disabled = false;
+      }
+    }
+
+    const passwordTooShort = (pass: string) => pass.length < 6;
+
+    const humanizeAuthError = (message: string) => {
+      if (/already registered|already been registered/i.test(message)) return "这个邮箱注册过了，直接点「登录」";
+      if (/invalid login credentials/i.test(message)) return "邮箱或密码不对";
+      if (/password should be at least/i.test(message)) return "密码至少 6 位";
+      if (/unable to validate email|invalid email/i.test(message)) return "邮箱格式不对";
+      if (/rate limit|too many/i.test(message)) return "试太多次了，等一会儿再来";
+      return message;
+    };
+
+    authToggle?.addEventListener("click", async () => {
+      if (session) {
+        await signOut();
+        session = null;
+        if (loginBox) loginBox.hidden = true;
+        renderIdentity();
+        return;
+      }
+      if (loginBox) loginBox.hidden = !loginBox.hidden;
+      if (loginBox && !loginBox.hidden) loginEmail?.focus();
+    });
+
+    loginDo?.addEventListener("click", () => void doAuth("in"));
+    loginSignup?.addEventListener("click", () => void doAuth("up"));
+    loginPass?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void doAuth("in");
+      }
+    });
+
+    renderIdentity();
 
     /* --------------------------- 访客身份 --------------------------- */
 
@@ -487,6 +731,12 @@ const cloud = cloudConfig();
       const name = document.createElement("span");
       name.className = "comment-name";
       name.textContent = c.author;
+      if (c.user_id) {
+        const badge = document.createElement("em");
+        badge.className = "comment-badge";
+        badge.textContent = "成员";
+        name.append(badge);
+      }
       const time = document.createElement("span");
       time.className = "comment-time";
       time.textContent = timeLabel(c.created_at);
@@ -610,9 +860,9 @@ const cloud = cloudConfig();
       author.placeholder = "你的昵称";
       author.autocomplete = "nickname";
       try {
-        author.value = localStorage.getItem(NICK_KEY) || "";
+        author.value = session ? nameFromSession() : localStorage.getItem(NICK_KEY) || "";
       } catch {
-        /* 忽略 */
+        author.value = session ? nameFromSession() : "";
       }
 
       const body = document.createElement("textarea");
@@ -659,8 +909,16 @@ const cloud = cloudConfig();
         try {
           const res = await fetch(`${base}/rest/v1/comments`, {
             method: "POST",
-            headers: { ...headers, Prefer: "return=representation" },
-            body: JSON.stringify([{ post_slug: slug, author: nick, body: content, parent_id: parentId }]),
+            headers: { ...writeHeaders(), Prefer: "return=representation" },
+            body: JSON.stringify([
+              {
+                post_slug: slug,
+                author: nick,
+                body: content,
+                parent_id: parentId,
+                user_id: session?.userId ?? null,
+              },
+            ]),
           });
           if (!res.ok) throw new Error(String(res.status));
           const [created] = await res.json();
@@ -712,7 +970,7 @@ const cloud = cloudConfig();
       try {
         const [cRes, lRes] = await Promise.all([
           fetch(
-            `${base}/rest/v1/comments?post_slug=eq.${enc(slug)}&select=id,author,body,created_at,parent_id&order=created_at.asc&limit=300`,
+            `${base}/rest/v1/comments?post_slug=eq.${enc(slug)}&select=id,author,body,created_at,parent_id,user_id&order=created_at.asc&limit=300`,
             { headers },
           ),
           fetch(`${base}/rest/v1/likes?select=target_type,target_id&limit=5000`, { headers }),
@@ -754,8 +1012,10 @@ const cloud = cloudConfig();
       try {
         const res = await fetch(`${base}/rest/v1/comments`, {
           method: "POST",
-          headers: { ...headers, Prefer: "return=representation" },
-          body: JSON.stringify([{ post_slug: slug, author, body }]),
+          headers: { ...writeHeaders(), Prefer: "return=representation" },
+          body: JSON.stringify([
+            { post_slug: slug, author, body, user_id: session?.userId ?? null },
+          ]),
         });
         if (!res.ok) throw new Error(String(res.status));
         const [created] = await res.json();
@@ -777,7 +1037,8 @@ const cloud = cloudConfig();
     });
 
     try {
-      const saved = localStorage.getItem(NICK_KEY);
+      // 登录了就用登录名，否则用上次留言记住的昵称
+      const saved = session ? nameFromSession() : localStorage.getItem(NICK_KEY);
       if (saved && authorInput) authorInput.value = saved;
     } catch {
       /* 忽略 */

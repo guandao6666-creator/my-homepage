@@ -86,18 +86,22 @@ create policy "media_auth_delete"
   using (bucket_id = 'blog-media');
 
 -- 4) 文章评论（互动栏） ---------------------------------------
--- 访客不用注册，填个昵称就能留言；站长登录后可以删除/隐藏。
+-- 访客不用注册，填个昵称就能留言；登录用户留言会记下 user_id。
 create table if not exists public.comments (
   id         uuid primary key default gen_random_uuid(),
   post_slug  text not null,
   author     text not null,
   body       text not null,
+  user_id    uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   visible    boolean not null default true
 );
 
 create index if not exists comments_slug_idx
   on public.comments (post_slug, created_at desc);
+
+create index if not exists comments_user_idx
+  on public.comments (user_id);
 
 alter table public.comments enable row level security;
 
@@ -108,7 +112,8 @@ create policy "comments_read"
   to anon, authenticated
   using (visible = true);
 
--- 任何人可留言，但不能自己塞隐藏状态，长度也有硬限制
+-- 任何人可留言，但不能自己塞隐藏状态，长度也有硬限制；
+-- 登录用户可带 user_id，但必须是自己（防冒充），游客留空
 drop policy if exists "comments_insert" on public.comments;
 create policy "comments_insert"
   on public.comments for insert
@@ -117,6 +122,7 @@ create policy "comments_insert"
     visible = true
     and char_length(btrim(author)) between 1 and 24
     and char_length(btrim(body)) between 1 and 800
+    and (user_id is null or user_id = auth.uid())
   );
 
 -- 站长（登录用户）可以改和删
