@@ -28,7 +28,7 @@ const siblings = collectTags(all).filter((item) => item.tag !== tag).slice(0, 8)
   <section class="tag-hero" style={`--hue:${hue}`}>
     <div class="wrap">
       <nav class="crumb" aria-label="面包屑">
-        <a href="/">首页</a><span>/</span><a href="/tags/">标签</a><span>/</span><span>{tag}</span>
+        <a href="/home/">首页</a><span>/</span><a href="/tags/">标签</a><span>/</span><span>{tag}</span>
       </nav>
       <span class="eyebrow">Tag</span>
       <h1>{tag}</h1>
