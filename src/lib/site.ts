@@ -17,10 +17,10 @@ export const SITE = {
   startYear: 2024,
   nav: [
     { href: "/blog/", label: "文章" },
-    { href: "/tags/", label: "标签" },
+    { href: "/notes/", label: "笔记" },
     { href: "/series/", label: "系列" },
+    { href: "/tags/", label: "标签" },
     { href: "/about/", label: "关于" },
-    { href: "/rss.xml", label: "RSS", external: true },
   ],
   socials: [
     { href: "https://github.com/", label: "GitHub", icon: "github" },

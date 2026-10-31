@@ -1,0 +1,173 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Icon from "../components/Icon.astro";
+import { USES } from "../lib/uses";
+import { SITE } from "../lib/site";
+
+const totalItems = USES.reduce((sum, group) => sum + group.items.length, 0);
+---
+
+<BaseLayout
+  title="我用什么"
+  description={`${SITE.author}日常使用的工具与装备：${USES.map((group) => group.title).join("、")}。`}
+  canonical="/uses/"
+>
+  <section class="page-head">
+    <div class="wrap">
+      <span class="eyebrow">Uses · {totalItems} 项</span>
+      <h1>我用什么</h1>
+      <p class="page-lede">
+        工具会换，记下来是为了以后回看自己是怎么变的。每条写的是「为什么用它」，不是参数表。
+      </p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="groups">
+      {USES.map((group) => (
+        <section class="group">
+          <div class="group-head">
+            <h2>{group.title}</h2>
+            {group.caption && <p>{group.caption}</p>}
+          </div>
+
+          <ul class="items">
+            {group.items.map((item) => (
+              <li>
+                <div class="item-name">
+                  {item.href ? <a href={item.href}>{item.name}</a> : item.name}
+                </div>
+                <p class="item-note">{item.note}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+
+    <p class="foot-note">
+      这张页面没有固定更新周期，换工具的时候顺手改一笔。
+      骑行的具体记录在 <a href="/cycling/">骑行页</a>，做过的东西在 <a href="/projects/">作品页</a>。
+    </p>
+
+    <a class="back" href="/about/">
+      关于我
+      <Icon name="arrow-right" size={13} />
+    </a>
+  </div>
+</BaseLayout>
+
+<style>
+  .page-head {
+    padding: 58px 0 34px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .page-head h1 {
+    margin: 14px 0 12px;
+    font-size: clamp(34px, 5vw, 46px);
+    letter-spacing: -0.03em;
+  }
+
+  .page-lede {
+    margin: 0;
+    max-width: 40em;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.9;
+  }
+
+  .groups {
+    padding-top: 10px;
+  }
+
+  .group {
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr);
+    gap: 44px;
+    padding: 36px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .group-head h2 {
+    font-size: 20px;
+    letter-spacing: -0.01em;
+  }
+
+  .group-head p {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .items li + li {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
+  }
+
+  .item-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+  }
+
+  .item-name a {
+    color: var(--accent-ink);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  .item-note {
+    margin: 6px 0 0;
+    font-size: 13.5px;
+    line-height: 1.85;
+    color: var(--muted);
+    max-width: 42em;
+  }
+
+  .foot-note {
+    margin: 34px 0 0;
+    font-size: 13px;
+    line-height: 1.9;
+    color: var(--muted);
+  }
+
+  .foot-note a {
+    color: var(--accent-ink);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    padding-bottom: 1px;
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 30px;
+    font-size: 13px;
+    color: var(--muted);
+    transition: color 0.2s var(--ease);
+  }
+
+  .back:hover {
+    color: var(--accent-ink);
+  }
+
+  @media (max-width: 720px) {
+    .group {
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 28px 0;
+    }
+    .group-head p {
+      margin-top: 4px;
+    }
+  }
+</style>

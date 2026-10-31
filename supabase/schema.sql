@@ -205,6 +205,35 @@ create trigger comments_clean_likes
   after delete on public.comments
   for each row execute function public.drop_comment_likes();
 
+-- 6) 碎片笔记 ---------------------------------------------------
+-- 短句为主，只允许站长（登录用户）发布；访客只读可见的。
+create table if not exists public.notes (
+  id         uuid primary key default gen_random_uuid(),
+  body       text not null,
+  image_url  text,
+  created_at timestamptz not null default now(),
+  visible    boolean not null default true
+);
+
+create index if not exists notes_created_idx
+  on public.notes (created_at desc);
+
+alter table public.notes enable row level security;
+
+drop policy if exists "notes_read" on public.notes;
+create policy "notes_read"
+  on public.notes for select
+  to anon, authenticated
+  using (visible = true);
+
+-- for all 同时覆盖 select，所以登录后能看到隐藏的笔记
+drop policy if exists "notes_write" on public.notes;
+create policy "notes_write"
+  on public.notes for all
+  to authenticated
+  using (true)
+  with check (char_length(btrim(body)) between 1 and 280);
+
 -- ============================================================
 --  使用说明
 --  1. Authentication → Users → Add user 创建一个账号（关闭邮箱验证更方便）。

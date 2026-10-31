@@ -81,6 +81,9 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
               <button class="list-tab is-active" id="tab-posts" type="button">
                 文章 <em id="post-count">0</em>
               </button>
+              <button class="list-tab" id="tab-notes" type="button">
+                笔记 <em id="note-count">0</em>
+              </button>
               <button class="list-tab" id="tab-comments" type="button">
                 留言 <em id="comment-count">0</em>
                 <span class="dot" id="comment-dot" hidden aria-label="有新留言"></span>
@@ -89,6 +92,9 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
             <button class="mini" id="new-post" type="button">+ 新建</button>
           </div>
           <div class="list-body" id="post-rows">
+            <p class="list-empty">加载中…</p>
+          </div>
+          <div class="list-body" id="note-rows" hidden>
             <p class="list-empty">加载中…</p>
           </div>
           <div class="list-body" id="comment-rows" hidden>
@@ -165,6 +171,26 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
               </div>
             </div>
           </form>
+        </div>
+
+        <div class="note-pane" id="note-pane" hidden>
+          <div class="note-compose">
+            <span class="eyebrow">记一笔</span>
+            <textarea
+              id="note-input"
+              rows="5"
+              maxlength="280"
+              placeholder="一句话、一个念头、路上看见的东西…"
+            ></textarea>
+            <div class="note-compose-foot">
+              <span class="note-typed" id="note-typed">0 / 280</span>
+              <button class="btn btn--solid" id="note-send" type="button">记下来</button>
+            </div>
+          </div>
+          <p class="note-hint">
+            发布后立刻出现在 <a href="/notes/" target="_blank" rel="noopener">/notes/</a>，不用等构建。
+            左边列表里可以删除。
+          </p>
         </div>
       </div>
     </section>
@@ -643,6 +669,94 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     border-color: color-mix(in srgb, #a33232 30%, var(--line));
   }
 
+  /* ---------------- 笔记 ---------------- */
+
+  .note-pane {
+    padding: 22px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .note-compose textarea {
+    margin-top: 14px;
+    min-height: 140px;
+    font-size: 14.5px;
+    line-height: 1.9;
+    resize: vertical;
+  }
+
+  .note-compose-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .note-typed {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .note-hint {
+    margin: 16px 0 0;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+
+  .note-hint a {
+    color: var(--accent-ink);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+
+  .note-row {
+    padding: 14px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .note-text {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: var(--ink-2);
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .note-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .note-foot button {
+    padding: 2px 7px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: none;
+    font: inherit;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .note-foot button:hover {
+    color: #a4443a;
+    border-color: #a4443a55;
+  }
+
   .editor-pane form {
     padding: 22px;
     border: 1px solid var(--line);
@@ -872,8 +986,12 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     listCloudComments,
     deleteCloudComment,
     setCloudCommentVisible,
+    listCloudNotes,
+    createCloudNote,
+    deleteCloudNote,
     type CloudPost,
     type CloudComment,
+    type CloudNote,
   } from "../../lib/cloud";
 
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -894,8 +1012,15 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
   const commentCount = $("comment-count");
   const commentDot = $("comment-dot");
 
+  const tabNotes = $<HTMLButtonElement>("tab-notes");
+  const noteRows = $("note-rows");
+  const noteCount = $("note-count");
+  const notePane = $("note-pane");
+  const editorPane = document.querySelector(".editor-pane") as HTMLElement | null;
+
   let posts: CloudPost[] = [];
   let comments: CloudComment[] = [];
+  let notes: CloudNote[] = [];
   let editingId: string | null = null;
   let previewing = false;
 
@@ -946,6 +1071,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     show("dash");
     void refresh();
     void loadComments();
+    void loadNotes();
   }
 
   /* ---------------------------- login --------------------------- */
@@ -969,6 +1095,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
       show("dash");
       await refresh();
       void loadComments();
+      void loadNotes();
     } catch (error) {
       loginError.textContent = (error as Error).message;
       loginError.hidden = false;
@@ -1071,19 +1198,123 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
       .join("");
   }
 
-  function switchList(name: "posts" | "comments") {
+  function switchList(name: "posts" | "notes" | "comments") {
     const isPosts = name === "posts";
+    const isNotes = name === "notes";
+    const isComments = name === "comments";
+
     tabPosts.classList.toggle("is-active", isPosts);
-    tabComments.classList.toggle("is-active", !isPosts);
+    tabNotes.classList.toggle("is-active", isNotes);
+    tabComments.classList.toggle("is-active", isComments);
+
     rows.hidden = !isPosts;
-    commentRows.hidden = isPosts;
+    noteRows.hidden = !isNotes;
+    commentRows.hidden = !isComments;
+
+    if (editorPane) editorPane.hidden = !isPosts;
+    notePane.hidden = !isNotes;
+
     $("new-post").hidden = !isPosts;
-    if (!isPosts) markSeen();
+    if (isComments) markSeen();
     syncCommentBadge();
   }
 
   tabPosts.addEventListener("click", () => switchList("posts"));
+  tabNotes.addEventListener("click", () => switchList("notes"));
   tabComments.addEventListener("click", () => switchList("comments"));
+
+  /* ----------------------------- notes --------------------------- */
+
+  async function loadNotes() {
+    noteRows.innerHTML = '<p class="list-empty">加载中…</p>';
+    try {
+      notes = await listCloudNotes(50);
+      renderNotes();
+    } catch (error) {
+      noteRows.innerHTML = `<p class="list-empty">加载失败：${escapeHtml((error as Error).message)}</p>`;
+    }
+  }
+
+  function renderNotes() {
+    noteCount.textContent = String(notes.length);
+    if (!notes.length) {
+      noteRows.innerHTML = '<p class="list-empty">还没有笔记，右边记一笔。</p>';
+      return;
+    }
+    noteRows.innerHTML = notes
+      .map(
+        (note) => `
+        <article class="note-row" data-id="${note.id}">
+          <p class="note-text">${escapeHtml(note.body)}</p>
+          <div class="note-foot">
+            <span>${timeAgo(note.created_at)}</span>
+            <button type="button" data-act="del">删除</button>
+          </div>
+        </article>`,
+      )
+      .join("");
+  }
+
+  noteRows.addEventListener("click", async (event) => {
+    const btn = (event.target as HTMLElement).closest(
+      "button[data-act='del']",
+    ) as HTMLButtonElement | null;
+    if (!btn) return;
+    const row = btn.closest(".note-row") as HTMLElement | null;
+    const id = row?.dataset.id;
+    if (!id) return;
+    if (!window.confirm("删除这条笔记？")) return;
+
+    btn.disabled = true;
+    try {
+      await deleteCloudNote(id);
+      notes = notes.filter((note) => note.id !== id);
+      renderNotes();
+      toast("已删除");
+    } catch (error) {
+      toast((error as Error).message);
+      btn.disabled = false;
+    }
+  });
+
+  const noteInput = $<HTMLTextAreaElement>("note-input");
+  const noteSend = $<HTMLButtonElement>("note-send");
+  const noteTyped = $("note-typed");
+
+  const syncTyped = () => {
+    noteTyped.textContent = `${noteInput.value.length} / 280`;
+  };
+  noteInput.addEventListener("input", syncTyped);
+
+  noteSend.addEventListener("click", async () => {
+    const body = noteInput.value.trim();
+    if (!body) {
+      toast("先写点什么");
+      noteInput.focus();
+      return;
+    }
+    noteSend.classList.add("busy");
+    try {
+      const [created] = await createCloudNote(body);
+      notes = [created, ...notes];
+      noteInput.value = "";
+      syncTyped();
+      renderNotes();
+      toast("已记下");
+    } catch (error) {
+      toast((error as Error).message);
+    } finally {
+      noteSend.classList.remove("busy");
+    }
+  });
+
+  // Ctrl / Cmd + Enter 直接发布
+  noteInput.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      noteSend.click();
+    }
+  });
 
   commentRows.addEventListener("click", async (event) => {
     const btn = (event.target as HTMLElement).closest("button[data-act]") as HTMLButtonElement | null;

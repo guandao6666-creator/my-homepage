@@ -245,6 +245,35 @@ export function setCloudCommentVisible(id: string, visible: boolean) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Notes（碎片笔记）                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface CloudNote {
+  id: string;
+  body: string;
+  image_url?: string | null;
+  created_at: string;
+  visible: boolean;
+}
+
+/** 访客也能读：RLS 只放行 visible = true 的记录 */
+export function listCloudNotes(limit = 60): Promise<CloudNote[]> {
+  return rest<CloudNote[]>(`notes?select=*&order=created_at.desc&limit=${limit}`);
+}
+
+export function createCloudNote(body: string, imageUrl?: string | null) {
+  return rest<CloudNote[]>("notes", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify([{ body, image_url: imageUrl ?? null }]),
+  });
+}
+
+export function deleteCloudNote(id: string) {
+  return rest<void>(`notes?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/* ------------------------------------------------------------------ */
 /* Storage                                                             */
 /* ------------------------------------------------------------------ */
 
