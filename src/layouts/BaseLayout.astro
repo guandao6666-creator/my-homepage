@@ -32,7 +32,8 @@ const {
 
 const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
 const canonicalUrl = new URL(canonical ?? Astro.url.pathname, SITE.url).href;
-const imageUrl = image ? new URL(image, SITE.url).href : `${SITE.url}/og-default.svg`;
+// 分享卡片必须是位图：微信 / 微博 / Twitter 都不认 SVG
+const imageUrl = image ? new URL(image, SITE.url).href : `${SITE.url}/og-default.jpg`;
 const fullJsonLd = jsonLd
   ? { "@context": "https://schema.org", ...jsonLd }
   : {
@@ -75,6 +76,9 @@ const fullJsonLd = jsonLd
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={imageUrl} />
+    {!image && <meta property="og:image:width" content="1200" />}
+    {!image && <meta property="og:image:height" content="630" />}
+    <meta property="og:image:alt" content={pageTitle} />
     <meta property="og:locale" content="zh_CN" />
 
     <meta name="twitter:card" content="summary_large_image" />

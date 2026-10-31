@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "my-homepage",
+  "compatibility_date": "2026-10-23",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}
