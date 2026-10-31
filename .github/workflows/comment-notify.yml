@@ -1,0 +1,120 @@
+name: Comment notify
+
+# 有新留言时发邮件到站长邮箱。
+# 依赖仓库 Secret：GMAIL_APP_PASSWORD（Gmail 应用专用密码，16 位）
+# 状态（上次通知到哪一刻）存在 notify-state 分支，避免往 main 推东西触发重新部署。
+
+on:
+  schedule:
+    # 每 30 分钟看一次
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: comment-notify
+  cancel-in-progress: false
+
+env:
+  SUPABASE_URL: https://mkcnftjhftpiofnhenjf.supabase.co
+  SUPABASE_ANON_KEY: sb_publishable_swd8og5pj-HV_AvGD087Ag_AIaWr5Yn
+  SITE: https://guandao.xin
+  MAIL_TO: guandao6666@gmail.com
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 取上次通知时间
+        id: state
+        run: |
+          git fetch origin notify-state --depth=1 2>/dev/null || true
+          LAST=$(git show origin/notify-state:last-seen.txt 2>/dev/null || true)
+          if [ -z "$LAST" ]; then
+            LAST="1970-01-01T00:00:00Z"
+          fi
+          echo "last=$LAST" >> "$GITHUB_OUTPUT"
+          echo "上次通知到：$LAST"
+
+      - name: 查询新留言
+        id: query
+        env:
+          LAST: ${{ steps.state.outputs.last }}
+        run: |
+          URL="$SUPABASE_URL/rest/v1/comments?select=author,body,post_slug,created_at&visible=eq.true&created_at=gt.${LAST}&order=created_at.asc&limit=50"
+          curl -sS -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" "$URL" -o new.json
+          COUNT=$(node -e "console.log(require('./new.json').length)")
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "新留言 $COUNT 条"
+          if [ "$COUNT" = "0" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: 组装邮件
+        if: steps.query.outputs.skip == 'false'
+        env:
+          LAST: ${{ steps.state.outputs.last }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const rows = require("./new.json");
+            const site = process.env.SITE;
+            const lines = [];
+            for (const c of rows) {
+              lines.push(`【${c.author}】在《${c.post_slug}》留言：`);
+              lines.push(c.body);
+              lines.push(`${site}/blog/${encodeURIComponent(c.post_slug)}/`);
+              lines.push("");
+            }
+            const body = [
+              `你的博客有 ${rows.length} 条新留言：`,
+              "",
+              ...lines,
+              "—— 自动通知，无需回复",
+            ].join("\n");
+            const head = [
+              "To: " + process.env.MAIL_TO,
+              "From: " + process.env.MAIL_TO,
+              "Subject: [guandao.xin] " + rows.length + " new comment" + (rows.length > 1 ? "s" : ""),
+              "Date: " + new Date().toUTCString().replace("GMT", "+0000"),
+              "MIME-Version: 1.0",
+              "Content-Type: text/plain; charset=UTF-8",
+              "Content-Transfer-Encoding: 8bit",
+              "",
+            ].join("\r\n");
+            fs.writeFileSync("mail.txt", head + body.replace(/\n/g, "\r\n"));
+            console.log("mail.txt 已生成，" + Buffer.byteLength(body) + " 字节正文");
+          '
+
+      - name: 发送邮件
+        if: steps.query.outputs.skip == 'false'
+        env:
+          MAIL_PASS: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          if [ -z "$MAIL_PASS" ]; then
+            echo "::warning::还没配置 GMAIL_APP_PASSWORD，本次跳过（不会打扰你）"
+            exit 0
+          fi
+          curl -sS --url "smtps://smtp.gmail.com:465" --ssl-reqd \
+            --user "$MAIL_TO:$MAIL_PASS" \
+            --mail-from "$MAIL_TO" \
+            --mail-rcpt "$MAIL_TO" \
+            --upload-file mail.txt
+          echo "邮件已发送"
+
+      - name: 记录进度
+        if: steps.query.outputs.skip == 'false'
+        run: |
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          git config user.name "guandao-publisher"
+          git config user.email "guandao6666@gmail.com"
+          git checkout --orphan notify-state-tmp 2>/dev/null || git checkout -B notify-state-tmp
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          rm -f new.json mail.txt
+          echo "$NOW" > last-seen.txt
+          git add last-seen.txt
+          git commit -m "notify state: $NOW"
+          git push -f origin HEAD:notify-state
+          echo "进度已记录：$NOW"
