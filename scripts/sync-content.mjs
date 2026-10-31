@@ -101,6 +101,17 @@ function frontmatter(post) {
   ];
   if (post.updated_at) lines.push(`updatedDate: ${toDateOnly(post.updated_at)}`);
   lines.push(`tags: [${tags.map(yamlString).join(", ")}]`);
+
+  // 系列：没填名称就不写；序号必须是正整数，否则 schema 会拒绝整篇文章
+  const series = String(post.series ?? "").trim();
+  const order = Number(post.series_order);
+  if (series) {
+    lines.push(`series: ${yamlString(series)}`);
+    if (Number.isFinite(order) && order > 0) {
+      lines.push(`seriesOrder: ${Math.trunc(order)}`);
+    }
+  }
+
   if (post.featured) lines.push("featured: true");
   if (post.cover_url) lines.push(`cover: ${yamlString(post.cover_url)}`);
   lines.push("source: cloud");

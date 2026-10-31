@@ -136,6 +136,17 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
               </div>
             </div>
 
+            <div class="field-row">
+              <label class="field">
+                <span>系列（留空则不归入系列）</span>
+                <input id="f-series" placeholder="C 语言入门" />
+              </label>
+              <label class="field">
+                <span>系列内序号（从 1 开始）</span>
+                <input id="f-series-order" type="number" min="1" step="1" placeholder="1" />
+              </label>
+            </div>
+
             <div class="markdown-wrap">
               <textarea id="f-content" class="markdown" rows="18" placeholder="支持 Markdown：# 标题、**加粗**、`代码`、- 列表、> 引用、```代码块```"></textarea>
               <div class="preview" id="preview" hidden></div>
@@ -1116,7 +1127,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
         (post) => `
         <button class="post-row ${post.id === editingId ? "active" : ""}" data-id="${post.id}" type="button">
           <strong>${escapeHtml(post.title || "（无标题）")}</strong>
-          <span><i class="dot-status ${post.published ? "" : "draft"}"></i>${post.published ? "已发布" : "草稿"} · ${(post.pub_date || "").slice(0, 10)}</span>
+          <span><i class="dot-status ${post.published ? "" : "draft"}"></i>${post.published ? "已发布" : "草稿"} · ${(post.pub_date || "").slice(0, 10)}${post.series ? ` · ${escapeHtml(post.series)}${post.series_order ? ` #${post.series_order}` : ""}` : ""}</span>
         </button>`,
       )
       .join("");
@@ -1143,6 +1154,8 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     date: $<HTMLInputElement>("f-date"),
     desc: $<HTMLTextAreaElement>("f-desc"),
     tags: $<HTMLInputElement>("f-tags"),
+    series: $<HTMLInputElement>("f-series"),
+    seriesOrder: $<HTMLInputElement>("f-series-order"),
     published: $<HTMLInputElement>("f-published"),
     featured: $<HTMLInputElement>("f-featured"),
     content: $<HTMLTextAreaElement>("f-content"),
@@ -1160,6 +1173,8 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     fields.date.value = new Date().toISOString().slice(0, 10);
     fields.desc.value = "";
     fields.tags.value = "";
+    fields.series.value = "";
+    fields.seriesOrder.value = "";
     fields.published.checked = false;
     fields.featured.checked = false;
     fields.content.value = "";
@@ -1177,6 +1192,8 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     fields.date.value = (post.pub_date ?? "").slice(0, 10);
     fields.desc.value = post.description ?? "";
     fields.tags.value = (post.tags ?? []).join(", ");
+    fields.series.value = post.series ?? "";
+    fields.seriesOrder.value = post.series_order ? String(post.series_order) : "";
     fields.published.checked = Boolean(post.published);
     fields.featured.checked = Boolean(post.featured);
     fields.content.value = post.content ?? "";
@@ -1259,6 +1276,23 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
       return;
     }
 
+    const seriesName = fields.series.value.trim();
+    const orderRaw = fields.seriesOrder.value.trim();
+    const seriesOrder = orderRaw ? Math.trunc(Number(orderRaw)) : null;
+
+    if (orderRaw && (!Number.isFinite(seriesOrder) || seriesOrder < 1)) {
+      editorError.textContent = "系列序号要是大于 0 的整数。";
+      editorError.hidden = false;
+      fields.seriesOrder.focus();
+      return;
+    }
+    if (orderRaw && !seriesName) {
+      editorError.textContent = "填了系列序号，就要一并填系列名。";
+      editorError.hidden = false;
+      fields.series.focus();
+      return;
+    }
+
     const payload = {
       title: fields.title.value.trim(),
       slug: (fields.slug.value.trim() || slugify(fields.title.value)) as string,
@@ -1268,6 +1302,8 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
         .split(/[,，]/)
         .map((tag) => tag.trim())
         .filter(Boolean),
+      series: seriesName || null,
+      series_order: seriesName ? seriesOrder : null,
       published: fields.published.checked,
       featured: fields.featured.checked,
       pub_date: fields.date.value ? `${fields.date.value}T09:00:00+08:00` : new Date().toISOString(),

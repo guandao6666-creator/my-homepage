@@ -145,6 +145,10 @@ export interface CloudPost {
   description: string;
   content: string;
   tags: string[];
+  /** 系列/专栏名，留空表示不归入系列 */
+  series?: string | null;
+  /** 系列内顺序，从 1 开始 */
+  series_order?: number | null;
   published: boolean;
   featured: boolean;
   pub_date: string;

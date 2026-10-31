@@ -11,6 +11,8 @@ create table if not exists public.posts (
   description text not null default '',
   content     text not null default '',
   tags        text[] not null default '{}',
+  series      text,
+  series_order integer,
   published   boolean not null default false,
   featured    boolean not null default false,
   cover_url   text,
@@ -22,6 +24,12 @@ create table if not exists public.posts (
 
 create index if not exists posts_pub_date_idx on public.posts (pub_date desc);
 create index if not exists posts_tags_idx on public.posts using gin (tags);
+
+-- 老库补列：系列/专栏（create table if not exists 不会给已有表加列）
+alter table public.posts add column if not exists series text;
+alter table public.posts add column if not exists series_order integer;
+comment on column public.posts.series is '系列/专栏名，留空表示不属于任何系列';
+comment on column public.posts.series_order is '系列内顺序，从 1 开始';
 
 -- 自动维护 updated_at
 create or replace function public.touch_updated_at()
