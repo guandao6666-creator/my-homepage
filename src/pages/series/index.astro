@@ -1,0 +1,208 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Icon from "../../components/Icon.astro";
+import { getAllPosts, collectSeries } from "../../lib/posts";
+import { SITE } from "../../lib/site";
+
+const posts = await getAllPosts();
+const seriesList = collectSeries(posts);
+const totalPosts = seriesList.reduce((sum, item) => sum + item.posts.length, 0);
+---
+
+<BaseLayout
+  title="系列专栏"
+  description={`${SITE.author}的系列文章：${seriesList.length} 个系列、${totalPosts} 篇文章，按线索成体系地读。`}
+  canonical="/series/"
+>
+  <section class="page-head">
+    <div class="wrap">
+      <span class="eyebrow">Series · {seriesList.length} 个系列</span>
+      <h1>系列专栏</h1>
+      <p class="page-lede">
+        有些话题一篇讲不完，就拆成一组。系列内的文章有固定顺序，顺着读比跳着读更清楚。
+      </p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    {seriesList.length === 0 ? (
+      <div class="series-empty">
+        <p>还没有系列。</p>
+        <p class="hint">
+          在文章 frontmatter 里写 <code>series: C 语言</code>，同一系列名的文章会自动归到这里，
+          再用 <code>seriesOrder: 1</code> 指定顺序即可。
+        </p>
+      </div>
+    ) : (
+      <div class="series-grid">
+        {seriesList.map((item) => (
+          <article class="series-card">
+            <header>
+              <a class="series-name" href={`/series/${encodeURIComponent(item.name)}/`}>
+                {item.name}
+              </a>
+              <span class="series-meta">{item.posts.length} 篇</span>
+            </header>
+
+            <ol>
+              {item.posts.slice(0, 4).map((post, i) => (
+                <li>
+                  <a href={`/blog/${post.slug}/`}>
+                    <span class="n">{String(i + 1).padStart(2, "0")}</span>
+                    <span class="t">{post.title}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+
+            {item.posts.length > 4 && (
+              <a class="series-more" href={`/series/${encodeURIComponent(item.name)}/`}>
+                查看全部 {item.posts.length} 篇
+                <Icon name="arrow-right" size={12} />
+              </a>
+            )}
+          </article>
+        ))}
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<style>
+  .page-head {
+    padding: 58px 0 34px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .page-head h1 {
+    margin: 14px 0 12px;
+    font-size: clamp(34px, 5vw, 46px);
+    letter-spacing: -0.03em;
+  }
+
+  .page-lede {
+    margin: 0;
+    max-width: 40em;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.9;
+  }
+
+  .series-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    padding-top: 34px;
+  }
+
+  .series-card {
+    padding: 22px 22px 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .series-card header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  .series-name {
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .series-name:hover {
+    color: var(--accent-ink);
+  }
+
+  .series-meta {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .series-card ol {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+  }
+
+  .series-card li + li {
+    border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  }
+
+  .series-card li a {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 9px 0;
+    font-size: 13.5px;
+    color: var(--ink-2);
+    transition: color 0.2s var(--ease);
+  }
+
+  .series-card li a:hover {
+    color: var(--accent-ink);
+  }
+
+  .series-card .n {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+
+  .series-card .t {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .series-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--accent-ink);
+  }
+
+  .series-empty {
+    padding: 52px 0 8px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .series-empty p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.95;
+    color: var(--muted);
+  }
+
+  .series-empty .hint {
+    margin-top: 8px;
+    font-size: 13px;
+  }
+
+  .series-empty code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--surface-sunk);
+    color: var(--accent-ink);
+  }
+
+  @media (max-width: 720px) {
+    .series-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,123 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PostCard from "../../components/PostCard.astro";
+import Icon from "../../components/Icon.astro";
+import { getAllPosts, collectSeries, type Post } from "../../lib/posts";
+import { SITE, formatShortDate } from "../../lib/site";
+
+export async function getStaticPaths() {
+  const posts = await getAllPosts();
+  return collectSeries(posts).map((item) => ({
+    params: { series: item.name },
+    props: { name: item.name, list: item.posts },
+  }));
+}
+
+interface Props {
+  name: string;
+  list: Post[];
+}
+
+const { name, list } = Astro.props;
+const totalMinutes = list.reduce((sum, post) => sum + post.minutes, 0);
+const latest = list.reduce(
+  (acc, post) => (post.pubDate > acc ? post.pubDate : acc),
+  list[0].pubDate,
+);
+---
+
+<BaseLayout
+  title={`${name} · 系列`}
+  description={`${SITE.author}的「${name}」系列，共 ${list.length} 篇，按阅读顺序排列。`}
+  canonical={`/series/${encodeURIComponent(name)}/`}
+>
+  <section class="page-head">
+    <div class="wrap">
+      <nav class="crumb" aria-label="面包屑">
+        <a href="/series/">系列专栏</a>
+        <span>/</span>
+        <span class="crumb-current">{name}</span>
+      </nav>
+      <span class="eyebrow">Series · {list.length} 篇</span>
+      <h1>{name}</h1>
+      <p class="page-lede">
+        共 {list.length} 篇、约 {totalMinutes} 分钟，最近更新于 {formatShortDate(latest)}。
+        建议按顺序读，前一篇通常是后一篇的前提。
+      </p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="post-list">
+      {list.map((post, i) => (
+        <PostCard post={post} index={i} />
+      ))}
+    </div>
+
+    <a class="back" href="/series/">
+      <Icon name="arrow-right" size={13} />
+      全部系列
+    </a>
+  </div>
+</BaseLayout>
+
+<style>
+  .page-head {
+    padding: 26px 0 34px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .crumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--muted);
+    padding-bottom: 22px;
+  }
+
+  .crumb a:hover {
+    color: var(--accent);
+  }
+
+  .crumb-current {
+    color: var(--ink-2);
+  }
+
+  .page-head h1 {
+    margin: 14px 0 12px;
+    font-size: clamp(32px, 5vw, 44px);
+    letter-spacing: -0.03em;
+  }
+
+  .page-lede {
+    margin: 0;
+    max-width: 42em;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.9;
+  }
+
+  .post-list {
+    margin-top: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 28px;
+    font-size: 13px;
+    color: var(--muted);
+    transition: color 0.2s var(--ease);
+  }
+
+  .back svg {
+    transform: rotate(180deg);
+  }
+
+  .back:hover {
+    color: var(--accent-ink);
+  }
+</style>

@@ -10,6 +10,8 @@ export interface Post {
   pubDate: Date;
   updatedDate?: Date;
   tags: string[];
+  series?: string;
+  seriesOrder?: number;
   featured: boolean;
   cover?: string;
   minutes: number;
@@ -31,6 +33,8 @@ export function toPost(entry: BlogEntry): Post {
     pubDate: entry.data.pubDate,
     updatedDate: entry.data.updatedDate,
     tags: entry.data.tags,
+    series: entry.data.series,
+    seriesOrder: entry.data.seriesOrder,
     featured: entry.data.featured,
     cover: entry.data.cover,
     minutes: readingTime(entry.body ?? entry.data.description),
@@ -128,4 +132,61 @@ export function tagHue(tag: string): number {
 export function coverGradient(post: Post): string {
   const hue = tagHue(post.tags[0] ?? "随笔");
   return `linear-gradient(135deg, hsl(${hue} 34% 88%) 0%, hsl(${(hue + 42) % 360} 30% 74%) 55%, hsl(${(hue + 80) % 360} 26% 42%) 100%)`;
+}
+
+/* ---------------- 系列 / 专栏 ---------------- */
+
+export interface SeriesStat {
+  name: string;
+  posts: Post[];
+  latest: Date;
+}
+
+/** 系列内排序：有序号按序号排，没序号的一律垫底再按时间 */
+export function sortSeries(posts: Post[]): Post[] {
+  return [...posts].sort((a, b) => {
+    const ao = a.seriesOrder ?? Number.MAX_SAFE_INTEGER;
+    const bo = b.seriesOrder ?? Number.MAX_SAFE_INTEGER;
+    if (ao !== bo) return ao - bo;
+    return a.pubDate.valueOf() - b.pubDate.valueOf();
+  });
+}
+
+export function collectSeries(posts: Post[]): SeriesStat[] {
+  const map = new Map<string, Post[]>();
+  for (const post of posts) {
+    if (!post.series) continue;
+    const list = map.get(post.series);
+    if (list) list.push(post);
+    else map.set(post.series, [post]);
+  }
+
+  return [...map.entries()]
+    .map(([name, list]) => ({
+      name,
+      posts: sortSeries(list),
+      latest: list.reduce(
+        (acc, post) => (post.pubDate > acc ? post.pubDate : acc),
+        list[0].pubDate,
+      ),
+    }))
+    .sort((a, b) => b.latest.valueOf() - a.latest.valueOf());
+}
+
+/** 当前文章在所属系列中的位置（用于「第 k 篇 / 共 N 篇」） */
+export function seriesInfo(posts: Post[], current: Post) {
+  if (!current.series) return null;
+  const list = sortSeries(posts.filter((post) => post.series === current.series));
+  const index = list.findIndex((post) => post.slug === current.slug);
+  if (index === -1) return null;
+  return { name: current.series, posts: list, index, total: list.length };
+}
+
+/** 分享图路径：清理规则必须和 src/lib/og-image.mjs 里的 ogSlug 保持一致 */
+export function ogImagePath(slug: string): string {
+  const safe = slug
+    .replace(/[\\/]+/g, "-")
+    .replace(/[<>:"|?*#%]+/g, "-")
+    .slice(0, 80);
+  return `/og/${encodeURIComponent(safe)}.png`;
 }

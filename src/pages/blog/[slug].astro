@@ -3,7 +3,15 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import Icon from "../../components/Icon.astro";
 import Comments from "../../components/Comments.astro";
 import { getCollection, render } from "astro:content";
-import { getAllPosts, toPost, neighbours, relatedPosts, slugOf } from "../../lib/posts";
+import {
+  getAllPosts,
+  toPost,
+  neighbours,
+  relatedPosts,
+  slugOf,
+  seriesInfo,
+  ogImagePath,
+} from "../../lib/posts";
 import { SITE, formatDate, isoDate, formatShortDate } from "../../lib/site";
 
 export async function getStaticPaths() {
@@ -21,7 +29,11 @@ const { Content, headings } = await render(entry);
 const all = await getAllPosts();
 const { prev, next } = neighbours(all, post.slug);
 const related = relatedPosts(all, post, 2);
-const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+const series = seriesInfo(all, post);
+// autolink 会在标题文本末尾追加一个 "#"，提取目录时去掉
+const toc = headings
+  .filter((heading) => heading.depth === 2 || heading.depth === 3)
+  .map((heading) => ({ ...heading, text: heading.text.replace(/\s*#\s*$/, "") }));
 
 const jsonLd = {
   "@type": "BlogPosting",
@@ -43,6 +55,7 @@ const jsonLd = {
   canonical={`/blog/${post.slug}/`}
   type="article"
   image={post.cover}
+  ogImage={ogImagePath(post.slug)}
   jsonLd={jsonLd}
 >
   <div class="progress" id="progress" aria-hidden="true"></div>
@@ -86,6 +99,22 @@ const jsonLd = {
       </header>
 
       <div class="article-layout">
+        {toc.length > 1 && (
+          <details class="toc-mobile">
+            <summary>
+              <span>本页目录</span>
+              <em>{toc.length} 节</em>
+            </summary>
+            <ul>
+              {toc.map((heading) => (
+                <li class:list={[`d${heading.depth}`]}>
+                  <a href={`#${heading.slug}`}>{heading.text}</a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
         <div class="prose article-body">
           <Content />
         </div>
@@ -161,6 +190,29 @@ const jsonLd = {
         </nav>
       </footer>
 
+      {series && (
+        <section class="series-box">
+          <div class="series-head">
+            <span class="eyebrow">系列</span>
+            <span class="series-count">共 {series.total} 篇 · 第 {series.index + 1} 篇</span>
+          </div>
+          <h2>
+            <a href={`/series/${encodeURIComponent(series.name)}/`}>{series.name}</a>
+          </h2>
+          <ol class="series-list">
+            {series.posts.map((item, i) => (
+              <li class:list={["series-item", { current: item.slug === post.slug }]}>
+                <a href={`/blog/${item.slug}/`}>
+                  <span class="series-num">{String(i + 1).padStart(2, "0")}</span>
+                  <span class="series-title">{item.title}</span>
+                  {item.slug === post.slug && <span class="series-now">正在读</span>}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
       <Comments slug={post.slug} />
     </div>
   </article>
@@ -223,6 +275,14 @@ const jsonLd = {
       targets.forEach((item) => observer.observe(item.el));
     }
 
+    // 移动端目录：点完一项就收起来，别让展开的目录挡在正文前面
+    const mobileToc = document.querySelector(".toc-mobile");
+    if (mobileToc) {
+      mobileToc.addEventListener("click", (event) => {
+        if (event.target.closest("a")) mobileToc.removeAttribute("open");
+      });
+    }
+
     // 复制链接
     for (const id of ["copy-link", "copy-link-2"]) {
       const button = document.getElementById(id);
@@ -268,6 +328,29 @@ const jsonLd = {
       overlay.addEventListener("click", close);
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && !overlay.hidden) close();
+      });
+    }
+
+    /* ---------------- 代码块复制 ---------------- */
+    for (const button of document.querySelectorAll("[data-code-copy]")) {
+      const block = button.closest(".code-block");
+      const code = block?.querySelector("pre code") ?? block?.querySelector("pre");
+      if (!code) continue;
+
+      button.addEventListener("click", async () => {
+        // 用 innerText：Shiki 把代码拆成一堆 span，textContent 会丢掉渲染换行
+        const source = code.innerText.replace(/\n$/, "");
+        try {
+          await navigator.clipboard.writeText(source);
+          button.textContent = "已复制";
+          button.dataset.copied = "1";
+        } catch {
+          button.textContent = "复制失败";
+        }
+        setTimeout(() => {
+          button.textContent = "复制";
+          delete button.dataset.copied;
+        }, 1600);
       });
     }
   })();
@@ -406,6 +489,74 @@ const jsonLd = {
   .article-body {
     max-width: 700px;
     min-width: 0;
+  }
+
+  /* 移动端折叠目录：桌面端不占位，由 .toc 侧栏承担导航 */
+  .toc-mobile {
+    display: none;
+  }
+
+  .toc-mobile summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+
+  .toc-mobile summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .toc-mobile summary em {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+
+  .toc-mobile summary::after {
+    content: "";
+    margin-left: auto;
+    width: 7px;
+    height: 7px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg) translate(-2px, -2px);
+    opacity: 0.55;
+    transition: transform 0.25s var(--ease);
+  }
+
+  .toc-mobile[open] summary::after {
+    transform: rotate(-135deg) translate(-2px, -2px);
+  }
+
+  .toc-mobile ul {
+    list-style: none;
+    margin: 0;
+    padding: 2px 16px 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .toc-mobile li a {
+    display: block;
+    padding: 8px 0 8px 2px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+    border-bottom: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
+  }
+
+  .toc-mobile li:last-child a {
+    border-bottom: 0;
+  }
+
+  .toc-mobile li.d3 a {
+    padding-left: 18px;
+    font-size: 12.5px;
+    color: var(--muted);
   }
 
   .article-body :global(.heading-anchor) {
@@ -595,6 +746,87 @@ const jsonLd = {
     line-height: 1.55;
   }
 
+  /* ---------------- series ---------------- */
+  .series-box {
+    margin-top: 34px;
+    padding: 22px 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .series-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .series-count {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .series-box h2 {
+    margin: 12px 0 14px;
+    font-size: 19px;
+  }
+
+  .series-box h2 a:hover {
+    color: var(--accent-ink);
+  }
+
+  .series-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .series-item + .series-item {
+    border-top: 1px dashed var(--line);
+  }
+
+  .series-item a {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 10px 4px;
+    font-size: 14px;
+    color: var(--ink-2);
+    transition: color 0.2s var(--ease);
+  }
+
+  .series-item a:hover {
+    color: var(--accent-ink);
+  }
+
+  .series-num {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .series-title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .series-item.current a {
+    color: var(--accent-ink);
+    font-weight: 550;
+  }
+
+  .series-now {
+    flex: none;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--accent-wash);
+    color: var(--accent-ink);
+    font-size: 10.5px;
+  }
+
   /* ---------------- related ---------------- */
   .related {
     margin-top: 64px;
@@ -662,11 +894,19 @@ const jsonLd = {
 
   @media (max-width: 1000px) {
     .article-layout {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       gap: 0;
     }
     .toc {
       display: none;
+    }
+    .toc-mobile {
+      display: block;
+      margin-bottom: 26px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      overflow: hidden;
     }
     .article-body {
       max-width: 100%;

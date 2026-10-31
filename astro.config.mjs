@@ -3,6 +3,8 @@ import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
+import rehypeEnhance from "./src/lib/rehype-enhance.mjs";
+import { ogImageIntegration } from "./src/lib/og-image.mjs";
 
 // https://astro.build/config
 export default defineConfig({
@@ -15,6 +17,7 @@ export default defineConfig({
     sitemap({
       filter: (page) => !page.includes("/admin"),
     }),
+    ogImageIntegration(),
   ],
   markdown: {
     shikiConfig: {
@@ -40,6 +43,8 @@ export default defineConfig({
           },
         },
       ],
+      // 必须放在最后：此时标题锚点已经生成，不会被误判成外链
+      rehypeEnhance,
     ],
   },
 });

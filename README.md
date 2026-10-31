@@ -3,10 +3,12 @@
 一个可以直接上线的个人博客：Astro 静态渲染 + 云端内容与认证。
 
 - **线上地址**：https://guandao.xin
-- **文章列表 / 详情 / 标签 / 关于**：完整的信息架构
-- **Markdown 渲染**：构建期编译，代码高亮、目录锚点、阅读时长全部预生成
+- **页面**：首页 / 文章列表 / 详情 / 标签 / 系列 / 归档 / 骑行 / 作品 / 关于
+- **阅读体验**：全文搜索（命中正文并给上下文）、代码块一键复制、移动端折叠目录、图片灯箱、阅读进度
+- **内容组织**：标签、系列（按序号串联）、按年月归档的时间轴
+- **社交**：每篇文章构建期生成独立的 1200×630 分享图，另有 RSS、sitemap、JSON-LD
 - **云端能力**：Supabase 提供 PostgreSQL 数据库、Auth 登录认证、Storage 对象存储
-- **零运行时框架**：除了 2KB 的交互脚本，页面就是纯 HTML + CSS
+- **零运行时框架**：页面就是纯 HTML + CSS，交互只有少量原生脚本
 
 ## 快速开始
 
@@ -27,15 +29,24 @@ src/
 ├─ content/blog/          文章 Markdown（云端同步的落地位置）
 ├─ lib/
 │  ├─ site.ts             站点配置：标题、导航、作者、日期格式化
-│  ├─ posts.ts            内容查询：列表、标签统计、相关文章、阅读时长
-│  └─ cloud.ts            云端 client：登录、增删改查、文件上传（REST，无 SDK）
+│  ├─ posts.ts            内容查询：列表、标签统计、相关文章、系列、阅读时长
+│  ├─ cycling.ts          骑行页数据（里程、装备、照片）
+│  ├─ projects.ts         作品页数据
+│  ├─ cloud.ts            云端 client：登录、增删改查、文件上传（REST，无 SDK）
+│  ├─ rehype-enhance.mjs  正文增强：代码块外壳、图片懒加载、外链新窗口
+│  └─ og-image.mjs        构建结束后为每篇文章渲染分享图
 ├─ layouts/BaseLayout.astro  文档骨架：SEO、OG、JSON-LD、主题脚本
-├─ components/            Header / Footer / PostCard / Icon
+├─ components/            Header / Footer / PostCard / Icon / Comments
 ├─ pages/
 │  ├─ index.astro         首页
-│  ├─ blog/index.astro    文章归档（关键词搜索 + 标签筛选）
-│  ├─ blog/[slug].astro   文章详情（目录、进度、上下篇、相关阅读）
+│  ├─ blog/index.astro    文章列表（全文搜索 + 标签筛选）
+│  ├─ blog/[slug].astro   文章详情（目录、进度、系列、上下篇、相关阅读）
 │  ├─ tags/               标签总览与标签页
+│  ├─ series/             系列总览与系列页
+│  ├─ archive.astro       按年月归档的时间轴
+│  ├─ cycling.astro       骑行记录
+│  ├─ projects.astro      作品
+│  ├─ search-index.json.ts 构建期生成全文索引
 │  ├─ about.astro         关于
 │  ├─ admin/index.astro   写作后台（登录后才能用）
 │  ├─ rss.xml.ts          RSS
@@ -44,8 +55,11 @@ src/
 scripts/
 ├─ sync-content.mjs       构建前把云端文章同步为本地 Markdown
 ├─ serve-dist.mjs         本地静态预览服务器
-└─ qa.mjs                 截图 + 横向溢出检测（视觉质检）
-supabase/schema.sql       建表、RLS 策略、Storage 桶与权限
+├─ qa.mjs                 截图 + 横向溢出检测（视觉质检）
+└─ fonts/                 分享图用的中文字体
+supabase/
+├─ schema.sql             建表、RLS 策略、Storage 桶与权限
+└─ notify.sql             新留言通知（pg_net 触发器）
 ```
 
 ## 云端配置（数据库 / 存储 / 登录）
@@ -128,11 +142,37 @@ description: "列表页与 SEO 用的摘要"
 pubDate: 2026-10-28
 updatedDate: 2026-10-30   # 可选
 tags: ["技术", "Astro"]
+series: "C 语言"          # 可选，同一个系列名会自动归到 /series/ 下
+seriesOrder: 3            # 可选，系列内的阅读顺序，不填则按发布时间
 featured: true             # 可选，首页精选
 draft: false               # true 时构建期会被排除
 cover: https://…           # 可选，留空则用标签色生成渐变封面
 ---
 ```
+
+## 分享图
+
+每次构建会为每篇文章渲染一张 1200×630 的 PNG（`dist/og/<slug>.png`），
+标题、摘要、标签、日期都取自文章本身——分享到微信 / 微博 / Telegram 时不再共用一张默认图。
+
+渲染用 satori + resvg，需要一份中文字体：`scripts/fonts/NotoSansSC-Regular.otf`
+（Noto Sans SC，SIL OFL 协议，约 8 MB，已随仓库提交，部署时无需额外准备）。
+字体缺失时构建不会失败，只是跳过这一步。
+
+## 留言通知
+
+`supabase/notify.sql` 用 `pg_net` 让数据库自己在留言后发 HTTP 请求，执行一次即可，
+不需要部署额外服务。支持三种通道，填哪个用哪个：
+
+| 通道 | 接收方式 | 说明 |
+| --- | --- | --- |
+| PushPlus | 微信 | 国内可用，个人博客免费额度够用 |
+| Telegram | 即时消息 | 需要能访问 Telegram |
+| Resend | 邮件 | 需要 API Key |
+
+配置存放在 `notify_config` 表（未开放任何 RLS policy，只有 service_role 能读）。
+具体填法见 SQL 文件末尾的注释，附自测与排查语句。
+
 
 ## 脚本
 

@@ -23,7 +23,10 @@ const isActive = (href: string) => {
       {SITE.nav.map((item) => (
         <a
           href={item.href}
-          class:list={["nav-link", { active: isActive(item.href) }]}
+          class:list={[
+            "nav-link",
+            { active: isActive(item.href), external: "external" in item && item.external },
+          ]}
           aria-current={isActive(item.href) ? "page" : undefined}
         >
           {item.label}
@@ -189,6 +192,10 @@ const isActive = (href: string) => {
       height: 60px;
     }
     .brand-text em {
+      display: none;
+    }
+    /* 窄屏放不下五个入口，RSS 在页脚仍然可点 */
+    .nav-link.external {
       display: none;
     }
     .nav-link {

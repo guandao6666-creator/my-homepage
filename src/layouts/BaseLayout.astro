@@ -13,6 +13,8 @@ interface Props {
   canonical?: string;
   type?: "website" | "article";
   image?: string;
+  /** 构建期生成的分享图（/og/xxx.png），image 为空时使用 */
+  ogImage?: string;
   noindex?: boolean;
   jsonLd?: Record<string, unknown>;
   /** 文章页隐藏页脚留白 */
@@ -25,6 +27,7 @@ const {
   canonical,
   type = "website",
   image,
+  ogImage,
   noindex = false,
   jsonLd,
   bare = false,
@@ -33,7 +36,11 @@ const {
 const pageTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
 const canonicalUrl = new URL(canonical ?? Astro.url.pathname, SITE.url).href;
 // 分享卡片必须是位图：微信 / 微博 / Twitter 都不认 SVG
-const imageUrl = image ? new URL(image, SITE.url).href : `${SITE.url}/og-default.jpg`;
+const imageUrl = image
+  ? new URL(image, SITE.url).href
+  : ogImage
+    ? new URL(ogImage, SITE.url).href
+    : `${SITE.url}/og-default.jpg`;
 const fullJsonLd = jsonLd
   ? { "@context": "https://schema.org", ...jsonLd }
   : {

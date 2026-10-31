@@ -76,7 +76,7 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
             </li>
             <li>
               <span class="now-tag">在骑</span>
-              骑行总里程已过 4000 公里，有空就想找条新路线。
+              <span>骑行总里程已过 4000 公里，<a class="now-link" href="/cycling/">看看骑过的路</a>。</span>
             </li>
           </ul>
           {lastUpdated && (
@@ -379,6 +379,17 @@ const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
     border-top: 1px dashed var(--line);
     font-size: 12px;
     color: var(--muted);
+  }
+
+  .now-link {
+    color: var(--accent-ink);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    padding-bottom: 1px;
+    transition: border-color 0.2s var(--ease);
+  }
+
+  .now-link:hover {
+    border-bottom-color: var(--accent);
   }
 
   /* ---------------- section head ---------------- */

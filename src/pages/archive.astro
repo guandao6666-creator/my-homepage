@@ -1,0 +1,303 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Icon from "../components/Icon.astro";
+import { getAllPosts, type Post } from "../lib/posts";
+import { SITE, formatShortDate } from "../lib/site";
+
+const posts = await getAllPosts();
+
+/** 按「年 → 月」两级分组，两级都保持时间倒序 */
+const yearMap = new Map<number, Map<number, Post[]>>();
+for (const post of posts) {
+  const date = new Date(post.pubDate);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + 1;
+  if (!yearMap.has(year)) yearMap.set(year, new Map());
+  const monthMap = yearMap.get(year)!;
+  if (!monthMap.has(month)) monthMap.set(month, []);
+  monthMap.get(month)!.push(post);
+}
+
+const groups = [...yearMap.entries()]
+  .sort((a, b) => b[0] - a[0])
+  .map(([year, monthMap]) => ({
+    year,
+    count: [...monthMap.values()].reduce((sum, list) => sum + list.length, 0),
+    months: [...monthMap.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([month, list]) => ({ month, posts: list })),
+  }));
+
+const totalMinutes = posts.reduce((sum, post) => sum + post.minutes, 0);
+const firstPost = posts[posts.length - 1];
+---
+
+<BaseLayout
+  title="归档"
+  description={`${SITE.author}的全部文章归档：共 ${posts.length} 篇，跨越 ${groups.length} 个年份，按时间排列。`}
+  canonical="/archive/"
+>
+  <section class="page-head">
+    <div class="wrap">
+      <span class="eyebrow">
+        Archive · {posts.length} 篇 · {groups.length} 年
+      </span>
+      <h1>归档</h1>
+      <p class="page-lede">
+        从 {firstPost ? formatShortDate(firstPost.pubDate) : "—"} 写到现在，一共 {posts.length} 篇、
+        约 {totalMinutes} 分钟。按时间往下翻，能看到一条自己走过的线。
+      </p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    {groups.length === 0 ? (
+      <p class="empty">还没有文章。第一篇写完之后，这里会自动出现时间轴。</p>
+    ) : (
+      <div class="archive-layout">
+        <nav class="year-nav" aria-label="按年份跳转">
+          {groups.map((group) => (
+            <a href={`#y${group.year}`}>
+              <span>{group.year}</span>
+              <em>{group.count}</em>
+            </a>
+          ))}
+        </nav>
+
+        <div class="timeline">
+          {groups.map((group) => (
+            <section class="year" id={`y${group.year}`}>
+              <h2 class="year-title">
+                {group.year}
+                <span>{group.count} 篇</span>
+              </h2>
+
+              {group.months.map((month) => (
+                <div class="month">
+                  <h3>{String(month.month).padStart(2, "0")} 月</h3>
+                  <ul>
+                    {month.posts.map((post) => {
+                      const day = String(new Date(post.pubDate).getUTCDate()).padStart(2, "0");
+                      return (
+                        <li>
+                          <a href={`/blog/${post.slug}/`}>
+                            <time datetime={new Date(post.pubDate).toISOString()}>{day}</time>
+                            <span class="title">{post.title}</span>
+                            <span class="meta">{post.minutes} 分钟</span>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </section>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <a class="back" href="/blog/">
+      回到文章列表
+      <Icon name="arrow-right" size={13} />
+    </a>
+  </div>
+</BaseLayout>
+
+<style>
+  .page-head {
+    padding: 58px 0 34px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .page-head h1 {
+    margin: 14px 0 12px;
+    font-size: clamp(34px, 5vw, 46px);
+    letter-spacing: -0.03em;
+  }
+
+  .page-lede {
+    margin: 0;
+    max-width: 40em;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.9;
+  }
+
+  .archive-layout {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 44px;
+    padding-top: 40px;
+  }
+
+  .year-nav {
+    position: sticky;
+    top: 92px;
+    align-self: start;
+    display: grid;
+    gap: 2px;
+  }
+
+  .year-nav a {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+  }
+
+  .year-nav a:hover {
+    background: var(--surface-sunk);
+    color: var(--accent-ink);
+  }
+
+  .year-nav em {
+    font-style: normal;
+    font-size: 10.5px;
+    opacity: 0.7;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 26px;
+    border-left: 1px solid var(--line);
+  }
+
+  .year {
+    position: relative;
+    scroll-margin-top: 96px;
+  }
+
+  .year + .year {
+    margin-top: 46px;
+  }
+
+  .year-title {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 30px;
+    letter-spacing: -0.02em;
+  }
+
+  .year-title::before {
+    content: "";
+    position: absolute;
+    left: -31px;
+    top: 12px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid var(--accent);
+  }
+
+  .year-title span {
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  .month {
+    margin-top: 22px;
+  }
+
+  .month h3 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .month ul {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+  }
+
+  .month li + li {
+    border-top: 1px dashed var(--line);
+  }
+
+  .month a {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: baseline;
+    padding: 9px 2px;
+    font-size: 14px;
+    color: var(--ink-2);
+    transition: color 0.2s var(--ease), padding-left 0.2s var(--ease);
+  }
+
+  .month a:hover {
+    color: var(--accent-ink);
+    padding-left: 6px;
+  }
+
+  .month time {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .month .title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .month .meta {
+    flex: none;
+    font-size: 11.5px;
+    color: var(--muted);
+    opacity: 0.8;
+  }
+
+  .empty {
+    padding: 52px 0 8px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 40px;
+    font-size: 13px;
+    color: var(--muted);
+    transition: color 0.2s var(--ease);
+  }
+
+  .back:hover {
+    color: var(--accent-ink);
+  }
+
+  @media (max-width: 760px) {
+    .archive-layout {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    .year-nav {
+      display: none;
+    }
+    .month .meta {
+      display: none;
+    }
+    .month a {
+      grid-template-columns: 26px minmax(0, 1fr);
+      gap: 10px;
+    }
+  }
+</style>

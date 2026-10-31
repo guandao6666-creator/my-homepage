@@ -17,6 +17,10 @@ const blog = defineCollection({
     pubDate: z.coerce.date(),
     updatedDate: z.coerce.date().optional(),
     tags: z.array(z.string()).default([]),
+    /** 系列/专栏名：同一系列的文章共享同一个名字 */
+    series: z.string().max(60).optional(),
+    /** 系列内序号，从 1 开始；不填则按发布时间排 */
+    seriesOrder: z.number().int().positive().optional(),
     /** 置顶/推荐 */
     featured: z.boolean().default(false),
     draft: z.boolean().default(false),

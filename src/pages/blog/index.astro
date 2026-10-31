@@ -33,7 +33,7 @@ const jsonLd = {
       <span class="eyebrow">Archive · {posts.length} 篇</span>
       <h1>全部文章</h1>
       <p class="page-lede">
-        按时间倒序排列。可以用关键词搜索，或者用标签快速缩小范围。
+        按时间倒序排列。关键词会同时匹配标题、摘要、标签和正文，也可以用标签快速缩小范围。
       </p>
     </div>
   </section>
@@ -45,7 +45,7 @@ const jsonLd = {
         <input
           type="search"
           id="post-search"
-          placeholder="搜索标题、摘要或标签…"
+          placeholder="搜索标题、正文或标签…"
           autocomplete="off"
           aria-label="搜索文章"
         />
@@ -72,10 +72,12 @@ const jsonLd = {
       {posts.map((post, i) => (
         <div
           class="post-item"
+          data-slug={post.slug}
           data-search={`${post.title} ${post.description} ${post.tags.join(" ")}`.toLowerCase()}
           data-tags={post.tags.join("|")}
         >
           <PostCard post={post} index={i} />
+          <p class="hit-snippet" hidden></p>
         </div>
       ))}
     </div>
@@ -115,23 +117,115 @@ const jsonLd = {
 
     let activeTag = "";
     let query = "";
+    /** null 表示索引还没到，此时退回服务端预渲染的 data-search 字段 */
+    let index = null;
+
+    const baseOrder = new Map(items.map((el, i) => [el, i]));
+    const normalize = (value) => (value || "").toLowerCase();
+    const termsOf = (value) => normalize(value).split(/\s+/).filter(Boolean);
+    const escapeHtml = (text) =>
+      String(text).replace(
+        /[&<>"]/g,
+        (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch],
+      );
+    const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    /** 标题 > 标签 > 摘要 > 正文；多个关键词之间取「并且」 */
+    function scoreEntry(entry, terms) {
+      if (!entry) return 0;
+      const title = normalize(entry.title);
+      const description = normalize(entry.description);
+      const tags = normalize((entry.tags || []).join(" "));
+      const body = normalize(entry.body);
+
+      let total = 0;
+      for (const term of terms) {
+        let score = 0;
+        if (title.includes(term)) score += 14;
+        if (tags.includes(term)) score += 8;
+        if (description.includes(term)) score += 5;
+        if (body.includes(term)) score += 2;
+        if (!score) return 0;
+        total += score;
+      }
+      return total;
+    }
+
+    /** 截一段正文命中的上下文，关键词包成 <mark> */
+    function snippetFor(entry, terms) {
+      if (!entry || !entry.body) return "";
+      const body = entry.body;
+      const lower = body.toLowerCase();
+
+      let pos = -1;
+      let hit = "";
+      for (const term of terms) {
+        const found = lower.indexOf(term);
+        if (found === -1) continue;
+        if (pos === -1 || found < pos) {
+          pos = found;
+          hit = term;
+        }
+      }
+      if (pos === -1) return "";
+
+      const start = Math.max(0, pos - 30);
+      const end = Math.min(body.length, pos + hit.length + 46);
+      let html = escapeHtml(
+        (start > 0 ? "…" : "") + body.slice(start, end) + (end < body.length ? "…" : ""),
+      );
+      for (const term of terms) {
+        if (!term) continue;
+        const pattern = new RegExp(escapeRegExp(escapeHtml(term)), "gi");
+        html = html.replace(pattern, (match) => `<mark>${match}</mark>`);
+      }
+      return html;
+    }
+
+    const legacyMatch = (item, terms) => {
+      const haystack = item.dataset.search || "";
+      return terms.every((term) => haystack.includes(term));
+    };
 
     const apply = () => {
+      const terms = termsOf(query);
+
       let visible = 0;
       for (const item of items) {
-        const haystack = item.dataset.search || "";
         const tags = (item.dataset.tags || "").split("|").filter(Boolean);
-        const matchQuery = !query || haystack.includes(query);
         const matchTag = !activeTag || tags.includes(activeTag);
-        const show = matchQuery && matchTag;
+
+        let show = matchTag;
+        let score = 0;
+        if (show && terms.length) {
+          const entry = index && index.find((row) => row.slug === item.dataset.slug);
+          if (entry) {
+            score = scoreEntry(entry, terms);
+            show = score > 0;
+          } else {
+            show = legacyMatch(item, terms);
+          }
+        }
+
         item.hidden = !show;
+        item.style.order = terms.length ? String(-score) : String(baseOrder.get(item) ?? 0);
+
+        const box = item.querySelector(".hit-snippet");
+        if (box) {
+          const entry = index && index.find((row) => row.slug === item.dataset.slug);
+          const snippet = terms.length && show && entry ? snippetFor(entry, terms) : "";
+          box.innerHTML = snippet;
+          box.hidden = !snippet;
+        }
+
         if (show) visible += 1;
       }
+
       counter.textContent = String(visible);
       empty.hidden = visible !== 0;
       hint.textContent =
         activeTag || query
-          ? `· 已筛选${activeTag ? `「${activeTag}」` : ""}${query ? ` 关键词「${query}」` : ""}`
+          ? `· 已筛选${activeTag ? `「${activeTag}」` : ""}${query ? ` 关键词「${query}」` : ""}${terms.length ? "（含正文）" : ""}`
           : "";
     };
 
@@ -167,6 +261,16 @@ const jsonLd = {
         input.focus();
       }
     });
+
+    // 索引不大，进页面就预取；失败也不影响搜索，还有 data-search 兜底
+    fetch("/search-index.json")
+      .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        index = data;
+        if (query) apply();
+      })
+      .catch(() => undefined);
 
     // 首次进入就先算一遍：没有文章时直接显示空状态
     apply();
@@ -308,9 +412,28 @@ const jsonLd = {
     color: var(--accent-ink);
   }
 
+  /* flex 列 + order：搜索命中时按相关度重排，不改 DOM 顺序 */
   .post-list {
+    display: flex;
+    flex-direction: column;
     margin-top: 6px;
     border-bottom: 1px solid var(--line);
+  }
+
+  .hit-snippet {
+    margin: -12px 0 20px 52px;
+    padding: 2px 0 2px 12px;
+    border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+
+  .hit-snippet mark {
+    padding: 0 2px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--ink);
   }
 
   .empty-state {
@@ -354,6 +477,9 @@ const jsonLd = {
     .search {
       max-width: none;
       flex-basis: 100%;
+    }
+    .hit-snippet {
+      margin-left: 0;
     }
   }
 </style>

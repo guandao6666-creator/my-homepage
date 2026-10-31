@@ -18,6 +18,7 @@ export const SITE = {
   nav: [
     { href: "/blog/", label: "文章" },
     { href: "/tags/", label: "标签" },
+    { href: "/series/", label: "系列" },
     { href: "/about/", label: "关于" },
     { href: "/rss.xml", label: "RSS", external: true },
   ],
