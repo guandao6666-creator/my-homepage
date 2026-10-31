@@ -200,6 +200,7 @@ export interface CloudComment {
   body: string;
   created_at: string;
   visible: boolean;
+  parent_id?: string | null;
 }
 
 /** 登录状态下能拿到全部留言（含被隐藏的） */

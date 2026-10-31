@@ -127,6 +127,43 @@ create policy "comments_admin"
   using (true)
   with check (true);
 
+-- 5) 评论的回复 + 点赞 -----------------------------------------
+-- 回复只有一层：parent_id 指向顶层留言，回复的回复也挂在同一个父级上。
+alter table public.comments
+  add column if not exists parent_id uuid references public.comments(id) on delete cascade;
+
+create index if not exists comments_parent_idx on public.comments (parent_id);
+
+-- 文章和评论共用一张点赞表，靠 target_type 区分。
+create table if not exists public.likes (
+  id          uuid primary key default gen_random_uuid(),
+  target_type text not null check (target_type in ('post', 'comment')),
+  target_id   text not null,
+  visitor     text not null,
+  created_at  timestamptz not null default now(),
+  unique (target_type, target_id, visitor)
+);
+
+create index if not exists likes_target_idx on public.likes (target_type, target_id);
+
+alter table public.likes enable row level security;
+
+drop policy if exists "likes_read" on public.likes;
+create policy "likes_read"
+  on public.likes for select
+  to anon, authenticated
+  using (true);
+
+-- 只允许新增：点赞不可取消，也防止有人批量删掉别人的赞
+drop policy if exists "likes_insert" on public.likes;
+create policy "likes_insert"
+  on public.likes for insert
+  to anon, authenticated
+  with check (
+    char_length(visitor) between 8 and 64
+    and char_length(target_id) between 1 and 80
+  );
+
 -- ============================================================
 --  使用说明
 --  1. Authentication → Users → Add user 创建一个账号（关闭邮箱验证更方便）。

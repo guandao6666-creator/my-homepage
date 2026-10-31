@@ -475,6 +475,17 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     white-space: nowrap;
   }
 
+  .comment-top .c-tag {
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: var(--accent-wash);
+    color: var(--accent-ink);
+    font-style: normal;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
   .comment-body {
     margin: 7px 0 0;
     font-size: 12.5px;
@@ -1033,7 +1044,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
         (c) => `
       <article class="comment-row${c.visible ? "" : " is-hidden"}" data-id="${c.id}">
         <div class="comment-top">
-          <strong>${escapeHtml(c.author)}</strong>
+          <strong>${escapeHtml(c.author)}${c.parent_id ? '<em class="c-tag">回复</em>' : ""}</strong>
           <span class="comment-ops">
             <button type="button" data-act="toggle">${c.visible ? "隐藏" : "恢复"}</button>
             <button type="button" data-act="del">删除</button>

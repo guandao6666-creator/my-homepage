@@ -66,7 +66,7 @@ const cloud = cloudConfig();
   <p class="comments-empty" id="comments-empty" hidden>还没有留言，来说第一句吧。</p>
 </section>
 
-<!-- 评论项由 JS 动态创建，拿不到 Astro 的 scoped 属性，所以这里必须用全局样式 -->
+<!-- 评论项和回复表单都是 JS 动态创建的，拿不到 Astro 的 scoped 属性，只能用全局样式 -->
 <style is:global>
   .comments {
     max-width: 700px;
@@ -107,7 +107,9 @@ const cloud = cloudConfig();
   }
 
   .comment-author,
-  .comment-body {
+  .comment-body,
+  .reply-author,
+  .reply-body {
     width: 100%;
     font: inherit;
     color: var(--ink);
@@ -131,14 +133,18 @@ const cloud = cloudConfig();
   }
 
   .comment-author:focus,
-  .comment-body:focus {
+  .comment-body:focus,
+  .reply-author:focus,
+  .reply-body:focus {
     outline: none;
     border-color: color-mix(in srgb, var(--accent) 55%, transparent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
   }
 
   .comment-author::placeholder,
-  .comment-body::placeholder {
+  .comment-body::placeholder,
+  .reply-author::placeholder,
+  .reply-body::placeholder {
     color: var(--muted);
   }
 
@@ -163,7 +169,6 @@ const cloud = cloudConfig();
     color: var(--accent-ink);
   }
 
-  .comment-btn[disabled],
   #comment-submit:disabled {
     opacity: 0.55;
     cursor: not-allowed;
@@ -176,6 +181,8 @@ const cloud = cloudConfig();
     height: 1px;
     overflow: hidden;
   }
+
+  /* ---------- 列表 ---------- */
 
   .comment-list {
     list-style: none;
@@ -214,6 +221,149 @@ const cloud = cloudConfig();
     color: var(--ink-2);
     white-space: pre-wrap;
     word-break: break-word;
+  }
+
+  .comment-acts {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 10px;
+  }
+
+  .c-like,
+  .comment-acts .c-reply {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s var(--ease);
+  }
+
+  .c-like:hover,
+  .comment-acts .c-reply:hover {
+    color: var(--accent-ink);
+  }
+
+  .c-like svg {
+    width: 13px;
+    height: 13px;
+    transition: transform 0.25s var(--ease);
+  }
+
+  .c-like[aria-pressed="true"] {
+    color: #a4443a;
+  }
+
+  .c-like[aria-pressed="true"] svg {
+    fill: currentColor;
+    transform: scale(1.1);
+  }
+
+  .c-like[data-busy="true"] {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .c-like-n {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- 回复 ---------- */
+
+  .comment-replies {
+    list-style: none;
+    margin: 10px 0 0 2px;
+    padding: 0 0 0 16px;
+    border-left: 2px solid var(--line);
+  }
+
+  .comment-replies .comment-item {
+    padding: 12px 0;
+    border-bottom: 0;
+  }
+
+  .comment-replies .comment-item:last-child {
+    padding-bottom: 0;
+  }
+
+  .comment-replies .comment-name {
+    font-size: 14px;
+  }
+
+  .comment-replies .comment-text {
+    font-size: 13.8px;
+    margin-top: 6px;
+  }
+
+  .reply-form {
+    margin: 12px 0 4px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  .reply-form .reply-author {
+    max-width: 180px;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  .reply-form .reply-body {
+    font-size: 13.5px;
+    line-height: 1.8;
+    min-height: 62px;
+    resize: vertical;
+  }
+
+  .reply-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 9px;
+  }
+
+  .reply-hint {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .reply-hint[data-tone="error"] {
+    color: #a4443a;
+  }
+
+  .reply-tools {
+    display: flex;
+    gap: 8px;
+  }
+
+  .reply-tools button {
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: none;
+    font: inherit;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .reply-tools button[type="submit"] {
+    border-color: transparent;
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .reply-tools button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .comments-empty,
@@ -256,22 +406,59 @@ const cloud = cloudConfig();
     const submitBtn = document.getElementById("comment-submit");
     const authorInput = document.getElementById("c-author");
     const bodyInput = document.getElementById("c-body");
-    if (!form || !list || !authorInput || !bodyInput) return;
 
     const headers = { apikey: key, "Content-Type": "application/json" };
+    const enc = (v) => encodeURIComponent(v);
+
+    const VISITOR_KEY = "guandao.visitor";
+    const LIKED_KEY = "guandao.liked";
+    const NICK_KEY = "comment-author";
+
+    const HEART =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21.2l7.7-7.7 1.1-1a5.5 5.5 0 0 0 0-7.9Z"/></svg>';
+
     let items = [];
+    const likeCount = new Map();
 
-    const setHint = (text, tone) => {
-      if (!hint) return;
-      hint.textContent = text;
-      if (tone) hint.dataset.tone = tone;
-      else delete hint.dataset.tone;
-    };
+    /* --------------------------- 访客身份 --------------------------- */
 
-    // 只写文本，永远不拼 HTML —— 防止留言里的标签被执行
-    const timeLabel = (iso) => {
-      const then = new Date(iso).getTime();
-      const diff = Date.now() - then;
+    function visitorId() {
+      try {
+        let id = localStorage.getItem(VISITOR_KEY);
+        if (!id) {
+          id = crypto.randomUUID();
+          localStorage.setItem(VISITOR_KEY, id);
+        }
+        return id;
+      } catch {
+        return "anon-" + Math.random().toString(36).slice(2, 12);
+      }
+    }
+
+    const visitor = visitorId();
+
+    function likedSet(): Set<string> {
+      try {
+        return new Set(JSON.parse(localStorage.getItem(LIKED_KEY) || "[]"));
+      } catch {
+        return new Set();
+      }
+    }
+
+    function saveLiked(set: Set<string>) {
+      try {
+        localStorage.setItem(LIKED_KEY, JSON.stringify([...set]));
+      } catch {
+        /* 忽略 */
+      }
+    }
+
+    const bump = (k: string, n: number) => likeCount.set(k, (likeCount.get(k) ?? 0) + n);
+
+    /* ----------------------------- 渲染 ----------------------------- */
+
+    const timeLabel = (iso: string) => {
+      const diff = Date.now() - new Date(iso).getTime();
       const min = Math.floor(diff / 60000);
       if (min < 1) return "刚刚";
       if (min < 60) return `${min} 分钟前`;
@@ -283,58 +470,274 @@ const cloud = cloudConfig();
       return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
     };
 
-    const render = () => {
-      list.textContent = "";
-      for (const item of items) {
-        const li = document.createElement("li");
-        li.className = "comment-item";
+    const setHint = (text: string, tone?: string) => {
+      if (!hint) return;
+      hint.textContent = text;
+      if (tone) hint.dataset.tone = tone;
+      else delete hint.dataset.tone;
+    };
 
-        const meta = document.createElement("div");
-        meta.className = "comment-meta-row";
+    function itemEl(c: any, replies: any[], withReply: boolean) {
+      const li = document.createElement("li");
+      li.className = "comment-item";
+      li.dataset.id = c.id;
 
-        const name = document.createElement("span");
-        name.className = "comment-name";
-        name.textContent = item.author;
+      const meta = document.createElement("div");
+      meta.className = "comment-meta-row";
+      const name = document.createElement("span");
+      name.className = "comment-name";
+      name.textContent = c.author;
+      const time = document.createElement("span");
+      time.className = "comment-time";
+      time.textContent = timeLabel(c.created_at);
+      time.title = new Date(c.created_at).toLocaleString("zh-CN");
+      meta.append(name, time);
 
-        const time = document.createElement("span");
-        time.className = "comment-time";
-        time.textContent = timeLabel(item.created_at);
-        time.title = new Date(item.created_at).toLocaleString("zh-CN");
+      const text = document.createElement("p");
+      text.className = "comment-text";
+      text.textContent = c.body;
 
-        meta.append(name, time);
+      const acts = document.createElement("div");
+      acts.className = "comment-acts";
 
-        const text = document.createElement("p");
-        text.className = "comment-text";
-        text.textContent = item.body;
+      const like = document.createElement("button");
+      like.type = "button";
+      like.className = "c-like";
+      like.dataset.like = "comment";
+      like.dataset.id = c.id;
+      like.setAttribute("aria-pressed", "false");
+      like.innerHTML = HEART + '<span class="c-like-n">0</span>';
+      acts.append(like);
 
-        li.append(meta, text);
-        list.append(li);
+      if (withReply) {
+        const reply = document.createElement("button");
+        reply.type = "button";
+        reply.className = "c-reply";
+        reply.dataset.reply = c.id;
+        reply.textContent = "回复";
+        acts.append(reply);
       }
+
+      li.append(meta, text, acts);
+
+      if (replies.length) {
+        const ul = document.createElement("ul");
+        ul.className = "comment-replies";
+        for (const r of replies) ul.append(itemEl(r, [], false));
+        li.append(ul);
+      }
+
+      return li;
+    }
+
+    function render() {
+      if (!list) return;
+      list.textContent = "";
+
+      const roots = items.filter((c) => !c.parent_id);
+      const kids = new Map<string, any[]>();
+      for (const c of items) {
+        if (!c.parent_id) continue;
+        if (!kids.has(c.parent_id)) kids.set(c.parent_id, []);
+        kids.get(c.parent_id)!.push(c);
+      }
+      // 父留言被删掉的回复，提到顶层，别让它们消失
+      for (const [pid, arr] of kids) {
+        if (!roots.some((c) => c.id === pid)) roots.push(...arr);
+      }
+
+      for (const c of roots) list.append(itemEl(c, kids.get(c.id) ?? [], true));
 
       if (empty) empty.hidden = items.length > 0;
       if (countEl) countEl.textContent = items.length ? `${items.length} 条` : "";
-    };
+    }
 
-    const load = async () => {
+    /* ----------------------------- 点赞 ----------------------------- */
+
+    function paintLikes() {
+      const liked = likedSet();
+      for (const btn of document.querySelectorAll<HTMLElement>("[data-like]")) {
+        const k = `${btn.dataset.like}:${btn.dataset.id}`;
+        const on = liked.has(k);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+        const num = btn.querySelector(".like-count, .c-like-n");
+        if (num) num.textContent = String(likeCount.get(k) ?? 0);
+      }
+    }
+
+    async function like(btn: HTMLElement) {
+      const type = btn.dataset.like ?? "";
+      const id = btn.dataset.id ?? "";
+      const k = `${type}:${id}`;
+      const liked = likedSet();
+      if (liked.has(k) || btn.dataset.busy === "true") return;
+
+      btn.dataset.busy = "true";
       try {
-        const query = `?post_slug=eq.${encodeURIComponent(slug)}&select=author,body,created_at&order=created_at.desc&limit=100`;
-        const res = await fetch(`${base}/rest/v1/comments${query}`, { headers });
-        if (!res.ok) throw new Error(String(res.status));
-        items = await res.json();
+        const res = await fetch(`${base}/rest/v1/likes`, {
+          method: "POST",
+          headers: { ...headers, Prefer: "return=minimal" },
+          body: JSON.stringify([{ target_type: type, target_id: id, visitor }]),
+        });
+        // 409 = 这台设备已经赞过了（比如清过缓存又点了一次）
+        if (!res.ok && res.status !== 409) throw new Error(String(res.status));
+        if (res.ok) bump(k, 1);
+        liked.add(k);
+        saveLiked(liked);
+        paintLikes();
+      } catch {
+        /* 静默失败，不要让点赞打断阅读 */
+      } finally {
+        delete btn.dataset.busy;
+      }
+    }
+
+    /* ----------------------------- 回复 ----------------------------- */
+
+    function closeReplyForms() {
+      for (const f of document.querySelectorAll(".reply-form")) f.remove();
+    }
+
+    function openReply(parentId: string, host: HTMLElement) {
+      closeReplyForms();
+
+      const box = document.createElement("form");
+      box.className = "reply-form";
+
+      const author = document.createElement("input");
+      author.className = "reply-author";
+      author.maxLength = 24;
+      author.placeholder = "你的昵称";
+      author.autocomplete = "nickname";
+      try {
+        author.value = localStorage.getItem(NICK_KEY) || "";
+      } catch {
+        /* 忽略 */
+      }
+
+      const body = document.createElement("textarea");
+      body.className = "reply-body";
+      body.rows = 2;
+      body.maxLength = 800;
+      body.placeholder = "写下你的回复…";
+
+      const actions = document.createElement("div");
+      actions.className = "reply-actions";
+
+      const status = document.createElement("span");
+      status.className = "reply-hint";
+
+      const tools = document.createElement("span");
+      tools.className = "reply-tools";
+
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "取消";
+
+      const send = document.createElement("button");
+      send.type = "submit";
+      send.textContent = "发送";
+      send.disabled = false;
+
+      tools.append(cancel, send);
+      actions.append(status, tools);
+      box.append(author, body, actions);
+
+      cancel.addEventListener("click", () => box.remove());
+
+      box.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const nick = author.value.trim();
+        const content = body.value.trim();
+        if (!nick || !content) {
+          status.textContent = "昵称和内容都要填";
+          status.dataset.tone = "error";
+          return;
+        }
+        send.disabled = true;
+        status.textContent = "发送中…";
+        try {
+          const res = await fetch(`${base}/rest/v1/comments`, {
+            method: "POST",
+            headers: { ...headers, Prefer: "return=representation" },
+            body: JSON.stringify([{ post_slug: slug, author: nick, body: content, parent_id: parentId }]),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          const [created] = await res.json();
+          items = [...items, created];
+          try {
+            localStorage.setItem(NICK_KEY, nick);
+          } catch {
+            /* 忽略 */
+          }
+          render();
+          paintLikes();
+        } catch {
+          status.textContent = "没发出去，稍后再试";
+          status.dataset.tone = "error";
+          send.disabled = false;
+        }
+      });
+
+      host.after(box);
+      body.focus();
+    }
+
+    /* ----------------------------- 交互 ----------------------------- */
+
+    document.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement;
+      const likeBtn = target.closest("[data-like]") as HTMLElement | null;
+      if (likeBtn) {
+        event.preventDefault();
+        void like(likeBtn);
+        return;
+      }
+      const replyBtn = target.closest("[data-reply]") as HTMLElement | null;
+      if (replyBtn) {
+        event.preventDefault();
+        const li = replyBtn.closest(".comment-item") as HTMLElement | null;
+        if (li && replyBtn.dataset.reply) openReply(replyBtn.dataset.reply, repliesHost(li));
+      }
+    });
+
+    // 回复框插在点赞/回复那行之后
+    function repliesHost(li: HTMLElement) {
+      return (li.querySelector(".comment-acts") as HTMLElement) ?? li;
+    }
+
+    /* ----------------------------- 加载 ----------------------------- */
+
+    async function load() {
+      try {
+        const [cRes, lRes] = await Promise.all([
+          fetch(
+            `${base}/rest/v1/comments?post_slug=eq.${enc(slug)}&select=id,author,body,created_at,parent_id&order=created_at.asc&limit=300`,
+            { headers },
+          ),
+          fetch(`${base}/rest/v1/likes?select=target_type,target_id&limit=5000`, { headers }),
+        ]);
+        if (cRes.ok) items = await cRes.json();
+        if (lRes.ok) {
+          const rows = await lRes.json();
+          likeCount.clear();
+          for (const row of rows) bump(`${row.target_type}:${row.target_id}`, 1);
+        }
         render();
+        paintLikes();
       } catch {
         setHint("留言加载失败，刷新试试", "error");
       }
-    };
+    }
 
-    form.addEventListener("submit", async (event) => {
+    form?.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (!authorInput || !bodyInput || !submitBtn) return;
 
       const author = authorInput.value.trim();
       const body = bodyInput.value.trim();
-      const trap = document.getElementById("c-website");
+      const trap = document.getElementById("c-website") as HTMLInputElement | null;
 
-      // 蜜罐被填 = 机器人，假装成功
       if (trap && trap.value) {
         form.reset();
         setHint("已发送", "ok");
@@ -356,12 +759,13 @@ const cloud = cloudConfig();
         });
         if (!res.ok) throw new Error(String(res.status));
         const [created] = await res.json();
-        items = [created, ...items];
+        items = [...items, created];
         render();
+        paintLikes();
         bodyInput.value = "";
         setHint("已发送，谢谢留言", "ok");
         try {
-          localStorage.setItem("comment-author", author);
+          localStorage.setItem(NICK_KEY, author);
         } catch {
           /* 忽略 */
         }
@@ -373,12 +777,12 @@ const cloud = cloudConfig();
     });
 
     try {
-      const saved = localStorage.getItem("comment-author");
-      if (saved) authorInput.value = saved;
+      const saved = localStorage.getItem(NICK_KEY);
+      if (saved && authorInput) authorInput.value = saved;
     } catch {
       /* 忽略 */
     }
 
-    load();
+    void load();
   })();
 </script>

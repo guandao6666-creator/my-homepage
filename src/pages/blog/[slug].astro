@@ -122,10 +122,19 @@ const jsonLd = {
               </a>
             ))}
           </div>
-          <button class="btn" id="copy-link-2" type="button" data-copied="链接已复制">
-            <Icon name="link" size={14} />
-            分享
-          </button>
+          <div class="post-action-buttons">
+            <button class="btn like-btn" id="post-like" type="button" data-like="post" data-id={post.slug} aria-pressed="false">
+              <span class="like-heart" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21.2l7.7-7.7 1.1-1a5.5 5.5 0 0 0 0-7.9Z"/></svg>
+              </span>
+              <span class="like-count">0</span>
+              <span class="like-label">喜欢</span>
+            </button>
+            <button class="btn" id="copy-link-2" type="button" data-copied="链接已复制">
+              <Icon name="link" size={14} />
+              分享
+            </button>
+          </div>
         </div>
 
         <nav class="pager" aria-label="上下篇">
@@ -444,6 +453,38 @@ const jsonLd = {
     gap: 14px;
     padding-bottom: 30px;
     border-bottom: 1px solid var(--line);
+  }
+
+  .post-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .like-btn .like-heart {
+    display: inline-flex;
+    transition: transform 0.25s var(--ease), color 0.25s var(--ease);
+  }
+
+  .like-btn .like-count {
+    font-variant-numeric: tabular-nums;
+    min-width: 1ch;
+  }
+
+  .like-btn[aria-pressed="true"] {
+    border-color: color-mix(in srgb, #c4574a 45%, transparent);
+    background: color-mix(in srgb, #c4574a 9%, var(--surface));
+    color: #a4443a;
+  }
+
+  .like-btn[aria-pressed="true"] .like-heart svg {
+    fill: currentColor;
+    transform: scale(1.08);
+  }
+
+  .like-btn[data-busy="true"] {
+    opacity: 0.6;
+    pointer-events: none;
   }
 
   .pager {
