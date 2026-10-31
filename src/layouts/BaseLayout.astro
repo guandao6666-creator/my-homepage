@@ -97,6 +97,14 @@ const fullJsonLd = jsonLd
         }
       })();
     </script>
+
+    <!-- Cloudflare Web Analytics：无 Cookie 的访问统计，只有正式域名会记账 -->
+    <script
+      is:inline
+      defer
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+      data-cf-beacon='{"token": "3ceb341a33ab4d019c6ae9c1ca91a905"}'
+    ></script>
   </head>
 
   <body class={bare ? "bare" : ""}>

@@ -119,7 +119,9 @@ async function existingFiles() {
 /* ------------------------------- main -------------------------------- */
 
 async function main() {
-  const endpoint = `${url}/rest/v1/${table}?select=*&published=eq.true&order=pub_date.desc`;
+  // 只同步「已发布」且「发布时间已到」的文章 —— 发布日期填未来，就是定时发布
+  const now = encodeURIComponent(new Date().toISOString());
+  const endpoint = `${url}/rest/v1/${table}?select=*&published=eq.true&pub_date=lte.${now}&order=pub_date.desc`;
   log(`拉取云端文章：${url}/rest/v1/${table}`);
 
   let res;

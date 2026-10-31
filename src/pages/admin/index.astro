@@ -114,7 +114,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
                 <input id="f-slug" placeholder="my-first-post" />
               </label>
               <label class="field">
-                <span>发布日期</span>
+                <span>发布日期（填未来就是定时发布）</span>
                 <input id="f-date" type="date" />
               </label>
             </div>
@@ -1330,15 +1330,71 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
 
   const fileInput = $<HTMLInputElement>("file-input");
 
+  /**
+   * 手机直出的照片动辄 3–5MB，直接上传既慢又费存储。
+   * 这里在浏览器里先缩到长边 1600px、JPEG 0.82，肉眼几乎看不出差别。
+   */
+  async function compressImage(file: File): Promise<File> {
+    const skippable = ["image/gif", "image/svg+xml"];
+    if (!file.type.startsWith("image/") || skippable.includes(file.type)) return file;
+    if (typeof createImageBitmap !== "function") return file;
+
+    try {
+      const bitmap = await createImageBitmap(file);
+      const max = 1600;
+      const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+      // 本来就不大、也不用缩，就不折腾了
+      if (scale === 1 && file.size < 400 * 1024) {
+        bitmap.close?.();
+        return file;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        bitmap.close?.();
+        return file;
+      }
+      // PNG 透明区域转 JPEG 会变黑，先铺白底
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close?.();
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.82),
+      );
+      if (!blob || blob.size >= file.size) return file;
+
+      const name = `${file.name.replace(/\.[^.]+$/, "")}.jpg`;
+      return new File([blob], name, { type: "image/jpeg" });
+    } catch {
+      return file; // 压缩失败就用原图，不能让上传中断
+    }
+  }
+
+  const formatSize = (bytes: number) =>
+    bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB` : `${Math.round(bytes / 1024)}KB`;
+
   $("insert-media").addEventListener("click", () => fileInput.click());
 
   fileInput.addEventListener("change", async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
+    const original = fileInput.files?.[0];
+    if (!original) return;
     const hint = $("save-hint");
-    const original = hint.textContent;
-    hint.textContent = `正在上传 ${file.name}…`;
+    const previous = hint.textContent;
+    hint.textContent = `正在处理 ${original.name}…`;
     try {
+      const file = await compressImage(original);
+      const saved = original.size - file.size;
+      hint.textContent =
+        saved > 20 * 1024
+          ? `已压缩 ${formatSize(original.size)} → ${formatSize(file.size)}，正在上传…`
+          : `正在上传 ${file.name}…`;
+
       const { url } = await uploadToCloud(file, "uploads");
       const isImage = file.type.startsWith("image/");
       const snippet = isImage
@@ -1353,7 +1409,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
       editorError.textContent = (error as Error).message;
       editorError.hidden = false;
     } finally {
-      hint.textContent = original;
+      hint.textContent = previous;
       fileInput.value = "";
     }
   });

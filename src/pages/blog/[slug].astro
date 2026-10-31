@@ -239,10 +239,64 @@ const jsonLd = {
         }
       });
     }
+
+    /* ---------------- 图片点击放大 ---------------- */
+    const body = document.querySelector(".article-body");
+    if (body) {
+      const overlay = document.createElement("div");
+      overlay.className = "lightbox";
+      overlay.hidden = true;
+      const big = document.createElement("img");
+      big.alt = "";
+      overlay.append(big);
+      document.body.append(overlay);
+
+      const close = () => {
+        overlay.hidden = true;
+        document.body.style.overflow = "";
+      };
+
+      body.addEventListener("click", (event) => {
+        const img = event.target.closest("img");
+        if (!img) return;
+        big.src = img.currentSrc || img.src;
+        big.alt = img.alt || "";
+        overlay.hidden = false;
+        document.body.style.overflow = "hidden";
+      });
+
+      overlay.addEventListener("click", close);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !overlay.hidden) close();
+      });
+    }
   })();
 </script>
 
 <style>
+  /* 灯箱是 JS 动态创建的，拿不到 scoped 属性，必须用 :global */
+  :global(.lightbox) {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: grid;
+    place-items: center;
+    padding: 4vmin;
+    background: rgb(18 20 17 / 0.84);
+    backdrop-filter: blur(6px);
+    cursor: zoom-out;
+  }
+
+  :global(.lightbox img) {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 10px;
+    box-shadow: 0 24px 70px rgb(0 0 0 / 0.5);
+  }
+
+  .article-body :global(img) {
+    cursor: zoom-in;
+  }
   .progress {
     position: fixed;
     top: 0;
