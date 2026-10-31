@@ -301,10 +301,18 @@ const data = {
           win.dataset.app = id;
 
           const offset = (cascade++ % 5) * 26;
+          const narrow = window.innerWidth <= 720;
+
           win.style.width = `${app.width}px`;
           win.style.height = `${app.height}px`;
-          win.style.left = `${Math.max(16, (window.innerWidth - app.width) / 2 + offset - 60)}px`;
-          win.style.top = `${Math.max(52, 96 + offset)}px`;
+
+          if (narrow) {
+            // 手机上位置固定，不要级联偏移，否则窗口会一路往下跑
+            win.style.top = "110px";
+          } else {
+            win.style.left = `${Math.max(16, (window.innerWidth - app.width) / 2 + offset - 60)}px`;
+            win.style.top = `${Math.max(52, 96 + offset)}px`;
+          }
 
           win.innerHTML = `
             <div class="titlebar">
@@ -627,8 +635,10 @@ const data = {
         tickClock();
         window.setInterval(tickClock, 15_000);
 
-        // 打开文章窗口作为欢迎
-        window.setTimeout(() => openApp("posts"), 420);
+        // 桌面端自动打开文章窗口作为欢迎；手机上先让人看到图标
+        if (window.innerWidth > 720) {
+          window.setTimeout(() => openApp("posts"), 420);
+        }
       })();
     </script>
 
@@ -1580,7 +1590,27 @@ const data = {
 
       @media (max-width: 720px) {
         .desk-icons {
-          display: none;
+          display: flex;
+          flex-direction: row;
+          flex-wrap: wrap;
+          top: 10px;
+          left: 10px;
+          right: 10px;
+          gap: 6px;
+        }
+
+        .desk-icon {
+          width: 58px;
+          padding: 6px 2px;
+        }
+
+        .di-glyph {
+          width: 30px;
+          height: 30px;
+        }
+
+        .di-label {
+          font-size: 10px;
         }
 
         .window {
@@ -1588,6 +1618,7 @@ const data = {
           right: 8px;
           width: auto !important;
           max-width: none;
+          max-height: calc(100dvh - 190px);
         }
 
         .finder {
@@ -1607,6 +1638,14 @@ const data = {
         .dock-item {
           width: 38px;
           height: 38px;
+        }
+
+        .desk-pet {
+          right: 10px;
+          bottom: 78px;
+          width: 64px;
+          height: 92px;
+          z-index: 8;
         }
 
         .desk-hint {
