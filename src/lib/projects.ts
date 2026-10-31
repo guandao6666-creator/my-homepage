@@ -26,20 +26,6 @@ export const PROJECTS: Project[] = [
     status: "在线",
   },
   {
-    title: "海边骑行 3D 场景",
-    summary:
-      "用 Three.js 搭的一段海岸公路：镜头跟着车走，海面有起伏和反光，用来练手 WebGL 里的相机与光照。",
-    tags: ["Three.js", "WebGL", "动画"],
-    year: 2026,
-  },
-  {
-    title: "鹈鹕骑自行车",
-    summary:
-      "纯 SVG 手写的循环动画。一只鹈鹕蹬着自行车往前，车轮、踏板和身体的起伏对齐到同一个节奏上。",
-    tags: ["SVG", "CSS 动画"],
-    year: 2026,
-  },
-  {
     title: "AI 学习 Skill",
     summary:
       "给 Codex 写的一套学习用 Skill，覆盖多个学科，按「先讲清原理再给例子」的顺序组织回答，避免只丢结论。",
