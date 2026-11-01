@@ -31,8 +31,9 @@ const data = {
     host: "guandao.xin",
   },
   // anon key 放前端是 Supabase 的正常用法，真正的权限由 RLS 兜
+  // 生产环境走 /sb 同源反代（functions/sb/[[path]].js），避开国内直连 supabase.co 超时
   supabase: {
-    url: import.meta.env.PUBLIC_SUPABASE_URL ?? "",
+    url: import.meta.env.DEV ? (import.meta.env.PUBLIC_SUPABASE_URL ?? "") : "/sb",
     key: import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? "",
   },
 };
@@ -225,6 +226,21 @@ const data = {
 
         const DATA = window.__OS__;
         if (!DATA) return;
+
+        /**
+         * 带超时的 fetch。
+         * 国内访问 supabase.co 经常是「连接挂住」而不是报错，
+         * 不设超时的话界面会永远停在「正在加载」。
+         */
+        const fetchWithTimeout = async (url: string, options: RequestInit = {}, ms = 7000) => {
+          const controller = new AbortController();
+          const timer = window.setTimeout(() => controller.abort(), ms);
+          try {
+            return await fetch(url, { ...options, signal: controller.signal });
+          } finally {
+            window.clearTimeout(timer);
+          }
+        };
 
         const os = document.getElementById("os");
         const windows = document.getElementById("windows");
@@ -767,15 +783,15 @@ const data = {
             }
 
             try {
-              const res = await fetch(
+              const res = await fetchWithTimeout(
                 `${sb!.url}/rest/v1/visitor_avatars?select=name,avatar_url&order=created_at.desc&limit=60`,
                 { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` } },
               );
               if (!res.ok) throw new Error(String(res.status));
               renderList(await res.json());
             } catch {
-              countEl.textContent = "读取失败";
-              grid.innerHTML = '<p class="wall-empty">读取失败，可能是表还没建。</p>';
+              countEl.textContent = "连不上";
+              grid.innerHTML = '<p class="wall-empty">数据库连不上，可能是网络到不了 supabase.co。</p>';
             }
           };
 
@@ -857,7 +873,7 @@ const data = {
               const blob = await compress(file);
               const key = `${crypto.randomUUID()}.webp`;
 
-              const up = await fetch(`${sb!.url}/storage/v1/object/visitors/${key}`, {
+              const up = await fetchWithTimeout(`${sb!.url}/storage/v1/object/visitors/${key}`, {
                 method: "POST",
                 headers: {
                   apikey: sb!.key!,
@@ -871,7 +887,7 @@ const data = {
 
               const publicUrl = `${sb!.url}/storage/v1/object/public/visitors/${key}`;
 
-              const ins = await fetch(`${sb!.url}/rest/v1/visitor_avatars`, {
+              const ins = await fetchWithTimeout(`${sb!.url}/rest/v1/visitor_avatars`, {
                 method: "POST",
                 headers: {
                   apikey: sb!.key!,
@@ -917,7 +933,7 @@ const data = {
           if (!sb?.url || !sb?.key) return;
 
           try {
-            await fetch(`${sb.url}/rest/v1/rpc/report_time`, {
+            await fetchWithTimeout(`${sb.url}/rest/v1/rpc/report_time`, {
               method: "POST",
               headers: {
                 apikey: sb.key,
@@ -958,7 +974,7 @@ const data = {
             }
 
             try {
-              const res = await fetch(
+              const res = await fetchWithTimeout(
                 `${sb!.url}/rest/v1/visitor_rank?select=name,seconds,visits&order=seconds.desc&limit=20`,
                 { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` } },
               );
@@ -987,8 +1003,8 @@ const data = {
                 )
                 .join("");
             } catch {
-              status.textContent = "读取失败";
-              list.innerHTML = '<p class="rank-empty">读取失败，可能是表还没建。</p>';
+              status.textContent = "连不上";
+              list.innerHTML = '<p class="rank-empty">数据库连不上，可能是网络到不了 supabase.co。</p>';
             }
           };
 
@@ -1208,7 +1224,7 @@ const data = {
                   `${sb!.url}/rest/v1/polls?select=id,title,kind,options&active=eq.true&order=created_at.asc`,
                   { headers },
                 ),
-                fetch(`${sb!.url}/rest/v1/votes?select=poll_id,option_index,voter`, { headers }),
+                fetchWithTimeout(`${sb!.url}/rest/v1/votes?select=poll_id,option_index,voter`, { headers }),
               ]);
 
               if (!pRes.ok || !vRes.ok) throw new Error("fetch failed");
@@ -1230,8 +1246,9 @@ const data = {
               if (retryBtn) retryBtn.hidden = true;
               render();
             } catch {
-              status.textContent = "读取失败";
-              list.innerHTML = '<p class="council-empty">读取失败，点右上角重试；多次失败可能是网络挡了 supabase.co。</p>';
+              status.textContent = "连不上";
+              list.innerHTML =
+                '<p class="council-empty">数据库连不上。<br>国内访问 supabase.co 经常超时或被拦，点右上角重试试试。<br>如果一直不行，说明网络到不了那边。</p>';
               if (retryBtn) retryBtn.hidden = false;
             }
           };
@@ -1240,7 +1257,7 @@ const data = {
             if (mine[pollId] !== undefined || !ready) return;
 
             try {
-              await fetch(`${sb!.url}/rest/v1/votes`, {
+              await fetchWithTimeout(`${sb!.url}/rest/v1/votes`, {
                 method: "POST",
                 headers: {
                   apikey: sb!.key!,
@@ -1961,7 +1978,7 @@ const data = {
           try {
             const headers = { apikey: sb.key, Authorization: `Bearer ${sb.key}` };
 
-            const pRes = await fetch(
+            const pRes = await fetchWithTimeout(
               `${sb.url}/rest/v1/polls?select=id,options&kind=eq.outfit&active=eq.true&limit=1`,
               { headers },
             );
@@ -1971,7 +1988,7 @@ const data = {
             if (!polls.length) return;
 
             const poll = polls[0];
-            const vRes = await fetch(
+            const vRes = await fetchWithTimeout(
               `${sb.url}/rest/v1/votes?select=option_index&poll_id=eq.${poll.id}`,
               { headers },
             );
