@@ -569,6 +569,25 @@ const data = {
             tank.dataset.phase = next;
             hint.textContent = PHASE_TEXT[next];
           }, 60_000);
+
+          // 深夜随机冒一个瞌睡泡
+          const zzzTimer = window.setInterval(() => {
+            if (!document.body.contains(tank)) {
+              window.clearInterval(zzzTimer);
+              return;
+            }
+            if (tank.dataset.phase !== "night") return;
+
+            const fishes = Array.from(layer.querySelectorAll<HTMLElement>(".fish"));
+            const target = fishes[Math.floor(Math.random() * fishes.length)];
+            if (!target) return;
+
+            const z = document.createElement("span");
+            z.className = "zzz";
+            z.textContent = Math.random() > 0.45 ? "z" : "Z";
+            target.appendChild(z);
+            window.setTimeout(() => z.remove(), 3100);
+          }, 2300);
         };
 
         const APPS: Record<
@@ -2252,10 +2271,10 @@ const data = {
 
       /* 傍晚：水偏紫，慢下来 */
       .tank[data-phase="dusk"] {
-        background: linear-gradient(180deg, #251a36 0%, #3c2649 48%, #150d20 100%);
+        background: linear-gradient(180deg, #321a4a 0%, #4d2760 48%, #1b0d28 100%);
         --phase-speed: 1.35;
-        --phase-bright: 0.94;
-        --phase-saturate: 0.9;
+        --phase-bright: 0.86;
+        --phase-saturate: 0.82;
       }
 
       /* 深夜：熄灯，游得最慢 */
@@ -2504,6 +2523,33 @@ const data = {
         color: #ff8fb1;
         pointer-events: none;
         animation: heartUp 1.7s ease-out forwards;
+      }
+
+      /* 深夜的瞌睡泡 */
+      .zzz {
+        position: absolute;
+        right: -2px;
+        top: -8px;
+        font-family: var(--font-serif);
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(190, 225, 255, 0.75);
+        pointer-events: none;
+        animation: zzzFloat 3s ease-out forwards;
+      }
+
+      @keyframes zzzFloat {
+        0% {
+          opacity: 0;
+          transform: translate(0, 0) scale(0.7);
+        }
+        22% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+          transform: translate(9px, -28px) scale(1.1);
+        }
       }
 
       @keyframes heartUp {
