@@ -30,11 +30,32 @@ const data = {
   </head>
   <body>
     <noscript>
+      <style>
+        .boot {
+          display: none !important;
+        }
+      </style>
       <p style="padding: 24px; color: #eef1f7; font-size: 14px">
         这个桌面需要 JavaScript 才能运行。
         <a href="/home/" style="color: #9fb4ff">直接看博客 →</a>
       </p>
     </noscript>
+
+    <div class="boot" id="boot">
+      <div class="boot-inner">
+        <span class="boot-logo">管</span>
+        <div class="boot-track"><span class="boot-bar" id="boot-bar"></span></div>
+        <p class="boot-text" id="boot-text">正在加载管道的数字世界……</p>
+      </div>
+    </div>
+
+    <script is:inline>
+      // 主脚本万一来不及执行，6 秒后也必须放人进桌面
+      setTimeout(function () {
+        var boot = document.getElementById("boot");
+        if (boot) boot.style.display = "none";
+      }, 6000);
+    </script>
 
     <div class="os" id="os" data-wall="nebula">
       <div class="wallpaper"></div>
@@ -132,6 +153,33 @@ const data = {
 
     <script>
       (() => {
+        /* ---------------- 开机动画 ---------------- */
+
+        const boot = document.getElementById("boot");
+        const bootBar = document.getElementById("boot-bar");
+        const bootText = document.getElementById("boot-text");
+
+        if (boot && bootBar && bootText) {
+          let booted = false;
+
+          const finishBoot = () => {
+            if (booted) return;
+            booted = true;
+            boot.classList.add("is-done");
+            window.setTimeout(() => boot.remove(), 650);
+          };
+
+          window.setTimeout(() => {
+            bootText.textContent = "加载完成";
+            bootText.classList.add("is-ready");
+          }, 1400);
+
+          window.setTimeout(finishBoot, 1900);
+
+          // 急着进去可以点一下跳过
+          boot.addEventListener("click", finishBoot);
+        }
+
         const DATA = window.__OS__;
         if (!DATA) return;
 
@@ -1740,6 +1788,91 @@ const data = {
         font-size: 12px;
         letter-spacing: 0.04em;
         color: rgba(255, 255, 255, 0.42);
+      }
+
+      /* ---------------- 开机动画 ---------------- */
+
+      .boot {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: grid;
+        place-items: center;
+        background: #05060a;
+        transition: opacity 0.55s ease, visibility 0s 0.55s;
+      }
+
+      .boot.is-done {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .boot-inner {
+        display: grid;
+        justify-items: center;
+        gap: 20px;
+      }
+
+      .boot-logo {
+        display: grid;
+        place-items: center;
+        width: 62px;
+        height: 62px;
+        border-radius: 16px;
+        background: linear-gradient(150deg, #6f8cff, #b06eff);
+        box-shadow: 0 18px 40px -16px rgba(111, 140, 255, 0.6);
+        font-family: var(--font-serif);
+        font-size: 29px;
+        color: #fff;
+        animation: bootLogo 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+      }
+
+      .boot-track {
+        width: 152px;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+
+      .boot-bar {
+        display: block;
+        width: 0;
+        height: 100%;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #6f8cff, #b06eff);
+        /* 用 CSS 动画而不是 JS 设宽度，脚本晚到也不影响进度条起步 */
+        animation: bootFill 1.2s 0.15s cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
+      }
+
+      @keyframes bootFill {
+        to {
+          width: 100%;
+        }
+      }
+
+      .boot-text {
+        margin: 0;
+        font-size: 12px;
+        letter-spacing: 0.05em;
+        color: rgba(255, 255, 255, 0.45);
+        transition: color 0.3s ease;
+      }
+
+      .boot-text.is-ready {
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      @keyframes bootLogo {
+        from {
+          opacity: 0;
+          transform: scale(0.86);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
       }
 
       /* ---------------- Dock ---------------- */
