@@ -185,6 +185,10 @@ const data = {
             <span class="di-glyph di-vote"></span>
             <span class="di-label">议会</span>
           </button>
+          <button class="desk-icon" type="button" data-app="treehole">
+            <span class="di-glyph di-hole"></span>
+            <span class="di-label">树洞</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -366,6 +370,7 @@ const data = {
           rank: "di-rank",
           draw: "di-draw",
           council: "di-vote",
+          treehole: "di-hole",
         };
 
         const readDock = (): string[] => {
@@ -1392,6 +1397,293 @@ const data = {
         };
 
 
+        /* ---------------- 匿名树洞 ---------------- */
+
+        const HOLE_ADJ = ["安静的", "路过的", "深夜的", "迷路的", "加班的", "刚睡醒的", "在骑车的", "写代码的", "晒太阳的"];
+        const HOLE_NOUN = ["鲸鱼", "海豚", "猫", "海鸥", "风", "路灯", "路人", "大肥鱼", "土豆"];
+
+        const holeNick = () =>
+          `${HOLE_ADJ[Math.floor(Math.random() * HOLE_ADJ.length)]}${HOLE_NOUN[Math.floor(Math.random() * HOLE_NOUN.length)]}`;
+
+        const timeAgo = (iso: string) => {
+          const diff = Date.now() - new Date(iso).getTime();
+          const min = Math.floor(diff / 60000);
+          if (min < 1) return "刚刚";
+          if (min < 60) return `${min} 分钟前`;
+          const hr = Math.floor(min / 60);
+          if (hr < 24) return `${hr} 小时前`;
+          const day = Math.floor(hr / 24);
+          if (day < 30) return `${day} 天前`;
+          return new Date(iso).toLocaleDateString("zh-CN");
+        };
+
+        const renderTreehole = () => `
+          <div class="hole">
+            <div class="hole-top">
+              <p class="hole-topic-label">今日话题</p>
+              <p class="hole-topic" id="hole-topic">今天有什么小事让你开心？</p>
+            </div>
+            <form class="hole-form" id="hole-form">
+              <textarea class="hole-input" id="hole-input" rows="2" maxlength="500" placeholder="想说什么就说，没人知道你是谁"></textarea>
+              <div class="hole-form-bar">
+                <span class="hole-count" id="hole-count">0 / 500</span>
+                <button class="hole-send" id="hole-send" type="submit">说出去</button>
+              </div>
+            </form>
+            <div class="hole-list" id="hole-list"></div>
+            <p class="hole-status" id="hole-status"></p>
+          </div>`;
+
+        const initTreehole = (win: HTMLElement) => {
+          const list = win.querySelector("#hole-list");
+          const form = win.querySelector<HTMLFormElement>("#hole-form");
+          const input = win.querySelector<HTMLTextAreaElement>("#hole-input");
+          const send = win.querySelector<HTMLButtonElement>("#hole-send");
+          const count = win.querySelector("#hole-count");
+          const status = win.querySelector("#hole-status");
+          const topicEl = win.querySelector("#hole-topic");
+          if (!list || !form || !input || !send || !count || !status) return;
+
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          const ready = Boolean(sb?.url && sb?.key);
+
+          interface Hole {
+            id: string;
+            content: string;
+            nick: string;
+            featured: boolean;
+            created_at: string;
+          }
+          interface Reply {
+            id: string;
+            hole_id: string;
+            content: string;
+            nick: string;
+            created_at: string;
+          }
+
+          let holes: Hole[] = [];
+          let replies: Reply[] = [];
+          const openReplies = new Set<string>();
+
+          const render = () => {
+            if (!holes.length) {
+              list.innerHTML = '<p class="hole-empty">还没有人说话。做第一个吧。</p>';
+              return;
+            }
+
+            list.innerHTML = holes
+              .map((h) => {
+                const rs = replies.filter((r) => r.hole_id === h.id);
+                const open = openReplies.has(h.id);
+
+                const replyBlock = open
+                  ? `
+                    <div class="hole-replies">
+                      ${
+                        rs.length
+                          ? rs
+                              .map(
+                                (r) => `
+                                  <div class="hole-reply">
+                                    <span class="hole-reply-nick">${escapeHtml(r.nick)}</span>
+                                    <span class="hole-reply-text">${escapeHtml(r.content)}</span>
+                                  </div>`,
+                              )
+                              .join("")
+                          : '<p class="hole-reply-empty">还没有回应，说点什么？</p>'
+                      }
+                      <form class="hole-reply-form" data-hole="${h.id}">
+                        <input class="hole-reply-input" maxlength="300" placeholder="回应一句…" />
+                        <button type="submit">发送</button>
+                      </form>
+                    </div>`
+                  : "";
+
+                return `
+                  <article class="hole-item ${h.featured ? "is-featured" : ""}">
+                    ${h.featured ? '<span class="hole-badge">精选</span>' : ""}
+                    <p class="hole-text">${escapeHtml(h.content)}</p>
+                    <div class="hole-meta">
+                      <span class="hole-nick">${escapeHtml(h.nick)}</span>
+                      <span class="hole-time">${timeAgo(h.created_at)}</span>
+                      <button class="hole-reply-toggle" data-hole="${h.id}" type="button">
+                        ${rs.length ? `${rs.length} 条回应` : "回应"}
+                      </button>
+                    </div>
+                    ${replyBlock}
+                  </article>`;
+              })
+              .join("");
+          };
+
+          const load = async () => {
+            if (!ready) {
+              status.textContent = "云端没接上，只能看不能发";
+              return;
+            }
+
+            status.textContent = "正在连…";
+
+            try {
+              const headers = { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` };
+
+              const [tRes, hRes, rRes] = await Promise.all([
+                fetchWithTimeout(
+                  `${sb!.url}/rest/v1/hole_topics?select=day,topic&order=day.desc&limit=1`,
+                  { headers },
+                  8000,
+                ),
+                fetchWithTimeout(
+                  `${sb!.url}/rest/v1/holes?select=id,content,nick,featured,created_at&order=featured.desc,created_at.desc&limit=40`,
+                  { headers },
+                  10000,
+                ),
+                fetchWithTimeout(
+                  `${sb!.url}/rest/v1/hole_replies?select=id,hole_id,content,nick,created_at&order=created_at.asc&limit=300`,
+                  { headers },
+                  10000,
+                ),
+              ]);
+
+              if (tRes.ok) {
+                const topics = (await tRes.json()) as Array<{ topic: string }>;
+                if (topics.length && topicEl) topicEl.textContent = topics[0].topic;
+              }
+
+              if (!hRes.ok || !rRes.ok) throw new Error("bad status");
+
+              holes = (await hRes.json()) as Hole[];
+              replies = (await rRes.json()) as Reply[];
+
+              status.textContent = holes.length ? `共 ${holes.length} 条` : "";
+              render();
+            } catch {
+              status.textContent = "连不上，可能是网络问题，关掉重开试试";
+            }
+          };
+
+          input.addEventListener("input", () => {
+            count.textContent = `${input.value.length} / 500`;
+          });
+
+          form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const text = input.value.trim();
+            if (!text) return;
+
+            const nick = holeNick();
+            const optimistic: Hole = {
+              id: `local-${Date.now()}`,
+              content: text,
+              nick,
+              featured: false,
+              created_at: new Date().toISOString(),
+            };
+
+            // 先插进列表，网络慢也不耽误看到自己说的话
+            holes.unshift(optimistic);
+            input.value = "";
+            count.textContent = "0 / 500";
+            render();
+            list.scrollTop = 0;
+
+            if (!ready) {
+              status.textContent = "显示在本地了，但云端没连上";
+              return;
+            }
+
+            send.disabled = true;
+
+            try {
+              const res = await fetchWithTimeout(
+                `${sb!.url}/rest/v1/holes`,
+                {
+                  method: "POST",
+                  headers: {
+                    apikey: sb!.key!,
+                    Authorization: `Bearer ${sb!.key}`,
+                    "Content-Type": "application/json",
+                    Prefer: "return=minimal",
+                  },
+                  body: JSON.stringify({ content: text, nick }),
+                },
+                10000,
+              );
+              if (!res.ok) throw new Error(String(res.status));
+              status.textContent = "说完了";
+            } catch {
+              holes = holes.filter((h) => h.id !== optimistic.id);
+              render();
+              status.textContent = "没发出去，再试一次";
+            } finally {
+              send.disabled = false;
+            }
+          });
+
+          list.addEventListener("click", (event) => {
+            const btn = (event.target as HTMLElement).closest<HTMLElement>(".hole-reply-toggle");
+            if (!btn) return;
+
+            const id = btn.dataset.hole;
+            if (!id) return;
+
+            if (openReplies.has(id)) openReplies.delete(id);
+            else openReplies.add(id);
+
+            render();
+          });
+
+          list.addEventListener("submit", async (event) => {
+            const formEl = event.target as HTMLFormElement;
+            if (!formEl.classList.contains("hole-reply-form")) return;
+            event.preventDefault();
+
+            const holeId = formEl.dataset.hole;
+            const inputEl = formEl.querySelector<HTMLInputElement>(".hole-reply-input");
+            const text = inputEl?.value.trim();
+            if (!holeId || !text || !ready) return;
+
+            const nick = holeNick();
+            const optimistic: Reply = {
+              id: `local-${Date.now()}`,
+              hole_id: holeId,
+              content: text,
+              nick,
+              created_at: new Date().toISOString(),
+            };
+
+            if (inputEl) inputEl.value = "";
+            replies.push(optimistic);
+            render();
+
+            try {
+              const res = await fetchWithTimeout(
+                `${sb!.url}/rest/v1/hole_replies`,
+                {
+                  method: "POST",
+                  headers: {
+                    apikey: sb!.key!,
+                    Authorization: `Bearer ${sb!.key}`,
+                    "Content-Type": "application/json",
+                    Prefer: "return=minimal",
+                  },
+                  body: JSON.stringify({ hole_id: holeId, content: text, nick }),
+                },
+                10000,
+              );
+              if (!res.ok) throw new Error(String(res.status));
+            } catch {
+              replies = replies.filter((r) => r.id !== optimistic.id);
+              render();
+              status.textContent = "回应没发出去，再试一次";
+            }
+          });
+
+          void load();
+        };
+
         const APPS: Record<
           string,
           { title: string; width: number; height: number; body: () => string }
@@ -1407,6 +1699,7 @@ const data = {
           rank: { title: "排行榜", width: 480, height: 460, body: renderRank },
           draw: { title: "每日抽奖", width: 440, height: 420, body: renderDraw },
           council: { title: "议会", width: 600, height: 540, body: renderCouncil },
+          treehole: { title: "树洞", width: 560, height: 620, body: renderTreehole },
         };
 
         /* ---------------- 窗口系统 ---------------- */
@@ -1580,6 +1873,7 @@ const data = {
             "rank",
             "draw",
             "council",
+            "treehole",
           ];
           if (ALL_APPS.every((app) => achState.apps.includes(app))) unlock("roam");
 
@@ -1596,6 +1890,7 @@ const data = {
           if (id === "rank") initRank(win);
           if (id === "draw") initDraw(win);
           if (id === "council") initCouncil(win);
+          if (id === "treehole") initTreehole(win);
         };
 
         /* ---------------- 终端 ---------------- */
@@ -2659,6 +2954,22 @@ const data = {
         height: 3px;
         border-radius: 1px;
         background: #6d28d9;
+      }
+
+      /* 图标：树洞 */
+      .di-hole {
+        background: linear-gradient(160deg, #a8bf85 0%, #3f5230 100%);
+      }
+      .di-hole::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 10px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 38% 32%, #2a1f16 0%, #0f0a06 78%);
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.85);
       }
 
       /* 图标：齿轮 */
@@ -4313,6 +4624,231 @@ const data = {
         text-align: center;
       }
 
+      /* ---------------- 匿名树洞 ---------------- */
+
+      .hole {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 14px 18px 10px;
+      }
+
+      .hole-top {
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .hole-topic-label {
+        margin: 0 0 4px;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
+      .hole-topic {
+        margin: 0;
+        font-family: var(--font-serif);
+        font-size: 15px;
+        color: #ffd479;
+      }
+
+      .hole-form {
+        display: grid;
+        gap: 6px;
+        margin: 12px 0;
+      }
+
+      .hole-input {
+        width: 100%;
+        min-height: 56px;
+        max-height: 140px;
+        padding: 9px 11px;
+        resize: vertical;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12.5px;
+        line-height: 1.7;
+        outline: none;
+      }
+
+      .hole-input:focus {
+        border-color: rgba(168, 191, 133, 0.6);
+      }
+
+      .hole-form-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .hole-count {
+        font-size: 10.5px;
+        font-variant-numeric: tabular-nums;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .hole-send {
+        margin-left: auto;
+        padding: 7px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: linear-gradient(150deg, #7f9e5a, #4a6b34);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .hole-send:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+
+      .hole-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .hole-item {
+        position: relative;
+        padding: 11px 13px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .hole-item.is-featured {
+        border-color: rgba(255, 212, 121, 0.3);
+        background: rgba(255, 212, 121, 0.05);
+      }
+
+      .hole-badge {
+        position: absolute;
+        top: -6px;
+        right: 10px;
+        padding: 2px 7px;
+        border-radius: 4px;
+        background: linear-gradient(150deg, #ffd479, #d19a2e);
+        color: #3a2a08;
+        font-size: 9px;
+        font-weight: 600;
+      }
+
+      .hole-text {
+        margin: 0 0 8px;
+        font-size: 12.5px;
+        line-height: 1.85;
+        color: rgba(255, 255, 255, 0.86);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .hole-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.34);
+      }
+
+      .hole-nick {
+        color: rgba(168, 191, 133, 0.9);
+      }
+
+      .hole-reply-toggle {
+        margin-left: auto;
+        padding: 2px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 5px;
+        background: none;
+        color: rgba(255, 255, 255, 0.5);
+        font: inherit;
+        font-size: 10.5px;
+        cursor: pointer;
+      }
+
+      .hole-reply-toggle:hover {
+        border-color: rgba(255, 255, 255, 0.25);
+        color: #fff;
+      }
+
+      .hole-replies {
+        display: grid;
+        gap: 7px;
+        margin-top: 10px;
+        padding-top: 9px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.08);
+      }
+
+      .hole-reply {
+        font-size: 11.5px;
+        line-height: 1.75;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .hole-reply-nick {
+        margin-right: 6px;
+        color: rgba(168, 191, 133, 0.85);
+      }
+
+      .hole-reply-empty {
+        margin: 0;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.28);
+      }
+
+      .hole-reply-form {
+        display: flex;
+        gap: 6px;
+      }
+
+      .hole-reply-input {
+        flex: 1;
+        min-width: 0;
+        padding: 6px 9px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 11.5px;
+        outline: none;
+      }
+
+      .hole-reply-form button {
+        padding: 6px 12px;
+        border: 0;
+        border-radius: 6px;
+        background: rgba(168, 191, 133, 0.3);
+        color: #d9e8c2;
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .hole-empty {
+        margin: 0;
+        padding: 40px 0;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.35);
+        text-align: center;
+      }
+
+      .hole-status {
+        min-height: 14px;
+        margin: 6px 0 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
       /* ---------------- 关机画面 ---------------- */
 
       .power-screen {
@@ -4513,6 +5049,7 @@ const data = {
       .dock-glyph.di-draw::after,
       .dock-glyph.di-vote::before,
       .dock-glyph.di-vote::after,
+      .dock-glyph.di-hole::before,
       .dock-glyph.di-gear::before,
       .dock-glyph.di-gear::after,
       .dock-glyph.di-home::before,
@@ -4660,6 +5197,18 @@ const data = {
 
       .dock-glyph.di-vote {
         background: linear-gradient(160deg, #a78bfa 0%, #6d28d9 100%);
+      }
+
+      .dock-glyph.di-hole {
+        background: linear-gradient(160deg, #a8bf85 0%, #3f5230 100%);
+      }
+      .dock-glyph.di-hole::before {
+        left: 12px;
+        top: 13px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 38% 32%, #2a1f16 0%, #0f0a06 78%);
       }
       .dock-glyph.di-vote::before {
         left: 11px;
