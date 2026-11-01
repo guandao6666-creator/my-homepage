@@ -50,6 +50,16 @@ const data = {
         <div class="mb-status">
           <span class="mb-dot"></span>
           <span id="mb-time">--:--</span>
+          <button class="mb-power" id="mb-power" type="button" aria-label="电源">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M12 3v9" stroke-linecap="round" />
+              <path d="M6.5 6.6a8 8 0 1 0 11 0" stroke-linecap="round" />
+            </svg>
+          </button>
+          <div class="power-menu" id="power-menu" hidden>
+            <button type="button" data-power="restart">重新启动</button>
+            <button type="button" data-power="shutdown">关机</button>
+          </div>
         </div>
       </header>
 
@@ -87,8 +97,7 @@ const data = {
         <p class="desk-hint" id="desk-hint">双击图标，或从下方程序坞打开</p>
       </main>
 
-      <footer class="dock" id="dock">
-        <button class="dock-item" type="button" data-app="posts" title="文章">
+      <footer class="dock" id="dock">        <button class="dock-item" type="button" data-app="posts" title="文章">
           <span class="dock-glyph di-folder"></span>
         </button>
         <button class="dock-item" type="button" data-app="about" title="关于">
@@ -110,6 +119,13 @@ const data = {
       </footer>
     </div>
 
+    <div class="power-screen" id="power-screen" hidden>
+      <div class="power-inner">
+        <span class="power-logo">管</span>
+        <p class="power-hint" id="power-hint"></p>
+      </div>
+    </div>
+
     <script is:inline define:vars={{ OS_DATA: data }}>
       window.__OS__ = OS_DATA;
     </script>
@@ -126,6 +142,46 @@ const data = {
 
         let zTop = 10;
         let cascade = 0;
+
+        /* ---------------- 状态持久化 ---------------- */
+
+        const STATE_KEY = "guandao.os.state.v1";
+
+        interface WinState {
+          left: number;
+          top: number;
+          minimized: boolean;
+        }
+
+        const readState = (): { wall?: string; windows?: Record<string, WinState> } => {
+          try {
+            return JSON.parse(localStorage.getItem(STATE_KEY) || "{}");
+          } catch {
+            return {};
+          }
+        };
+
+        const writeState = (patch: Record<string, unknown>) => {
+          try {
+            localStorage.setItem(STATE_KEY, JSON.stringify({ ...readState(), ...patch }));
+          } catch {
+            /* 隐私模式写不进去，忽略即可 */
+          }
+        };
+
+        const saveWindows = () => {
+          const map: Record<string, WinState> = {};
+          windows.querySelectorAll<HTMLElement>(".window").forEach((win) => {
+            const app = win.dataset.app;
+            if (!app) return;
+            map[app] = {
+              left: win.offsetLeft,
+              top: win.offsetTop,
+              minimized: win.classList.contains("is-minimized"),
+            };
+          });
+          writeState({ windows: map });
+        };
 
         /* ---------------- 窗口内容 ---------------- */
 
@@ -239,7 +295,51 @@ const data = {
 
         const closeWin = (win: HTMLElement) => {
           win.classList.add("is-closing");
-          window.setTimeout(() => win.remove(), 180);
+          const dockItem = document.querySelector(`.dock-item[data-app="${win.dataset.app}"]`);
+          dockItem?.classList.remove("has-open", "has-hidden");
+          window.setTimeout(() => {
+            win.remove();
+            saveWindows();
+          }, 180);
+        };
+
+        /** 缩到 Dock 图标里，图标下方亮一个小点 */
+        const minimizeWin = (win: HTMLElement) => {
+          const dockItem = document.querySelector<HTMLElement>(`.dock-item[data-app="${win.dataset.app}"]`);
+
+          if (dockItem) {
+            const rect = win.getBoundingClientRect();
+            const target = dockItem.getBoundingClientRect();
+            const dx = target.left + target.width / 2 - (rect.left + rect.width / 2);
+            const dy = target.top + target.height / 2 - (rect.top + rect.height / 2);
+
+            win.style.transformOrigin = "center center";
+            win.style.transform = `translate(${dx}px, ${dy}px) scale(0.06)`;
+
+            dockItem.classList.remove("has-open");
+            dockItem.classList.add("has-hidden");
+          }
+
+          win.style.opacity = "0";
+          win.classList.add("is-minimized");
+          saveWindows();
+        };
+
+        const restoreWin = (win: HTMLElement) => {
+          win.classList.remove("is-minimized");
+          win.style.opacity = "1";
+
+          // 下一帧再清 transform，才有从 Dock 弹回来的动画
+          window.requestAnimationFrame(() => {
+            win.style.transform = "";
+          });
+
+          const dockItem = document.querySelector(`.dock-item[data-app="${win.dataset.app}"]`);
+          dockItem?.classList.remove("has-hidden");
+          dockItem?.classList.add("has-open");
+
+          focusWin(win);
+          saveWindows();
         };
 
         const bindDrag = (win: HTMLElement) => {
@@ -263,6 +363,7 @@ const data = {
             window.removeEventListener("pointermove", onMove);
             window.removeEventListener("pointerup", onUp);
             window.removeEventListener("pointercancel", onUp);
+            saveWindows();
           };
 
           bar.addEventListener("pointerdown", (event) => {
@@ -290,7 +391,8 @@ const data = {
 
           const existing = windows.querySelector(`.window[data-app="${id}"]`) as HTMLElement | null;
           if (existing) {
-            focusWin(existing);
+            if (existing.classList.contains("is-minimized")) restoreWin(existing);
+            else focusWin(existing);
             return;
           }
 
@@ -302,6 +404,7 @@ const data = {
 
           const offset = (cascade++ % 5) * 26;
           const narrow = window.innerWidth <= 720;
+          const saved = readState().windows?.[id];
 
           win.style.width = `${app.width}px`;
           win.style.height = `${app.height}px`;
@@ -309,6 +412,10 @@ const data = {
           if (narrow) {
             // 手机上位置固定，不要级联偏移，否则窗口会一路往下跑
             win.style.top = "110px";
+          } else if (saved) {
+            // 沿用上次的位置，越界就拉回可视范围
+            win.style.left = `${Math.max(-40, Math.min(window.innerWidth - 140, saved.left))}px`;
+            win.style.top = `${Math.max(32, Math.min(window.innerHeight - 110, saved.top))}px`;
           } else {
             win.style.left = `${Math.max(16, (window.innerWidth - app.width) / 2 + offset - 60)}px`;
             win.style.top = `${Math.max(52, 96 + offset)}px`;
@@ -329,8 +436,11 @@ const data = {
           focusWin(win);
           bindDrag(win);
 
+          document.querySelector(`.dock-item[data-app="${id}"]`)?.classList.add("has-open");
+          saveWindows();
+
           win.querySelector(".dot-close")?.addEventListener("click", () => closeWin(win));
-          win.querySelector(".dot-min")?.addEventListener("click", () => closeWin(win));
+          win.querySelector(".dot-min")?.addEventListener("click", () => minimizeWin(win));
           win.querySelector(".dot-max")?.addEventListener("click", () => focusWin(win));
           win.addEventListener("pointerdown", () => focusWin(win));
 
@@ -417,6 +527,7 @@ const data = {
             button.addEventListener("click", () => {
               const wall = button.dataset.wall ?? "nebula";
               os.dataset.wall = wall;
+              writeState({ wall });
               win.querySelectorAll(".wall-pick").forEach((el) => el.classList.toggle("is-active", el === button));
             });
           });
@@ -635,6 +746,69 @@ const data = {
         tickClock();
         window.setInterval(tickClock, 15_000);
 
+        /* ---------------- 电源 ---------------- */
+
+        const powerBtn = document.getElementById("mb-power");
+        const powerMenu = document.getElementById("power-menu");
+        const powerScreen = document.getElementById("power-screen");
+        const powerHint = document.getElementById("power-hint");
+
+        const setHint = (text: string) => {
+          if (powerHint) powerHint.textContent = text;
+        };
+
+        const screenOn = () => {
+          if (!powerScreen) return;
+          powerScreen.hidden = false;
+          window.requestAnimationFrame(() => powerScreen.classList.add("is-on"));
+        };
+
+        const shutdown = () => {
+          setHint("");
+          screenOn();
+          window.setTimeout(() => {
+            setHint("已关机 · 点一下开机");
+            // 黑屏铺满后再藏起桌面，避免 Dock 的毛玻璃层叠上来透出轮廓
+            os.classList.add("is-off");
+          }, 700);
+        };
+
+        const restart = () => {
+          setHint("正在重新启动…");
+          screenOn();
+          window.setTimeout(() => window.location.reload(), 1000);
+        };
+
+        powerBtn?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (powerMenu) powerMenu.hidden = !powerMenu.hidden;
+        });
+
+        powerMenu?.querySelectorAll<HTMLButtonElement>("[data-power]").forEach((button) => {
+          button.addEventListener("click", () => {
+            if (powerMenu) powerMenu.hidden = true;
+            if (button.dataset.power === "restart") restart();
+            if (button.dataset.power === "shutdown") shutdown();
+          });
+        });
+
+        document.addEventListener("click", () => {
+          if (powerMenu) powerMenu.hidden = true;
+        });
+
+        powerScreen?.addEventListener("click", () => {
+          os.classList.remove("is-off");
+          powerScreen.classList.remove("is-on");
+          window.setTimeout(() => {
+            powerScreen.hidden = true;
+            setHint("");
+          }, 620);
+        });
+
+        // 恢复上次选的壁纸
+        const savedWall = readState().wall;
+        if (savedWall) os.dataset.wall = savedWall;
+
         // 桌面端自动打开文章窗口作为欢迎；手机上先让人看到图标
         if (window.innerWidth > 720) {
           window.setTimeout(() => openApp("posts"), 420);
@@ -679,6 +853,11 @@ const data = {
         height: 100dvh;
         overflow: hidden;
         user-select: none;
+      }
+
+      .os.is-off {
+        /* Dock 的 backdrop-filter 会生成独立合成层，visibility 盖不住它 */
+        display: none;
       }
 
       /* ---------------- 壁纸 ---------------- */
@@ -749,6 +928,59 @@ const data = {
         border-radius: 50%;
         background: #6ee7a8;
         box-shadow: 0 0 8px rgba(110, 231, 168, 0.8);
+      }
+
+      .mb-power {
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        transition: color 0.2s ease;
+      }
+
+      .mb-power:hover {
+        color: #fff;
+      }
+
+      .mb-power svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .power-menu {
+        position: absolute;
+        top: 28px;
+        right: 10px;
+        z-index: 80;
+        display: grid;
+        min-width: 138px;
+        padding: 6px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.97);
+        box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(20px);
+      }
+
+      .power-menu button {
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .power-menu button:hover {
+        background: rgba(255, 255, 255, 0.1);
       }
 
       /* ---------------- 桌面 ---------------- */
@@ -1041,6 +1273,11 @@ const data = {
       .window.is-closing {
         transform: scale(0.94);
         opacity: 0;
+      }
+
+      .window.is-minimized {
+        pointer-events: none;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.6, 1), opacity 0.3s ease;
       }
 
       @keyframes winIn {
@@ -1448,6 +1685,63 @@ const data = {
         }
       }
 
+      /* ---------------- 关机画面 ---------------- */
+
+      .power-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background: #000;
+        opacity: 0;
+        transition: opacity 0.55s ease;
+        cursor: pointer;
+      }
+
+      /* display: grid 会盖掉 [hidden] 的默认样式，这里补回来 */
+      .power-screen[hidden],
+      .power-menu[hidden] {
+        display: none;
+      }
+
+      .power-screen.is-on {
+        opacity: 1;
+      }
+
+      .power-inner {
+        display: grid;
+        justify-items: center;
+        gap: 18px;
+      }
+
+      .power-logo {
+        display: grid;
+        place-items: center;
+        width: 58px;
+        height: 58px;
+        border-radius: 15px;
+        background: linear-gradient(150deg, #6f8cff, #b06eff);
+        font-family: var(--font-serif);
+        font-size: 27px;
+        color: #fff;
+        opacity: 0;
+        transform: scale(0.9);
+        transition: opacity 0.4s 0.25s ease, transform 0.5s 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+      }
+
+      .power-screen.is-on .power-logo {
+        opacity: 1;
+        transform: none;
+      }
+
+      .power-hint {
+        margin: 0;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
       /* ---------------- Dock ---------------- */
 
       .dock {
@@ -1597,6 +1891,31 @@ const data = {
 
       .dock-link {
         display: block;
+      }
+
+      /* Dock 下方的运行指示点 */
+      .dock-item {
+        position: relative;
+      }
+
+      .dock-item.has-open::after,
+      .dock-item.has-hidden::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -5px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        transform: translateX(-50%);
+      }
+
+      .dock-item.has-open::after {
+        background: rgba(255, 255, 255, 0.42);
+      }
+
+      .dock-item.has-hidden::after {
+        background: #8fa6ff;
       }
 
       /* ---------------- 响应式 ---------------- */
