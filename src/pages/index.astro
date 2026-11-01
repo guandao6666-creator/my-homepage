@@ -267,6 +267,26 @@ const data = {
         if (!DATA) return;
 
         /**
+         * 生成一个随机 ID。
+         * crypto.randomUUID 要 Safari 15.4 以上才有，老浏览器会直接抛错，
+         * 所以这里逐级降级，保证任何环境都能拿到一个唯一值。
+         */
+        const makeId = (): string => {
+          if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+            return crypto.randomUUID();
+          }
+          if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+            return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+          }
+          return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        };
+
+        /**
          * 带超时的 fetch。
          * 国内访问 supabase.co 经常是「连接挂住」而不是报错，
          * 不设超时的话界面会永远停在「正在加载」。
@@ -910,7 +930,7 @@ const data = {
 
             try {
               const blob = await compress(file);
-              const key = `${crypto.randomUUID()}.webp`;
+              const key = `${makeId()}.webp`;
 
               const up = await fetchWithTimeout(`${sb!.url}/storage/v1/object/visitors/${key}`, {
                 method: "POST",
@@ -1169,7 +1189,7 @@ const data = {
         const councilVoter = (): string => {
           let id = localStorage.getItem(COUNCIL_VOTER_KEY);
           if (!id) {
-            id = crypto.randomUUID();
+            id = makeId();
             localStorage.setItem(COUNCIL_VOTER_KEY, id);
           }
           return id;
@@ -1355,8 +1375,9 @@ const data = {
 
               for (const k of Object.keys(baseCounts)) delete baseCounts[k];
               for (const v of votes) {
-                baseCounts[v.poll_id] ??= {};
-                baseCounts[v.poll_id][v.option_index] = (baseCounts[v.poll_id][v.option_index] ?? 0) + 1;
+                if (!baseCounts[v.poll_id]) baseCounts[v.poll_id] = {};
+                const cur = baseCounts[v.poll_id][v.option_index];
+                baseCounts[v.poll_id][v.option_index] = (typeof cur === "number" ? cur : 0) + 1;
               }
 
               render();
