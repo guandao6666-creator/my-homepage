@@ -1,8 +1,18 @@
 ---
 import "../styles/global.css";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { getAllPosts } from "../lib/posts";
 
 const posts = await getAllPosts();
+
+// 扫 public/music 下的音频，文件名当歌名
+const musicDir = join(process.cwd(), "public", "music");
+const trackFiles = existsSync(musicDir)
+  ? readdirSync(musicDir)
+      .filter((name) => /\.(mp3|m4a|ogg|wav|flac)$/i.test(name))
+      .sort((a, b) => a.localeCompare(b, "zh"))
+  : [];
 
 const data = {
   posts: posts.map((post) => ({
@@ -11,6 +21,10 @@ const data = {
     date: post.pubDate.toISOString().slice(0, 10),
     tags: post.tags,
     minutes: post.minutes,
+  })),
+  tracks: trackFiles.map((file) => ({
+    src: `/music/${encodeURIComponent(file)}`,
+    title: file.replace(/\.[^.]+$/, ""),
   })),
   site: {
     author: "管道",
@@ -520,16 +534,16 @@ const data = {
           <div class="music">
             <div class="music-cover"><span class="cover-disc"></span></div>
             <div class="music-meta">
-              <p class="music-title">白饭时间</p>
-              <p class="music-sub">Guandao OS · 现场合成</p>
+              <p class="music-title" id="music-title">白饭时间</p>
+              <p class="music-sub" id="music-sub">现场合成 · 不用加载</p>
             </div>
             <div class="music-bar">
+              <button class="music-step" id="music-prev" type="button" aria-label="上一首">‹</button>
               <button class="music-play" id="music-play" type="button" aria-label="播放">▶</button>
-              <canvas class="music-wave" id="music-wave" width="280" height="42"></canvas>
+              <button class="music-step" id="music-next" type="button" aria-label="下一首">›</button>
+              <canvas class="music-wave" id="music-wave" width="220" height="42"></canvas>
             </div>
-            <p class="music-note">
-              声音是 Web Audio 现场合成的四个和弦，没有音频文件，所以加载不花时间。
-            </p>
+            <ul class="music-list" id="music-list"></ul>
           </div>`;
 
         const renderAchievements = () => {
@@ -1094,7 +1108,7 @@ const data = {
         > = {
           posts: { title: "文章", width: 660, height: 440, body: renderPosts },
           about: { title: "关于", width: 460, height: 380, body: renderAbout },
-          music: { title: "音乐", width: 420, height: 340, body: renderMusic },
+          music: { title: "音乐", width: 430, height: 470, body: renderMusic },
           terminal: { title: "终端", width: 560, height: 360, body: renderTerminal },
           settings: { title: "设置", width: 460, height: 470, body: renderSettings },
           achievements: { title: "成就", width: 540, height: 476, body: renderAchievements },
@@ -1393,12 +1407,33 @@ const data = {
         const initMusic = (win: HTMLElement) => {
           const btn = win.querySelector("#music-play") as HTMLButtonElement | null;
           const canvas = win.querySelector("#music-wave") as HTMLCanvasElement | null;
-          if (!btn || !canvas) return;
+          const listEl = win.querySelector("#music-list");
+          const titleEl = win.querySelector("#music-title");
+          const subEl = win.querySelector("#music-sub");
+          const prevBtn = win.querySelector("#music-prev");
+          const nextBtn = win.querySelector("#music-next");
+          if (!btn || !canvas || !listEl || !titleEl || !subEl) return;
 
           const g2d = canvas.getContext("2d");
           if (!g2d) return;
 
-          let audio: { ctx: AudioContext; analyser: AnalyserNode; timer: number } | null = null;
+          type Track = { kind: "synth" | "file"; title: string; sub: string; src?: string };
+
+          // 第一首是现场合成的，后面是 public/music 里的文件
+          const tracks: Track[] = [
+            { kind: "synth", title: "白饭时间", sub: "现场合成 · 不用加载" },
+            ...((DATA.tracks ?? []) as Array<{ src: string; title: string }>).map((t) => ({
+              kind: "file" as const,
+              title: t.title,
+              sub: "本地文件",
+              src: t.src,
+            })),
+          ];
+
+          let index = 0;
+          let playing = false;
+          let synth: { ctx: AudioContext; analyser: AnalyserNode; timer: number } | null = null;
+          let el: HTMLAudioElement | null = null;
           let raf = 0;
 
           // Am – F – C – G，四个和弦循环
@@ -1409,13 +1444,14 @@ const data = {
             [196.0, 246.94, 293.66],
           ];
 
-          const draw = () => {
-            if (!audio) return;
-            raf = window.requestAnimationFrame(draw);
+          const sizeCanvas = () => {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = Math.max(1, Math.round(rect.width * dpr));
+            canvas.height = Math.max(1, Math.round(rect.height * dpr));
+          };
 
-            const buf = new Uint8Array(audio.analyser.frequencyBinCount);
-            audio.analyser.getByteFrequencyData(buf);
-
+          const drawBars = (level: (i: number) => number) => {
             const w = canvas.width;
             const h = canvas.height;
             g2d.clearRect(0, 0, w, h);
@@ -1423,38 +1459,61 @@ const data = {
             const bars = 40;
             const bw = w / bars;
 
-            // 没有音频设备时 analyser 全是 0，用正弦波兜底；有数据时取两者较大的
-            const t = performance.now() / 620;
-
             for (let i = 0; i < bars; i += 1) {
-              const raw = (buf[i * 2] ?? 0) / 255;
-              const fallback = Math.abs(Math.sin(t + i * 0.34)) * 0.7 + 0.18;
-              const v = Math.min(1, Math.max(raw, fallback));
-
+              const v = Math.min(1, Math.max(0, level(i)));
               const bh = Math.max(3, v * h * 0.92);
               g2d.fillStyle = `rgba(150, 176, 255, ${0.34 + v * 0.55})`;
               g2d.fillRect(i * bw + 1, (h - bh) / 2, bw - 2, bh);
             }
           };
 
-          const stop = () => {
-            if (!audio) return;
-            window.clearInterval(audio.timer);
-            audio.ctx.close();
-            audio = null;
+          const drawSynth = () => {
+            if (!synth) return;
+            raf = window.requestAnimationFrame(drawSynth);
+
+            const buf = new Uint8Array(synth.analyser.frequencyBinCount);
+            synth.analyser.getByteFrequencyData(buf);
+            const t = performance.now() / 620;
+
+            // 没有音频设备时 analyser 全是 0，用正弦波兜底
+            drawBars((i) => {
+              const raw = (buf[i * 2] ?? 0) / 255;
+              const fallback = Math.abs(Math.sin(t + i * 0.34)) * 0.7 + 0.18;
+              return Math.max(raw, fallback);
+            });
+          };
+
+          const drawFake = () => {
+            if (!playing) return;
+            raf = window.requestAnimationFrame(drawFake);
+            const t = performance.now() / 520;
+
+            drawBars((i) => {
+              const a = Math.abs(Math.sin(t + i * 0.28));
+              const b = Math.abs(Math.sin(t * 0.6 + i * 0.11));
+              return a * 0.55 + b * 0.35 + 0.1;
+            });
+          };
+
+          const stopAll = () => {
+            if (synth) {
+              window.clearInterval(synth.timer);
+              void synth.ctx.close();
+              synth = null;
+            }
+            if (el) {
+              el.pause();
+              el.src = "";
+              el = null;
+            }
             window.cancelAnimationFrame(raf);
+            playing = false;
             btn.textContent = "▶";
             g2d.clearRect(0, 0, canvas.width, canvas.height);
           };
 
-          const start = () => {
-            unlock("music");
-
-            // 画布按实际显示尺寸铺开（物理像素），否则会被拉伸糊掉
-            const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = Math.max(1, Math.round(rect.width * dpr));
-            canvas.height = Math.max(1, Math.round(rect.height * dpr));
+          const startSynth = () => {
+            sizeCanvas();
 
             const ac = new AudioContext();
             const master = ac.createGain();
@@ -1478,37 +1537,114 @@ const data = {
                 osc.frequency.value = freq;
 
                 gain.gain.setValueAtTime(0.0001, now);
-                gain.gain.linearRampToValueAtTime(0.1 / (i + 1.4), now + 0.7);
-                gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.4);
+                gain.gain.exponentialRampToValueAtTime(0.9 / (i + 1.6), now + 0.06);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
 
                 osc.connect(gain);
                 gain.connect(master);
                 osc.start(now);
-                osc.stop(now + 3.6);
+                osc.stop(now + 1.15);
               });
 
               step += 1;
             };
 
             playChord();
-            const timer = window.setInterval(playChord, 2000);
+            const timer = window.setInterval(playChord, 1200);
+            synth = { ctx: ac, analyser, timer };
 
-            audio = { ctx: ac, analyser, timer };
-            btn.textContent = "⏸";
-            draw();
+            playing = true;
+            btn.textContent = "❚❚";
+            updateMeta();
+            drawSynth();
+          };
+
+          const startFile = (src: string) => {
+            sizeCanvas();
+
+            el = new Audio(src);
+            el.volume = 0.85;
+            el.addEventListener("ended", () => step(1));
+
+            void el.play();
+            playing = true;
+            btn.textContent = "❚❚";
+            updateMeta();
+            drawFake();
+          };
+
+          const updateMeta = () => {
+            const t = tracks[index];
+            titleEl.textContent = t.title;
+            subEl.textContent = t.sub;
+
+            listEl.querySelectorAll<HTMLElement>(".music-row").forEach((row, i) => {
+              row.classList.toggle("is-current", i === index);
+              row.classList.toggle("is-playing", i === index && playing);
+            });
+          };
+
+          const renderList = () => {
+            listEl.innerHTML = tracks
+              .map(
+                (t, i) => `
+                  <li class="music-row ${i === index ? "is-current" : ""}" data-track="${i}">
+                    <span class="music-row-no">${String(i + 1).padStart(2, "0")}</span>
+                    <span class="music-row-name">${escapeHtml(t.title)}</span>
+                  </li>`,
+              )
+              .join("");
+          };
+
+          const playAt = (i: number) => {
+            stopAll();
+            index = i;
+            updateMeta();
+
+            const t = tracks[index];
+            if (t.kind === "synth") startSynth();
+            else if (t.src) startFile(t.src);
+          };
+
+          const step = (dir: number) => {
+            stopAll();
+            index = (index + dir + tracks.length) % tracks.length;
+            updateMeta();
+            playAt(index);
           };
 
           btn.addEventListener("click", () => {
-            if (audio) stop();
-            else start();
+            if (playing) {
+              stopAll();
+              updateMeta();
+              return;
+            }
+            playAt(index);
+            unlock("music");
           });
 
-          // 窗口关掉后别让声音继续响
-          const watcher = window.setInterval(() => {
-            if (document.body.contains(win)) return;
-            stop();
-            window.clearInterval(watcher);
-          }, 800);
+          prevBtn?.addEventListener("click", () => step(-1));
+          nextBtn?.addEventListener("click", () => step(1));
+
+          listEl.addEventListener("click", (event) => {
+            const row = (event.target as HTMLElement).closest<HTMLElement>(".music-row");
+            if (!row) return;
+
+            const i = Number(row.dataset.track);
+            if (Number.isNaN(i)) return;
+
+            if (i === index && playing) {
+              stopAll();
+              updateMeta();
+              return;
+            }
+
+            playAt(i);
+            unlock("music");
+          });
+
+          renderList();
+          updateMeta();
         };
 
         /* ---------------- 入口 ---------------- */
@@ -2687,7 +2823,7 @@ const data = {
       .music-bar {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
       }
 
       .music-play {
@@ -2718,6 +2854,79 @@ const data = {
         font-size: 11px;
         line-height: 1.7;
         color: rgba(255, 255, 255, 0.42);
+      }
+
+      .music-step {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border: 0;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.66);
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        transition: background-color 0.18s ease, color 0.18s ease;
+      }
+
+      .music-step:hover {
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+      }
+
+      .music-list {
+        max-height: 152px;
+        margin: 14px 0 0;
+        padding: 0;
+        overflow: auto;
+        list-style: none;
+        display: grid;
+        gap: 2px;
+      }
+
+      .music-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 9px;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+      }
+
+      .music-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .music-row.is-current {
+        background: rgba(111, 140, 255, 0.16);
+      }
+
+      .music-row-no {
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .music-row.is-playing .music-row-no {
+        color: #8fa6ff;
+      }
+
+      .music-row-name {
+        flex: 1;
+        overflow: hidden;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.78);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .music-row.is-current .music-row-name {
+        color: #fff;
       }
 
       @keyframes discSpin {
