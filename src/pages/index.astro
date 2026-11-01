@@ -479,12 +479,28 @@ const data = {
 
         const renderAquarium = () => {
           const hour = new Date().getHours();
-          const night = hour >= 23 || hour < 6;
+
+          // 四档：清晨 / 白天 / 傍晚 / 深夜
+          const phase =
+            hour >= 5 && hour < 9
+              ? "dawn"
+              : hour >= 9 && hour < 17
+                ? "day"
+                : hour >= 17 && hour < 21
+                  ? "dusk"
+                  : "night";
+
+          const PHASE_TEXT: Record<string, string> = {
+            dawn: "天刚亮，它们醒过来了 · 点水里投喂",
+            day: "点水里投喂 · 七只都在",
+            dusk: "日头下去了，游得慢些",
+            night: "熄灯了，它们都安静下来",
+          };
 
           const fish = AI_FISH.map(
             (ai, i) => `
               <div class="fish" data-ai="${ai.id}"
-                style="--bg: url(/aquarium/${ai.id}.webp); --dur: ${8 + (i % 4) * 2.2}s; --delay: ${-i * 1.3}s; --dx: ${16 + (i % 3) * 12}px; --dy: ${9 + (i % 2) * 14}px; left: ${5 + i * 12.5}%; top: ${16 + (i % 3) * 24}%">
+                style="--bg: url(/aquarium/${ai.id}.webp); --delay: ${-i * 1.3}s; left: ${5 + i * 12.5}%; top: ${16 + (i % 3) * 24}%">
                 <span class="fish-name">${ai.name}</span>
               </div>`,
           ).join("");
@@ -496,13 +512,11 @@ const data = {
           ).join("");
 
           return `
-            <div class="tank ${night ? "is-night" : ""}" id="tank">
+            <div class="tank" id="tank" data-phase="${phase}">
               <div class="bubbles">${bubbles}</div>
               <div class="tank-floor"></div>
               <div class="fish-layer" id="fish-layer">${fish}</div>
-              <p class="tank-hint" id="tank-hint">
-                ${night ? "熄灯了，它们游得很慢 · 点水里投喂" : "点水里投喂 · 七只都在"}
-              </p>
+              <p class="tank-hint" id="tank-hint">${PHASE_TEXT[phase]}</p>
             </div>`;
         };
 
@@ -2205,7 +2219,40 @@ const data = {
         height: 100%;
         overflow: hidden;
         cursor: pointer;
+        --phase-speed: 1;
+        --phase-bright: 1;
+        --phase-saturate: 1;
         background: linear-gradient(180deg, #0a2f45 0%, #0e4762 48%, #071e2c 100%);
+        transition: background 1.4s ease;
+      }
+
+      /* 清晨：水偏青，醒得快（时长倍率 <1 代表更快） */
+      .tank[data-phase="dawn"] {
+        background: linear-gradient(180deg, #0d3d4c 0%, #1a6478 48%, #0a2b36 100%);
+        --phase-speed: 0.85;
+        --phase-bright: 1.06;
+      }
+
+      /* 白天：常态 */
+      .tank[data-phase="day"] {
+        background: linear-gradient(180deg, #0a2f45 0%, #0e4762 48%, #071e2c 100%);
+        --phase-speed: 1;
+      }
+
+      /* 傍晚：水偏紫，慢下来 */
+      .tank[data-phase="dusk"] {
+        background: linear-gradient(180deg, #251a36 0%, #3c2649 48%, #150d20 100%);
+        --phase-speed: 1.35;
+        --phase-bright: 0.94;
+        --phase-saturate: 0.9;
+      }
+
+      /* 深夜：熄灯，游得最慢 */
+      .tank[data-phase="night"] {
+        background: linear-gradient(180deg, #061622 0%, #0a2a3c 48%, #04101a 100%);
+        --phase-speed: 2.1;
+        --phase-bright: 0.66;
+        --phase-saturate: 0.72;
       }
 
       .tank::after {
@@ -2214,10 +2261,6 @@ const data = {
         inset: 0;
         background: linear-gradient(180deg, rgba(120, 220, 255, 0.16), transparent 30%);
         pointer-events: none;
-      }
-
-      .tank.is-night {
-        background: linear-gradient(180deg, #061622 0%, #0a2a3c 48%, #04101a 100%);
       }
 
       .bubbles {
@@ -2272,9 +2315,46 @@ const data = {
         box-shadow:
           0 0 0 2px rgba(180, 230, 255, 0.32),
           0 10px 22px -8px rgba(0, 0, 0, 0.65);
-        animation: fishSwim var(--dur) ease-in-out infinite alternate;
+        animation-name: driftSoft;
+        animation-duration: calc(var(--base-dur, 11s) * var(--phase-speed, 1));
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+        animation-direction: alternate;
         animation-delay: var(--delay);
-        transition: filter 0.5s ease;
+        filter: brightness(var(--phase-bright, 1)) saturate(var(--phase-saturate, 1));
+        transition: filter 1.2s ease;
+      }
+
+      /* 按性格给每条不同的游法 */
+      .fish[data-ai="chatgpt"] {
+        --base-dur: 11s;
+        animation-name: driftSoft;
+      }
+      .fish[data-ai="deepseek"] {
+        --base-dur: 13s;
+        animation-name: driftDeep;
+      }
+      .fish[data-ai="claude"] {
+        --base-dur: 12s;
+        animation-name: driftWide;
+      }
+      .fish[data-ai="grok"] {
+        --base-dur: 9s;
+        animation-name: dashAround;
+        animation-direction: normal;
+      }
+      .fish[data-ai="gemini"] {
+        --base-dur: 14s;
+        animation-name: orbitPath;
+        animation-direction: normal;
+      }
+      .fish[data-ai="wenxin"] {
+        --base-dur: 19s;
+        animation-name: driftSlow;
+      }
+      .fish[data-ai="qwen"] {
+        --base-dur: 15s;
+        animation-name: glideDiagonal;
       }
 
       .fish::after {
@@ -2286,12 +2366,91 @@ const data = {
         pointer-events: none;
       }
 
-      @keyframes fishSwim {
+      /* ChatGPT：不紧不慢地上下浮 */
+      @keyframes driftSoft {
         from {
           transform: translate(0, 0);
         }
         to {
-          transform: translate(var(--dx), var(--dy));
+          transform: translate(16px, -20px);
+        }
+      }
+
+      /* DeepSeek：喜欢沉在下面，偶尔上来 */
+      @keyframes driftDeep {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(26px, 24px);
+        }
+      }
+
+      /* Claude：稳稳地横着走 */
+      @keyframes driftWide {
+        from {
+          transform: translate(-16px, 2px);
+        }
+        to {
+          transform: translate(16px, -12px);
+        }
+      }
+
+      /* 文心：动得很轻，像懒得动 */
+      @keyframes driftSlow {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(7px, -10px);
+        }
+      }
+
+      /* Grok：横冲直撞 */
+      @keyframes dashAround {
+        0% {
+          transform: translate(0, 0);
+        }
+        28% {
+          transform: translate(104px, -32px);
+        }
+        52% {
+          transform: translate(-64px, 38px);
+        }
+        78% {
+          transform: translate(72px, 16px);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
+
+      /* Gemini：绕着圈转 */
+      @keyframes orbitPath {
+        0% {
+          transform: translate(0, 0);
+        }
+        25% {
+          transform: translate(32px, -18px);
+        }
+        50% {
+          transform: translate(0, -36px);
+        }
+        75% {
+          transform: translate(-32px, -18px);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
+
+      /* 千问：斜着滑，像摇扇子 */
+      @keyframes glideDiagonal {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(-24px, -18px);
         }
       }
 
@@ -2305,11 +2464,6 @@ const data = {
         color: rgba(215, 238, 255, 0.5);
         white-space: nowrap;
         pointer-events: none;
-      }
-
-      .tank.is-night .fish {
-        filter: brightness(0.7) saturate(0.78);
-        animation-duration: calc(var(--dur) * 2);
       }
 
       .food {
