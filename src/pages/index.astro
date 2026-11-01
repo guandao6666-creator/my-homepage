@@ -102,6 +102,10 @@ const data = {
             <span class="di-glyph di-term"></span>
             <span class="di-label">终端</span>
           </button>
+          <button class="desk-icon" type="button" data-app="achievements">
+            <span class="di-glyph di-ach"></span>
+            <span class="di-label">成就</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -130,6 +134,9 @@ const data = {
         <button class="dock-item" type="button" data-app="terminal" title="终端">
           <span class="dock-glyph di-term"></span>
         </button>
+        <button class="dock-item" type="button" data-app="achievements" title="成就">
+          <span class="dock-glyph di-ach"></span>
+        </button>
         <button class="dock-item" type="button" data-app="settings" title="设置">
           <span class="dock-glyph di-gear"></span>
         </button>
@@ -139,6 +146,8 @@ const data = {
         </a>
       </footer>
     </div>
+
+    <div class="toast-stack" id="toast-stack"></div>
 
     <div class="power-screen" id="power-screen" hidden>
       <div class="power-inner">
@@ -229,6 +238,108 @@ const data = {
             };
           });
           writeState({ windows: map });
+        };
+
+        /* ---------------- 成就 ---------------- */
+
+        const ACH_KEY = "guandao.os.ach.v1";
+
+        interface AchState {
+          unlocked: Record<string, number>;
+          visits: number;
+          petClicks: number;
+          apps: string[];
+          reads: number;
+        }
+
+        interface Achievement {
+          id: string;
+          mark: string;
+          name: string;
+          desc: string;
+        }
+
+        const ACHIEVEMENTS: Achievement[] = [
+          { id: "first", mark: "初", name: "第一位访客", desc: "第一次推开这扇门" },
+          { id: "night", mark: "夜", name: "深夜探索者", desc: "凌晨还在这里逛" },
+          { id: "dawn", mark: "晨", name: "赶早的人", desc: "天没亮就来了" },
+          { id: "roam", mark: "游", name: "桌面漫游者", desc: "每个应用都打开过一遍" },
+          { id: "hack", mark: ">_", name: "终端黑客", desc: "在终端敲下第一条命令" },
+          { id: "music", mark: "♪", name: "音乐鉴赏家", desc: "听过「白饭时间」" },
+          { id: "rice", mark: "饭", name: "白饭信徒", desc: "戳了鲸鲸十次" },
+          { id: "power", mark: "关", name: "关机达人", desc: "认真把它关掉过一次" },
+          { id: "regular", mark: "常", name: "常客", desc: "来过五次以上" },
+          { id: "reader", mark: "读", name: "考古学家", desc: "翻过三篇文章" },
+        ];
+
+        const readAch = (): AchState => {
+          try {
+            const raw = JSON.parse(localStorage.getItem(ACH_KEY) || "{}");
+            return {
+              unlocked: raw.unlocked ?? {},
+              visits: raw.visits ?? 0,
+              petClicks: raw.petClicks ?? 0,
+              apps: raw.apps ?? [],
+              reads: raw.reads ?? 0,
+            };
+          } catch {
+            return { unlocked: {}, visits: 0, petClicks: 0, apps: [], reads: 0 };
+          }
+        };
+
+        const saveAch = (state: AchState) => {
+          try {
+            localStorage.setItem(ACH_KEY, JSON.stringify(state));
+          } catch {
+            /* 写不进去就算了 */
+          }
+        };
+
+        const toastStack = document.getElementById("toast-stack");
+
+        const showToast = (ach: Achievement) => {
+          if (!toastStack) return;
+
+          const el = document.createElement("div");
+          el.className = "toast";
+
+          const mark = document.createElement("span");
+          mark.className = "toast-mark";
+          mark.textContent = ach.mark;
+
+          const body = document.createElement("span");
+          body.className = "toast-body";
+
+          const kicker = document.createElement("span");
+          kicker.className = "toast-kicker";
+          kicker.textContent = "解锁成就";
+
+          const name = document.createElement("span");
+          name.className = "toast-name";
+          name.textContent = ach.name;
+
+          body.append(kicker, name);
+          el.append(mark, body);
+          toastStack.appendChild(el);
+
+          window.requestAnimationFrame(() => el.classList.add("is-in"));
+          window.setTimeout(() => {
+            el.classList.remove("is-in");
+            window.setTimeout(() => el.remove(), 420);
+          }, 3200);
+        };
+
+        const unlock = (id: string, silent = false) => {
+          const state = readAch();
+          if (state.unlocked[id]) return false;
+
+          const ach = ACHIEVEMENTS.find((item) => item.id === id);
+          if (!ach) return false;
+
+          state.unlocked[id] = Date.now();
+          saveAch(state);
+          if (!silent) showToast(ach);
+          return true;
         };
 
         /* ---------------- 窗口内容 ---------------- */
@@ -323,6 +434,30 @@ const data = {
             </p>
           </div>`;
 
+        const renderAchievements = () => {
+          const state = readAch();
+
+          const rows = ACHIEVEMENTS.map((ach) => {
+            const got = Boolean(state.unlocked[ach.id]);
+            return `
+              <div class="ach ${got ? "is-got" : "is-locked"}">
+                <span class="ach-mark">${got ? ach.mark : "?"}</span>
+                <span class="ach-body">
+                  <span class="ach-name">${got ? ach.name : "未解锁"}</span>
+                  <span class="ach-desc">${got ? ach.desc : "继续逛逛看"}</span>
+                </span>
+              </div>`;
+          }).join("");
+
+          const count = ACHIEVEMENTS.filter((ach) => state.unlocked[ach.id]).length;
+
+          return `
+            <div class="ach-wrap">
+              <p class="ach-head">已解锁 <b>${count}</b> / ${ACHIEVEMENTS.length}</p>
+              <div class="ach-grid">${rows}</div>
+            </div>`;
+        };
+
         const APPS: Record<
           string,
           { title: string; width: number; height: number; body: () => string }
@@ -332,6 +467,7 @@ const data = {
           music: { title: "音乐", width: 420, height: 340, body: renderMusic },
           terminal: { title: "终端", width: 560, height: 360, body: renderTerminal },
           settings: { title: "设置", width: 420, height: 320, body: renderSettings },
+          achievements: { title: "成就", width: 540, height: 476, body: renderAchievements },
         };
 
         /* ---------------- 窗口系统 ---------------- */
@@ -487,6 +623,15 @@ const data = {
           document.querySelector(`.dock-item[data-app="${id}"]`)?.classList.add("has-open");
           saveWindows();
 
+          // 成就：记录打开过哪些应用，全部打开过就是「桌面漫游者」
+          const achState = readAch();
+          if (!achState.apps.includes(id)) {
+            achState.apps.push(id);
+            saveAch(achState);
+          }
+          const ALL_APPS = ["posts", "about", "music", "terminal", "settings", "achievements"];
+          if (ALL_APPS.every((app) => achState.apps.includes(app))) unlock("roam");
+
           win.querySelector(".dot-close")?.addEventListener("click", () => closeWin(win));
           win.querySelector(".dot-min")?.addEventListener("click", () => minimizeWin(win));
           win.querySelector(".dot-max")?.addEventListener("click", () => focusWin(win));
@@ -515,6 +660,7 @@ const data = {
           const run = (raw: string) => {
             const cmd = raw.trim();
             if (!cmd) return;
+            unlock("hack");
             print(`~ $ ${cmd}`, "term-echo");
 
             const [name, ...rest] = cmd.split(/\s+/);
@@ -641,6 +787,8 @@ const data = {
           };
 
           const start = () => {
+            unlock("music");
+
             // 画布按实际显示尺寸铺开（物理像素），否则会被拉伸糊掉
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             const rect = canvas.getBoundingClientRect();
@@ -774,11 +922,29 @@ const data = {
           });
 
           window.addEventListener("pointerup", () => {
-            if (drag && !drag.moved) say(LINES[Math.floor(Math.random() * LINES.length)]);
+            if (drag && !drag.moved) {
+              say(LINES[Math.floor(Math.random() * LINES.length)]);
+
+              const ach = readAch();
+              ach.petClicks += 1;
+              saveAch(ach);
+              if (ach.petClicks >= 10) unlock("rice");
+            }
             pet.classList.remove("is-dragging");
             drag = null;
           });
         }
+
+        // 成就：翻过三篇文章就记一笔（跳转前写入，来不及弹提示，静默解锁）
+        windows.addEventListener("click", (event) => {
+          const row = (event.target as HTMLElement).closest(".file-row");
+          if (!row) return;
+
+          const ach = readAch();
+          ach.reads += 1;
+          saveAch(ach);
+          if (ach.reads >= 3) unlock("reader", true);
+        });
 
         /* ---------------- 菜单栏时间 ---------------- */
 
@@ -812,6 +978,7 @@ const data = {
         };
 
         const shutdown = () => {
+          unlock("power");
           setHint("");
           screenOn();
           window.setTimeout(() => {
@@ -856,6 +1023,23 @@ const data = {
         // 恢复上次选的壁纸
         const savedWall = readState().wall;
         if (savedWall) os.dataset.wall = savedWall;
+
+        /* ---------------- 成就初始化 ---------------- */
+
+        // 等开机动画结束再弹，免得和 logo 叠在一起
+        window.setTimeout(() => {
+          const state = readAch();
+          state.visits += 1;
+          saveAch(state);
+
+          unlock("first");
+
+          const hour = new Date().getHours();
+          if (hour < 5) unlock("night");
+          else if (hour < 7) unlock("dawn");
+
+          if (state.visits >= 5) unlock("regular");
+        }, 2200);
 
         // 桌面端自动打开文章窗口作为欢迎；手机上先让人看到图标
         if (window.innerWidth > 720) {
@@ -1165,6 +1349,31 @@ const data = {
         inset: 15px;
         border-radius: 50%;
         background: #a83f74;
+      }
+
+      /* 图标：奖杯 */
+      .di-ach {
+        background: linear-gradient(160deg, #ffd479 0%, #d1902a 100%);
+      }
+      .di-ach::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 7px;
+        width: 16px;
+        height: 15px;
+        border-radius: 0 0 9px 9px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .di-ach::after {
+        content: "";
+        position: absolute;
+        left: 13px;
+        bottom: 7px;
+        width: 8px;
+        height: 7px;
+        border-radius: 0 0 2px 2px;
+        background: rgba(255, 255, 255, 0.94);
       }
 
       /* 图标：齿轮 */
@@ -1733,6 +1942,147 @@ const data = {
         }
       }
 
+      /* ---------------- 成就 ---------------- */
+
+      .ach-wrap {
+        padding: 18px 20px 20px;
+      }
+
+      .ach-head {
+        margin: 0 0 14px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .ach-head b {
+        font-size: 15px;
+        color: #ffd479;
+      }
+
+      .ach-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .ach {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .ach.is-got {
+        border-color: rgba(255, 212, 121, 0.32);
+        background: rgba(255, 212, 121, 0.08);
+      }
+
+      .ach-mark {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        flex: none;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.07);
+        font-family: var(--font-serif);
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .ach.is-got .ach-mark {
+        background: linear-gradient(150deg, #ffd479, #d1902a);
+        color: #3a2606;
+      }
+
+      .ach-body {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .ach-name {
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .ach.is-got .ach-name {
+        color: #fff;
+      }
+
+      .ach-desc {
+        overflow: hidden;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.3);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ---------------- 成就提示 ---------------- */
+
+      .toast-stack {
+        position: fixed;
+        right: 18px;
+        bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        z-index: 500;
+        display: grid;
+        gap: 8px;
+        pointer-events: none;
+      }
+
+      .toast {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 196px;
+        padding: 10px 14px 10px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(26, 29, 38, 0.94);
+        box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(18px);
+        opacity: 0;
+        transform: translateX(24px) scale(0.96);
+        transition: opacity 0.3s ease, transform 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+      }
+
+      .toast.is-in {
+        opacity: 1;
+        transform: none;
+      }
+
+      .toast-mark {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        flex: none;
+        border-radius: 9px;
+        background: linear-gradient(150deg, #ffd479, #d1902a);
+        font-family: var(--font-serif);
+        font-size: 15px;
+        color: #3a2606;
+      }
+
+      .toast-body {
+        display: grid;
+        gap: 2px;
+      }
+
+      .toast-kicker {
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .toast-name {
+        font-size: 13px;
+        color: #fff;
+      }
+
       /* ---------------- 关机画面 ---------------- */
 
       .power-screen {
@@ -1923,6 +2273,8 @@ const data = {
       .dock-glyph.di-person::after,
       .dock-glyph.di-music::before,
       .dock-glyph.di-music::after,
+      .dock-glyph.di-ach::before,
+      .dock-glyph.di-ach::after,
       .dock-glyph.di-gear::before,
       .dock-glyph.di-gear::after,
       .dock-glyph.di-home::before,
@@ -1984,6 +2336,26 @@ const data = {
         inset: 17px;
         border-radius: 50%;
         background: #a83f74;
+      }
+
+      .dock-glyph.di-ach {
+        background: linear-gradient(160deg, #ffd479 0%, #d1902a 100%);
+      }
+      .dock-glyph.di-ach::before {
+        left: 13px;
+        top: 10px;
+        width: 20px;
+        height: 19px;
+        border-radius: 0 0 11px 11px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .dock-glyph.di-ach::after {
+        left: 18px;
+        bottom: 9px;
+        width: 10px;
+        height: 9px;
+        border-radius: 0 0 2px 2px;
+        background: rgba(255, 255, 255, 0.94);
       }
 
       .dock-glyph.di-gear::before {
@@ -2111,6 +2483,15 @@ const data = {
           width: 64px;
           height: 92px;
           z-index: 8;
+        }
+
+        .ach-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .toast-stack {
+          right: 10px;
+          bottom: calc(86px + env(safe-area-inset-bottom, 0px));
         }
 
         .desk-hint {
