@@ -1124,6 +1124,7 @@ const data = {
           <div class="council">
             <div class="council-head">
               <span class="council-status" id="council-status">正在加载…</span>
+              <button class="council-retry" id="council-retry" type="button" hidden>重试</button>
               <span class="council-tip">一人一票 · 投完看结果</span>
             </div>
             <div class="council-list" id="council-list"></div>
@@ -1132,6 +1133,7 @@ const data = {
         const initCouncil = (win: HTMLElement) => {
           const list = win.querySelector("#council-list");
           const status = win.querySelector("#council-status");
+          const retryBtn = win.querySelector<HTMLButtonElement>("#council-retry");
           if (!list || !status) return;
 
           const sb = DATA.supabase as { url?: string; key?: string } | undefined;
@@ -1225,10 +1227,12 @@ const data = {
                 return;
               }
 
+              if (retryBtn) retryBtn.hidden = true;
               render();
             } catch {
               status.textContent = "读取失败";
-              list.innerHTML = '<p class="council-empty">读取失败，可能是表还没建。</p>';
+              list.innerHTML = '<p class="council-empty">读取失败，点右上角重试；多次失败可能是网络挡了 supabase.co。</p>';
+              if (retryBtn) retryBtn.hidden = false;
             }
           };
 
@@ -1262,6 +1266,13 @@ const data = {
             if (!pollId || Number.isNaN(optIndex)) return;
 
             void vote(pollId, optIndex);
+          });
+
+          retryBtn?.addEventListener("click", () => {
+            if (!retryBtn) return;
+            retryBtn.hidden = true;
+            status.textContent = "正在加载…";
+            void load();
           });
 
           void load();
@@ -1835,6 +1846,14 @@ const data = {
 
         // 按保存的配置重建程序坞
         renderDock();
+
+        // 支持 guandao.xin/#council 这种直达
+        const openFromHash = () => {
+          const id = location.hash.replace(/^#/, "");
+          if (id && APPS[id]) openApp(id);
+        };
+        openFromHash();
+        window.addEventListener("hashchange", openFromHash);
 
         /* ---------------- 桌面宠物 ---------------- */
 
@@ -4042,6 +4061,25 @@ const data = {
         margin-left: auto;
         font-size: 10.5px;
         color: rgba(255, 255, 255, 0.3);
+      }
+
+      .council-retry {
+        padding: 3px 10px;
+        border: 1px solid rgba(167, 139, 250, 0.42);
+        border-radius: 6px;
+        background: rgba(167, 139, 250, 0.16);
+        color: #d9c9ff;
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .council-retry:hover {
+        background: rgba(167, 139, 250, 0.3);
+      }
+
+      .council-retry[hidden] {
+        display: none;
       }
 
       .council-list {
