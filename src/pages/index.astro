@@ -119,6 +119,14 @@ const data = {
             <span class="di-glyph di-wall"></span>
             <span class="di-label">访客墙</span>
           </button>
+          <button class="desk-icon" type="button" data-app="rank">
+            <span class="di-glyph di-rank"></span>
+            <span class="di-label">排行榜</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="draw">
+            <span class="di-glyph di-draw"></span>
+            <span class="di-label">每日抽奖</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -155,6 +163,12 @@ const data = {
         </button>
         <button class="dock-item" type="button" data-app="visitors" title="访客墙">
           <span class="dock-glyph di-wall"></span>
+        </button>
+        <button class="dock-item" type="button" data-app="rank" title="排行榜">
+          <span class="dock-glyph di-rank"></span>
+        </button>
+        <button class="dock-item" type="button" data-app="draw" title="每日抽奖">
+          <span class="dock-glyph di-draw"></span>
         </button>
         <button class="dock-item" type="button" data-app="settings" title="设置">
           <span class="dock-glyph di-gear"></span>
@@ -289,6 +303,7 @@ const data = {
           { id: "power", mark: "关", name: "关机达人", desc: "认真把它关掉过一次" },
           { id: "regular", mark: "常", name: "常客", desc: "来过五次以上" },
           { id: "reader", mark: "读", name: "考古学家", desc: "翻过三篇文章" },
+          { id: "draw", mark: "运", name: "手气不错", desc: "抽到过隐藏奖励" },
         ];
 
         const readAch = (): AchState => {
@@ -802,6 +817,213 @@ const data = {
           void loadWall();
         };
 
+        /* ---------------- 排行榜 ---------------- */
+
+        const RANK_NAME_KEY = "guandao.rank.name";
+
+        const fmtDuration = (secs: number) => {
+          if (secs < 60) return `${secs} 秒`;
+          if (secs < 3600) return `${Math.floor(secs / 60)} 分钟`;
+          const h = Math.floor(secs / 3600);
+          const m = Math.floor((secs % 3600) / 60);
+          return m ? `${h} 小时 ${m} 分` : `${h} 小时`;
+        };
+
+        const reportTime = async (name: string, seconds: number) => {
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          if (!sb?.url || !sb?.key) return;
+
+          try {
+            await fetch(`${sb.url}/rest/v1/rpc/report_time`, {
+              method: "POST",
+              headers: {
+                apikey: sb.key,
+                Authorization: `Bearer ${sb.key}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ p_name: name, p_seconds: seconds }),
+            });
+          } catch {
+            /* 报不上去就等下一轮 */
+          }
+        };
+
+        const renderRank = () => `
+          <div class="rank">
+            <div class="rank-head">
+              <span class="rank-status" id="rank-status">正在加载…</span>
+              <button class="rank-join" id="rank-join" type="button">加入排行</button>
+            </div>
+            <div class="rank-list" id="rank-list"></div>
+            <p class="rank-note">按累计停留时长排序，每 60 秒上报一次</p>
+          </div>`;
+
+        const initRank = (win: HTMLElement) => {
+          const list = win.querySelector("#rank-list");
+          const status = win.querySelector("#rank-status");
+          const joinBtn = win.querySelector("#rank-join") as HTMLButtonElement | null;
+          if (!list || !status || !joinBtn) return;
+
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          const ready = Boolean(sb?.url && sb?.key);
+
+          const load = async () => {
+            if (!ready) {
+              status.textContent = "未连接";
+              list.innerHTML = '<p class="rank-empty">云端还没接上。</p>';
+              return;
+            }
+
+            try {
+              const res = await fetch(
+                `${sb!.url}/rest/v1/visitor_rank?select=name,seconds,visits&order=seconds.desc&limit=20`,
+                { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` } },
+              );
+              if (!res.ok) throw new Error(String(res.status));
+              const rows = (await res.json()) as Array<{
+                name: string;
+                seconds: number;
+                visits: number;
+              }>;
+
+              if (!rows.length) {
+                status.textContent = "还没有人上榜";
+                list.innerHTML = '<p class="rank-empty">榜还是空的，做第一个。</p>';
+                return;
+              }
+
+              status.textContent = `${rows.length} 位在榜`;
+              list.innerHTML = rows
+                .map(
+                  (r, i) => `
+                    <div class="rank-row ${i < 3 ? "is-top" : ""}">
+                      <span class="rank-no">${i + 1}</span>
+                      <span class="rank-name">${escapeHtml(r.name)}</span>
+                      <span class="rank-time">${fmtDuration(r.seconds)}</span>
+                    </div>`,
+                )
+                .join("");
+            } catch {
+              status.textContent = "读取失败";
+              list.innerHTML = '<p class="rank-empty">读取失败，可能是表还没建。</p>';
+            }
+          };
+
+          const current = localStorage.getItem(RANK_NAME_KEY);
+          if (current) {
+            joinBtn.textContent = `以「${current}」参与`;
+            joinBtn.disabled = true;
+          }
+
+          joinBtn.addEventListener("click", () => {
+            const input = window.prompt("留个名字，榜上用它显示（1–16 字）");
+            if (!input) return;
+
+            const name = input.trim().slice(0, 16);
+            if (!name) return;
+
+            localStorage.setItem(RANK_NAME_KEY, name);
+            joinBtn.textContent = `以「${name}」参与`;
+            joinBtn.disabled = true;
+            void reportTime(name, 0);
+            void load();
+          });
+
+          void load();
+        };
+
+        /* ---------------- 每日抽奖 ---------------- */
+
+        const DRAW_KEY = "guandao.draw.v1";
+
+        const QUOTES = [
+          "写下来，才算真的想清楚。",
+          "今天也在认真吃白饭。",
+          "骑到坡顶之前，别老回头看还差多少。",
+          "代码跑通的那一秒，比什么都值。",
+          "把复杂的事拆开，就没那么吓人了。",
+          "慢慢来，比较快。",
+          "会做题不等于会做事，但总得先会一样。",
+          "今天比昨天多懂一点点，就够了。",
+          "下坡爽是因为上坡苦，反过来也成立。",
+          "记笔记的意义在于，三个月后还能看懂自己。",
+          "别急着优化，先让它跑起来。",
+          "早睡这件事，明天再说。",
+          "看不进去的时候，就去骑一圈。",
+          "所有让人羡慕的结果，背后都是无聊的重复。",
+          "先把碗里的吃完。",
+          "遇到不会的，先猜一个再查。",
+          "写代码最费时间的不是写，是想清楚要写什么。",
+          "今天的太阳不错，别忘了抬头。",
+          "比起聪明，我更信手熟。",
+          "困了就睡，别硬撑。",
+          "一个能跑的原型胜过十个完美的设想。",
+          "把喜欢的事做久一点，就会有点不一样。",
+          "风大的时候，低着头骑也行。",
+          "别把时间都花在挑工具上。",
+          "记得喝水。",
+          "想不通就先放下，脑子会自己接着转。",
+          "路是自己选的，慢一点也没关系。",
+          "今年的目标：少立 flag，多干活。",
+        ];
+
+        const BONUS = "今日幸运：解锁隐藏成就「手气不错」";
+
+        const renderDraw = () => `
+          <div class="draw">
+            <div class="draw-card" id="draw-card">
+              <span class="draw-mark" id="draw-mark">?</span>
+            </div>
+            <p class="draw-text" id="draw-text">每天可以抽一张，明天再来</p>
+            <button class="draw-btn" id="draw-btn" type="button">抽一张</button>
+          </div>`;
+
+        const initDraw = (win: HTMLElement) => {
+          const card = win.querySelector("#draw-card");
+          const mark = win.querySelector("#draw-mark");
+          const text = win.querySelector("#draw-text");
+          const btn = win.querySelector("#draw-btn") as HTMLButtonElement | null;
+          if (!card || !mark || !text || !btn) return;
+
+          const today = new Date().toISOString().slice(0, 10);
+
+          const show = (content: string, isBonus: boolean) => {
+            mark.textContent = isBonus ? "★" : "“";
+            text.textContent = content;
+            card.classList.toggle("is-bonus", isBonus);
+            btn.disabled = true;
+            btn.textContent = "明天再来";
+          };
+
+          try {
+            const saved = JSON.parse(localStorage.getItem(DRAW_KEY) || "null");
+            if (saved && saved.date === today) {
+              show(saved.text, Boolean(saved.bonus));
+              return;
+            }
+          } catch {
+            /* 记录坏了就重抽 */
+          }
+
+          btn.addEventListener("click", () => {
+            btn.disabled = true;
+            btn.textContent = "抽取中…";
+            card.classList.add("is-shaking");
+
+            window.setTimeout(() => {
+              card.classList.remove("is-shaking");
+
+              const isBonus = Math.random() < 0.1;
+              const content = isBonus ? BONUS : QUOTES[Math.floor(Math.random() * QUOTES.length)];
+
+              localStorage.setItem(DRAW_KEY, JSON.stringify({ date: today, text: content, bonus: isBonus }));
+              show(content, isBonus);
+
+              if (isBonus) unlock("draw");
+            }, 900);
+          });
+        };
+
         const APPS: Record<
           string,
           { title: string; width: number; height: number; body: () => string }
@@ -814,6 +1036,8 @@ const data = {
           achievements: { title: "成就", width: 540, height: 476, body: renderAchievements },
           aquarium: { title: "水族箱", width: 720, height: 480, body: renderAquarium },
           visitors: { title: "访客墙", width: 640, height: 460, body: renderVisitors },
+          rank: { title: "排行榜", width: 480, height: 460, body: renderRank },
+          draw: { title: "每日抽奖", width: 440, height: 420, body: renderDraw },
         };
 
         /* ---------------- 窗口系统 ---------------- */
@@ -975,7 +1199,18 @@ const data = {
             achState.apps.push(id);
             saveAch(achState);
           }
-          const ALL_APPS = ["posts", "about", "music", "terminal", "settings", "achievements", "aquarium", "visitors"];
+          const ALL_APPS = [
+            "posts",
+            "about",
+            "music",
+            "terminal",
+            "settings",
+            "achievements",
+            "aquarium",
+            "visitors",
+            "rank",
+            "draw",
+          ];
           if (ALL_APPS.every((app) => achState.apps.includes(app))) unlock("roam");
 
           win.querySelector(".dot-close")?.addEventListener("click", () => closeWin(win));
@@ -988,6 +1223,8 @@ const data = {
           if (id === "music") initMusic(win);
           if (id === "aquarium") initAquarium(win);
           if (id === "visitors") initVisitors(win);
+          if (id === "rank") initRank(win);
+          if (id === "draw") initDraw(win);
         };
 
         /* ---------------- 终端 ---------------- */
@@ -1389,6 +1626,14 @@ const data = {
           if (state.visits >= 5) unlock("regular");
         }, 2200);
 
+        // 有名字就每 60 秒报一次停留时长，只在前台时算
+        const rankUser = localStorage.getItem(RANK_NAME_KEY);
+        if (rankUser) {
+          window.setInterval(() => {
+            if (document.visibilityState === "visible") void reportTime(rankUser, 60);
+          }, 60_000);
+        }
+
         // 桌面端自动打开文章窗口作为欢迎；手机上先让人看到图标
         if (window.innerWidth > 720) {
           window.setTimeout(() => openApp("posts"), 420);
@@ -1573,13 +1818,14 @@ const data = {
       .desk-icons {
         position: absolute;
         top: 24px;
-        left: 22px;
+        left: 20px;
         display: grid;
-        gap: 16px;
+        grid-template-columns: repeat(2, 66px);
+        gap: 10px 4px;
       }
 
       .desk-icon {
-        width: 74px;
+        width: 68px;
         display: grid;
         justify-items: center;
         gap: 6px;
@@ -1759,6 +2005,49 @@ const data = {
         inset: 7px;
         background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 3.2px, transparent 3.6px);
         background-size: 10px 10px;
+      }
+
+      /* 图标：柱状排行 */
+      .di-rank {
+        background: linear-gradient(160deg, #8ee6a8 0%, #2f9a5e 100%);
+      }
+      .di-rank::before {
+        content: "";
+        position: absolute;
+        left: 8px;
+        bottom: 8px;
+        width: 5px;
+        height: 8px;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow:
+          7px -5px 0 rgba(255, 255, 255, 0.95),
+          14px -11px 0 rgba(255, 255, 255, 0.95);
+      }
+
+      /* 图标：礼物盒 */
+      .di-draw {
+        background: linear-gradient(160deg, #ff7a86 0%, #c02848 100%);
+      }
+      .di-draw::before {
+        content: "";
+        position: absolute;
+        inset: 12px 6px 6px;
+        border-radius: 2px;
+        background:
+          linear-gradient(#c02848, #c02848) center / 4px 100% no-repeat,
+          linear-gradient(#c02848, #c02848) center / 100% 4px no-repeat,
+          rgba(255, 255, 255, 0.94);
+      }
+      .di-draw::after {
+        content: "";
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        top: 8px;
+        height: 4px;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.94);
       }
 
       /* 图标：齿轮 */
@@ -2965,6 +3254,184 @@ const data = {
         color: rgba(255, 212, 121, 0.85);
       }
 
+      /* ---------------- 排行榜 ---------------- */
+
+      .rank {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 16px 18px 14px;
+      }
+
+      .rank-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .rank-status {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .rank-join {
+        margin-left: auto;
+        padding: 7px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background: rgba(142, 230, 168, 0.18);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .rank-join:hover:not(:disabled) {
+        background: rgba(142, 230, 168, 0.32);
+      }
+
+      .rank-join:disabled {
+        cursor: default;
+        opacity: 0.72;
+      }
+
+      .rank-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 4px;
+        overflow: auto;
+      }
+
+      .rank-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 8px;
+      }
+
+      .rank-row.is-top {
+        background: rgba(255, 212, 121, 0.08);
+      }
+
+      .rank-no {
+        width: 20px;
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
+      .rank-row.is-top .rank-no {
+        color: #ffd479;
+      }
+
+      .rank-name {
+        flex: 1;
+        overflow: hidden;
+        font-size: 12.5px;
+        color: #f2f5fa;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .rank-time {
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .rank-empty {
+        margin: 0;
+        padding: 26px 0;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+      }
+
+      .rank-note {
+        margin: 10px 0 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
+      /* ---------------- 每日抽奖 ---------------- */
+
+      .draw {
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        gap: 16px;
+        height: 100%;
+        padding: 20px;
+      }
+
+      .draw-card {
+        display: grid;
+        place-items: center;
+        width: 148px;
+        height: 186px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 14px;
+        background: linear-gradient(160deg, rgba(111, 140, 255, 0.28), rgba(155, 107, 255, 0.16));
+        box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.8);
+        transition: background 0.4s ease, border-color 0.4s ease;
+      }
+
+      .draw-card.is-shaking {
+        animation: drawShake 0.12s linear infinite;
+      }
+
+      .draw-card.is-bonus {
+        border-color: rgba(255, 212, 121, 0.5);
+        background: linear-gradient(160deg, rgba(255, 212, 121, 0.34), rgba(209, 144, 42, 0.18));
+      }
+
+      @keyframes drawShake {
+        0%,
+        100% {
+          transform: rotate(-1.6deg) translateY(0);
+        }
+        50% {
+          transform: rotate(1.6deg) translateY(-3px);
+        }
+      }
+
+      .draw-mark {
+        font-family: var(--font-serif);
+        font-size: 44px;
+        line-height: 1;
+        color: rgba(255, 255, 255, 0.85);
+      }
+
+      .draw-text {
+        max-width: 320px;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.9;
+        color: rgba(255, 255, 255, 0.78);
+        text-align: center;
+      }
+
+      .draw-btn {
+        padding: 10px 22px;
+        border: 0;
+        border-radius: 10px;
+        background: linear-gradient(150deg, #6f8cff, #9b6bff);
+        color: #fff;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .draw-btn:disabled {
+        cursor: default;
+        opacity: 0.55;
+      }
+
       /* ---------------- 关机画面 ---------------- */
 
       .power-screen {
@@ -3160,6 +3627,9 @@ const data = {
       .dock-glyph.di-tank::before,
       .dock-glyph.di-tank::after,
       .dock-glyph.di-wall::before,
+      .dock-glyph.di-rank::before,
+      .dock-glyph.di-draw::before,
+      .dock-glyph.di-draw::after,
       .dock-glyph.di-gear::before,
       .dock-glyph.di-gear::after,
       .dock-glyph.di-home::before,
@@ -3270,6 +3740,39 @@ const data = {
         inset: 10px;
         background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 4px, transparent 4.4px);
         background-size: 12px 12px;
+      }
+
+      .dock-glyph.di-rank {
+        background: linear-gradient(160deg, #8ee6a8 0%, #2f9a5e 100%);
+      }
+      .dock-glyph.di-rank::before {
+        left: 13px;
+        bottom: 9px;
+        width: 6px;
+        height: 10px;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow:
+          9px -7px 0 rgba(255, 255, 255, 0.95),
+          18px -14px 0 rgba(255, 255, 255, 0.95);
+      }
+
+      .dock-glyph.di-draw {
+        background: linear-gradient(160deg, #ff7a86 0%, #c02848 100%);
+      }
+      .dock-glyph.di-draw::before {
+        inset: 17px 7px 8px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 -6px 0 -1px rgba(255, 255, 255, 0.92);
+      }
+      .dock-glyph.di-draw::after {
+        left: 50%;
+        top: 11px;
+        width: 5px;
+        height: 25px;
+        margin-left: -2.5px;
+        background: #c02848;
       }
 
       .dock-glyph.di-gear::before {
@@ -3384,6 +3887,14 @@ const data = {
           gap: 6px;
           padding: 7px 10px;
           border-radius: 16px;
+          max-width: calc(100vw - 20px);
+          overflow-x: auto;
+          overflow-y: hidden;
+          scrollbar-width: none;
+        }
+
+        .dock::-webkit-scrollbar {
+          display: none;
         }
 
         .dock-item {
