@@ -37,3 +37,6 @@ src/content/blog/.sync-manifest.json
 
 # 本地工作区数据（记忆、截图等）
 .workbuddy/
+
+# 工具留下的临时标记
+/*.txt.txt
