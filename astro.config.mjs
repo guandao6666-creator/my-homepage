@@ -14,13 +14,9 @@ export default defineConfig({
     inlineStylesheets: "auto",
   },
   vite: {
-    // 降到 es2019：Safari 13 和部分国产浏览器解析不了 ??= 这类 ES2021 语法，
-    // 一旦解析失败整段脚本都不执行，页面会永远停在「正在加载」。
-    // build.target 和 esbuild.target 都要设，Astro 内部会覆盖其中一个。
     build: {
-      target: ["es2019", "safari13", "chrome80", "firefox78"],
-    },
-    esbuild: {
+      // 降到 es2019：Safari 13 和部分国产浏览器解析不了 ??= 这类 ES2021 语法，
+      // 一旦解析失败整段脚本都不执行，页面会永远停在「正在加载」。
       target: "es2019",
     },
   },
