@@ -16,6 +16,11 @@ const data = {
     author: "管道",
     host: "guandao.xin",
   },
+  // anon key 放前端是 Supabase 的正常用法，真正的权限由 RLS 兜
+  supabase: {
+    url: import.meta.env.PUBLIC_SUPABASE_URL ?? "",
+    key: import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? "",
+  },
 };
 ---
 
@@ -110,6 +115,10 @@ const data = {
             <span class="di-glyph di-tank"></span>
             <span class="di-label">水族箱</span>
           </button>
+          <button class="desk-icon" type="button" data-app="visitors">
+            <span class="di-glyph di-wall"></span>
+            <span class="di-label">访客墙</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -143,6 +152,9 @@ const data = {
         </button>
         <button class="dock-item" type="button" data-app="aquarium" title="水族箱">
           <span class="dock-glyph di-tank"></span>
+        </button>
+        <button class="dock-item" type="button" data-app="visitors" title="访客墙">
+          <span class="dock-glyph di-wall"></span>
         </button>
         <button class="dock-item" type="button" data-app="settings" title="设置">
           <span class="dock-glyph di-gear"></span>
@@ -590,6 +602,206 @@ const data = {
           }, 2300);
         };
 
+        /* ---------------- 访客墙 ---------------- */
+
+        const renderVisitors = () => `
+          <div class="wall">
+            <div class="wall-head">
+              <span class="wall-count" id="wall-count">正在加载…</span>
+              <button class="wall-add" id="wall-add" type="button">留下我的头像</button>
+            </div>
+            <div class="wall-grid" id="wall-grid"></div>
+            <form class="wall-form" id="wall-form" hidden>
+              <input class="wall-name" id="wall-name" maxlength="16" placeholder="你的名字，最多 16 字" />
+              <label class="wall-pick">
+                <input type="file" id="wall-file" accept="image/*" hidden />
+                <span id="wall-file-label">选一张图</span>
+              </label>
+              <button class="wall-submit" id="wall-submit" type="submit">上传</button>
+            </form>
+            <p class="wall-note" id="wall-note"></p>
+          </div>`;
+
+        const initVisitors = (win: HTMLElement) => {
+          const grid = win.querySelector("#wall-grid");
+          const countEl = win.querySelector("#wall-count");
+          const addBtn = win.querySelector("#wall-add");
+          const form = win.querySelector("#wall-form") as HTMLFormElement | null;
+          const nameInput = win.querySelector("#wall-name") as HTMLInputElement | null;
+          const fileInput = win.querySelector("#wall-file") as HTMLInputElement | null;
+          const fileLabel = win.querySelector("#wall-file-label");
+          const submitBtn = win.querySelector("#wall-submit") as HTMLButtonElement | null;
+          const note = win.querySelector("#wall-note");
+
+          if (!grid || !countEl || !form || !nameInput || !fileInput || !submitBtn || !note) return;
+
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          const ready = Boolean(sb?.url && sb?.key);
+
+          const setNote = (text: string) => {
+            note.textContent = text;
+          };
+
+          const renderList = (list: Array<{ name: string; avatar_url: string }>) => {
+            if (!list.length) {
+              countEl.textContent = "还没有人";
+              grid.innerHTML = '<p class="wall-empty">墙还是空的，来做第一个。</p>';
+              return;
+            }
+            countEl.textContent = `${list.length} 位访客`;
+            grid.innerHTML = list
+              .map(
+                (v) => `
+                  <div class="wall-item">
+                    <img src="${escapeHtml(v.avatar_url)}" alt="" loading="lazy" />
+                    <span>${escapeHtml(v.name)}</span>
+                  </div>`,
+              )
+              .join("");
+          };
+
+          const loadWall = async () => {
+            if (!ready) {
+              countEl.textContent = "未连接";
+              grid.innerHTML =
+                '<p class="wall-empty">云端还没接上，需要先在 Supabase 执行 visitors.sql。</p>';
+              return;
+            }
+
+            try {
+              const res = await fetch(
+                `${sb!.url}/rest/v1/visitor_avatars?select=name,avatar_url&order=created_at.desc&limit=60`,
+                { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` } },
+              );
+              if (!res.ok) throw new Error(String(res.status));
+              renderList(await res.json());
+            } catch {
+              countEl.textContent = "读取失败";
+              grid.innerHTML = '<p class="wall-empty">读取失败，可能是表还没建。</p>';
+            }
+          };
+
+          const compress = (file: File) =>
+            new Promise<Blob>((resolve, reject) => {
+              const img = new Image();
+              img.onload = () => {
+                const size = 240;
+                const canvas = document.createElement("canvas");
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) return reject(new Error("no ctx"));
+
+                const side = Math.min(img.width, img.height);
+                ctx.drawImage(
+                  img,
+                  (img.width - side) / 2,
+                  (img.height - side) / 2,
+                  side,
+                  side,
+                  0,
+                  0,
+                  size,
+                  size,
+                );
+
+                canvas.toBlob(
+                  (blob) => (blob ? resolve(blob) : reject(new Error("blob"))),
+                  "image/webp",
+                  0.86,
+                );
+              };
+              img.onerror = () => reject(new Error("img"));
+              img.src = URL.createObjectURL(file);
+            });
+
+          addBtn?.addEventListener("click", () => {
+            form.hidden = !form.hidden;
+            if (!form.hidden) nameInput.focus();
+          });
+
+          fileInput.addEventListener("change", () => {
+            const file = fileInput.files?.[0];
+            if (fileLabel) fileLabel.textContent = file ? file.name.slice(0, 18) : "选一张图";
+          });
+
+          form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            if (!ready) {
+              setNote("云端还没配好");
+              return;
+            }
+
+            const name = nameInput.value.trim();
+            const file = fileInput.files?.[0];
+
+            if (name.length < 1 || name.length > 16) {
+              setNote("名字写 1 到 16 个字");
+              return;
+            }
+            if (!file) {
+              setNote("先选一张图");
+              return;
+            }
+
+            const lastKey = "guandao.wall.last";
+            const last = Number(localStorage.getItem(lastKey) ?? 0);
+            if (Date.now() - last < 86_400_000) {
+              setNote("一天只能留一次，明天再来");
+              return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "上传中…";
+
+            try {
+              const blob = await compress(file);
+              const key = `${crypto.randomUUID()}.webp`;
+
+              const up = await fetch(`${sb!.url}/storage/v1/object/visitors/${key}`, {
+                method: "POST",
+                headers: {
+                  apikey: sb!.key!,
+                  Authorization: `Bearer ${sb!.key}`,
+                  "Content-Type": "image/webp",
+                  "x-upsert": "false",
+                },
+                body: blob,
+              });
+              if (!up.ok) throw new Error(`upload ${up.status}`);
+
+              const publicUrl = `${sb!.url}/storage/v1/object/public/visitors/${key}`;
+
+              const ins = await fetch(`${sb!.url}/rest/v1/visitor_avatars`, {
+                method: "POST",
+                headers: {
+                  apikey: sb!.key!,
+                  Authorization: `Bearer ${sb!.key}`,
+                  "Content-Type": "application/json",
+                  Prefer: "return=minimal",
+                },
+                body: JSON.stringify({ name, avatar_url: publicUrl }),
+              });
+              if (!ins.ok) throw new Error(`insert ${ins.status}`);
+
+              localStorage.setItem(lastKey, String(Date.now()));
+              form.reset();
+              form.hidden = true;
+              if (fileLabel) fileLabel.textContent = "选一张图";
+              setNote("已经挂上墙了");
+              await loadWall();
+            } catch {
+              setNote("上传失败，稍后再试");
+            } finally {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "上传";
+            }
+          });
+
+          void loadWall();
+        };
+
         const APPS: Record<
           string,
           { title: string; width: number; height: number; body: () => string }
@@ -601,6 +813,7 @@ const data = {
           settings: { title: "设置", width: 420, height: 320, body: renderSettings },
           achievements: { title: "成就", width: 540, height: 476, body: renderAchievements },
           aquarium: { title: "水族箱", width: 720, height: 480, body: renderAquarium },
+          visitors: { title: "访客墙", width: 640, height: 460, body: renderVisitors },
         };
 
         /* ---------------- 窗口系统 ---------------- */
@@ -762,7 +975,7 @@ const data = {
             achState.apps.push(id);
             saveAch(achState);
           }
-          const ALL_APPS = ["posts", "about", "music", "terminal", "settings", "achievements", "aquarium"];
+          const ALL_APPS = ["posts", "about", "music", "terminal", "settings", "achievements", "aquarium", "visitors"];
           if (ALL_APPS.every((app) => achState.apps.includes(app))) unlock("roam");
 
           win.querySelector(".dot-close")?.addEventListener("click", () => closeWin(win));
@@ -774,6 +987,7 @@ const data = {
           if (id === "settings") initSettings(win);
           if (id === "music") initMusic(win);
           if (id === "aquarium") initAquarium(win);
+          if (id === "visitors") initVisitors(win);
         };
 
         /* ---------------- 终端 ---------------- */
@@ -1533,6 +1747,18 @@ const data = {
         height: 7px;
         border-radius: 0 0 6px 6px;
         background: rgba(255, 255, 255, 0.72);
+      }
+
+      /* 图标：头像墙 */
+      .di-wall {
+        background: linear-gradient(160deg, #ffb47a 0%, #d9603a 100%);
+      }
+      .di-wall::before {
+        content: "";
+        position: absolute;
+        inset: 7px;
+        background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 3.2px, transparent 3.6px);
+        background-size: 10px 10px;
       }
 
       /* 图标：齿轮 */
@@ -2579,6 +2805,166 @@ const data = {
         pointer-events: none;
       }
 
+      /* ---------------- 访客墙 ---------------- */
+
+      .wall {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 16px 20px 18px;
+      }
+
+      .wall-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .wall-count {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .wall-add {
+        margin-left: auto;
+        padding: 7px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background: rgba(111, 140, 255, 0.22);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .wall-add:hover {
+        background: rgba(111, 140, 255, 0.38);
+      }
+
+      .wall-grid {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+        align-content: start;
+        gap: 10px;
+        overflow: auto;
+      }
+
+      .wall-item {
+        display: grid;
+        justify-items: center;
+        gap: 6px;
+        padding: 8px 4px;
+        border-radius: 10px;
+        transition: background-color 0.18s ease;
+      }
+
+      .wall-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .wall-item img {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
+        object-fit: cover;
+      }
+
+      .wall-item span {
+        max-width: 78px;
+        overflow: hidden;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.62);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .wall-empty {
+        grid-column: 1 / -1;
+        margin: 0;
+        padding: 30px 0;
+        font-size: 12.5px;
+        line-height: 1.8;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+      }
+
+      .wall-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .wall-form[hidden] {
+        display: none;
+      }
+
+      .wall-name {
+        flex: 1;
+        min-width: 140px;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        outline: none;
+      }
+
+      .wall-name:focus {
+        border-color: rgba(111, 140, 255, 0.6);
+      }
+
+      .wall-pick {
+        max-width: 168px;
+        overflow: hidden;
+        padding: 8px 12px;
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.66);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .wall-pick:hover {
+        border-color: rgba(111, 140, 255, 0.5);
+        color: #fff;
+      }
+
+      .wall-submit {
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: linear-gradient(150deg, #6f8cff, #9b6bff);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .wall-submit:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      .wall-note {
+        min-height: 16px;
+        margin: 8px 0 0;
+        font-size: 11px;
+        color: rgba(255, 212, 121, 0.85);
+      }
+
       /* ---------------- 关机画面 ---------------- */
 
       .power-screen {
@@ -2773,6 +3159,7 @@ const data = {
       .dock-glyph.di-ach::after,
       .dock-glyph.di-tank::before,
       .dock-glyph.di-tank::after,
+      .dock-glyph.di-wall::before,
       .dock-glyph.di-gear::before,
       .dock-glyph.di-gear::after,
       .dock-glyph.di-home::before,
@@ -2874,6 +3261,15 @@ const data = {
         height: 9px;
         border-radius: 0 0 7px 7px;
         background: rgba(255, 255, 255, 0.72);
+      }
+
+      .dock-glyph.di-wall {
+        background: linear-gradient(160deg, #ffb47a 0%, #d9603a 100%);
+      }
+      .dock-glyph.di-wall::before {
+        inset: 10px;
+        background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 4px, transparent 4.4px);
+        background-size: 12px 12px;
       }
 
       .dock-glyph.di-gear::before {
