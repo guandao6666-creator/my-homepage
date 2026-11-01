@@ -141,6 +141,10 @@ const data = {
             <span class="di-glyph di-draw"></span>
             <span class="di-label">每日抽奖</span>
           </button>
+          <button class="desk-icon" type="button" data-app="council">
+            <span class="di-glyph di-vote"></span>
+            <span class="di-label">议会</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -286,6 +290,7 @@ const data = {
           visitors: "di-wall",
           rank: "di-rank",
           draw: "di-draw",
+          council: "di-vote",
         };
 
         const readDock = (): string[] => {
@@ -1102,6 +1107,166 @@ const data = {
           });
         };
 
+        /* ---------------- 民主议会 ---------------- */
+
+        const COUNCIL_VOTER_KEY = "guandao.council.voter";
+
+        const councilVoter = (): string => {
+          let id = localStorage.getItem(COUNCIL_VOTER_KEY);
+          if (!id) {
+            id = crypto.randomUUID();
+            localStorage.setItem(COUNCIL_VOTER_KEY, id);
+          }
+          return id;
+        };
+
+        const renderCouncil = () => `
+          <div class="council">
+            <div class="council-head">
+              <span class="council-status" id="council-status">正在加载…</span>
+              <span class="council-tip">一人一票 · 投完看结果</span>
+            </div>
+            <div class="council-list" id="council-list"></div>
+          </div>`;
+
+        const initCouncil = (win: HTMLElement) => {
+          const list = win.querySelector("#council-list");
+          const status = win.querySelector("#council-status");
+          if (!list || !status) return;
+
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          const ready = Boolean(sb?.url && sb?.key);
+          const voter = councilVoter();
+
+          interface Poll {
+            id: string;
+            title: string;
+            kind: string;
+            options: string[];
+          }
+          interface Vote {
+            poll_id: string;
+            option_index: number;
+            voter: string;
+          }
+
+          let polls: Poll[] = [];
+          let votes: Vote[] = [];
+          let mine: Record<string, number> = {};
+
+          const render = () => {
+            status.textContent = `${polls.length} 项在议 · ${votes.length} 票已投`;
+
+            list.innerHTML = polls
+              .map((poll) => {
+                const opts = poll.options;
+                const counts = opts.map(
+                  (_, i) => votes.filter((v) => v.poll_id === poll.id && v.option_index === i).length,
+                );
+                const total = counts.reduce((a, b) => a + b, 0);
+                const chosen = mine[poll.id];
+                const locked = chosen !== undefined;
+
+                const rows = opts
+                  .map((label, i) => {
+                    const pct = total ? Math.round((counts[i] / total) * 100) : 0;
+                    return `
+                      <button class="council-opt ${chosen === i ? "is-mine" : ""}" type="button"
+                        data-poll="${poll.id}" data-opt="${i}" ${locked ? "disabled" : ""}>
+                        <span class="council-bar" style="width:${pct}%"></span>
+                        <span class="council-label">${escapeHtml(label)}</span>
+                        <span class="council-num">${counts[i]}</span>
+                      </button>`;
+                  })
+                  .join("");
+
+                return `
+                  <section class="council-item">
+                    <p class="council-title">${escapeHtml(poll.title)}</p>
+                    <div class="council-opts">${rows}</div>
+                    <p class="council-meta">
+                      ${total} 票${locked ? ` · 你投了「${escapeHtml(opts[chosen])}」` : " · 点一个选项投票"}
+                    </p>
+                  </section>`;
+              })
+              .join("");
+          };
+
+          const load = async () => {
+            if (!ready) {
+              status.textContent = "未连接";
+              list.innerHTML = '<p class="council-empty">云端还没接上。</p>';
+              return;
+            }
+
+            try {
+              const headers = { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` };
+              const [pRes, vRes] = await Promise.all([
+                fetch(
+                  `${sb!.url}/rest/v1/polls?select=id,title,kind,options&active=eq.true&order=created_at.asc`,
+                  { headers },
+                ),
+                fetch(`${sb!.url}/rest/v1/votes?select=poll_id,option_index,voter`, { headers }),
+              ]);
+
+              if (!pRes.ok || !vRes.ok) throw new Error("fetch failed");
+
+              polls = (await pRes.json()) as Poll[];
+              votes = (await vRes.json()) as Vote[];
+
+              mine = {};
+              for (const v of votes) {
+                if (v.voter === voter) mine[v.poll_id] = v.option_index;
+              }
+
+              if (!polls.length) {
+                status.textContent = "暂无议题";
+                list.innerHTML = '<p class="council-empty">还没有在议的议题。</p>';
+                return;
+              }
+
+              render();
+            } catch {
+              status.textContent = "读取失败";
+              list.innerHTML = '<p class="council-empty">读取失败，可能是表还没建。</p>';
+            }
+          };
+
+          const vote = async (pollId: string, optIndex: number) => {
+            if (mine[pollId] !== undefined || !ready) return;
+
+            try {
+              await fetch(`${sb!.url}/rest/v1/votes`, {
+                method: "POST",
+                headers: {
+                  apikey: sb!.key!,
+                  Authorization: `Bearer ${sb!.key}`,
+                  "Content-Type": "application/json",
+                  Prefer: "return=minimal",
+                },
+                body: JSON.stringify({ poll_id: pollId, option_index: optIndex, voter }),
+              });
+            } catch {
+              /* 失败也重拉一次，看真实状态 */
+            }
+
+            await load();
+          };
+
+          list.addEventListener("click", (event) => {
+            const btn = (event.target as HTMLElement).closest<HTMLButtonElement>(".council-opt");
+            if (!btn || btn.disabled) return;
+
+            const pollId = btn.dataset.poll;
+            const optIndex = Number(btn.dataset.opt);
+            if (!pollId || Number.isNaN(optIndex)) return;
+
+            void vote(pollId, optIndex);
+          });
+
+          void load();
+        };
+
         const APPS: Record<
           string,
           { title: string; width: number; height: number; body: () => string }
@@ -1116,6 +1281,7 @@ const data = {
           visitors: { title: "访客墙", width: 640, height: 460, body: renderVisitors },
           rank: { title: "排行榜", width: 480, height: 460, body: renderRank },
           draw: { title: "每日抽奖", width: 440, height: 420, body: renderDraw },
+          council: { title: "议会", width: 600, height: 540, body: renderCouncil },
         };
 
         /* ---------------- 窗口系统 ---------------- */
@@ -1288,6 +1454,7 @@ const data = {
             "visitors",
             "rank",
             "draw",
+            "council",
           ];
           if (ALL_APPS.every((app) => achState.apps.includes(app))) unlock("roam");
 
@@ -1303,6 +1470,7 @@ const data = {
           if (id === "visitors") initVisitors(win);
           if (id === "rank") initRank(win);
           if (id === "draw") initDraw(win);
+          if (id === "council") initCouncil(win);
         };
 
         /* ---------------- 终端 ---------------- */
@@ -2268,6 +2436,31 @@ const data = {
         height: 4px;
         border-radius: 1px;
         background: rgba(255, 255, 255, 0.94);
+      }
+
+      /* 图标：投票箱 */
+      .di-vote {
+        background: linear-gradient(160deg, #a78bfa 0%, #6d28d9 100%);
+      }
+      .di-vote::before {
+        content: "";
+        position: absolute;
+        left: 7px;
+        top: 13px;
+        width: 20px;
+        height: 12px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .di-vote::after {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 9px;
+        width: 12px;
+        height: 3px;
+        border-radius: 1px;
+        background: #6d28d9;
       }
 
       /* 图标：齿轮 */
@@ -3759,6 +3952,150 @@ const data = {
         opacity: 0.55;
       }
 
+      /* ---------------- 民主议会 ---------------- */
+
+      .council {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 16px 20px 14px;
+      }
+
+      .council-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .council-status {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .council-tip {
+        margin-left: auto;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .council-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 16px;
+        overflow: auto;
+        padding-right: 6px;
+      }
+
+      .council-list::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .council-list::-webkit-scrollbar-thumb {
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .council-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .council-item {
+        display: grid;
+        gap: 7px;
+      }
+
+      .council-title {
+        margin: 0;
+        font-size: 13px;
+        color: #fff;
+      }
+
+      .council-opts {
+        display: grid;
+        gap: 5px;
+      }
+
+      .council-opt {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        overflow: hidden;
+        padding: 9px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        color: inherit;
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.2s ease, background-color 0.2s ease;
+      }
+
+      .council-opt:not(:disabled):hover {
+        border-color: rgba(167, 139, 250, 0.5);
+        background: rgba(167, 139, 250, 0.1);
+      }
+
+      .council-opt:disabled {
+        cursor: default;
+      }
+
+      .council-bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, rgba(167, 139, 250, 0.32), rgba(109, 40, 217, 0.22));
+        transition: width 0.6s cubic-bezier(0.2, 0.8, 0.3, 1);
+      }
+
+      .council-opt.is-mine {
+        border-color: rgba(167, 139, 250, 0.6);
+      }
+
+      .council-opt.is-mine .council-bar {
+        background: linear-gradient(90deg, rgba(167, 139, 250, 0.5), rgba(109, 40, 217, 0.36));
+      }
+
+      .council-label {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+        color: rgba(255, 255, 255, 0.85);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .council-num {
+        position: relative;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .council-opt.is-mine .council-num {
+        color: #d9c9ff;
+      }
+
+      .council-meta {
+        margin: 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.34);
+      }
+
+      .council-empty {
+        margin: 0;
+        padding: 40px 0;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+      }
+
       /* ---------------- 关机画面 ---------------- */
 
       .power-screen {
@@ -3957,6 +4294,8 @@ const data = {
       .dock-glyph.di-rank::before,
       .dock-glyph.di-draw::before,
       .dock-glyph.di-draw::after,
+      .dock-glyph.di-vote::before,
+      .dock-glyph.di-vote::after,
       .dock-glyph.di-gear::before,
       .dock-glyph.di-gear::after,
       .dock-glyph.di-home::before,
@@ -4100,6 +4439,26 @@ const data = {
         height: 25px;
         margin-left: -2.5px;
         background: #c02848;
+      }
+
+      .dock-glyph.di-vote {
+        background: linear-gradient(160deg, #a78bfa 0%, #6d28d9 100%);
+      }
+      .dock-glyph.di-vote::before {
+        left: 11px;
+        top: 17px;
+        width: 24px;
+        height: 15px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .dock-glyph.di-vote::after {
+        left: 15px;
+        top: 12px;
+        width: 16px;
+        height: 4px;
+        border-radius: 1px;
+        background: #6d28d9;
       }
 
       .dock-glyph.di-gear::before {
