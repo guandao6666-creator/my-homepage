@@ -106,6 +106,10 @@ const data = {
             <span class="di-glyph di-ach"></span>
             <span class="di-label">成就</span>
           </button>
+          <button class="desk-icon" type="button" data-app="aquarium">
+            <span class="di-glyph di-tank"></span>
+            <span class="di-label">水族箱</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -136,6 +140,9 @@ const data = {
         </button>
         <button class="dock-item" type="button" data-app="achievements" title="成就">
           <span class="dock-glyph di-ach"></span>
+        </button>
+        <button class="dock-item" type="button" data-app="aquarium" title="水族箱">
+          <span class="dock-glyph di-tank"></span>
         </button>
         <button class="dock-item" type="button" data-app="settings" title="设置">
           <span class="dock-glyph di-gear"></span>
@@ -458,6 +465,87 @@ const data = {
             </div>`;
         };
 
+        /* ---------------- 水族箱 ---------------- */
+
+        const AI_FISH = [
+          { id: "chatgpt", name: "ChatGPT" },
+          { id: "deepseek", name: "DeepSeek" },
+          { id: "claude", name: "Claude" },
+          { id: "grok", name: "Grok" },
+          { id: "gemini", name: "Gemini" },
+          { id: "wenxin", name: "文心一言" },
+          { id: "qwen", name: "千问" },
+        ];
+
+        const renderAquarium = () => {
+          const hour = new Date().getHours();
+          const night = hour >= 23 || hour < 6;
+
+          const fish = AI_FISH.map(
+            (ai, i) => `
+              <div class="fish" data-ai="${ai.id}"
+                style="--bg: url(/aquarium/${ai.id}.webp); --dur: ${8 + (i % 4) * 2.2}s; --delay: ${-i * 1.3}s; --dx: ${16 + (i % 3) * 12}px; --dy: ${9 + (i % 2) * 14}px; left: ${5 + i * 12.5}%; top: ${16 + (i % 3) * 24}%">
+                <span class="fish-name">${ai.name}</span>
+              </div>`,
+          ).join("");
+
+          const bubbles = Array.from(
+            { length: 10 },
+            (_, i) =>
+              `<span class="bubble" style="--size: ${4 + (i % 3) * 3}px; --dur: ${9 + i * 1.3}s; --delay: ${-i * 1.6}s; left: ${6 + i * 9}%"></span>`,
+          ).join("");
+
+          return `
+            <div class="tank ${night ? "is-night" : ""}" id="tank">
+              <div class="bubbles">${bubbles}</div>
+              <div class="tank-floor"></div>
+              <div class="fish-layer" id="fish-layer">${fish}</div>
+              <p class="tank-hint" id="tank-hint">
+                ${night ? "熄灯了，它们游得很慢 · 点水里投喂" : "点水里投喂 · 七只都在"}
+              </p>
+            </div>`;
+        };
+
+        const initAquarium = (win: HTMLElement) => {
+          const tank = win.querySelector("#tank") as HTMLElement | null;
+          const layer = win.querySelector("#fish-layer");
+          const hint = win.querySelector("#tank-hint");
+          if (!tank || !layer || !hint) return;
+
+          let fed = 0;
+
+          tank.addEventListener("click", (event) => {
+            const rect = tank.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            const food = document.createElement("span");
+            food.className = "food";
+            food.style.left = `${x}px`;
+            food.style.top = `${y}px`;
+            tank.appendChild(food);
+
+            window.setTimeout(() => {
+              food.remove();
+
+              const fishes = Array.from(layer.querySelectorAll<HTMLElement>(".fish"));
+              const target = fishes[Math.floor(Math.random() * fishes.length)];
+
+              if (target) {
+                const heart = document.createElement("span");
+                heart.className = "heart";
+                heart.textContent = "♥";
+                target.appendChild(heart);
+                window.setTimeout(() => heart.remove(), 1700);
+              }
+
+              fed += 1;
+              hint.textContent =
+                fed >= 6 ? "吃饱了，谢谢你" : `投喂了 ${fed} 次 · 它们很开心`;
+            }, 820);
+          });
+        };
+
         const APPS: Record<
           string,
           { title: string; width: number; height: number; body: () => string }
@@ -468,6 +556,7 @@ const data = {
           terminal: { title: "终端", width: 560, height: 360, body: renderTerminal },
           settings: { title: "设置", width: 420, height: 320, body: renderSettings },
           achievements: { title: "成就", width: 540, height: 476, body: renderAchievements },
+          aquarium: { title: "水族箱", width: 720, height: 480, body: renderAquarium },
         };
 
         /* ---------------- 窗口系统 ---------------- */
@@ -629,7 +718,7 @@ const data = {
             achState.apps.push(id);
             saveAch(achState);
           }
-          const ALL_APPS = ["posts", "about", "music", "terminal", "settings", "achievements"];
+          const ALL_APPS = ["posts", "about", "music", "terminal", "settings", "achievements", "aquarium"];
           if (ALL_APPS.every((app) => achState.apps.includes(app))) unlock("roam");
 
           win.querySelector(".dot-close")?.addEventListener("click", () => closeWin(win));
@@ -640,6 +729,7 @@ const data = {
           if (id === "terminal") initTerminal(win);
           if (id === "settings") initSettings(win);
           if (id === "music") initMusic(win);
+          if (id === "aquarium") initAquarium(win);
         };
 
         /* ---------------- 终端 ---------------- */
@@ -1376,6 +1466,31 @@ const data = {
         background: rgba(255, 255, 255, 0.94);
       }
 
+      /* 图标：水母 */
+      .di-tank {
+        background: linear-gradient(160deg, #66d6ff 0%, #1a72b8 100%);
+      }
+      .di-tank::before {
+        content: "";
+        position: absolute;
+        left: 8px;
+        top: 8px;
+        width: 18px;
+        height: 13px;
+        border-radius: 9px 9px 5px 5px;
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .di-tank::after {
+        content: "";
+        position: absolute;
+        left: 12px;
+        top: 21px;
+        width: 10px;
+        height: 7px;
+        border-radius: 0 0 6px 6px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
       /* 图标：齿轮 */
       .di-gear {
         background: linear-gradient(180deg, #a9b4c9 0%, #6b7688 100%);
@@ -2083,6 +2198,176 @@ const data = {
         color: #fff;
       }
 
+      /* ---------------- 水族箱 ---------------- */
+
+      .tank {
+        position: relative;
+        height: 100%;
+        overflow: hidden;
+        cursor: pointer;
+        background: linear-gradient(180deg, #0a2f45 0%, #0e4762 48%, #071e2c 100%);
+      }
+
+      .tank::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(120, 220, 255, 0.16), transparent 30%);
+        pointer-events: none;
+      }
+
+      .tank.is-night {
+        background: linear-gradient(180deg, #061622 0%, #0a2a3c 48%, #04101a 100%);
+      }
+
+      .bubbles {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .bubble {
+        position: absolute;
+        bottom: -14px;
+        width: var(--size);
+        height: var(--size);
+        border-radius: 50%;
+        background: radial-gradient(circle at 32% 30%, rgba(255, 255, 255, 0.95), rgba(130, 215, 255, 0.3));
+        animation: bubbleRise var(--dur) linear infinite;
+        animation-delay: var(--delay);
+      }
+
+      @keyframes bubbleRise {
+        to {
+          transform: translateY(-520px);
+          opacity: 0;
+        }
+      }
+
+      .tank-floor {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 46px;
+        background: radial-gradient(58% 100% at 50% 100%, rgba(36, 104, 104, 0.5), transparent 70%);
+        pointer-events: none;
+      }
+
+      .fish-layer {
+        position: absolute;
+        inset: 0;
+      }
+
+      .fish {
+        position: absolute;
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background-image: var(--bg);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        box-shadow:
+          0 0 0 2px rgba(180, 230, 255, 0.32),
+          0 10px 22px -8px rgba(0, 0, 0, 0.65);
+        animation: fishSwim var(--dur) ease-in-out infinite alternate;
+        animation-delay: var(--delay);
+        transition: filter 0.5s ease;
+      }
+
+      .fish::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: linear-gradient(150deg, rgba(255, 255, 255, 0.26), transparent 46%);
+        pointer-events: none;
+      }
+
+      @keyframes fishSwim {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(var(--dx), var(--dy));
+        }
+      }
+
+      .fish-name {
+        position: absolute;
+        left: 50%;
+        bottom: -15px;
+        transform: translateX(-50%);
+        font-size: 9px;
+        letter-spacing: 0.02em;
+        color: rgba(215, 238, 255, 0.5);
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      .tank.is-night .fish {
+        filter: brightness(0.7) saturate(0.78);
+        animation-duration: calc(var(--dur) * 2);
+      }
+
+      .food {
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        margin: -3px 0 0 -3px;
+        border-radius: 50%;
+        background: #ffd479;
+        box-shadow: 0 0 8px rgba(255, 212, 121, 0.85);
+        animation: foodSink 0.82s ease-in forwards;
+        pointer-events: none;
+      }
+
+      @keyframes foodSink {
+        to {
+          transform: translateY(24px);
+          opacity: 0.35;
+        }
+      }
+
+      .heart {
+        position: absolute;
+        left: 50%;
+        top: -10px;
+        font-size: 14px;
+        color: #ff8fb1;
+        pointer-events: none;
+        animation: heartUp 1.7s ease-out forwards;
+      }
+
+      @keyframes heartUp {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, 0) scale(0.6);
+        }
+        25% {
+          opacity: 1;
+          transform: translate(-50%, -10px) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -40px) scale(1.1);
+        }
+      }
+
+      .tank-hint {
+        position: absolute;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
+        margin: 0;
+        font-size: 10.5px;
+        color: rgba(200, 235, 255, 0.42);
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
       /* ---------------- 关机画面 ---------------- */
 
       .power-screen {
@@ -2275,6 +2560,8 @@ const data = {
       .dock-glyph.di-music::after,
       .dock-glyph.di-ach::before,
       .dock-glyph.di-ach::after,
+      .dock-glyph.di-tank::before,
+      .dock-glyph.di-tank::after,
       .dock-glyph.di-gear::before,
       .dock-glyph.di-gear::after,
       .dock-glyph.di-home::before,
@@ -2356,6 +2643,26 @@ const data = {
         height: 9px;
         border-radius: 0 0 2px 2px;
         background: rgba(255, 255, 255, 0.94);
+      }
+
+      .dock-glyph.di-tank {
+        background: linear-gradient(160deg, #66d6ff 0%, #1a72b8 100%);
+      }
+      .dock-glyph.di-tank::before {
+        left: 12px;
+        top: 10px;
+        width: 22px;
+        height: 16px;
+        border-radius: 11px 11px 6px 6px;
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .dock-glyph.di-tank::after {
+        left: 16px;
+        top: 25px;
+        width: 14px;
+        height: 9px;
+        border-radius: 0 0 7px 7px;
+        background: rgba(255, 255, 255, 0.72);
       }
 
       .dock-glyph.di-gear::before {
