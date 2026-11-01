@@ -14,6 +14,44 @@ const trackFiles = existsSync(musicDir)
       .sort((a, b) => a.localeCompare(b, "zh"))
   : [];
 
+// 构建时把议会数据抓下来内联进页面：
+// 国内访问 supabase.co 经常挂住，运行时再拉会一直转圈。
+// 构建在 GitHub / Cloudflare 跑，那边网络是通的。
+const sbUrlBuild = import.meta.env.PUBLIC_SUPABASE_URL;
+const sbKeyBuild = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+
+let councilSeed: { polls: unknown[]; counts: Record<string, Record<string, number>> } = {
+  polls: [],
+  counts: {},
+};
+
+if (sbUrlBuild && sbKeyBuild) {
+  try {
+    const headers = { apikey: sbKeyBuild, Authorization: `Bearer ${sbKeyBuild}` };
+    const [pRes, vRes] = await Promise.all([
+      fetch(`${sbUrlBuild}/rest/v1/polls?select=id,title,kind,options&active=eq.true&order=created_at.asc`, {
+        headers,
+      }),
+      fetch(`${sbUrlBuild}/rest/v1/votes?select=poll_id,option_index`, { headers }),
+    ]);
+
+    if (pRes.ok && vRes.ok) {
+      const polls = (await pRes.json()) as unknown[];
+      const votes = (await vRes.json()) as Array<{ poll_id: string; option_index: number }>;
+
+      const counts: Record<string, Record<string, number>> = {};
+      for (const v of votes) {
+        counts[v.poll_id] ??= {};
+        counts[v.poll_id][v.option_index] = (counts[v.poll_id][v.option_index] ?? 0) + 1;
+      }
+
+      councilSeed = { polls, counts };
+    }
+  } catch {
+    /* 构建时连不上就留空，前端会退回运行时请求 */
+  }
+}
+
 const data = {
   posts: posts.map((post) => ({
     title: post.title,
@@ -30,6 +68,7 @@ const data = {
     author: "管道",
     host: "guandao.xin",
   },
+  council: councilSeed,
   // anon key 放前端是 Supabase 的正常用法，真正的权限由 RLS 兜
   // 生产环境走 /sb 同源反代（functions/sb/[[path]].js），避开国内直连 supabase.co 超时
   supabase: {
@@ -1146,6 +1185,8 @@ const data = {
             <div class="council-list" id="council-list"></div>
           </div>`;
 
+        const COUNCIL_MINE_KEY = "guandao.council.mine";
+
         const initCouncil = (win: HTMLElement) => {
           const list = win.querySelector("#council-list");
           const status = win.querySelector("#council-status");
@@ -1162,102 +1203,99 @@ const data = {
             kind: string;
             options: string[];
           }
-          interface Vote {
-            poll_id: string;
-            option_index: number;
-            voter: string;
+
+          // 议题和票数在构建时就写进页面了，打开即有内容，不等网络
+          const seed = (DATA.council ?? { polls: [], counts: {} }) as {
+            polls: Poll[];
+            counts: Record<string, Record<string, number>>;
+          };
+
+          const polls: Poll[] = seed.polls ?? [];
+          const baseCounts = seed.counts ?? {};
+
+          // 我投过哪些，记在本地，不靠网络
+          let mine: Record<string, number> = {};
+          try {
+            mine = JSON.parse(localStorage.getItem(COUNCIL_MINE_KEY) || "{}");
+          } catch {
+            mine = {};
           }
 
-          let polls: Poll[] = [];
-          let votes: Vote[] = [];
-          let mine: Record<string, number> = {};
+          // 本次会话新投的票（还没进构建时的统计）
+          const liveVotes: Record<string, number> = {};
+
+          const countOf = (pollId: string, optIdx: number) => {
+            let n = baseCounts[pollId]?.[String(optIdx)] ?? 0;
+            if (liveVotes[pollId] === optIdx && mine[pollId] === optIdx) n += 1;
+            return n;
+          };
+
+          const totalOf = (poll: Poll) => poll.options.reduce((sum, _, i) => sum + countOf(poll.id, i), 0);
 
           const render = () => {
-            status.textContent = `${polls.length} 项在议 · ${votes.length} 票已投`;
+            if (!polls.length) {
+              status.textContent = "暂无议题";
+              list.innerHTML =
+                '<p class="council-empty">页面里没有议题数据，可能是构建时没连上数据库。</p>';
+              return;
+            }
+
+            const grand = polls.reduce((sum, p) => sum + totalOf(p), 0);
+            status.textContent = `${polls.length} 项在议 · ${grand} 票`;
 
             list.innerHTML = polls
               .map((poll) => {
-                const opts = poll.options;
-                const counts = opts.map(
-                  (_, i) => votes.filter((v) => v.poll_id === poll.id && v.option_index === i).length,
-                );
-                const total = counts.reduce((a, b) => a + b, 0);
+                const total = totalOf(poll);
                 const chosen = mine[poll.id];
                 const locked = chosen !== undefined;
 
-                const rows = opts
+                const rows = poll.options
                   .map((label, i) => {
-                    const pct = total ? Math.round((counts[i] / total) * 100) : 0;
+                    const n = countOf(poll.id, i);
+                    const pct = total ? Math.round((n / total) * 100) : 0;
                     return `
                       <button class="council-opt ${chosen === i ? "is-mine" : ""}" type="button"
                         data-poll="${poll.id}" data-opt="${i}" ${locked ? "disabled" : ""}>
                         <span class="council-bar" style="width:${pct}%"></span>
                         <span class="council-label">${escapeHtml(label)}</span>
-                        <span class="council-num">${counts[i]}</span>
+                        <span class="council-num">${n}</span>
                       </button>`;
                   })
                   .join("");
+
+                const myLabel = locked && poll.options[chosen] ? ` · 你投了「${escapeHtml(poll.options[chosen])}」` : "";
 
                 return `
                   <section class="council-item">
                     <p class="council-title">${escapeHtml(poll.title)}</p>
                     <div class="council-opts">${rows}</div>
-                    <p class="council-meta">
-                      ${total} 票${locked ? ` · 你投了「${escapeHtml(opts[chosen])}」` : " · 点一个选项投票"}
-                    </p>
+                    <p class="council-meta">${total} 票${myLabel}</p>
                   </section>`;
               })
               .join("");
           };
 
-          const load = async () => {
+          const vote = (pollId: string, optIdx: number) => {
+            if (mine[pollId] !== undefined) return;
+
+            // 先在本地记下并刷新，网络再慢也不耽误
+            mine[pollId] = optIdx;
+            liveVotes[pollId] = optIdx;
+            try {
+              localStorage.setItem(COUNCIL_MINE_KEY, JSON.stringify(mine));
+            } catch {
+              /* 隐私模式忽略 */
+            }
+            render();
+
             if (!ready) {
-              status.textContent = "未连接";
-              list.innerHTML = '<p class="council-empty">云端还没接上。</p>';
+              status.textContent = "已记在本地，但云端没连上";
               return;
             }
 
-            try {
-              const headers = { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` };
-              const [pRes, vRes] = await Promise.all([
-                fetch(
-                  `${sb!.url}/rest/v1/polls?select=id,title,kind,options&active=eq.true&order=created_at.asc`,
-                  { headers },
-                ),
-                fetchWithTimeout(`${sb!.url}/rest/v1/votes?select=poll_id,option_index,voter`, { headers }),
-              ]);
-
-              if (!pRes.ok || !vRes.ok) throw new Error("fetch failed");
-
-              polls = (await pRes.json()) as Poll[];
-              votes = (await vRes.json()) as Vote[];
-
-              mine = {};
-              for (const v of votes) {
-                if (v.voter === voter) mine[v.poll_id] = v.option_index;
-              }
-
-              if (!polls.length) {
-                status.textContent = "暂无议题";
-                list.innerHTML = '<p class="council-empty">还没有在议的议题。</p>';
-                return;
-              }
-
-              if (retryBtn) retryBtn.hidden = true;
-              render();
-            } catch {
-              status.textContent = "连不上";
-              list.innerHTML =
-                '<p class="council-empty">数据库连不上。<br>国内访问 supabase.co 经常超时或被拦，点右上角重试试试。<br>如果一直不行，说明网络到不了那边。</p>';
-              if (retryBtn) retryBtn.hidden = false;
-            }
-          };
-
-          const vote = async (pollId: string, optIndex: number) => {
-            if (mine[pollId] !== undefined || !ready) return;
-
-            try {
-              await fetchWithTimeout(`${sb!.url}/rest/v1/votes`, {
+            void fetchWithTimeout(
+              `${sb!.url}/rest/v1/votes`,
+              {
                 method: "POST",
                 headers: {
                   apikey: sb!.key!,
@@ -1265,13 +1303,26 @@ const data = {
                   "Content-Type": "application/json",
                   Prefer: "return=minimal",
                 },
-                body: JSON.stringify({ poll_id: pollId, option_index: optIndex, voter }),
+                body: JSON.stringify({ poll_id: pollId, option_index: optIdx, voter }),
+              },
+              8000,
+            )
+              .then((res) => {
+                if (!res.ok && res.status !== 409) throw new Error(String(res.status));
+              })
+              .catch(() => {
+                // 没提交成功就撤销这票，让人还能重投
+                delete mine[pollId];
+                delete liveVotes[pollId];
+                try {
+                  localStorage.setItem(COUNCIL_MINE_KEY, JSON.stringify(mine));
+                } catch {
+                  /* 忽略 */
+                }
+                render();
+                status.textContent = "投票没提交上，再点一次试试";
+                if (retryBtn) retryBtn.hidden = false;
               });
-            } catch {
-              /* 失败也重拉一次，看真实状态 */
-            }
-
-            await load();
           };
 
           list.addEventListener("click", (event) => {
@@ -1279,21 +1330,46 @@ const data = {
             if (!btn || btn.disabled) return;
 
             const pollId = btn.dataset.poll;
-            const optIndex = Number(btn.dataset.opt);
-            if (!pollId || Number.isNaN(optIndex)) return;
+            const optIdx = Number(btn.dataset.opt);
+            if (!pollId || Number.isNaN(optIdx)) return;
 
-            void vote(pollId, optIndex);
+            vote(pollId, optIdx);
           });
 
-          retryBtn?.addEventListener("click", () => {
-            if (!retryBtn) return;
+          // 手动拉最新票数，失败也不影响已经显示的内容
+          retryBtn?.addEventListener("click", async () => {
+            if (!ready || !retryBtn) return;
+
             retryBtn.hidden = true;
-            status.textContent = "正在加载…";
-            void load();
+            status.textContent = "正在拉最新票数…";
+
+            try {
+              const res = await fetchWithTimeout(
+                `${sb!.url}/rest/v1/votes?select=poll_id,option_index`,
+                { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` } },
+                8000,
+              );
+              if (!res.ok) throw new Error("bad status");
+
+              const votes = (await res.json()) as Array<{ poll_id: string; option_index: number }>;
+
+              for (const k of Object.keys(baseCounts)) delete baseCounts[k];
+              for (const v of votes) {
+                baseCounts[v.poll_id] ??= {};
+                baseCounts[v.poll_id][v.option_index] = (baseCounts[v.poll_id][v.option_index] ?? 0) + 1;
+              }
+
+              render();
+              status.textContent = "已更新到最新";
+            } catch {
+              status.textContent = "还是连不上，先看页面里的结果";
+              retryBtn.hidden = false;
+            }
           });
 
-          void load();
+          render();
         };
+
 
         const APPS: Record<
           string,
