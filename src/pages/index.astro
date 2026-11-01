@@ -143,32 +143,15 @@ const data = {
         <p class="desk-hint" id="desk-hint">双击图标，或从下方程序坞打开</p>
       </main>
 
-      <footer class="dock" id="dock">        <button class="dock-item" type="button" data-app="posts" title="文章">
+      <footer class="dock" id="dock">
+        <button class="dock-item" type="button" data-app="posts" title="文章">
           <span class="dock-glyph di-folder"></span>
         </button>
         <button class="dock-item" type="button" data-app="about" title="关于">
           <span class="dock-glyph di-person"></span>
         </button>
-        <button class="dock-item" type="button" data-app="music" title="音乐">
-          <span class="dock-glyph di-music"></span>
-        </button>
         <button class="dock-item" type="button" data-app="terminal" title="终端">
           <span class="dock-glyph di-term"></span>
-        </button>
-        <button class="dock-item" type="button" data-app="achievements" title="成就">
-          <span class="dock-glyph di-ach"></span>
-        </button>
-        <button class="dock-item" type="button" data-app="aquarium" title="水族箱">
-          <span class="dock-glyph di-tank"></span>
-        </button>
-        <button class="dock-item" type="button" data-app="visitors" title="访客墙">
-          <span class="dock-glyph di-wall"></span>
-        </button>
-        <button class="dock-item" type="button" data-app="rank" title="排行榜">
-          <span class="dock-glyph di-rank"></span>
-        </button>
-        <button class="dock-item" type="button" data-app="draw" title="每日抽奖">
-          <span class="dock-glyph di-draw"></span>
         </button>
         <button class="dock-item" type="button" data-app="settings" title="设置">
           <span class="dock-glyph di-gear"></span>
@@ -271,6 +254,72 @@ const data = {
             };
           });
           writeState({ windows: map });
+        };
+
+        /* ---------------- 程序坞配置 ---------------- */
+
+        const DOCK_KEY = "guandao.os.dock";
+        const DOCK_DEFAULT = ["posts", "about", "terminal", "settings"];
+
+        const APP_ICON: Record<string, string> = {
+          posts: "di-folder",
+          about: "di-person",
+          music: "di-music",
+          terminal: "di-term",
+          settings: "di-gear",
+          achievements: "di-ach",
+          aquarium: "di-tank",
+          visitors: "di-wall",
+          rank: "di-rank",
+          draw: "di-draw",
+        };
+
+        const readDock = (): string[] => {
+          try {
+            const raw = JSON.parse(localStorage.getItem(DOCK_KEY) || "null");
+            if (Array.isArray(raw)) return raw.filter((id): id is string => typeof id === "string");
+          } catch {
+            /* 配置坏了就退回默认 */
+          }
+          return [...DOCK_DEFAULT];
+        };
+
+        const saveDock = (list: string[]) => {
+          try {
+            localStorage.setItem(DOCK_KEY, JSON.stringify(list));
+          } catch {
+            /* 忽略 */
+          }
+        };
+
+        const renderDock = () => {
+          const dock = document.getElementById("dock");
+          if (!dock || !DATA) return;
+
+          const items = readDock()
+            .filter((id) => APPS[id])
+            .map(
+              (id) => `
+                <button class="dock-item" type="button" data-app="${id}" title="${APPS[id].title}">
+                  <span class="dock-glyph ${APP_ICON[id] ?? "di-folder"}"></span>
+                </button>`,
+            )
+            .join("");
+
+          dock.innerHTML = `${items}
+            <span class="dock-sep"></span>
+            <a class="dock-item dock-link" href="/home/" title="回到博客">
+              <span class="dock-glyph di-home"></span>
+            </a>`;
+
+          // 重建后把运行中的小圆点补回去
+          dock.querySelectorAll<HTMLElement>(".dock-item[data-app]").forEach((el) => {
+            const id = el.dataset.app;
+            if (!id) return;
+            const win = windows.querySelector(`.window[data-app="${id}"]`);
+            if (!win) return;
+            el.classList.add(win.classList.contains("is-minimized") ? "has-hidden" : "has-open");
+          });
         };
 
         /* ---------------- 成就 ---------------- */
@@ -448,6 +497,21 @@ const data = {
               <button class="wall-pick" type="button" data-wall="dusk">暮色</button>
               <button class="wall-pick" type="button" data-wall="deep">深海</button>
             </div>
+
+            <p class="side-title">程序坞显示</p>
+            <div class="dock-picker" id="dock-picker">
+              ${Object.entries(APPS)
+                .map(
+                  ([id, app]) => `
+                    <label class="dock-opt">
+                      <input type="checkbox" data-dock="${id}" ${readDock().includes(id) ? "checked" : ""} />
+                      <span>${app.title}</span>
+                    </label>`,
+                )
+                .join("")}
+            </div>
+            <p class="settings-tip">回博客固定在最右边。取消勾选只是从程序坞拿掉，桌面上还在。</p>
+
             <p class="side-title">关于系统</p>
             <p class="settings-note">Guandao OS · 用 Astro 静态生成，没有框架，窗口拖动是原生的 pointer 事件。</p>
           </div>`;
@@ -1032,7 +1096,7 @@ const data = {
           about: { title: "关于", width: 460, height: 380, body: renderAbout },
           music: { title: "音乐", width: 420, height: 340, body: renderMusic },
           terminal: { title: "终端", width: 560, height: 360, body: renderTerminal },
-          settings: { title: "设置", width: 420, height: 320, body: renderSettings },
+          settings: { title: "设置", width: 460, height: 470, body: renderSettings },
           achievements: { title: "成就", width: 540, height: 476, body: renderAchievements },
           aquarium: { title: "水族箱", width: 720, height: 480, body: renderAquarium },
           visitors: { title: "访客墙", width: 640, height: 460, body: renderVisitors },
@@ -1310,6 +1374,18 @@ const data = {
               win.querySelectorAll(".wall-pick").forEach((el) => el.classList.toggle("is-active", el === button));
             });
           });
+
+          // 程序坞勾选：改完立刻重建
+          win.querySelectorAll<HTMLInputElement>("[data-dock]").forEach((box) => {
+            box.addEventListener("change", () => {
+              const picked = Array.from(win.querySelectorAll<HTMLInputElement>("[data-dock]"))
+                .filter((el) => el.checked)
+                .map((el) => el.dataset.dock ?? "")
+                .filter(Boolean);
+              saveDock(picked);
+              renderDock();
+            });
+          });
         };
 
         /* ---------------- 音乐 ---------------- */
@@ -1437,16 +1513,16 @@ const data = {
 
         /* ---------------- 入口 ---------------- */
 
-        document.querySelectorAll<HTMLElement>("[data-app]").forEach((trigger) => {
+        // 用事件委托，程序坞重建后不用重新绑定
+        document.addEventListener("click", (event) => {
+          const trigger = (event.target as HTMLElement).closest<HTMLElement>("[data-app]");
+          if (!trigger) return;
           const id = trigger.dataset.app;
-          if (!id) return;
-          if (trigger.classList.contains("desk-icon")) {
-            trigger.addEventListener("dblclick", () => openApp(id));
-            trigger.addEventListener("click", () => openApp(id));
-          } else {
-            trigger.addEventListener("click", () => openApp(id));
-          }
+          if (id) openApp(id);
         });
+
+        // 按保存的配置重建程序坞
+        renderDock();
 
         /* ---------------- 桌面宠物 ---------------- */
 
@@ -2502,6 +2578,40 @@ const data = {
         display: flex;
         gap: 8px;
         margin-bottom: 18px;
+      }
+
+      .dock-picker {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px 12px;
+        margin-bottom: 8px;
+      }
+
+      .dock-opt {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.72);
+        cursor: pointer;
+      }
+
+      .dock-opt:hover {
+        color: #fff;
+      }
+
+      .dock-opt input {
+        width: 13px;
+        height: 13px;
+        accent-color: #6f8cff;
+        cursor: pointer;
+      }
+
+      .settings-tip {
+        margin: 0 0 18px;
+        font-size: 10.5px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.34);
       }
 
       .wall-pick {
