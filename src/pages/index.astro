@@ -1566,7 +1566,15 @@ const data = {
             el.volume = 0.85;
             el.addEventListener("ended", () => step(1));
 
-            void el.play();
+            // 有些浏览器会拦自动播放，失败时把状态退回去并提示
+            void el.play().catch(() => {
+              playing = false;
+              el = null;
+              btn.textContent = "▶";
+              subEl.textContent = "被浏览器拦了，再点一次播放";
+              updateMeta();
+            });
+
             playing = true;
             btn.textContent = "❚❚";
             updateMeta();
