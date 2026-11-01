@@ -1919,6 +1919,68 @@ const data = {
           if (ach.reads >= 3) unlock("reader", true);
         });
 
+        /* ---------------- 宠物换装 ---------------- */
+
+        const OUTFIT_MAP: Record<string, string> = {
+          白T恤: "/pet/tshirt.webp",
+          连帽卫衣: "/pet/hoodie.webp",
+          小西装: "/pet/suit.webp",
+          睡衣: "/pet/pajamas.webp",
+        };
+
+        // 议会里「大肥鱼穿什么」票数最高的那项决定穿哪套
+        const applyOutfit = async () => {
+          const img = document.querySelector<HTMLImageElement>(".pet-img");
+          if (!img) return;
+
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          if (!sb?.url || !sb?.key) return;
+
+          try {
+            const headers = { apikey: sb.key, Authorization: `Bearer ${sb.key}` };
+
+            const pRes = await fetch(
+              `${sb.url}/rest/v1/polls?select=id,options&kind=eq.outfit&active=eq.true&limit=1`,
+              { headers },
+            );
+            if (!pRes.ok) return;
+
+            const polls = (await pRes.json()) as Array<{ id: string; options: string[] }>;
+            if (!polls.length) return;
+
+            const poll = polls[0];
+            const vRes = await fetch(
+              `${sb.url}/rest/v1/votes?select=option_index&poll_id=eq.${poll.id}`,
+              { headers },
+            );
+            if (!vRes.ok) return;
+
+            const votes = (await vRes.json()) as Array<{ option_index: number }>;
+            if (!votes.length) return;
+
+            const counts = poll.options.map(
+              (_, i) => votes.filter((v) => v.option_index === i).length,
+            );
+            const max = Math.max(...counts);
+            if (max === 0) return;
+
+            const label = poll.options[counts.indexOf(max)];
+            // 选项文字里的空格可能被省略，两种写法都认
+            const src = OUTFIT_MAP[label] ?? OUTFIT_MAP[label.replace(/\s+/g, "")];
+            if (!src) return;
+
+            img.src = src;
+            img.alt = `鲸鲸穿着${label}`;
+
+            const host = document.getElementById("desk-pet");
+            if (host) host.title = `今天穿：${label}（议会投票结果）`;
+          } catch {
+            /* 拿不到就保持默认那套 */
+          }
+        };
+
+        window.setTimeout(() => void applyOutfit(), 1600);
+
         /* ---------------- 菜单栏时间 ---------------- */
 
         const mbTime = document.getElementById("mb-time");
