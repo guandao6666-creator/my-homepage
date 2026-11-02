@@ -8063,6 +8063,30 @@ const data = {
         }
       }
 
+      /* ---------------- 手机端：菜单栏收窄 ---------------- */
+      @media (max-width: 640px) {
+        .mb-menu {
+          display: none;
+        }
+        .mb-version,
+        #mb-date,
+        .mb-sep-v,
+        .spaces,
+        .mb-dot {
+          display: none;
+        }
+        .mb-brand-text {
+          white-space: nowrap;
+        }
+        .menubar {
+          gap: 10px;
+        }
+        .mb-time-btn {
+          gap: 4px;
+          padding: 3px 6px;
+        }
+      }
+
       /* ---------------- 减少动态效果 ---------------- */
       @media (prefers-reduced-motion: reduce) {
         .wallpaper::after,
