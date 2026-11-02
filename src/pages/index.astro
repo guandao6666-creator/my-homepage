@@ -216,6 +216,7 @@ const data = {
             <button type="button" data-menu-action="reset">重置桌面布局</button>
             <p class="mb-mp-cat">视图</p>
             <button type="button" data-menu-action="search">搜索（Spotlight）</button>
+            <button type="button" data-menu-action="launchpad">启动台（全部应用）</button>
             <button type="button" data-menu-action="wallpaper">下一张壁纸</button>
             <button type="button" data-menu-action="theme">切换外观</button>
             <button type="button" data-menu-action="fullscreen">进入全屏</button>
@@ -327,6 +328,13 @@ const data = {
 
         <div class="widgets" id="widgets"></div>
       </main>
+
+      <div class="launchpad" id="launchpad" hidden aria-hidden="true">
+        <button class="lp-close" id="lp-close" type="button" aria-label="关闭启动台">✕</button>
+        <div class="lp-inner">
+          <div class="lp-grid" id="lp-grid"></div>
+        </div>
+      </div>
 
       <div class="snap-preview" id="snap-preview" hidden></div>
 
@@ -955,6 +963,13 @@ const data = {
           treehole: "di-hole",
           news: "di-tv",
           social: "di-net",
+          calc: "di-calc",
+          notes: "di-note",
+          monitor: "di-mon",
+          calendar: "di-cal",
+          viewer: "di-viewer",
+          browser: "di-browser",
+          files: "di-files",
         };
 
         const readDock = (): string[] => {
@@ -989,7 +1004,11 @@ const data = {
             )
             .join("");
 
-          dock.innerHTML = `${items}
+          dock.innerHTML = `
+            <button class="dock-item dock-launch" type="button" data-launchpad title="启动台">
+              <span class="dock-glyph di-grid"></span>
+            </button>
+            ${items}
             <span class="dock-sep"></span>
             <a class="dock-item dock-link" href="/home/" title="回到博客">
               <span class="dock-glyph di-home"></span>
@@ -5260,6 +5279,61 @@ const data = {
           }
         };
 
+        /* ---------------- 启动台（全屏应用网格） ---------------- */
+        const launchpad = document.getElementById("launchpad");
+        const lpGrid = document.getElementById("lp-grid");
+        const lpClose = document.getElementById("lp-close");
+
+        const fillLaunchpad = () => {
+          if (!lpGrid) return;
+          lpGrid.innerHTML = Object.keys(APPS)
+            .filter((id) => APPS[id] && APPS[id].title)
+            .map((id) => {
+              const icon = APP_ICON[id] ?? "di-folder";
+              return `<button class="lp-icon" type="button" data-app="${id}">
+                <span class="di-glyph ${icon}"></span>
+                <span class="lp-label">${APPS[id].title}</span>
+              </button>`;
+            })
+            .join("");
+        };
+        fillLaunchpad();
+
+        const closeLaunchpad = () => {
+          if (!launchpad) return;
+          launchpad.hidden = true;
+          launchpad.setAttribute("aria-hidden", "true");
+        };
+
+        const openLaunchpad = () => {
+          if (!launchpad) return;
+          closeMenus();
+          closeMobilePanel();
+          launchpad.hidden = false;
+          launchpad.setAttribute("aria-hidden", "false");
+        };
+
+        if (lpGrid) {
+          lpGrid.addEventListener("click", (event) => {
+            const btn = (event.target as HTMLElement).closest<HTMLElement>("[data-app]");
+            if (!btn) return;
+            openApp(btn.dataset.app ?? "");
+            closeLaunchpad();
+          });
+        }
+        if (lpClose) lpClose.addEventListener("click", closeLaunchpad);
+        if (launchpad) {
+          launchpad.addEventListener("click", (event) => {
+            if (event.target === launchpad) closeLaunchpad();
+          });
+        }
+        document.addEventListener("click", (event) => {
+          if ((event.target as HTMLElement).closest("[data-launchpad]")) openLaunchpad();
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && launchpad && !launchpad.hidden) closeLaunchpad();
+        });
+
         const runMenuAction = (action: string) => {
           closeMenus();
           closeMobilePanel();
@@ -5302,6 +5376,9 @@ const data = {
               break;
             case "search":
               openSpot();
+              break;
+            case "launchpad":
+              openLaunchpad();
               break;
           }
         };
@@ -12899,6 +12976,107 @@ const data = {
         background: rgba(20, 24, 40, 0.05);
         color: rgba(20, 24, 40, 0.82);
       }
+
+      /* ---------------- 启动台（全屏应用网格） ---------------- */
+      .launchpad {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        display: flex;
+        flex-direction: column;
+        padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+        background: rgba(10, 12, 22, 0.82);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        overflow-y: auto;
+        animation: lp-in 0.18s ease;
+      }
+      .launchpad[hidden] {
+        display: none;
+      }
+      @keyframes lp-in {
+        from { opacity: 0; transform: scale(1.04); }
+        to { opacity: 1; transform: none; }
+      }
+      .lp-close {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        right: 16px;
+        width: 36px;
+        height: 36px;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      .lp-inner {
+        margin: auto 0;
+        width: 100%;
+        max-width: 560px;
+        align-self: center;
+      }
+      .lp-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px 8px;
+        justify-items: center;
+      }
+      .lp-icon {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 7px;
+        width: 76px;
+        padding: 6px;
+        border: 0;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.92);
+        cursor: pointer;
+        border-radius: 14px;
+      }
+      .lp-icon:active {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .lp-icon .di-glyph {
+        width: 58px;
+        height: 58px;
+        border-radius: 15px;
+      }
+      .lp-label {
+        font-size: 11px;
+        max-width: 70px;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      /* 启动台触发图标（dock 上的 2×2 点阵） */
+      .di-grid {
+        background:
+          radial-gradient(circle at 33% 33%, #fff 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 67% 33%, #fff 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 33% 67%, #fff 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 67% 67%, #fff 0 2.4px, transparent 2.6px),
+          rgba(255, 255, 255, 0.14);
+      }
+      .di-grid::before,
+      .di-grid::after { content: none; }
+
+      /* 桌面模式下，手机浮动窗口标题栏增大触摸热区、禁止拖动时页面滚动 */
+      body.is-touch-desktop .titlebar {
+        touch-action: none;
+        height: 46px;
+      }
+      body.is-touch-desktop .desk-icon {
+        min-height: 64px;
+      }
+
+      @media (max-width: 360px) {
+        .lp-grid { grid-template-columns: repeat(3, 1fr); }
+      }
+
     </style>
   </body>
 </html>
