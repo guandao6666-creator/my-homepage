@@ -124,7 +124,7 @@ const data = {
         <span class="mb-brand">
           <span class="mb-logo" aria-hidden="true">管</span>
           <span class="mb-brand-text">Guandao OS</span>
-          <span class="mb-version">1.1</span>
+          <span class="mb-version">1.2</span>
         </span>
         <nav class="mb-menu">
           <div class="mb-menu-item">
@@ -156,6 +156,8 @@ const data = {
           <div class="mb-menu-item">
             <button class="mb-menu-btn" type="button" data-menu-btn="window">窗口</button>
             <div class="mb-dropdown" data-menu-panel="window" hidden>
+              <button type="button" data-menu-action="mission">任务视图</button>
+              <span class="mb-sep"></span>
               <button type="button" data-menu-action="minimize-all">全部最小化</button>
               <button type="button" data-menu-action="restore-all">全部还原</button>
               <span class="mb-sep"></span>
@@ -164,10 +166,7 @@ const data = {
           </div>
         </nav>
         <div class="mb-status">
-          <div class="spaces" id="spaces" title="虚拟桌面">
-            <button class="space-dot is-active" type="button" data-space="1" aria-label="工作区 1"></button>
-            <button class="space-dot" type="button" data-space="2" aria-label="工作区 2"></button>
-          </div>
+          <div class="spaces" id="spaces" title="虚拟桌面"></div>
           <span class="mb-sep-v"></span>
           <span class="mb-dot" title="在线"></span>
           <button class="mb-time-btn" id="mb-time-btn" type="button" aria-label="日期和时间">
@@ -267,7 +266,11 @@ const data = {
         </div>
 
         <p class="desk-hint" id="desk-hint">双击图标，或从下方程序坞打开</p>
+
+        <div class="widgets" id="widgets"></div>
       </main>
+
+      <div class="snap-preview" id="snap-preview" hidden></div>
 
       <footer class="dock" id="dock">
         <button class="dock-item" type="button" data-app="posts" title="文章">
@@ -307,6 +310,34 @@ const data = {
       <p class="notif-empty" id="notif-empty">还没有通知，去逛逛桌面吧。</p>
     </div>
 
+    <div class="spotlight" id="spotlight" hidden>
+      <div class="spotlight-box">
+        <div class="spotlight-input-row">
+          <svg class="spotlight-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" stroke-linecap="round" />
+          </svg>
+          <input id="spotlight-input" type="text" placeholder="搜索应用、文章、设置…" autocomplete="off" spellcheck="false" />
+          <kbd class="spotlight-kbd">esc</kbd>
+        </div>
+        <div class="spotlight-results" id="spotlight-results"></div>
+        <div class="spotlight-foot">
+          <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+          <span><kbd>↵</kbd> 打开</span>
+          <span><kbd>esc</kbd> 关闭</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mission" id="mission" hidden>
+      <div class="mission-top">
+        <span class="mission-title">任务视图</span>
+        <div class="mission-desks" id="mission-desks"></div>
+        <button class="mission-close" id="mission-close" type="button" aria-label="关闭任务视图">×</button>
+      </div>
+      <div class="mission-grid" id="mission-grid"></div>
+    </div>
+
     <script is:inline define:vars={{ OS_DATA: data }}>
       window.__OS__ = OS_DATA;
     </script>
@@ -341,6 +372,7 @@ const data = {
         }
 
         const DATA = window.__OS__;
+        const OS_BOOT = Date.now();
         if (!DATA) return;
 
         /** 通用的登录 / 注册表单，树洞、议会、社会网络共用一份 */
@@ -662,6 +694,7 @@ const data = {
           showPet?: boolean;
           reduceMotion?: boolean;
           space?: number;
+          desks?: { id: number; name: string }[];
         }
 
         const readState = (): OsState => {
@@ -678,6 +711,65 @@ const data = {
           } catch {
             /* 隐私模式写不进去，忽略即可 */
           }
+        };
+
+        /* ---------------- 数据持久化：导出 / 导入 / 恢复默认 ---------------- */
+
+        const collectOsData = () => {
+          const data: Record<string, unknown> = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("guandao.")) {
+              const raw = localStorage.getItem(k);
+              try {
+                data[k] = JSON.parse(raw || "");
+              } catch {
+                data[k] = raw;
+              }
+            }
+          }
+          return data;
+        };
+
+        const exportData = () => {
+          const payload = { version: "guandao-os/1.2", exportedAt: new Date().toISOString(), data: collectOsData() };
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `guandao-os-backup-${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          pushNotif({ icon: "↓", title: "数据已导出", body: "备份文件已下载到本地。" });
+        };
+
+        const importData = (file: File) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const parsed = JSON.parse(String(reader.result));
+              if (!parsed || typeof parsed !== "object" || !parsed.data) throw new Error("bad");
+              const entries = Object.entries(parsed.data as Record<string, unknown>).filter(([k]) => k.startsWith("guandao."));
+              if (!entries.length) throw new Error("empty");
+              for (const [k, v] of entries) {
+                localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
+              }
+              location.reload();
+            } catch {
+              pushNotif({ icon: "!", title: "导入失败", body: "文件格式不正确或不是 Guandao OS 备份。" });
+            }
+          };
+          reader.readAsText(file);
+        };
+
+        const resetAllData = () => {
+          const keys: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("guandao.")) keys.push(k);
+          }
+          for (const k of keys) localStorage.removeItem(k);
+          location.reload();
         };
 
         const saveWindows = () => {
@@ -700,22 +792,83 @@ const data = {
 
         /* ---------------- 虚拟桌面 ---------------- */
 
+        interface Desk {
+          id: number;
+          name: string;
+        }
+
+        const defaultDesks = (): Desk[] => [
+          { id: 1, name: "日常桌面" },
+          { id: 2, name: "学习空间" },
+        ];
+
+        let desks: Desk[] = readState().desks?.length ? readState().desks! : defaultDesks();
         let currentSpace = 1;
 
-        const applySpace = (n: number) => {
-          currentSpace = n;
-          os.dataset.space = String(n);
-          writeState({ space: n });
-          document.querySelectorAll<HTMLElement>(".space-dot").forEach((d) => {
-            d.classList.toggle("is-active", d.dataset.space === String(n));
+        const desksPersist = () => writeState({ desks, space: currentSpace });
+
+        const refreshSpaceVisibility = () => {
+          windows.querySelectorAll<HTMLElement>(".window").forEach((win) => {
+            win.classList.toggle("is-hidden-space", Number(win.dataset.space) !== currentSpace);
           });
         };
 
+        const renderSpaces = () => {
+          const bar = document.getElementById("spaces");
+          if (!bar) return;
+          bar.innerHTML = desks
+            .map(
+              (d) => `<button class="space-dot ${d.id === currentSpace ? "is-active" : ""}" type="button" data-space="${d.id}" title="${escapeHtml(d.name)}" aria-label="${escapeHtml(d.name)}"></button>`,
+            )
+            .join("");
+        };
+
+        const applySpace = (n: number) => {
+          if (!desks.some((d) => d.id === n)) n = desks[0]?.id ?? 1;
+          currentSpace = n;
+          os.dataset.space = String(n);
+          refreshSpaceVisibility();
+          renderSpaces();
+          desksPersist();
+        };
+
         const switchSpace = (n: number) => {
-          if (n === currentSpace || n < 1 || n > 2) return;
+          if (n === currentSpace || !desks.some((d) => d.id === n)) return;
           windows.classList.add("is-switching");
           window.setTimeout(() => windows.classList.remove("is-switching"), 260);
           applySpace(n);
+        };
+
+        const addDesk = (name?: string) => {
+          if (desks.length >= 4) return;
+          const id = Math.max(...desks.map((d) => d.id), 0) + 1;
+          desks.push({ id, name: name?.trim() || `桌面 ${id}` });
+          desksPersist();
+          switchSpace(id);
+        };
+
+        const deleteDesk = (id: number) => {
+          if (desks.length <= 1) return;
+          // 把该桌面的窗口移到主桌面
+          windows.querySelectorAll<HTMLElement>(`.window[data-space="${id}"]`).forEach((w) => {
+            w.dataset.space = String(desks[0].id);
+          });
+          desks = desks.filter((d) => d.id !== id);
+          desksPersist();
+          if (currentSpace === id) applySpace(desks[0].id);
+          else {
+            refreshSpaceVisibility();
+            renderSpaces();
+          }
+          saveWindows();
+        };
+
+        const renameDesk = (id: number, name: string) => {
+          const d = desks.find((d) => d.id === id);
+          if (!d || !name.trim()) return;
+          d.name = name.trim();
+          renderSpaces();
+          desksPersist();
         };
 
         document.getElementById("spaces")?.addEventListener("click", (event) => {
@@ -956,7 +1109,7 @@ const data = {
         const renderTerminal = () => `
           <div class="term">
             <div class="term-out" id="term-out">
-              <p class="term-line term-muted">Guandao OS 1.1 · 输入 help 看可用命令</p>
+              <p class="term-line term-muted">Guandao OS 1.2 · 输入 help 看可用命令</p>
             </div>
             <label class="term-input-row">
               <span class="term-prompt">~ $</span>
@@ -1015,20 +1168,48 @@ const data = {
               <input type="checkbox" id="opt-show-pet" ${showPet ? "checked" : ""} />
             </label>
 
+            <p class="side-title">桌面小组件</p>
+            ${["clock", "calendar", "weather", "todo", "sys"]
+              .map(
+                (id) => `
+              <label class="settings-row">
+                <span>${WIDGET_TITLES[id]}</span>
+                <input type="checkbox" data-widget-toggle="${id}" ${widgetOn(id) ? "checked" : ""} />
+              </label>`,
+              )
+              .join("")}
+
             <p class="side-title">动效</p>
             <label class="settings-row">
               <span>减少动态效果</span>
               <input type="checkbox" id="opt-reduce-motion" ${reduceMotion ? "checked" : ""} />
             </label>
 
+            <p class="side-title">快捷键</p>
+            <div class="sys-info">
+              <div class="sys-row"><span>Spotlight 搜索</span><b>Ctrl / ⌘ + K</b></div>
+              <div class="sys-row"><span>任务视图</span><b>F3</b></div>
+              <div class="sys-row"><span>显示桌面</span><b>Ctrl + Shift + D</b></div>
+              <div class="sys-row"><span>切换窗口</span><b>Ctrl + &#96;</b></div>
+              <div class="sys-row"><span>关闭弹层</span><b>Esc</b></div>
+            </div>
+
+            <p class="side-title">数据管理</p>
+            <div class="data-actions">
+              <button class="data-btn" type="button" id="data-export">导出备份</button>
+              <button class="data-btn" type="button" id="data-import">导入备份</button>
+              <button class="data-btn is-danger" type="button" id="data-reset">恢复默认</button>
+            </div>
+            <p class="settings-tip">导出会下载 JSON 备份（含桌面布局/主题/成就等）；恢复默认会清空本机所有 Guandao 数据并刷新。</p>
+
             <p class="side-title">系统信息</p>
             <div class="sys-info">
-              <div class="sys-row"><span>版本</span><b>Guandao OS 1.1</b></div>
-              <div class="sys-row"><span>代号</span><b>Refined</b></div>
+              <div class="sys-row"><span>版本</span><b>Guandao OS 1.2</b></div>
+              <div class="sys-row"><span>代号</span><b>Desktop Evolution</b></div>
               <div class="sys-row"><span>引擎</span><b>Astro 静态渲染</b></div>
               <div class="sys-row"><span>环境</span><b>浏览器桌面</b></div>
             </div>
-            <p class="settings-note">Guandao OS 1.1 · Refined Visual Experience · Enhanced Interaction · More Details · Better Performance</p>
+            <p class="settings-note">Guandao OS 1.2 · More Power. More Freedom. More Possibilities.</p>
           </div>`;
         };
 
@@ -2933,6 +3114,85 @@ const data = {
           });
         };
 
+        /* ---------------- 窗口贴靠 Snap ---------------- */
+
+        const snapPreview = document.getElementById("snap-preview");
+
+        // 计算当前指针指向的贴靠区域（null 表示不贴靠）
+        const snapZone = (x: number, y: number) => {
+          const W = window.innerWidth;
+          const H = window.innerHeight;
+          const EDGE = 26;
+          const CORNER = 48;
+          const TOP = 42;
+          if (x < CORNER && y < TOP) return "tl";
+          if (x > W - CORNER && y < TOP) return "tr";
+          if (x < CORNER && y > H - 60) return "bl";
+          if (x > W - CORNER && y > H - 60) return "br";
+          if (x < EDGE) return "left";
+          if (x > W - EDGE) return "right";
+          if (y < TOP) return "full";
+          return null;
+        };
+
+        // 贴靠目标矩形（桌面坐标，顶栏下方）
+        const snapRect = (zone: string) => {
+          const W = window.innerWidth;
+          const H = window.innerHeight - 36;
+          const halfW = W / 2;
+          const halfH = H / 2;
+          switch (zone) {
+            case "left":
+              return { x: 0, y: 0, w: halfW, h: H };
+            case "right":
+              return { x: halfW, y: 0, w: halfW, h: H };
+            case "full":
+              return { x: 0, y: 0, w: W, h: H };
+            case "tl":
+              return { x: 0, y: 0, w: halfW, h: halfH };
+            case "tr":
+              return { x: halfW, y: 0, w: halfW, h: halfH };
+            case "bl":
+              return { x: 0, y: halfH, w: halfW, h: halfH };
+            case "br":
+              return { x: halfW, y: halfH, w: halfW, h: halfH };
+            default:
+              return null;
+          }
+        };
+
+        const showSnapPreview = (zone: string | null) => {
+          if (!snapPreview) return;
+          const r = zone ? snapRect(zone) : null;
+          if (!r) {
+            snapPreview.hidden = true;
+            return;
+          }
+          snapPreview.style.left = `${r.x}px`;
+          snapPreview.style.top = `${r.y + 36}px`;
+          snapPreview.style.width = `${r.w}px`;
+          snapPreview.style.height = `${r.h}px`;
+          snapPreview.hidden = false;
+        };
+
+        const hideSnapPreview = () => {
+          if (snapPreview) snapPreview.hidden = true;
+        };
+
+        const applySnap = (win: HTMLElement, zone: string) => {
+          const r = snapRect(zone);
+          if (!r) return;
+          if (zone === "full") {
+            maximizeWin(win);
+            return;
+          }
+          win.classList.remove("is-maximized");
+          win.style.left = `${r.x}px`;
+          win.style.top = `${r.y}px`;
+          win.style.width = `${r.w}px`;
+          win.style.height = `${r.h}px`;
+        };
+
         const bindDrag = (win: HTMLElement) => {
           const bar = win.querySelector(".titlebar") as HTMLElement | null;
           if (!bar) return;
@@ -2941,12 +3201,16 @@ const data = {
           let startY = 0;
           let originX = 0;
           let originY = 0;
+          let snapTarget: string | null = null;
 
           const onMove = (event: PointerEvent) => {
             const maxX = window.innerWidth - 140;
             const maxY = window.innerHeight - 110;
             win.style.left = `${Math.max(-40, Math.min(maxX, originX + event.clientX - startX))}px`;
             win.style.top = `${Math.max(32, Math.min(maxY, originY + event.clientY - startY))}px`;
+
+            snapTarget = snapZone(event.clientX, event.clientY);
+            showSnapPreview(snapTarget);
           };
 
           const onUp = () => {
@@ -2954,6 +3218,9 @@ const data = {
             window.removeEventListener("pointermove", onMove);
             window.removeEventListener("pointerup", onUp);
             window.removeEventListener("pointercancel", onUp);
+            if (snapTarget) applySnap(win, snapTarget);
+            hideSnapPreview();
+            snapTarget = null;
             saveWindows();
           };
 
@@ -3040,6 +3307,7 @@ const data = {
           focusWin(win);
           bindDrag(win);
           bindResize(win);
+          refreshSpaceVisibility();
 
           // 上次关闭时是最大化，就原样恢复到全屏
           if (saved?.maximized && !narrow) {
@@ -3227,6 +3495,32 @@ const data = {
             const on = (e.target as HTMLInputElement).checked;
             writeState({ reduceMotion: on });
             document.body.classList.toggle("os-reduce-motion", on);
+          });
+
+          // 桌面小组件开关
+          win.querySelectorAll<HTMLInputElement>("[data-widget-toggle]").forEach((box) => {
+            box.addEventListener("change", () => {
+              const id = box.dataset.widgetToggle ?? "";
+              const all = readWidgets();
+              all[id] = { ...all[id], enabled: box.checked };
+              localStorage.setItem(WIDGET_KEY, JSON.stringify(all));
+              renderWidget(id);
+            });
+          });
+
+          // 数据管理
+          win.querySelector("#data-export")?.addEventListener("click", exportData);
+          win.querySelector("#data-reset")?.addEventListener("click", () => {
+            if (window.confirm("确定清空本机所有 Guandao 数据并恢复默认吗？此操作不可撤销。")) resetAllData();
+          });
+          win.querySelector("#data-import")?.addEventListener("click", () => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "application/json";
+            input.onchange = () => {
+              if (input.files?.[0]) importData(input.files[0]);
+            };
+            input.click();
           });
         };
 
@@ -3801,14 +4095,15 @@ const data = {
 
         const resetLayout = () => {
           windows.querySelectorAll<HTMLElement>(".window").forEach((w) => w.remove());
-          writeState({ windows: {}, wall: "nebula", space: 1 });
+          desks = defaultDesks();
+          writeState({ windows: {}, wall: "nebula", space: 1, desks });
           try {
             localStorage.removeItem(DOCK_KEY);
           } catch {}
           renderDock();
           os.dataset.wall = "nebula";
           applySpace(1);
-          pushNotif({ icon: "↺", title: "桌面已重置", body: "窗口位置与程序坞配置已恢复默认。" });
+          pushNotif({ icon: "↺", title: "桌面已重置", body: "窗口位置、虚拟桌面与程序坞配置已恢复默认。" });
         };
 
         const minimizeAll = () =>
@@ -3828,6 +4123,9 @@ const data = {
         const runMenuAction = (action: string) => {
           closeMenus();
           switch (action) {
+            case "mission":
+              openMission();
+              break;
             case "posts":
               openApp("posts");
               break;
@@ -3968,7 +4266,8 @@ const data = {
           if (st.reduceMotion === true) {
             document.body.classList.add("os-reduce-motion");
           }
-          if (st.space === 2) applySpace(2);
+          renderSpaces();
+          if (st.space) applySpace(st.space);
           if (st.autoWall === true) {
             os.dataset.autoWall = "1";
           }
@@ -4005,9 +4304,559 @@ const data = {
           }, 60_000);
         }
 
+        /* ---------------- Spotlight 全局搜索 ---------------- */
+
+        const spotlightEl = document.getElementById("spotlight");
+        const spotInput = document.getElementById("spotlight-input") as HTMLInputElement | null;
+        const spotResults = document.getElementById("spotlight-results");
+
+        interface SpotItem {
+          title: string;
+          subtitle: string;
+          kind: string;
+          action: () => void;
+        }
+
+        const spotIndex = (): SpotItem[] => {
+          const items: SpotItem[] = [];
+          for (const [id, app] of Object.entries(APPS)) {
+            items.push({ title: app.title, subtitle: "应用", kind: "应用", action: () => openApp(id) });
+          }
+          for (const post of DATA.posts) {
+            items.push({ title: post.title, subtitle: `文章 · ${post.date}`, kind: "文章", action: () => { location.href = post.href; } });
+          }
+          const settings: [string, () => void][] = [
+            ["切换深色 / 浅色", () => toggleOsTheme()],
+            ["更换壁纸", () => nextWallpaper()],
+            ["导出数据备份", () => exportData()],
+            ["重置桌面布局", () => resetLayout()],
+            ["打开设置", () => openApp("settings")],
+          ];
+          for (const [label, fn] of settings) {
+            items.push({ title: label, subtitle: "系统设置", kind: "设置", action: fn });
+          }
+          return items;
+        };
+
+        let spotItems: SpotItem[] = [];
+        let spotActive = 0;
+
+        const renderSpot = () => {
+          if (!spotResults) return;
+          if (!spotItems.length) {
+            spotResults.innerHTML = `<div class="spot-empty">没有找到「${escapeHtml(spotInput?.value ?? "")}」</div>`;
+            return;
+          }
+          spotResults.innerHTML = spotItems
+            .map(
+              (it, i) => `
+                <button class="spot-item ${i === spotActive ? "is-active" : ""}" data-i="${i}">
+                  <span class="spot-kind">${escapeHtml(it.kind)}</span>
+                  <span class="spot-main">
+                    <span class="spot-title">${escapeHtml(it.title)}</span>
+                    <span class="spot-sub">${escapeHtml(it.subtitle)}</span>
+                  </span>
+                  <span class="spot-enter">↵</span>
+                </button>`,
+            )
+            .join("");
+        };
+
+        const spotRefresh = () => {
+          const q = (spotInput?.value ?? "").trim().toLowerCase();
+          const all = spotIndex();
+          spotItems = (q ? all.filter((i) => (i.title + i.subtitle).toLowerCase().includes(q)) : all).slice(0, 12);
+          spotActive = 0;
+          renderSpot();
+        };
+
+        const openSpot = () => {
+          if (!spotlightEl) return;
+          spotlightEl.hidden = false;
+          if (spotInput) spotInput.value = "";
+          spotRefresh();
+          spotInput?.focus();
+        };
+
+        const closeSpot = () => {
+          if (spotlightEl) spotlightEl.hidden = true;
+          spotInput?.blur();
+        };
+
+        const spotChoose = (i: number) => {
+          const it = spotItems[i];
+          if (!it) return;
+          closeSpot();
+          it.action();
+        };
+
+        spotInput?.addEventListener("input", spotRefresh);
+        spotInput?.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            spotActive = Math.min(spotActive + 1, spotItems.length - 1);
+            renderSpot();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            spotActive = Math.max(spotActive - 1, 0);
+            renderSpot();
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            spotChoose(spotActive);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            closeSpot();
+          }
+        });
+        spotResults?.addEventListener("click", (e) => {
+          const b = (e.target as HTMLElement).closest<HTMLElement>(".spot-item");
+          if (b) spotChoose(Number(b.dataset.i));
+        });
+        spotlightEl?.addEventListener("click", (e) => {
+          if (e.target === spotlightEl) closeSpot();
+        });
+
+        document.addEventListener("keydown", (e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+            e.preventDefault();
+            if (spotlightEl?.hidden) openSpot();
+            else closeSpot();
+          }
+          if (e.key === "Escape" && spotlightEl && !spotlightEl.hidden) closeSpot();
+        });
+
+        /* ---------------- Mission Control 任务视图 ---------------- */
+
+        const missionEl = document.getElementById("mission");
+        const missionGrid = document.getElementById("mission-grid");
+        const missionDesks = document.getElementById("mission-desks");
+
+        const renderMissionDesks = () => {
+          if (!missionDesks) return;
+          missionDesks.innerHTML =
+            desks
+              .map((d) => {
+                const count = windows.querySelectorAll(`.window[data-space="${d.id}"]`).length;
+                return `<button class="mc-desk ${d.id === currentSpace ? "is-active" : ""}" data-desk="${d.id}">
+                  <span class="mc-desk-name">${escapeHtml(d.name)}</span>
+                  <span class="mc-desk-count">${count} 窗口</span>
+                </button>`;
+              })
+              .join("") +
+            `<button class="mc-desk mc-desk-add" data-desk-add title="新建桌面" ${desks.length >= 4 ? "disabled" : ""}>＋</button>`;
+        };
+
+        const renderMission = () => {
+          if (!missionGrid) return;
+          renderMissionDesks();
+          const wins = Array.from(windows.querySelectorAll<HTMLElement>(".window"));
+          if (!wins.length) {
+            missionGrid.innerHTML = `<div class="mc-empty">还没有打开的窗口。<br/>双击桌面图标，或从程序坞启动应用。</div>`;
+            return;
+          }
+          missionGrid.innerHTML = wins
+            .map((w) => {
+              const id = w.dataset.app ?? "";
+              const app = APPS[id];
+              const glyph = app?.glyph ?? "di-folder";
+              const title = app?.title ?? id;
+              const inOther = Number(w.dataset.space) !== currentSpace;
+              return `
+                <div class="mc-card ${inOther ? "is-other" : ""}" data-app="${id}" data-space="${w.dataset.space}">
+                  <div class="mc-card-bar">
+                    <span class="mc-dots"><i></i><i></i><i></i></span>
+                    <span class="mc-card-title">${escapeHtml(title)}</span>
+                    <button class="mc-card-close" data-close="${id}" title="关闭">×</button>
+                  </div>
+                  <div class="mc-card-body"><span class="mc-glyph dock-glyph ${glyph}"></span></div>
+                  <span class="mc-card-space">${escapeHtml(desks.find((d) => d.id === Number(w.dataset.space))?.name ?? "")}</span>
+                </div>`;
+            })
+            .join("");
+        };
+
+        const openMission = () => {
+          if (!missionEl) return;
+          renderMission();
+          missionEl.hidden = false;
+        };
+        const closeMission = () => {
+          if (missionEl) missionEl.hidden = true;
+        };
+
+        missionGrid?.addEventListener("click", (e) => {
+          const closeBtn = (e.target as HTMLElement).closest<HTMLElement>("[data-close]");
+          if (closeBtn) {
+            const id = closeBtn.dataset.close;
+            const w = windows.querySelector<HTMLElement>(`.window[data-app="${id}"]`);
+            if (w) closeWin(w);
+            window.setTimeout(renderMission, 200);
+            return;
+          }
+          const card = (e.target as HTMLElement).closest<HTMLElement>(".mc-card");
+          if (card) {
+            const id = card.dataset.app ?? "";
+            const space = Number(card.dataset.space);
+            if (space !== currentSpace) switchSpace(space);
+            closeMission();
+            window.setTimeout(() => {
+              const w = windows.querySelector<HTMLElement>(`.window[data-app="${id}"]`);
+              if (w) {
+                if (w.classList.contains("is-minimized")) restoreWin(w);
+                else focusWin(w);
+              }
+            }, 280);
+          }
+        });
+
+        missionDesks?.addEventListener("click", (e) => {
+          const add = (e.target as HTMLElement).closest("[data-desk-add]");
+          if (add) {
+            addDesk();
+            window.setTimeout(renderMission, 100);
+            return;
+          }
+          const d = (e.target as HTMLElement).closest<HTMLElement>("[data-desk]");
+          if (d) {
+            switchSpace(Number(d.dataset.desk));
+            window.setTimeout(renderMission, 280);
+          }
+        });
+
+        document.getElementById("mission-close")?.addEventListener("click", closeMission);
+        missionEl?.addEventListener("click", (e) => {
+          if (e.target === missionEl) closeMission();
+        });
+
+        /* ---------------- 全局快捷键 ---------------- */
+
+        document.addEventListener("keydown", (e) => {
+          // F3 → 任务视图
+          if (e.key === "F3") {
+            e.preventDefault();
+            if (missionEl?.hidden) openMission();
+            else closeMission();
+            return;
+          }
+          // Esc → 关闭当前弹层
+          if (e.key === "Escape") {
+            closeMenus();
+            closeMission();
+            if (notifCenter) notifCenter.hidden = true;
+            if (clockPanel) clockPanel.hidden = true;
+            return;
+          }
+          // Ctrl+Shift+D → 显示桌面（Win+D 为系统保留键，用此替代）
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "d") {
+            e.preventDefault();
+            minimizeAll();
+            return;
+          }
+          // Ctrl+` → 切换窗口（Alt+Tab 为系统保留键，用此替代）
+          if ((e.ctrlKey || e.metaKey) && e.key === "`") {
+            e.preventDefault();
+            const wins = Array.from(
+              windows.querySelectorAll<HTMLElement>(".window:not(.is-minimized):not(.is-hidden-space)"),
+            );
+            if (!wins.length) return;
+            const front = wins.find((w) => w.classList.contains("is-front"));
+            const idx = front ? wins.indexOf(front) : -1;
+            focusWin(wins[(idx + 1) % wins.length]);
+          }
+        });
+
+        /* ---------------- 桌面小组件 ---------------- */
+
+        const WIDGET_KEY = "guandao.os.widgets.v1";
+        const TODO_KEY = "guandao.os.todo.v1";
+
+        interface WidgetState {
+          x?: number;
+          y?: number;
+          enabled?: boolean;
+        }
+
+        const readWidgets = (): Record<string, WidgetState> => {
+          try {
+            return JSON.parse(localStorage.getItem(WIDGET_KEY) || "{}");
+          } catch {
+            return {};
+          }
+        };
+
+        const widgetHost = document.getElementById("widgets");
+
+        const WIDGET_IDS = ["clock", "calendar", "weather", "todo", "sys"];
+        const WIDGET_TITLES: Record<string, string> = {
+          clock: "时钟",
+          calendar: "日历",
+          weather: "天气",
+          todo: "待办",
+          sys: "系统信息",
+        };
+
+        const widgetOn = (id: string) => readWidgets()[id]?.enabled !== false;
+
+        const widgetBody = (id: string) => {
+          switch (id) {
+            case "clock":
+              return `<div class="w-clock"><div class="w-time" data-w-clock>--:--</div><div class="w-date" data-w-date></div></div>`;
+            case "calendar":
+              return `<div class="w-cal" data-w-cal></div>`;
+            case "weather":
+              return `<div class="w-weather" data-w-weather><span class="w-loading">加载中…</span></div>`;
+            case "todo":
+              return `<div class="w-todo"><input class="w-todo-input" data-w-todo-input placeholder="添加待办，回车保存" maxlength="40"/><ul class="w-todo-list" data-w-todo-list></ul></div>`;
+            case "sys":
+              return `<div class="w-sys" data-w-sys></div>`;
+            default:
+              return "";
+          }
+        };
+
+        const renderWidget = (id: string) => {
+          if (!widgetHost) return;
+          const old = widgetHost.querySelector(`[data-widget="${id}"]`);
+          old?.remove();
+          if (!widgetOn(id)) return;
+
+          const st = readWidgets()[id];
+          const idx = WIDGET_IDS.indexOf(id);
+          const x = st?.x ?? Math.max(12, window.innerWidth - 200);
+          const y = st?.y ?? 24 + idx * 120;
+
+          const el = document.createElement("div");
+          el.className = "widget";
+          el.dataset.widget = id;
+          el.style.left = `${x}px`;
+          el.style.top = `${y}px`;
+          el.innerHTML = `
+            <div class="widget-head">
+              <span class="widget-title">${WIDGET_TITLES[id]}</span>
+              <span class="widget-grip" aria-hidden="true">⋮⋮</span>
+            </div>
+            <div class="widget-body">${widgetBody(id)}</div>`;
+          widgetHost.appendChild(el);
+          initWidget(id, el);
+        };
+
+        const renderAllWidgets = () => {
+          if (!widgetHost) return;
+          widgetHost.innerHTML = "";
+          for (const id of WIDGET_IDS) renderWidget(id);
+        };
+
+        /* 小组件拖动 */
+        const initWidgetDrag = (el: HTMLElement) => {
+          const head = el.querySelector<HTMLElement>(".widget-head");
+          if (!head) return;
+          let sx = 0,
+            sy = 0,
+            ox = 0,
+            oy = 0;
+          const onMove = (e: PointerEvent) => {
+            const W = window.innerWidth;
+            const H = window.innerHeight;
+            el.style.left = `${Math.max(0, Math.min(W - el.offsetWidth, ox + e.clientX - sx))}px`;
+            el.style.top = `${Math.max(36, Math.min(H - 60, oy + e.clientY - sy))}px`;
+          };
+          const onUp = () => {
+            el.classList.remove("is-dragging");
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            const id = el.dataset.widget ?? "";
+            const all = readWidgets();
+            all[id] = { ...all[id], x: el.offsetLeft, y: el.offsetTop };
+            try {
+              localStorage.setItem(WIDGET_KEY, JSON.stringify(all));
+            } catch {
+              /* 忽略 */
+            }
+          };
+          head.addEventListener("pointerdown", (e) => {
+            e.preventDefault();
+            sx = e.clientX;
+            sy = e.clientY;
+            ox = el.offsetLeft;
+            oy = el.offsetTop;
+            el.classList.add("is-dragging");
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", onUp);
+          });
+        };
+
+        const initWidget = (id: string, el: HTMLElement) => {
+          initWidgetDrag(el);
+          if (id === "clock") {
+            const timeEl = el.querySelector("[data-w-clock]");
+            const dateEl = el.querySelector("[data-w-date]");
+            const tick = () => {
+              const now = new Date();
+              const p = (n: number) => String(n).padStart(2, "0");
+              if (timeEl) timeEl.textContent = `${p(now.getHours())}:${p(now.getMinutes())}`;
+              if (dateEl)
+                dateEl.textContent = now.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" });
+            };
+            tick();
+          }
+          if (id === "calendar") {
+            const box = el.querySelector("[data-w-cal]");
+            if (box) {
+              const now = new Date();
+              const y = now.getFullYear();
+              const m = now.getMonth();
+              const first = new Date(y, m, 1).getDay();
+              const days = new Date(y, m + 1, 0).getDate();
+              const today = now.getDate();
+              const heads = ["日", "一", "二", "三", "四", "五", "六"];
+              let html = `<div class="w-cal-title">${y}年${m + 1}月</div><div class="w-cal-grid">`;
+              for (const h of heads) html += `<span class="w-cal-h">${h}</span>`;
+              for (let i = 0; i < first; i++) html += `<span></span>`;
+              for (let d = 1; d <= days; d++) html += `<span class="${d === today ? "is-today" : ""}">${d}</span>`;
+              html += `</div>`;
+              box.innerHTML = html;
+            }
+          }
+          if (id === "weather") {
+            const box = el.querySelector("[data-w-weather]");
+            if (box) {
+              const CACHE = "guandao.widget.weather";
+              const show = (d: { temp: number; code: number; wind: number }) => {
+                const clear = d.code <= 2;
+                const rain = (d.code >= 51 && d.code <= 67) || d.code >= 95;
+                box.innerHTML = `<div class="w-wx-main"><span class="w-wx-temp">${d.temp}°C</span><span class="w-wx-desc">${clear ? "晴" : rain ? "有雨" : "多云"} · 大连</span></div><div class="w-wx-sub">风 ${d.wind} km/h</div>`;
+              };
+              try {
+                const raw = localStorage.getItem(CACHE);
+                if (raw) {
+                  const c = JSON.parse(raw);
+                  if (Date.now() - c.at < 10 * 60 * 1000) {
+                    show(c.data);
+                    return;
+                  }
+                }
+              } catch {
+                /* 忽略 */
+              }
+              fetch(
+                "https://api.open-meteo.com/v1/forecast?latitude=38.914&longitude=121.6147&current=temperature_2m,weather_code,wind_speed_10m&timezone=Asia%2FShanghai",
+              )
+                .then((r) => r.json())
+                .then((j) => {
+                  const d = {
+                    temp: Math.round(j.current.temperature_2m),
+                    code: j.current.weather_code,
+                    wind: Math.round(j.current.wind_speed_10m),
+                  };
+                  try {
+                    localStorage.setItem(CACHE, JSON.stringify({ at: Date.now(), data: d }));
+                  } catch {
+                    /* 忽略 */
+                  }
+                  show(d);
+                })
+                .catch(() => {
+                  box.innerHTML = `<span class="w-loading">天气加载失败</span>`;
+                });
+            }
+          }
+          if (id === "todo") {
+            const listEl = el.querySelector("[data-w-todo-list]");
+            const inputEl = el.querySelector("[data-w-todo-input]") as HTMLInputElement | null;
+            const readTodos = (): { id: string; text: string; done: boolean }[] => {
+              try {
+                return JSON.parse(localStorage.getItem(TODO_KEY) || "[]");
+              } catch {
+                return [];
+              }
+            };
+            const renderTodos = () => {
+              if (!listEl) return;
+              const todos = readTodos();
+              listEl.innerHTML = todos.length
+                ? todos
+                    .map(
+                      (t) => `<li class="w-todo-item ${t.done ? "is-done" : ""}">
+                        <span class="w-todo-check" data-todo-check="${t.id}">${t.done ? "✓" : ""}</span>
+                        <span class="w-todo-text">${escapeHtml(t.text)}</span>
+                        <button class="w-todo-del" data-todo-del="${t.id}" title="删除">×</button>
+                      </li>`,
+                    )
+                    .join("")
+                : `<li class="w-todo-empty">还没有待办</li>`;
+            };
+            inputEl?.addEventListener("keydown", (e) => {
+              if (e.key !== "Enter" || !inputEl.value.trim()) return;
+              const todos = readTodos();
+              todos.unshift({ id: makeId(), text: inputEl.value.trim(), done: false });
+              localStorage.setItem(TODO_KEY, JSON.stringify(todos));
+              inputEl.value = "";
+              renderTodos();
+            });
+            el.addEventListener("click", (e) => {
+              const t = e.target as HTMLElement;
+              const check = t.closest("[data-todo-check]");
+              const del = t.closest("[data-todo-del]");
+              const todos = readTodos();
+              if (check) {
+                const it = todos.find((x) => x.id === check.getAttribute("data-todo-check"));
+                if (it) it.done = !it.done;
+                localStorage.setItem(TODO_KEY, JSON.stringify(todos));
+                renderTodos();
+              } else if (del) {
+                localStorage.setItem(TODO_KEY, JSON.stringify(todos.filter((x) => x.id !== del.getAttribute("data-todo-del"))));
+                renderTodos();
+              }
+            });
+            renderTodos();
+          }
+          if (id === "sys") {
+            const box = el.querySelector("[data-w-sys]");
+            if (box) {
+              const start = OS_BOOT;
+              const mins = Math.max(1, Math.floor((Date.now() - start) / 60000));
+              const winCount = windows.querySelectorAll(".window").length;
+              let storage = "—";
+              try {
+                let bytes = 0;
+                for (let i = 0; i < localStorage.length; i++) {
+                  const k = localStorage.key(i) || "";
+                  if (k.startsWith("guandao.")) bytes += (localStorage.getItem(k) || "").length;
+                }
+                storage = `${(bytes / 1024).toFixed(1)} KB`;
+              } catch {
+                /* 忽略 */
+              }
+              box.innerHTML = `<div class="w-sys-row"><span>运行窗口</span><b>${winCount}</b></div>
+                <div class="w-sys-row"><span>已开启</span><b>${mins} 分钟</b></div>
+                <div class="w-sys-row"><span>本地存储</span><b>${storage}</b></div>`;
+            }
+          }
+        };
+
+        // 小组件定时刷新：时钟每秒、系统信息每秒
+        window.setInterval(() => {
+          if (!widgetHost) return;
+          const now = new Date();
+          const p = (n: number) => String(n).padStart(2, "0");
+          widgetHost.querySelectorAll("[data-w-clock]").forEach((t) => {
+            t.textContent = `${p(now.getHours())}:${p(now.getMinutes())}`;
+          });
+          const mins = Math.max(1, Math.floor((Date.now() - OS_BOOT) / 60000));
+          const winCount = windows.querySelectorAll(".window").length;
+          widgetHost.querySelectorAll("[data-w-sys]").forEach((box) => {
+            box.innerHTML = `<div class="w-sys-row"><span>运行窗口</span><b>${winCount}</b></div>
+              <div class="w-sys-row"><span>已开启</span><b>${mins} 分钟</b></div>
+              <div class="w-sys-row"><span>虚拟桌面</span><b>${desks.length} 个</b></div>`;
+          });
+        }, 1000);
+
         // 通知中心：先渲染已保存的通知，铃铛红点即时可见
         renderNotifs();
         updateBell();
+
+        // 桌面小组件：在全部定义之后渲染，避免 TDZ
+        renderAllWidgets();
 
         // 桌面端自动打开文章窗口作为欢迎；手机上先让人看到图标
         if (window.innerWidth > 720) {
@@ -5057,10 +5906,21 @@ const data = {
       }
 
       /* 虚拟桌面：属于另一个工作区的窗口淡出并禁用交互 */
-      .os[data-space="2"] .window[data-space="1"],
-      .os:not([data-space="2"]) .window[data-space="2"] {
+      .window.is-hidden-space {
         opacity: 0;
         pointer-events: none;
+      }
+
+      /* ---------------- 窗口贴靠预览 ---------------- */
+      .snap-preview {
+        position: fixed;
+        z-index: 5000;
+        border-radius: 10px;
+        border: 1.5px solid rgba(111, 140, 255, 0.65);
+        background: rgba(111, 140, 255, 0.12);
+        box-shadow: 0 0 0 1px rgba(111, 140, 255, 0.15), inset 0 0 60px rgba(111, 140, 255, 0.12);
+        pointer-events: none;
+        transition: all 0.12s ease;
       }
 
       .window.is-closing {
@@ -5523,6 +6383,40 @@ const data = {
         height: 15px;
         accent-color: #6f8cff;
         cursor: pointer;
+      }
+
+      /* 设置：数据管理 */
+      .data-actions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .data-btn {
+        flex: 1;
+        padding: 8px 0;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.72);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .data-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+      }
+
+      .data-btn.is-danger {
+        border-color: rgba(255, 95, 87, 0.4);
+        color: #ff9b95;
+      }
+
+      .data-btn.is-danger:hover {
+        background: rgba(255, 95, 87, 0.16);
       }
 
       /* 设置：系统信息 */
@@ -6001,6 +6895,597 @@ const data = {
         font-size: 10px;
         color: rgba(255, 255, 255, 0.32);
         margin-top: 3px;
+      }
+
+      /* ---------------- Spotlight 全局搜索 ---------------- */
+
+      .spotlight {
+        position: fixed;
+        inset: 0;
+        z-index: 8000;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 16vh;
+        background: rgba(6, 8, 14, 0.4);
+        backdrop-filter: blur(6px);
+        animation: spotFade 0.18s ease;
+      }
+
+      .spotlight[hidden] {
+        display: none;
+      }
+
+      @keyframes spotFade {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      .spotlight-box {
+        width: min(560px, 92vw);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(24, 27, 38, 0.92);
+        box-shadow: 0 32px 80px -24px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(28px) saturate(1.6);
+        overflow: hidden;
+        animation: spotIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+      }
+
+      @keyframes spotIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .spotlight-input-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .spotlight-icon {
+        width: 17px;
+        height: 17px;
+        color: rgba(255, 255, 255, 0.45);
+        flex: none;
+      }
+
+      #spotlight-input {
+        flex: 1;
+        border: 0;
+        background: none;
+        outline: none;
+        color: #fff;
+        font-size: 16px;
+      }
+
+      .spotlight-kbd,
+      .spotlight-foot kbd {
+        padding: 2px 6px;
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .spotlight-results {
+        max-height: 340px;
+        overflow-y: auto;
+        padding: 6px;
+      }
+
+      .spot-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 0;
+        border-radius: 9px;
+        background: none;
+        color: #eef1f7;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .spot-item.is-active {
+        background: rgba(111, 140, 255, 0.24);
+      }
+
+      .spot-kind {
+        flex: none;
+        width: 34px;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.5);
+        text-align: center;
+      }
+
+      .spot-main {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+
+      .spot-title {
+        font-size: 13px;
+        color: #fff;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .spot-sub {
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .spot-enter {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .spot-empty {
+        padding: 24px;
+        text-align: center;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .spotlight-foot {
+        display: flex;
+        justify-content: flex-end;
+        gap: 14px;
+        padding: 8px 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* ---------------- Mission Control 任务视图 ---------------- */
+
+      .mission {
+        position: fixed;
+        inset: 0;
+        z-index: 7000;
+        display: flex;
+        flex-direction: column;
+        padding: 44px 32px 32px;
+        background: rgba(6, 8, 14, 0.62);
+        backdrop-filter: blur(22px) saturate(1.4);
+        animation: spotFade 0.2s ease;
+      }
+
+      .mission[hidden] {
+        display: none;
+      }
+
+      .mission-top {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 24px;
+      }
+
+      .mission-title {
+        font-size: 16px;
+        font-weight: 650;
+        color: #fff;
+        flex: none;
+      }
+
+      .mission-desks {
+        display: flex;
+        gap: 10px;
+        flex: 1;
+        overflow-x: auto;
+      }
+
+      .mc-desk {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 96px;
+        padding: 10px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex: none;
+      }
+
+      .mc-desk.is-active {
+        border-color: rgba(111, 140, 255, 0.7);
+        background: rgba(111, 140, 255, 0.22);
+      }
+
+      .mc-desk-name {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .mc-desk-count {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .mc-desk-add {
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        font-size: 18px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .mc-desk-add:disabled {
+        opacity: 0.3;
+        cursor: default;
+      }
+
+      .mission-close {
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+        flex: none;
+      }
+
+      .mission-grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 22px;
+        align-content: start;
+        overflow-y: auto;
+      }
+
+      .mc-card {
+        position: relative;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(24, 27, 38, 0.9);
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        animation: mcIn 0.24s var(--os-ease) both;
+      }
+
+      .mc-card:hover {
+        transform: translateY(-4px) scale(1.02);
+        border-color: rgba(111, 140, 255, 0.6);
+        box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+      }
+
+      .mc-card.is-other {
+        opacity: 0.6;
+      }
+
+      @keyframes mcIn {
+        from {
+          opacity: 0;
+          transform: translateY(12px) scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .mc-card-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .mc-dots {
+        display: flex;
+        gap: 4px;
+      }
+      .mc-dots i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .mc-card-title {
+        flex: 1;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.7);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mc-card-close {
+        width: 18px;
+        height: 18px;
+        border: 0;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 13px;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .mc-card-close:hover {
+        background: #ff5f57;
+        color: #fff;
+      }
+
+      .mc-card-body {
+        display: grid;
+        place-items: center;
+        height: 110px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .mc-glyph {
+        width: 44px;
+        height: 44px;
+        border-radius: 11px;
+      }
+
+      .mc-card-space {
+        position: absolute;
+        bottom: 8px;
+        right: 10px;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .mc-empty {
+        grid-column: 1 / -1;
+        padding: 60px 0;
+        text-align: center;
+        font-size: 13px;
+        line-height: 2;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      /* ---------------- 桌面小组件 ---------------- */
+
+      .widgets {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+      }
+
+      .widget {
+        position: absolute;
+        width: 172px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(20, 23, 33, 0.6);
+        backdrop-filter: blur(20px) saturate(1.5);
+        box-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+        pointer-events: auto;
+        overflow: hidden;
+        animation: widgetIn 0.3s var(--os-ease);
+      }
+
+      .widget.is-dragging {
+        opacity: 0.85;
+        cursor: grabbing;
+      }
+
+      @keyframes widgetIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .widget-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px 0;
+        cursor: grab;
+        user-select: none;
+      }
+
+      .widget-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .widget-grip {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.3);
+        letter-spacing: -2px;
+      }
+
+      .widget-body {
+        padding: 8px 12px 12px;
+      }
+
+      /* 时钟 */
+      .w-time {
+        font-family: var(--font-mono);
+        font-size: 30px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: 0.01em;
+        font-variant-numeric: tabular-nums;
+      }
+      .w-date {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 2px;
+      }
+
+      /* 日历 */
+      .w-cal-title {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 6px;
+        text-align: center;
+      }
+      .w-cal-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+        text-align: center;
+      }
+      .w-cal-h {
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.35);
+        padding-bottom: 3px;
+      }
+      .w-cal-grid span {
+        font-size: 10px;
+        padding: 3px 0;
+        color: rgba(255, 255, 255, 0.72);
+        border-radius: 4px;
+      }
+      .w-cal-grid span.is-today {
+        background: var(--os-accent);
+        color: #fff;
+        font-weight: 700;
+      }
+
+      /* 天气 */
+      .w-wx-main {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .w-wx-temp {
+        font-family: var(--font-mono);
+        font-size: 24px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .w-wx-desc {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .w-wx-sub {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-top: 4px;
+      }
+      .w-loading {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* 待办 */
+      .w-todo-input {
+        width: 100%;
+        padding: 5px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font: inherit;
+        font-size: 11px;
+        outline: none;
+      }
+      .w-todo-input:focus {
+        border-color: var(--os-accent);
+      }
+      .w-todo-list {
+        list-style: none;
+        margin: 8px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 4px;
+        max-height: 110px;
+        overflow-y: auto;
+      }
+      .w-todo-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .w-todo-check {
+        width: 14px;
+        height: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 10px;
+        line-height: 12px;
+        text-align: center;
+        flex: none;
+      }
+      .w-todo-item.is-done .w-todo-check {
+        background: var(--os-success);
+        border-color: var(--os-success);
+        color: #0a2016;
+      }
+      .w-todo-item.is-done .w-todo-text {
+        text-decoration: line-through;
+        opacity: 0.5;
+      }
+      .w-todo-text {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .w-todo-del {
+        border: 0;
+        background: none;
+        color: rgba(255, 255, 255, 0.35);
+        cursor: pointer;
+        font-size: 13px;
+        padding: 0 2px;
+      }
+      .w-todo-del:hover {
+        color: #ff5f57;
+      }
+      .w-todo-empty {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.35);
+        text-align: center;
+        padding: 8px 0;
+      }
+
+      /* 系统信息 */
+      .w-sys-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10.5px;
+        padding: 3px 0;
+        color: rgba(255, 255, 255, 0.55);
+      }
+      .w-sys-row b {
+        color: #fff;
+        font-weight: 600;
       }
 
       /* ---------------- 水族箱 ---------------- */
@@ -8061,6 +9546,10 @@ const data = {
         .desk-hint {
           display: none;
         }
+
+        .widgets {
+          display: none;
+        }
       }
 
       /* ---------------- 手机端：菜单栏收窄 ---------------- */
@@ -8385,6 +9874,19 @@ const data = {
       }
       [data-os-theme="light"] .sys-row b {
         color: rgba(20, 24, 40, 0.82);
+      }
+      [data-os-theme="light"] .data-btn {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.05);
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .data-btn:hover {
+        background: rgba(20, 24, 40, 0.1);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .data-btn.is-danger {
+        border-color: rgba(200, 60, 55, 0.4);
+        color: #b03028;
       }
 
       /* 音乐 */
@@ -8788,6 +10290,156 @@ const data = {
         color: rgba(20, 24, 40, 0.32);
       }
       [data-os-theme="light"] .notif-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* Spotlight：浅色 */
+      [data-os-theme="light"] .spotlight {
+        background: rgba(20, 28, 50, 0.28);
+      }
+      [data-os-theme="light"] .spotlight-box {
+        background: rgba(252, 253, 255, 0.94);
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 32px 80px -24px rgba(30, 40, 70, 0.4);
+      }
+      [data-os-theme="light"] .spotlight-input-row {
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .spotlight-icon {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] #spotlight-input {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .spotlight-kbd,
+      [data-os-theme="light"] .spotlight-foot kbd {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .spot-item {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .spot-item.is-active {
+        background: rgba(111, 140, 255, 0.2);
+      }
+      [data-os-theme="light"] .spot-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .spot-sub,
+      [data-os-theme="light"] .spot-kind,
+      [data-os-theme="light"] .spot-enter {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .spotlight-foot {
+        border-top-color: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .spot-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* Mission Control：浅色 */
+      [data-os-theme="light"] .mission {
+        background: rgba(20, 28, 50, 0.4);
+      }
+      [data-os-theme="light"] .mission-title,
+      [data-os-theme="light"] .mc-desk,
+      [data-os-theme="light"] .mc-card-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .mc-desk {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(252, 253, 255, 0.7);
+      }
+      [data-os-theme="light"] .mc-desk.is-active {
+        border-color: rgba(111, 140, 255, 0.7);
+        background: rgba(111, 140, 255, 0.2);
+      }
+      [data-os-theme="light"] .mc-desk-count {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .mission-close {
+        background: rgba(252, 253, 255, 0.7);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .mc-card {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(252, 253, 255, 0.92);
+      }
+      [data-os-theme="light"] .mc-card-bar {
+        background: rgba(20, 24, 40, 0.04);
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .mc-card-close {
+        background: rgba(20, 24, 40, 0.1);
+        color: rgba(20, 24, 40, 0.7);
+      }
+      [data-os-theme="light"] .mc-card-close:hover {
+        background: #ff5f57;
+        color: #fff;
+      }
+      [data-os-theme="light"] .mc-dots i {
+        background: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .mc-card-body {
+        background: rgba(20, 24, 40, 0.02);
+      }
+      [data-os-theme="light"] .mc-card-space {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .mc-empty {
+        color: rgba(20, 24, 40, 0.45);
+      }
+
+      /* 小组件：浅色 */
+      [data-os-theme="light"] .widget {
+        background: rgba(252, 253, 255, 0.82);
+        border-color: rgba(20, 24, 40, 0.12);
+        box-shadow: 0 12px 32px -14px rgba(30, 40, 70, 0.3);
+      }
+      [data-os-theme="light"] .widget-title {
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .widget-grip {
+        color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .w-time,
+      [data-os-theme="light"] .w-wx-temp,
+      [data-os-theme="light"] .w-sys-row b {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .w-date,
+      [data-os-theme="light"] .w-wx-desc,
+      [data-os-theme="light"] .w-cal-title {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .w-cal-h {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .w-cal-grid span {
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .w-cal-grid span.is-today {
+        color: #fff;
+      }
+      [data-os-theme="light"] .w-todo-input {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .w-todo-item {
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .w-todo-check {
+        border-color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .w-sys-row {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .w-loading,
+      [data-os-theme="light"] .w-wx-sub,
+      [data-os-theme="light"] .w-todo-empty {
         color: rgba(20, 24, 40, 0.4);
       }
     </style>
