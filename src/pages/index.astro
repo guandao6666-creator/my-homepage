@@ -121,16 +121,71 @@ const data = {
       <div class="wallpaper"></div>
 
       <header class="menubar">
-        <span class="mb-brand">Guandao OS</span>
+        <span class="mb-brand">
+          <span class="mb-logo" aria-hidden="true">管</span>
+          <span class="mb-brand-text">Guandao OS</span>
+          <span class="mb-version">1.1</span>
+        </span>
         <nav class="mb-menu">
-          <span>文件</span>
-          <span>编辑</span>
-          <span>视图</span>
-          <span>窗口</span>
+          <div class="mb-menu-item">
+            <button class="mb-menu-btn" type="button" data-menu-btn="file">文件</button>
+            <div class="mb-dropdown" data-menu-panel="file" hidden>
+              <button type="button" data-menu-action="posts">打开「文章」</button>
+              <button type="button" data-menu-action="terminal">打开「终端」</button>
+              <span class="mb-sep"></span>
+              <a href="/home/">回到博客</a>
+              <span class="mb-sep"></span>
+              <button type="button" data-menu-action="shutdown">关机…</button>
+            </div>
+          </div>
+          <div class="mb-menu-item">
+            <button class="mb-menu-btn" type="button" data-menu-btn="edit">编辑</button>
+            <div class="mb-dropdown" data-menu-panel="edit" hidden>
+              <button type="button" data-menu-action="settings">打开「设置」</button>
+              <button type="button" data-menu-action="reset">重置桌面布局</button>
+            </div>
+          </div>
+          <div class="mb-menu-item">
+            <button class="mb-menu-btn" type="button" data-menu-btn="view">视图</button>
+            <div class="mb-dropdown" data-menu-panel="view" hidden>
+              <button type="button" data-menu-action="wallpaper">下一张壁纸</button>
+              <button type="button" data-menu-action="theme">切换外观</button>
+              <button type="button" data-menu-action="fullscreen">进入全屏</button>
+            </div>
+          </div>
+          <div class="mb-menu-item">
+            <button class="mb-menu-btn" type="button" data-menu-btn="window">窗口</button>
+            <div class="mb-dropdown" data-menu-panel="window" hidden>
+              <button type="button" data-menu-action="minimize-all">全部最小化</button>
+              <button type="button" data-menu-action="restore-all">全部还原</button>
+              <span class="mb-sep"></span>
+              <button type="button" data-menu-action="close-all">全部关闭</button>
+            </div>
+          </div>
         </nav>
         <div class="mb-status">
-          <span class="mb-dot"></span>
-          <span id="mb-time">--:--</span>
+          <div class="spaces" id="spaces" title="虚拟桌面">
+            <button class="space-dot is-active" type="button" data-space="1" aria-label="工作区 1"></button>
+            <button class="space-dot" type="button" data-space="2" aria-label="工作区 2"></button>
+          </div>
+          <span class="mb-sep-v"></span>
+          <span class="mb-dot" title="在线"></span>
+          <button class="mb-time-btn" id="mb-time-btn" type="button" aria-label="日期和时间">
+            <span id="mb-date">--</span>
+            <span id="mb-time">--:--</span>
+          </button>
+          <div class="clock-panel" id="clock-panel" hidden>
+            <p class="clock-date" id="clock-date">--</p>
+            <p class="clock-time" id="clock-time">--:--</p>
+            <p class="clock-msg" id="clock-msg"></p>
+          </div>
+          <button class="mb-bell" id="mb-bell" type="button" aria-label="通知中心">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span class="mb-bell-dot" id="mb-bell-dot" hidden></span>
+          </button>
           <button class="mb-power" id="mb-power" type="button" aria-label="电源">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M12 3v9" stroke-linecap="round" />
@@ -241,6 +296,15 @@ const data = {
         <span class="power-logo">管</span>
         <p class="power-hint" id="power-hint"></p>
       </div>
+    </div>
+
+    <div class="notif-center" id="notif-center" hidden>
+      <div class="notif-head">
+        <span class="notif-head-title">通知中心</span>
+        <button class="notif-clear" id="notif-clear" type="button">清空</button>
+      </div>
+      <div class="notif-list" id="notif-list"></div>
+      <p class="notif-empty" id="notif-empty">还没有通知，去逛逛桌面吧。</p>
     </div>
 
     <script is:inline define:vars={{ OS_DATA: data }}>
@@ -438,6 +502,135 @@ const data = {
           }
         };
 
+        /* ---------------- 通知中心 ---------------- */
+
+        const NOTIF_KEY = "guandao.os.notif.v1";
+
+        interface Notif {
+          id: string;
+          icon: string;
+          title: string;
+          body: string;
+          at: number;
+          read: boolean;
+        }
+
+        const readNotifs = (): Notif[] => {
+          try {
+            const raw = JSON.parse(localStorage.getItem(NOTIF_KEY) || "[]");
+            return Array.isArray(raw) ? (raw as Notif[]) : [];
+          } catch {
+            return [];
+          }
+        };
+
+        const writeNotifs = (list: Notif[]) => {
+          try {
+            localStorage.setItem(NOTIF_KEY, JSON.stringify(list.slice(0, 40)));
+          } catch {
+            /* 隐私模式忽略 */
+          }
+        };
+
+        const notifTime = (at: number) => {
+          const min = Math.floor((Date.now() - at) / 60000);
+          if (min < 1) return "刚刚";
+          if (min < 60) return `${min} 分钟前`;
+          const hr = Math.floor(min / 60);
+          if (hr < 24) return `${hr} 小时前`;
+          const day = Math.floor(hr / 24);
+          if (day < 30) return `${day} 天前`;
+          return new Date(at).toLocaleDateString("zh-CN");
+        };
+
+        const notifListEl = document.getElementById("notif-list");
+        const notifEmptyEl = document.getElementById("notif-empty");
+        const notifClearBtn = document.getElementById("notif-clear");
+        const bellDotEl = document.getElementById("mb-bell-dot");
+
+        const renderNotifs = () => {
+          const list = readNotifs();
+          if (!notifListEl || !notifEmptyEl) return;
+          if (!list.length) {
+            notifListEl.innerHTML = "";
+            notifEmptyEl.hidden = false;
+            return;
+          }
+          notifEmptyEl.hidden = true;
+          notifListEl.innerHTML = list
+            .map(
+              (n) => `
+                <div class="notif-item ${n.read ? "" : "is-new"}">
+                  <span class="notif-icon">${escapeHtml(n.icon)}</span>
+                  <div class="notif-body">
+                    <p class="notif-title">${escapeHtml(n.title)}</p>
+                    <p class="notif-text">${escapeHtml(n.body)}</p>
+                    <span class="notif-time">${notifTime(n.at)}</span>
+                  </div>
+                </div>`,
+            )
+            .join("");
+        };
+
+        const updateBell = () => {
+          if (!bellDotEl) return;
+          bellDotEl.hidden = !readNotifs().some((n) => !n.read);
+        };
+
+        const pushNotif = (n: { icon: string; title: string; body: string }) => {
+          const list = readNotifs();
+          list.unshift({ id: makeId(), icon: n.icon, title: n.title, body: n.body, at: Date.now(), read: false });
+          writeNotifs(list);
+          renderNotifs();
+          updateBell();
+        };
+
+        const markNotifsRead = () => {
+          const list = readNotifs();
+          if (!list.some((n) => !n.read)) return;
+          writeNotifs(list.map((n) => ({ ...n, read: true })));
+          updateBell();
+        };
+
+        notifClearBtn?.addEventListener("click", () => {
+          writeNotifs([]);
+          renderNotifs();
+          updateBell();
+        });
+
+        /* 首次进入：欢迎 + 博客概览；每日一条提醒 */
+        const seedNotifications = () => {
+          const welcomedKey = "guandao.os.welcomed";
+          if (!localStorage.getItem(welcomedKey)) {
+            try {
+              localStorage.setItem(welcomedKey, "1");
+            } catch {
+              /* 忽略 */
+            }
+            pushNotif({ icon: "管", title: "欢迎来到 Guandao OS", body: "窗口可拖拽、可缩放，双击标题栏最大化，右上角铃铛是通知中心。" });
+            const latest = DATA.posts[0];
+            if (latest) pushNotif({ icon: "文", title: "博客更新", body: `最新一篇《${latest.title}》已经上线，点「文章」查看。` });
+          }
+          const today = new Date().toDateString();
+          if (localStorage.getItem("guandao.os.remind") !== today) {
+            try {
+              localStorage.setItem("guandao.os.remind", today);
+            } catch {
+              /* 忽略 */
+            }
+            const hour = new Date().getHours();
+            const remind =
+              hour < 6
+                ? "夜深了，早点休息。"
+                : hour < 12
+                  ? "早上好，今天也一起写点什么吧。"
+                  : hour < 18
+                    ? "下午了，记得站起来活动一下。"
+                    : "晚上好，把今天的想法记下来再睡。";
+            pushNotif({ icon: "✓", title: "今日提醒", body: remind });
+          }
+        };
+
         const os = document.getElementById("os");
         const windows = document.getElementById("windows");
         const hint = document.getElementById("desk-hint");
@@ -453,10 +646,25 @@ const data = {
         interface WinState {
           left: number;
           top: number;
+          width: number;
+          height: number;
           minimized: boolean;
+          maximized: boolean;
+          space: number;
         }
 
-        const readState = (): { wall?: string; windows?: Record<string, WinState> } => {
+        interface OsState {
+          wall?: string;
+          windows?: Record<string, WinState>;
+          theme?: "dark" | "light";
+          autoWall?: boolean;
+          showIcons?: boolean;
+          showPet?: boolean;
+          reduceMotion?: boolean;
+          space?: number;
+        }
+
+        const readState = (): OsState => {
           try {
             return JSON.parse(localStorage.getItem(STATE_KEY) || "{}");
           } catch {
@@ -480,11 +688,41 @@ const data = {
             map[app] = {
               left: win.offsetLeft,
               top: win.offsetTop,
+              width: win.offsetWidth,
+              height: win.offsetHeight,
               minimized: win.classList.contains("is-minimized"),
+              maximized: win.classList.contains("is-maximized"),
+              space: Number(win.dataset.space) || 1,
             };
           });
           writeState({ windows: map });
         };
+
+        /* ---------------- 虚拟桌面 ---------------- */
+
+        let currentSpace = 1;
+
+        const applySpace = (n: number) => {
+          currentSpace = n;
+          os.dataset.space = String(n);
+          writeState({ space: n });
+          document.querySelectorAll<HTMLElement>(".space-dot").forEach((d) => {
+            d.classList.toggle("is-active", d.dataset.space === String(n));
+          });
+        };
+
+        const switchSpace = (n: number) => {
+          if (n === currentSpace || n < 1 || n > 2) return;
+          windows.classList.add("is-switching");
+          window.setTimeout(() => windows.classList.remove("is-switching"), 260);
+          applySpace(n);
+        };
+
+        document.getElementById("spaces")?.addEventListener("click", (event) => {
+          const dot = (event.target as HTMLElement).closest<HTMLElement>(".space-dot");
+          if (!dot) return;
+          switchSpace(Number(dot.dataset.space));
+        });
 
         /* ---------------- 程序坞配置 ---------------- */
 
@@ -655,7 +893,10 @@ const data = {
 
           state.unlocked[id] = Date.now();
           saveAch(state);
-          if (!silent) showToast(ach);
+          if (!silent) {
+            showToast(ach);
+            pushNotif({ icon: ach.mark, title: `解锁成就：${ach.name}`, body: ach.desc });
+          }
           return true;
         };
 
@@ -715,7 +956,7 @@ const data = {
         const renderTerminal = () => `
           <div class="term">
             <div class="term-out" id="term-out">
-              <p class="term-line term-muted">Guandao OS 1.0 · 输入 help 看可用命令</p>
+              <p class="term-line term-muted">Guandao OS 1.1 · 输入 help 看可用命令</p>
             </div>
             <label class="term-input-row">
               <span class="term-prompt">~ $</span>
@@ -723,14 +964,32 @@ const data = {
             </label>
           </div>`;
 
-        const renderSettings = () => `
+        const renderSettings = () => {
+          const st = readState();
+          const isLight = document.body.dataset.osTheme === "light";
+          const showIcons = st.showIcons !== false;
+          const showPet = st.showPet !== false;
+          const reduceMotion = st.reduceMotion === true;
+          const autoWall = st.autoWall === true;
+
+          return `
           <div class="settings">
+            <p class="side-title">外观</p>
+            <div class="theme-picks">
+              <button class="theme-pick ${isLight ? "" : "is-active"}" type="button" data-theme-pick="dark">深色</button>
+              <button class="theme-pick ${isLight ? "is-active" : ""}" type="button" data-theme-pick="light">浅色</button>
+            </div>
+
             <p class="side-title">壁纸</p>
             <div class="wall-picks">
-              <button class="wall-pick is-active" type="button" data-wall="nebula">星云</button>
-              <button class="wall-pick" type="button" data-wall="dusk">暮色</button>
-              <button class="wall-pick" type="button" data-wall="deep">深海</button>
+              <button class="wall-pick ${os.dataset.wall === "nebula" || !os.dataset.wall ? "is-active" : ""}" type="button" data-wall="nebula">星云</button>
+              <button class="wall-pick ${os.dataset.wall === "dusk" ? "is-active" : ""}" type="button" data-wall="dusk">暮色</button>
+              <button class="wall-pick ${os.dataset.wall === "deep" ? "is-active" : ""}" type="button" data-wall="deep">深海</button>
             </div>
+            <label class="settings-row">
+              <span>壁纸随昼夜自动变化</span>
+              <input type="checkbox" id="opt-auto-wall" ${autoWall ? "checked" : ""} />
+            </label>
 
             <p class="side-title">程序坞显示</p>
             <div class="dock-picker" id="dock-picker">
@@ -746,9 +1005,32 @@ const data = {
             </div>
             <p class="settings-tip">回博客固定在最右边。取消勾选只是从程序坞拿掉，桌面上还在。</p>
 
-            <p class="side-title">关于系统</p>
-            <p class="settings-note">Guandao OS · 用 Astro 静态生成，没有框架，窗口拖动是原生的 pointer 事件。</p>
+            <p class="side-title">桌面</p>
+            <label class="settings-row">
+              <span>显示桌面图标</span>
+              <input type="checkbox" id="opt-show-icons" ${showIcons ? "checked" : ""} />
+            </label>
+            <label class="settings-row">
+              <span>显示桌面宠物「鲸鲸」</span>
+              <input type="checkbox" id="opt-show-pet" ${showPet ? "checked" : ""} />
+            </label>
+
+            <p class="side-title">动效</p>
+            <label class="settings-row">
+              <span>减少动态效果</span>
+              <input type="checkbox" id="opt-reduce-motion" ${reduceMotion ? "checked" : ""} />
+            </label>
+
+            <p class="side-title">系统信息</p>
+            <div class="sys-info">
+              <div class="sys-row"><span>版本</span><b>Guandao OS 1.1</b></div>
+              <div class="sys-row"><span>代号</span><b>Refined</b></div>
+              <div class="sys-row"><span>引擎</span><b>Astro 静态渲染</b></div>
+              <div class="sys-row"><span>环境</span><b>浏览器桌面</b></div>
+            </div>
+            <p class="settings-note">Guandao OS 1.1 · Refined Visual Experience · Enhanced Interaction · More Details · Better Performance</p>
           </div>`;
+        };
 
         const renderMusic = () => `
           <div class="music">
@@ -816,6 +1098,15 @@ const data = {
           if (hour >= 9 && hour < 17) return "day";
           if (hour >= 17 && hour < 21) return "dusk";
           return "night";
+        };
+
+        /** 壁纸随昼夜变化：自动模式下给壁纸叠加时段光效 */
+        const applyTimeWallpaper = () => {
+          if (os.dataset.autoWall === "1") {
+            os.dataset.wallPhase = phaseNow();
+          } else {
+            delete os.dataset.wallPhase;
+          }
         };
 
         const renderAquarium = () => {
@@ -2539,14 +2830,12 @@ const data = {
             dockItem.classList.add("has-hidden");
           }
 
-          win.style.opacity = "0";
           win.classList.add("is-minimized");
           saveWindows();
         };
 
         const restoreWin = (win: HTMLElement) => {
           win.classList.remove("is-minimized");
-          win.style.opacity = "1";
 
           // 下一帧再清 transform，才有从 Dock 弹回来的动画
           window.requestAnimationFrame(() => {
@@ -2559,6 +2848,89 @@ const data = {
 
           focusWin(win);
           saveWindows();
+        };
+
+        /* ---------------- 窗口最大化 / 调整大小 ---------------- */
+
+        // 最大化前的几何位置，还原时用（仅当前会话内保留）
+        const preMax = new WeakMap<HTMLElement, { left: string; top: string; width: string; height: string }>();
+
+        const MIN_W = 320;
+        const MIN_H = 240;
+
+        const maximizeWin = (win: HTMLElement) => {
+          if (win.classList.contains("is-maximized")) return;
+          preMax.set(win, {
+            left: win.style.left,
+            top: win.style.top,
+            width: win.style.width,
+            height: win.style.height,
+          });
+          win.classList.add("is-maximized");
+          win.style.left = "0px";
+          win.style.top = "0px";
+          win.style.width = "100%";
+          win.style.height = "100%";
+          saveWindows();
+        };
+
+        const restoreMax = (win: HTMLElement) => {
+          if (!win.classList.contains("is-maximized")) return;
+          const prev = preMax.get(win);
+          win.classList.remove("is-maximized");
+          if (prev) {
+            win.style.left = prev.left;
+            win.style.top = prev.top;
+            win.style.width = prev.width;
+            win.style.height = prev.height;
+          } else {
+            const app = APPS[win.dataset.app ?? ""];
+            win.style.width = `${app?.width ?? 520}px`;
+            win.style.height = `${app?.height ?? 380}px`;
+          }
+          saveWindows();
+        };
+
+        const toggleMaximize = (win: HTMLElement) => {
+          if (win.classList.contains("is-maximized")) restoreMax(win);
+          else maximizeWin(win);
+        };
+
+        const bindResize = (win: HTMLElement) => {
+          const handle = win.querySelector<HTMLElement>(".resize-handle");
+          if (!handle) return;
+
+          let startX = 0;
+          let startY = 0;
+          let startW = 0;
+          let startH = 0;
+
+          const onMove = (event: PointerEvent) => {
+            win.style.width = `${Math.max(MIN_W, startW + event.clientX - startX)}px`;
+            win.style.height = `${Math.max(MIN_H, startH + event.clientY - startY)}px`;
+          };
+
+          const onUp = () => {
+            win.classList.remove("is-resizing");
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            window.removeEventListener("pointercancel", onUp);
+            saveWindows();
+          };
+
+          handle.addEventListener("pointerdown", (event) => {
+            if (win.classList.contains("is-maximized")) return;
+            event.preventDefault();
+            event.stopPropagation();
+            startX = event.clientX;
+            startY = event.clientY;
+            startW = win.offsetWidth;
+            startH = win.offsetHeight;
+            win.classList.add("is-resizing");
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", onUp);
+            window.addEventListener("pointercancel", onUp);
+          });
         };
 
         const bindDrag = (win: HTMLElement) => {
@@ -2587,6 +2959,7 @@ const data = {
 
           bar.addEventListener("pointerdown", (event) => {
             if ((event.target as HTMLElement).closest(".dot")) return;
+            if (win.classList.contains("is-maximized")) return;
             event.preventDefault();
 
             startX = event.clientX;
@@ -2602,6 +2975,11 @@ const data = {
             window.addEventListener("pointerup", onUp);
             window.addEventListener("pointercancel", onUp);
           });
+
+          bar.addEventListener("dblclick", (event) => {
+            if ((event.target as HTMLElement).closest(".dot")) return;
+            toggleMaximize(win);
+          });
         };
 
         const openApp = (id: string) => {
@@ -2610,6 +2988,9 @@ const data = {
 
           const existing = windows.querySelector(`.window[data-app="${id}"]`) as HTMLElement | null;
           if (existing) {
+            // 窗口在另一个工作区：先切过去，再还原 / 聚焦
+            const inSpace = Number(existing.dataset.space) || 1;
+            if (inSpace !== currentSpace) switchSpace(inSpace);
             if (existing.classList.contains("is-minimized")) restoreWin(existing);
             else focusWin(existing);
             return;
@@ -2620,13 +3001,16 @@ const data = {
           const win = document.createElement("div");
           win.className = "window";
           win.dataset.app = id;
+          win.dataset.space = String(currentSpace);
 
           const offset = (cascade++ % 5) * 26;
           const narrow = window.innerWidth <= 720;
           const saved = readState().windows?.[id];
 
-          win.style.width = `${app.width}px`;
-          win.style.height = `${app.height}px`;
+          if (saved?.space) win.dataset.space = String(saved.space);
+
+          win.style.width = `${saved?.width ?? app.width}px`;
+          win.style.height = `${saved?.height ?? app.height}px`;
 
           if (narrow) {
             // 手机上位置固定，不要级联偏移，否则窗口会一路往下跑
@@ -2645,15 +3029,26 @@ const data = {
               <span class="dots">
                 <button class="dot dot-close" type="button" aria-label="关闭"></button>
                 <button class="dot dot-min" type="button" aria-label="收起"></button>
-                <button class="dot dot-max" type="button" aria-label="置顶"></button>
+                <button class="dot dot-max" type="button" aria-label="最大化"></button>
               </span>
               <span class="win-title">${app.title}</span>
             </div>
-            <div class="win-body">${app.body()}</div>`;
+            <div class="win-body">${app.body()}</div>
+            <span class="resize-handle" aria-hidden="true"></span>`;
 
           windows.appendChild(win);
           focusWin(win);
           bindDrag(win);
+          bindResize(win);
+
+          // 上次关闭时是最大化，就原样恢复到全屏
+          if (saved?.maximized && !narrow) {
+            win.classList.add("is-maximized");
+            win.style.left = "0px";
+            win.style.top = "0px";
+            win.style.width = "100%";
+            win.style.height = "100%";
+          }
 
           document.querySelector(`.dock-item[data-app="${id}"]`)?.classList.add("has-open");
           saveWindows();
@@ -2684,7 +3079,7 @@ const data = {
 
           win.querySelector(".dot-close")?.addEventListener("click", () => closeWin(win));
           win.querySelector(".dot-min")?.addEventListener("click", () => minimizeWin(win));
-          win.querySelector(".dot-max")?.addEventListener("click", () => focusWin(win));
+          win.querySelector(".dot-max")?.addEventListener("click", () => toggleMaximize(win));
           win.addEventListener("pointerdown", () => focusWin(win));
 
           if (id === "terminal") initTerminal(win);
@@ -2784,6 +3179,14 @@ const data = {
             });
           });
 
+          // 外观主题
+          win.querySelectorAll<HTMLButtonElement>(".theme-pick").forEach((button) => {
+            button.addEventListener("click", () => {
+              applyOsTheme(button.dataset.themePick ?? "dark");
+              win.querySelectorAll(".theme-pick").forEach((el) => el.classList.toggle("is-active", el === button));
+            });
+          });
+
           // 程序坞勾选：改完立刻重建
           win.querySelectorAll<HTMLInputElement>("[data-dock]").forEach((box) => {
             box.addEventListener("change", () => {
@@ -2794,6 +3197,36 @@ const data = {
               saveDock(picked);
               renderDock();
             });
+          });
+
+          // 壁纸随昼夜变化
+          win.querySelector<HTMLInputElement>("#opt-auto-wall")?.addEventListener("change", (e) => {
+            const on = (e.target as HTMLInputElement).checked;
+            writeState({ autoWall: on });
+            if (on) os.dataset.autoWall = "1";
+            else delete os.dataset.autoWall;
+            applyTimeWallpaper();
+          });
+
+          // 桌面图标 / 宠物显示
+          const iconsEl = document.querySelector<HTMLElement>(".desk-icons");
+          const petEl = document.getElementById("desk-pet");
+          win.querySelector<HTMLInputElement>("#opt-show-icons")?.addEventListener("change", (e) => {
+            const on = (e.target as HTMLInputElement).checked;
+            writeState({ showIcons: on });
+            if (iconsEl) iconsEl.hidden = !on;
+          });
+          win.querySelector<HTMLInputElement>("#opt-show-pet")?.addEventListener("change", (e) => {
+            const on = (e.target as HTMLInputElement).checked;
+            writeState({ showPet: on });
+            if (petEl) petEl.hidden = !on;
+          });
+
+          // 减少动态效果
+          win.querySelector<HTMLInputElement>("#opt-reduce-motion")?.addEventListener("change", (e) => {
+            const on = (e.target as HTMLInputElement).checked;
+            writeState({ reduceMotion: on });
+            document.body.classList.toggle("os-reduce-motion", on);
           });
         };
 
@@ -3081,6 +3514,28 @@ const data = {
         // 按保存的配置重建程序坞
         renderDock();
 
+        /* ---- Dock 放大效果：随鼠标距离逐级缩放 ---- */
+        const dockEl = document.getElementById("dock");
+        if (dockEl) {
+          const dockItems = () => dockEl.querySelectorAll<HTMLElement>(".dock-item");
+          const magnify = (clientX: number) => {
+            dockItems().forEach((item) => {
+              const r = item.getBoundingClientRect();
+              const dist = Math.abs(r.left + r.width / 2 - clientX);
+              const t = Math.max(0, 1 - dist / 140);
+              item.style.transform = `translateY(-${(t * 10).toFixed(1)}px) scale(${(1 + t * 0.34).toFixed(3)})`;
+              item.style.zIndex = String(Math.round(1 + t * 10));
+            });
+          };
+          dockEl.addEventListener("pointermove", (event) => magnify(event.clientX));
+          dockEl.addEventListener("pointerleave", () => {
+            dockItems().forEach((item) => {
+              item.style.transform = "";
+              item.style.zIndex = "";
+            });
+          });
+        }
+
         // 支持 guandao.xin/#council 这种直达
         const openFromHash = () => {
           const id = location.hash.replace(/^#/, "");
@@ -3238,19 +3693,205 @@ const data = {
 
         window.setTimeout(() => void applyOutfit(), 1600);
 
-        /* ---------------- 菜单栏时间 ---------------- */
+        /* ---------------- 菜单栏：时间 / 菜单 / 通知入口 ---------------- */
 
         const mbTime = document.getElementById("mb-time");
+        const mbDate = document.getElementById("mb-date");
+        const clockDate = document.getElementById("clock-date");
+        const clockTime = document.getElementById("clock-time");
+        const clockMsg = document.getElementById("clock-msg");
+        const clockPanel = document.getElementById("clock-panel");
+        const timeBtn = document.getElementById("mb-time-btn");
+        const notifCenter = document.getElementById("notif-center");
+        const bell = document.getElementById("mb-bell");
         const pad = (n: number) => String(n).padStart(2, "0");
 
+        const PHASE_LABEL: Record<string, string> = {
+          dawn: "清晨 · 新的一天",
+          day: "白天 · 精力满满",
+          dusk: "傍晚 · 该歇一歇了",
+          night: "深夜 · 早点休息",
+        };
+
         const tickClock = () => {
-          if (!mbTime) return;
           const now = new Date();
-          mbTime.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+          const hh = pad(now.getHours());
+          const mm = pad(now.getMinutes());
+          if (mbTime) mbTime.textContent = `${hh}:${mm}`;
+          if (clockTime) clockTime.textContent = `${hh}:${mm}:${pad(now.getSeconds())}`;
+
+          const dateLabel = now.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" });
+          if (mbDate) mbDate.textContent = dateLabel;
+          if (clockDate)
+            clockDate.textContent = now.toLocaleDateString("zh-CN", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              weekday: "long",
+            });
+          if (clockMsg) clockMsg.textContent = PHASE_LABEL[phaseNow()] ?? "";
         };
 
         tickClock();
-        window.setInterval(tickClock, 15_000);
+        window.setInterval(tickClock, 1000);
+
+        /* ---- 外观主题 ---- */
+        const THEME_KEY = "guandao.os.theme";
+        try {
+          if (localStorage.getItem(THEME_KEY) === "light") document.body.dataset.osTheme = "light";
+        } catch {}
+        const applyOsTheme = (theme: string) => {
+          document.body.dataset.osTheme = theme;
+          try {
+            localStorage.setItem(THEME_KEY, theme);
+          } catch {}
+        };
+        const toggleOsTheme = () => {
+          const next = document.body.dataset.osTheme === "light" ? "dark" : "light";
+          applyOsTheme(next);
+          pushNotif({ icon: "◐", title: "外观已切换", body: next === "light" ? "已切换到浅色模式。" : "已切换到深色模式。" });
+        };
+
+        /* ---- 下拉菜单 ---- */
+        const closeMenus = () => {
+          document.querySelectorAll<HTMLElement>(".mb-dropdown").forEach((p) => (p.hidden = true));
+          document.querySelectorAll<HTMLElement>(".mb-menu-btn").forEach((b) => b.classList.remove("is-open"));
+        };
+
+        document.querySelectorAll<HTMLElement>(".mb-menu-btn").forEach((btn) => {
+          btn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            const name = btn.dataset.menuBtn;
+            const panel = document.querySelector<HTMLElement>(`[data-menu-panel="${name}"]`);
+            const wasOpen = panel ? !panel.hidden : false;
+            closeMenus();
+            if (panel && !wasOpen) {
+              panel.hidden = false;
+              btn.classList.add("is-open");
+            }
+          });
+
+          // 已有菜单展开时，移入其它菜单直接切换
+          btn.addEventListener("mouseenter", () => {
+            const anyOpen = document.querySelector<HTMLElement>(".mb-dropdown:not([hidden])");
+            if (!anyOpen) return;
+            const name = btn.dataset.menuBtn;
+            const panel = document.querySelector<HTMLElement>(`[data-menu-panel="${name}"]`);
+            if (panel && panel.hidden) {
+              closeMenus();
+              panel.hidden = false;
+              btn.classList.add("is-open");
+            }
+          });
+        });
+
+        document.addEventListener("click", (event) => {
+          if (!(event.target as HTMLElement).closest(".mb-menu-item")) closeMenus();
+        });
+
+        /* ---- 菜单动作 ---- */
+        const WALLS = ["nebula", "dusk", "deep"];
+
+        const nextWallpaper = () => {
+          const cur = os.dataset.wall ?? "nebula";
+          const next = WALLS[(WALLS.indexOf(cur) + 1) % WALLS.length];
+          os.dataset.wall = next;
+          writeState({ wall: next });
+        };
+
+        const resetLayout = () => {
+          windows.querySelectorAll<HTMLElement>(".window").forEach((w) => w.remove());
+          writeState({ windows: {}, wall: "nebula", space: 1 });
+          try {
+            localStorage.removeItem(DOCK_KEY);
+          } catch {}
+          renderDock();
+          os.dataset.wall = "nebula";
+          applySpace(1);
+          pushNotif({ icon: "↺", title: "桌面已重置", body: "窗口位置与程序坞配置已恢复默认。" });
+        };
+
+        const minimizeAll = () =>
+          windows.querySelectorAll<HTMLElement>(".window:not(.is-minimized)").forEach(minimizeWin);
+        const restoreAll = () =>
+          windows.querySelectorAll<HTMLElement>(".window.is-minimized").forEach(restoreWin);
+        const closeAll = () => windows.querySelectorAll<HTMLElement>(".window").forEach(closeWin);
+
+        const toggleFullscreen = () => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen?.().catch(() => undefined);
+          } else {
+            document.exitFullscreen?.().catch(() => undefined);
+          }
+        };
+
+        const runMenuAction = (action: string) => {
+          closeMenus();
+          switch (action) {
+            case "posts":
+              openApp("posts");
+              break;
+            case "terminal":
+              openApp("terminal");
+              break;
+            case "settings":
+              openApp("settings");
+              break;
+            case "shutdown":
+              shutdown();
+              break;
+            case "reset":
+              resetLayout();
+              break;
+            case "wallpaper":
+              nextWallpaper();
+              break;
+            case "theme":
+              toggleOsTheme();
+              break;
+            case "fullscreen":
+              toggleFullscreen();
+              break;
+            case "minimize-all":
+              minimizeAll();
+              break;
+            case "restore-all":
+              restoreAll();
+              break;
+            case "close-all":
+              closeAll();
+              break;
+          }
+        };
+
+        document.querySelectorAll<HTMLElement>("[data-menu-action]").forEach((el) => {
+          el.addEventListener("click", () => runMenuAction(el.dataset.menuAction ?? ""));
+        });
+
+        /* ---- 时钟面板 ---- */
+        timeBtn?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (clockPanel) clockPanel.hidden = !clockPanel.hidden;
+          if (powerMenu) powerMenu.hidden = true;
+          if (notifCenter) notifCenter.hidden = true;
+        });
+
+        /* ---- 通知中心入口（内容逻辑见下方「通知中心」） ---- */
+        bell?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (notifCenter) {
+            notifCenter.hidden = !notifCenter.hidden;
+            if (!notifCenter.hidden) markNotifsRead();
+          }
+          if (clockPanel) clockPanel.hidden = true;
+          if (powerMenu) powerMenu.hidden = true;
+        });
+
+        document.addEventListener("click", (event) => {
+          const t = event.target as HTMLElement;
+          if (clockPanel && !t.closest("#mb-time-btn") && !t.closest("#clock-panel")) clockPanel.hidden = true;
+          if (notifCenter && !t.closest("#mb-bell") && !t.closest("#notif-center")) notifCenter.hidden = true;
+        });
 
         /* ---------------- 电源 ---------------- */
 
@@ -3312,9 +3953,29 @@ const data = {
           }, 620);
         });
 
-        // 恢复上次选的壁纸
+        // 恢复上次的外观设置（壁纸 / 主题 / 图标 / 宠物 / 动效）
         const savedWall = readState().wall;
         if (savedWall) os.dataset.wall = savedWall;
+
+        (() => {
+          const st = readState();
+          if (st.showIcons === false) {
+            document.querySelector<HTMLElement>(".desk-icons")?.setAttribute("hidden", "");
+          }
+          if (st.showPet === false) {
+            document.getElementById("desk-pet")?.setAttribute("hidden", "");
+          }
+          if (st.reduceMotion === true) {
+            document.body.classList.add("os-reduce-motion");
+          }
+          if (st.space === 2) applySpace(2);
+          if (st.autoWall === true) {
+            os.dataset.autoWall = "1";
+          }
+          applyTimeWallpaper();
+          // 开着页面跨时段时，自动壁纸也跟上
+          window.setInterval(applyTimeWallpaper, 60_000);
+        })();
 
         /* ---------------- 成就初始化 ---------------- */
 
@@ -3331,6 +3992,9 @@ const data = {
           else if (hour < 7) unlock("dawn");
 
           if (state.visits >= 5) unlock("regular");
+
+          // 通知中心：首次欢迎 + 博客概览 + 每日提醒
+          seedNotifications();
         }, 2200);
 
         // 有名字就每 60 秒报一次停留时长，只在前台时算
@@ -3341,6 +4005,10 @@ const data = {
           }, 60_000);
         }
 
+        // 通知中心：先渲染已保存的通知，铃铛红点即时可见
+        renderNotifs();
+        updateBell();
+
         // 桌面端自动打开文章窗口作为欢迎；手机上先让人看到图标
         if (window.innerWidth > 720) {
           window.setTimeout(() => openApp("posts"), 420);
@@ -3349,12 +4017,50 @@ const data = {
     </script>
 
     <style is:global>
+      /* ============================================================
+         Guandao OS 1.1 · 设计 Token
+         语义化变量：颜色 / 表面 / 描边 / 阴影 / 圆角 / 动效
+         深色为默认；浅色主题通过 [data-os-theme="light"] 覆盖
+         ============================================================ */
       :root {
+        /* 文字层级 */
         --os-fg: #eef1f7;
+        --os-fg-hi: #ffffff;
         --os-dim: rgba(238, 241, 247, 0.56);
+        --os-faint: rgba(238, 241, 247, 0.36);
+
+        /* 表面 */
+        --os-panel: rgba(26, 29, 39, 0.78);
+        --os-panel-solid: #1a1d27;
+        --os-well: rgba(255, 255, 255, 0.04);
+        --os-hover: rgba(255, 255, 255, 0.08);
+        --os-active: rgba(111, 140, 255, 0.22);
+
+        /* 描边 */
         --os-line: rgba(255, 255, 255, 0.1);
-        --os-panel: rgba(28, 31, 40, 0.72);
+        --os-line-soft: rgba(255, 255, 255, 0.06);
+        --os-line-strong: rgba(255, 255, 255, 0.16);
+
+        /* 强调色与状态色 */
         --os-accent: #6f8cff;
+        --os-accent-2: #b06eff;
+        --os-success: #6ee7a8;
+        --os-warning: #ffd479;
+        --os-danger: #ff8f8f;
+
+        /* 阴影层级 */
+        --os-shadow-sm: 0 6px 18px -10px rgba(0, 0, 0, 0.5);
+        --os-shadow-md: 0 18px 44px -18px rgba(0, 0, 0, 0.65);
+        --os-shadow-lg: 0 32px 70px -26px rgba(0, 0, 0, 0.8);
+
+        /* 圆角尺度 */
+        --os-r-sm: 8px;
+        --os-r-md: 12px;
+        --os-r-lg: 16px;
+
+        /* 动效曲线 */
+        --os-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+        --os-ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.3);
       }
 
       /* 移动端地址栏会伸缩，这里把滚动彻底锁死：
@@ -3418,6 +4124,63 @@ const data = {
           linear-gradient(160deg, #08131c 0%, #0c2230 46%, #060e16 100%);
       }
 
+      /* 环境光斑：极慢漂移，让壁纸有细微的呼吸感 */
+      .wallpaper::before {
+        content: "";
+        position: absolute;
+        inset: -20%;
+        background:
+          radial-gradient(42% 38% at 70% 20%, rgba(140, 170, 255, 0.18), transparent 70%),
+          radial-gradient(34% 30% at 24% 72%, rgba(190, 140, 255, 0.14), transparent 70%);
+        animation: wallDrift 60s ease-in-out infinite alternate;
+        pointer-events: none;
+      }
+
+      @keyframes wallDrift {
+        from {
+          transform: translate3d(-2%, -1%, 0) scale(1);
+        }
+        to {
+          transform: translate3d(2%, 1.5%, 0) scale(1.06);
+        }
+      }
+
+      /* 时段光影：自动壁纸开启时由 data-wall-phase 驱动，平滑交叉淡入 */
+      .wallpaper::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transition: opacity 1.6s ease;
+        pointer-events: none;
+      }
+
+      .os[data-wall-phase="dawn"] .wallpaper::after {
+        opacity: 1;
+        background:
+          radial-gradient(900px 600px at 20% 8%, rgba(255, 196, 140, 0.35), transparent 60%),
+          radial-gradient(700px 500px at 90% 90%, rgba(120, 160, 255, 0.16), transparent 60%);
+      }
+
+      .os[data-wall-phase="day"] .wallpaper::after {
+        opacity: 1;
+        background:
+          radial-gradient(1000px 700px at 50% 0%, rgba(255, 255, 255, 0.2), transparent 55%),
+          radial-gradient(800px 600px at 80% 20%, rgba(150, 200, 255, 0.14), transparent 60%);
+      }
+
+      .os[data-wall-phase="dusk"] .wallpaper::after {
+        opacity: 1;
+        background:
+          radial-gradient(900px 640px at 82% 86%, rgba(255, 140, 90, 0.3), transparent 58%),
+          radial-gradient(800px 600px at 16% 10%, rgba(150, 110, 220, 0.2), transparent 60%);
+      }
+
+      .os[data-wall-phase="night"] .wallpaper::after {
+        opacity: 1;
+        background: linear-gradient(180deg, rgba(6, 10, 24, 0.5), rgba(4, 6, 16, 0.7));
+      }
+
       /* ---------------- 菜单栏 ---------------- */
 
       .menubar {
@@ -3425,31 +4188,174 @@ const data = {
         z-index: 40;
         display: flex;
         align-items: center;
-        gap: 20px;
-        height: 30px;
-        padding: 0 16px;
-        background: rgba(12, 14, 22, 0.5);
-        backdrop-filter: blur(18px);
+        gap: 18px;
+        height: 36px;
+        padding: 0 14px;
+        background: rgba(12, 14, 22, 0.55);
+        backdrop-filter: blur(20px) saturate(1.4);
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         font-size: 12px;
       }
 
       .mb-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
         font-weight: 600;
         letter-spacing: 0.01em;
+        flex: none;
+      }
+
+      .mb-logo {
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        background: linear-gradient(150deg, #6f8cff, #b06eff);
+        font-family: var(--font-serif);
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .mb-brand-text {
+        font-weight: 650;
+      }
+
+      .mb-version {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.34);
+        font-variant-numeric: tabular-nums;
       }
 
       .mb-menu {
         display: flex;
-        gap: 16px;
+        gap: 2px;
         color: var(--os-dim);
+      }
+
+      .mb-menu-item {
+        position: relative;
+      }
+
+      .mb-menu-btn {
+        padding: 4px 10px;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: var(--os-dim);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: color 0.15s ease, background-color 0.15s ease;
+      }
+
+      .mb-menu-btn:hover,
+      .mb-menu-btn.is-open {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .mb-dropdown {
+        position: absolute;
+        top: 30px;
+        left: 0;
+        z-index: 90;
+        display: grid;
+        min-width: 168px;
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.97);
+        box-shadow: 0 20px 48px -18px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(24px);
+        animation: menuIn 0.16s var(--os-ease);
+      }
+
+      .mb-dropdown[hidden] {
+        display: none;
+      }
+
+      @keyframes menuIn {
+        from {
+          opacity: 0;
+          transform: translateY(-6px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .mb-dropdown button,
+      .mb-dropdown a {
+        display: block;
+        padding: 7px 10px;
+        border: 0;
+        border-radius: 7px;
+        background: none;
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .mb-dropdown button:hover,
+      .mb-dropdown a:hover {
+        background: rgba(111, 140, 255, 0.24);
+      }
+
+      .mb-sep {
+        height: 1px;
+        margin: 5px 4px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* 虚拟桌面指示器（菜单栏内） */
+      .spaces {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 7px;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .space-dot {
+        width: 8px;
+        height: 8px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.24);
+        cursor: pointer;
+        transition: width 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .space-dot:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .space-dot.is-active {
+        width: 16px;
+        border-radius: 4px;
+        background: var(--os-accent);
+        box-shadow: 0 0 8px rgba(111, 140, 255, 0.6);
+      }
+
+      .mb-sep-v {
+        width: 1px;
+        height: 16px;
+        background: rgba(255, 255, 255, 0.12);
       }
 
       .mb-status {
         margin-left: auto;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         color: var(--os-dim);
         font-variant-numeric: tabular-nums;
       }
@@ -3462,21 +4368,122 @@ const data = {
         box-shadow: 0 0 8px rgba(110, 231, 168, 0.8);
       }
 
-      .mb-power {
+      .mb-time-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: var(--os-dim);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease;
+      }
+
+      .mb-time-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+      }
+
+      .clock-panel {
+        position: absolute;
+        top: 32px;
+        right: 8px;
+        z-index: 90;
+        display: grid;
+        justify-items: center;
+        gap: 4px;
+        min-width: 190px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.97);
+        box-shadow: 0 20px 48px -18px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(24px);
+        animation: menuIn 0.16s var(--os-ease);
+      }
+
+      .clock-panel[hidden] {
+        display: none;
+      }
+
+      .clock-date {
+        margin: 0;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .clock-time {
+        margin: 0;
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 22px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: 0.02em;
+      }
+
+      .clock-msg {
+        margin: 2px 0 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .mb-bell {
+        position: relative;
         display: grid;
         place-items: center;
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         padding: 0;
         border: 0;
+        border-radius: 6px;
         background: none;
         color: rgba(255, 255, 255, 0.6);
         cursor: pointer;
-        transition: color 0.2s ease;
+        transition: color 0.2s ease, background-color 0.2s ease;
+      }
+
+      .mb-bell:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .mb-bell svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .mb-bell-dot {
+        position: absolute;
+        top: 4px;
+        right: 5px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ff5f57;
+        box-shadow: 0 0 6px rgba(255, 95, 87, 0.9);
+      }
+
+      .mb-power {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        transition: color 0.2s ease, background-color 0.2s ease;
       }
 
       .mb-power:hover {
         color: #fff;
+        background: rgba(255, 255, 255, 0.1);
       }
 
       .mb-power svg {
@@ -3486,17 +4493,18 @@ const data = {
 
       .power-menu {
         position: absolute;
-        top: 28px;
-        right: 10px;
-        z-index: 80;
+        top: 32px;
+        right: 8px;
+        z-index: 90;
         display: grid;
         min-width: 138px;
         padding: 6px;
-        border-radius: 10px;
+        border-radius: 12px;
         border: 1px solid rgba(255, 255, 255, 0.12);
         background: rgba(26, 29, 38, 0.97);
         box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.85);
         backdrop-filter: blur(20px);
+        animation: menuIn 0.16s var(--os-ease);
       }
 
       .power-menu button {
@@ -3519,7 +4527,7 @@ const data = {
 
       .desk {
         position: absolute;
-        inset: 30px 0 0;
+        inset: 36px 0 0;
       }
 
       .desk-icons {
@@ -3975,29 +4983,84 @@ const data = {
         position: absolute;
         inset: 0;
         pointer-events: none;
+        transition: opacity 0.26s ease, transform 0.26s ease;
+      }
+
+      /* 工作区切换时，整个窗口层做一个短暂的位移淡出 */
+      .windows.is-switching {
+        opacity: 0.5;
+        transform: translateX(18px);
       }
 
       .window {
         position: absolute;
         display: flex;
         flex-direction: column;
-        border-radius: 12px;
+        border-radius: var(--os-r-md);
         overflow: hidden;
         pointer-events: auto;
         background: var(--os-panel);
         backdrop-filter: blur(26px) saturate(1.5);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 32px 70px -26px rgba(0, 0, 0, 0.8);
-        transition: transform 0.18s ease, opacity 0.18s ease;
+        border: 1px solid var(--os-line);
+        box-shadow: var(--os-shadow-lg);
+        transition: transform 0.18s ease, opacity 0.18s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         animation: winIn 0.22s ease-out;
       }
 
       .window.is-front {
-        border-color: rgba(255, 255, 255, 0.18);
+        border-color: var(--os-line-strong);
+      }
+
+      /* 非激活窗口：弱化边框与阴影，标题栏变暗 */
+      .window:not(.is-front) {
+        border-color: var(--os-line-soft);
+        box-shadow: var(--os-shadow-md);
+      }
+
+      .window:not(.is-front) .titlebar {
+        opacity: 0.66;
       }
 
       .window.is-dragging {
         transition: none;
+      }
+
+      .window.is-resizing {
+        transition: none;
+        user-select: none;
+      }
+
+      .window.is-maximized {
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+        border-bottom: 0;
+      }
+
+      /* 右下角调整大小手柄 */
+      .resize-handle {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 18px;
+        height: 18px;
+        cursor: nwse-resize;
+        touch-action: none;
+        z-index: 6;
+        background:
+          linear-gradient(135deg, transparent 55%, rgba(255, 255, 255, 0.34) 55%) 6px 10px / 6px 6px no-repeat,
+          linear-gradient(135deg, transparent 55%, rgba(255, 255, 255, 0.34) 55%) 2px 6px / 6px 6px no-repeat;
+      }
+
+      .window.is-maximized .resize-handle {
+        display: none;
+      }
+
+      /* 虚拟桌面：属于另一个工作区的窗口淡出并禁用交互 */
+      .os[data-space="2"] .window[data-space="1"],
+      .os:not([data-space="2"]) .window[data-space="2"] {
+        opacity: 0;
+        pointer-events: none;
       }
 
       .window.is-closing {
@@ -4006,6 +5069,7 @@ const data = {
       }
 
       .window.is-minimized {
+        opacity: 0;
         pointer-events: none;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.6, 1), opacity 0.3s ease;
       }
@@ -4022,14 +5086,16 @@ const data = {
       }
 
       .titlebar {
+        position: relative;
         display: flex;
         align-items: center;
         gap: 10px;
-        height: 38px;
-        padding: 0 12px;
-        background: rgba(255, 255, 255, 0.05);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        height: 40px;
+        padding: 0 14px;
+        background: rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         cursor: grab;
+        transition: opacity 0.2s ease;
       }
 
       .is-dragging .titlebar {
@@ -4038,16 +5104,43 @@ const data = {
 
       .dots {
         display: flex;
-        gap: 7px;
+        gap: 8px;
+        flex: none;
       }
 
       .dot {
-        width: 11px;
-        height: 11px;
+        position: relative;
+        width: 12px;
+        height: 12px;
         padding: 0;
         border: 0;
         border-radius: 50%;
         cursor: pointer;
+        box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+      }
+
+      /* 悬停标题栏时，交通灯上浮现 × − + 符号 */
+      .dot::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, sans-serif;
+        font-size: 8px;
+        line-height: 1;
+        font-weight: 700;
+        color: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transition: opacity 0.12s ease;
+      }
+
+      .dot-close::before { content: "×"; }
+      .dot-min::before { content: "–"; }
+      .dot-max::before { content: "+"; }
+
+      .titlebar:hover .dot::before {
+        opacity: 1;
       }
 
       .dot-close {
@@ -4061,8 +5154,16 @@ const data = {
       }
 
       .win-title {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
         font-size: 12px;
         color: rgba(255, 255, 255, 0.72);
+        pointer-events: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 60%;
       }
 
       .win-body {
@@ -4367,6 +5468,98 @@ const data = {
         color: rgba(255, 255, 255, 0.46);
       }
 
+      /* 设置：外观主题 */
+      .theme-picks {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .theme-pick {
+        flex: 1;
+        padding: 9px 0;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(255, 255, 255, 0.72);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .theme-pick:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .theme-pick.is-active {
+        border-color: var(--os-accent);
+        background: rgba(111, 140, 255, 0.22);
+        color: #fff;
+      }
+
+      /* 设置：开关行 */
+      .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 9px 12px;
+        margin-bottom: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.78);
+        cursor: pointer;
+      }
+
+      .settings-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .settings-row input {
+        width: 15px;
+        height: 15px;
+        accent-color: #6f8cff;
+        cursor: pointer;
+      }
+
+      /* 设置：系统信息 */
+      .sys-info {
+        display: grid;
+        gap: 2px;
+        margin-bottom: 8px;
+        padding: 4px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .sys-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 7px 0;
+        font-size: 12px;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+      }
+
+      .sys-row:last-child {
+        border-bottom: 0;
+      }
+
+      .sys-row span {
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .sys-row b {
+        font-weight: 550;
+        color: rgba(255, 255, 255, 0.82);
+        font-variant-numeric: tabular-nums;
+      }
+
       /* ---------------- 音乐 ---------------- */
 
       .music {
@@ -4661,6 +5854,153 @@ const data = {
       .toast-name {
         font-size: 13px;
         color: #fff;
+      }
+
+      /* ---------------- 通知中心 ---------------- */
+
+      .notif-center {
+        position: fixed;
+        top: 46px;
+        right: 12px;
+        z-index: 600;
+        width: 320px;
+        max-width: calc(100vw - 24px);
+        max-height: min(72vh, 520px);
+        display: flex;
+        flex-direction: column;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.96);
+        box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(24px) saturate(1.5);
+        overflow: hidden;
+        animation: notifIn 0.22s var(--os-ease);
+      }
+
+      .notif-center[hidden] {
+        display: none;
+      }
+
+      @keyframes notifIn {
+        from {
+          opacity: 0;
+          transform: translateY(-8px) translateX(12px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .notif-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .notif-head-title {
+        font-size: 13px;
+        font-weight: 650;
+        color: #fff;
+      }
+
+      .notif-clear {
+        padding: 4px 10px;
+        border: 0;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.6);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease;
+      }
+
+      .notif-clear:hover {
+        background: rgba(255, 255, 255, 0.14);
+        color: #fff;
+      }
+
+      .notif-list {
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 8px;
+        display: grid;
+        gap: 4px;
+      }
+
+      .notif-empty {
+        margin: 0;
+        padding: 32px 16px;
+        text-align: center;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .notif-empty[hidden] {
+        display: none;
+      }
+
+      .notif-item {
+        position: relative;
+        display: flex;
+        gap: 11px;
+        padding: 11px 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid transparent;
+      }
+
+      .notif-item.is-new {
+        background: rgba(111, 140, 255, 0.09);
+        border-color: rgba(111, 140, 255, 0.16);
+      }
+
+      .notif-icon {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.07);
+        font-family: var(--font-serif);
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .notif-item.is-new .notif-icon {
+        background: linear-gradient(150deg, #6f8cff, #b06eff);
+        color: #fff;
+      }
+
+      .notif-body {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+
+      .notif-title {
+        margin: 0;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .notif-text {
+        margin: 0;
+        font-size: 11.5px;
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.55);
+        overflow-wrap: break-word;
+      }
+
+      .notif-time {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.32);
+        margin-top: 3px;
       }
 
       /* ---------------- 水族箱 ---------------- */
@@ -6311,11 +7651,11 @@ const data = {
         align-items: center;
         gap: 10px;
         padding: 9px 13px;
-        border-radius: 18px;
-        background: rgba(20, 22, 30, 0.55);
-        backdrop-filter: blur(22px) saturate(1.6);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(30, 33, 43, 0.62), rgba(18, 20, 28, 0.55));
+        backdrop-filter: blur(24px) saturate(1.7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
       }
 
       .dock-item {
@@ -6326,11 +7666,14 @@ const data = {
         border-radius: 12px;
         background: none;
         cursor: pointer;
-        transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+        will-change: transform;
+        transition: transform 0.12s ease-out;
       }
 
-      .dock-item:hover {
-        transform: translateY(-8px) scale(1.12);
+      /* 点击按压反馈 */
+      .dock-item:active {
+        transform: translateY(-1px) scale(0.94) !important;
+        transition-duration: 0.05s;
       }
 
       .dock-glyph {
@@ -6620,7 +7963,7 @@ const data = {
         content: "";
         position: absolute;
         left: 50%;
-        bottom: -5px;
+        bottom: -6px;
         width: 4px;
         height: 4px;
         border-radius: 50%;
@@ -6628,11 +7971,12 @@ const data = {
       }
 
       .dock-item.has-open::after {
-        background: rgba(255, 255, 255, 0.42);
+        background: rgba(255, 255, 255, 0.5);
       }
 
       .dock-item.has-hidden::after {
         background: #8fa6ff;
+        box-shadow: 0 0 8px rgba(143, 166, 255, 0.9);
       }
 
       /* ---------------- 响应式 ---------------- */
@@ -6717,6 +8061,710 @@ const data = {
         .desk-hint {
           display: none;
         }
+      }
+
+      /* ---------------- 减少动态效果 ---------------- */
+      @media (prefers-reduced-motion: reduce) {
+        .wallpaper::after,
+        .wallpaper::before,
+        .fish,
+        .bubble,
+        .cover-disc,
+        .boot-bar,
+        .boot-logo,
+        .news-item {
+          animation: none !important;
+        }
+        .wallpaper,
+        .window,
+        .dock-item,
+        .toast,
+        .boot,
+        .power-screen,
+        .menubar,
+        .wallpaper::after {
+          transition-duration: 0.001ms !important;
+        }
+      }
+
+      /* 手动开关：减少动态效果 */
+      .os-reduce-motion *,
+      .os-reduce-motion *::before,
+      .os-reduce-motion *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+
+      /* ============================================================
+         浅色主题
+         ============================================================ */
+      [data-os-theme="light"] body {
+        background: #dce1ee;
+      }
+
+      [data-os-theme="light"] .wallpaper {
+        background:
+          radial-gradient(1100px 760px at 18% 12%, rgba(168, 184, 255, 0.55), transparent 62%),
+          radial-gradient(900px 700px at 84% 82%, rgba(120, 200, 255, 0.42), transparent 58%),
+          linear-gradient(158deg, #e9ecf6 0%, #dde2f0 46%, #eef1f8 100%);
+      }
+
+      [data-os-theme="light"] .os[data-wall="dusk"] .wallpaper {
+        background:
+          radial-gradient(1000px 700px at 22% 16%, rgba(255, 196, 150, 0.5), transparent 60%),
+          radial-gradient(880px 660px at 82% 78%, rgba(210, 150, 230, 0.4), transparent 58%),
+          linear-gradient(160deg, #f2e4e0 0%, #e8d8e2 48%, #efe6ec 100%);
+      }
+
+      [data-os-theme="light"] .os[data-wall="deep"] .wallpaper {
+        background:
+          radial-gradient(1000px 720px at 24% 14%, rgba(140, 210, 235, 0.55), transparent 60%),
+          radial-gradient(900px 700px at 80% 80%, rgba(120, 170, 220, 0.45), transparent 58%),
+          linear-gradient(160deg, #dcecf2 0%, #cfe2ec 46%, #e2eef4 100%);
+      }
+
+      [data-os-theme="light"] .os[data-wall-phase="night"] .wallpaper::after {
+        background: linear-gradient(180deg, rgba(30, 40, 70, 0.26), rgba(20, 28, 50, 0.4));
+      }
+
+      /* 菜单栏 / Dock */
+      [data-os-theme="light"] .menubar {
+        background: rgba(250, 251, 255, 0.72);
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+
+      [data-os-theme="light"] .mb-brand-text,
+      [data-os-theme="light"] .mb-menu-btn,
+      [data-os-theme="light"] .mb-time-btn,
+      [data-os-theme="light"] .mb-bell,
+      [data-os-theme="light"] .mb-power {
+        color: rgba(20, 24, 40, 0.62);
+      }
+
+      [data-os-theme="light"] .mb-menu-btn:hover,
+      [data-os-theme="light"] .mb-menu-btn.is-open,
+      [data-os-theme="light"] .mb-time-btn:hover,
+      [data-os-theme="light"] .mb-bell:hover,
+      [data-os-theme="light"] .mb-power:hover {
+        color: #1c2030;
+        background: rgba(20, 24, 40, 0.08);
+      }
+
+      [data-os-theme="light"] .mb-version {
+        color: rgba(20, 24, 40, 0.35);
+      }
+
+      [data-os-theme="light"] .mb-dropdown,
+      [data-os-theme="light"] .clock-panel,
+      [data-os-theme="light"] .power-menu {
+        background: rgba(252, 253, 255, 0.96);
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 20px 48px -18px rgba(30, 40, 70, 0.4);
+      }
+
+      [data-os-theme="light"] .mb-dropdown button,
+      [data-os-theme="light"] .mb-dropdown a,
+      [data-os-theme="light"] .power-menu button {
+        color: #1c2030;
+      }
+
+      [data-os-theme="light"] .mb-dropdown button:hover,
+      [data-os-theme="light"] .mb-dropdown a:hover {
+        background: rgba(111, 140, 255, 0.18);
+      }
+
+      [data-os-theme="light"] .power-menu button:hover {
+        background: rgba(20, 24, 40, 0.08);
+      }
+
+      [data-os-theme="light"] .mb-sep {
+        background: rgba(20, 24, 40, 0.1);
+      }
+
+      [data-os-theme="light"] .mb-sep-v {
+        background: rgba(20, 24, 40, 0.12);
+      }
+      [data-os-theme="light"] .spaces {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .space-dot {
+        background: rgba(20, 24, 40, 0.24);
+      }
+      [data-os-theme="light"] .space-dot:hover {
+        background: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .space-dot.is-active {
+        background: #6f8cff;
+        box-shadow: 0 0 8px rgba(111, 140, 255, 0.5);
+      }
+
+      [data-os-theme="light"] .clock-date {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .clock-time {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .clock-msg {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* Dock 玻璃 */
+      [data-os-theme="light"] .dock {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(240, 242, 250, 0.78));
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 18px 44px -18px rgba(30, 40, 70, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      }
+
+      [data-os-theme="light"] .dock-item.has-open::after {
+        background: rgba(20, 24, 40, 0.45);
+      }
+
+      /* 桌面 */
+      [data-os-theme="light"] .di-label {
+        color: rgba(20, 24, 40, 0.82);
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+      }
+
+      [data-os-theme="light"] .desk-icon:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+
+      [data-os-theme="light"] .desk-hint {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* 窗口 */
+      [data-os-theme="light"] .window {
+        background: rgba(252, 253, 255, 0.9);
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 24px 60px -24px rgba(30, 40, 70, 0.42);
+      }
+
+      [data-os-theme="light"] .window:not(.is-front) {
+        border-color: rgba(20, 24, 40, 0.06);
+        box-shadow: 0 14px 34px -16px rgba(30, 40, 70, 0.3);
+      }
+
+      [data-os-theme="light"] .titlebar {
+        background: rgba(20, 24, 40, 0.04);
+        border-bottom-color: rgba(20, 24, 40, 0.06);
+      }
+
+      [data-os-theme="light"] .win-title {
+        color: rgba(20, 24, 40, 0.62);
+      }
+
+      [data-os-theme="light"] .resize-handle {
+        background:
+          linear-gradient(135deg, transparent 55%, rgba(20, 24, 40, 0.35) 55%) 6px 10px / 6px 6px no-repeat,
+          linear-gradient(135deg, transparent 55%, rgba(20, 24, 40, 0.35) 55%) 2px 6px / 6px 6px no-repeat;
+      }
+
+      /* Finder（文章） */
+      [data-os-theme="light"] .finder-side {
+        background: rgba(20, 24, 40, 0.03);
+        border-right-color: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .side-title {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .side-item {
+        color: rgba(20, 24, 40, 0.62);
+      }
+      [data-os-theme="light"] .side-item.is-active {
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .file-row:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .file-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .file-meta {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .file-index {
+        color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .file-icon {
+        border: 1px solid rgba(20, 24, 40, 0.1);
+      }
+      [data-os-theme="light"] .finder-empty {
+        color: rgba(20, 24, 40, 0.45);
+      }
+
+      /* 关于 */
+      [data-os-theme="light"] .about {
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .about-kicker {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .about h2 {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .about-links {
+        border-top-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .about-links a {
+        color: #3f5bd6;
+      }
+
+      /* 设置 */
+      [data-os-theme="light"] .wall-pick,
+      [data-os-theme="light"] .theme-pick {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.04);
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .wall-pick:hover,
+      [data-os-theme="light"] .theme-pick:hover {
+        background: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .wall-pick.is-active,
+      [data-os-theme="light"] .theme-pick.is-active {
+        border-color: #6f8cff;
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .dock-opt {
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .dock-opt:hover {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .settings-tip {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .settings-note {
+        color: rgba(20, 24, 40, 0.46);
+      }
+      [data-os-theme="light"] .settings-row {
+        border-color: rgba(20, 24, 40, 0.08);
+        background: rgba(20, 24, 40, 0.03);
+        color: rgba(20, 24, 40, 0.78);
+      }
+      [data-os-theme="light"] .settings-row:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .sys-info {
+        border-color: rgba(20, 24, 40, 0.08);
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .sys-row {
+        border-bottom-color: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .sys-row span {
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .sys-row b {
+        color: rgba(20, 24, 40, 0.82);
+      }
+
+      /* 音乐 */
+      [data-os-theme="light"] .music-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .music-sub {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .music-play {
+        border-color: rgba(20, 24, 40, 0.18);
+        background: rgba(111, 140, 255, 0.22);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .music-play:hover {
+        background: rgba(111, 140, 255, 0.34);
+      }
+      [data-os-theme="light"] .music-step {
+        background: rgba(20, 24, 40, 0.08);
+        color: rgba(20, 24, 40, 0.66);
+      }
+      [data-os-theme="light"] .music-step:hover {
+        background: rgba(20, 24, 40, 0.14);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .music-row:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .music-row.is-current {
+        background: rgba(111, 140, 255, 0.16);
+      }
+      [data-os-theme="light"] .music-row-no {
+        color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .music-row.is-playing .music-row-no {
+        color: #3f5bd6;
+      }
+      [data-os-theme="light"] .music-row-name {
+        color: rgba(20, 24, 40, 0.78);
+      }
+      [data-os-theme="light"] .music-row.is-current .music-row-name {
+        color: #1c2030;
+      }
+
+      /* 成就 */
+      [data-os-theme="light"] .ach-head {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .ach {
+        border-color: rgba(20, 24, 40, 0.07);
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .ach-mark {
+        background: rgba(20, 24, 40, 0.07);
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .ach-name {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .ach.is-got .ach-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .ach-desc {
+        color: rgba(20, 24, 40, 0.3);
+      }
+
+      /* 访客墙 */
+      [data-os-theme="light"] .wall-count {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .wall-add {
+        border-color: rgba(20, 24, 40, 0.16);
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .wall-add:hover {
+        background: rgba(111, 140, 255, 0.32);
+      }
+      [data-os-theme="light"] .wall-item:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .wall-item img {
+        box-shadow: 0 0 0 2px rgba(20, 24, 40, 0.12);
+      }
+      [data-os-theme="light"] .wall-item span {
+        color: rgba(20, 24, 40, 0.62);
+      }
+      [data-os-theme="light"] .wall-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .wall-name {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.05);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .wall-pick {
+        border-color: rgba(20, 24, 40, 0.2);
+        color: rgba(20, 24, 40, 0.66);
+      }
+      [data-os-theme="light"] .wall-pick:hover {
+        border-color: #6f8cff;
+        color: #1c2030;
+      }
+
+      /* 排行榜 */
+      [data-os-theme="light"] .rank-status {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .rank-join {
+        border-color: rgba(20, 24, 40, 0.16);
+        background: rgba(46, 154, 94, 0.16);
+        color: #1f5c39;
+      }
+      [data-os-theme="light"] .rank-row.is-top {
+        background: rgba(255, 190, 60, 0.14);
+      }
+      [data-os-theme="light"] .rank-no {
+        color: rgba(20, 24, 40, 0.32);
+      }
+      [data-os-theme="light"] .rank-row.is-top .rank-no {
+        color: #a06a00;
+      }
+      [data-os-theme="light"] .rank-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .rank-time {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .rank-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .rank-note {
+        color: rgba(20, 24, 40, 0.32);
+      }
+
+      /* 每日抽奖 */
+      [data-os-theme="light"] .draw-mark {
+        color: rgba(20, 24, 40, 0.85);
+      }
+      [data-os-theme="light"] .draw-text {
+        color: rgba(20, 24, 40, 0.78);
+      }
+
+      /* 议会 */
+      [data-os-theme="light"] .council-status {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .council-tip {
+        color: rgba(20, 24, 40, 0.32);
+      }
+      [data-os-theme="light"] .council-retry {
+        border-color: rgba(109, 40, 217, 0.4);
+        background: rgba(167, 139, 250, 0.18);
+        color: #5b3fa0;
+      }
+      [data-os-theme="light"] .council-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .council-opt {
+        border-color: rgba(20, 24, 40, 0.1);
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .council-opt:not(:disabled):hover {
+        border-color: rgba(167, 139, 250, 0.5);
+        background: rgba(167, 139, 250, 0.1);
+      }
+      [data-os-theme="light"] .council-label {
+        color: rgba(20, 24, 40, 0.85);
+      }
+      [data-os-theme="light"] .council-num {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .council-meta {
+        color: rgba(20, 24, 40, 0.34);
+      }
+      [data-os-theme="light"] .council-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* 树洞 */
+      [data-os-theme="light"] .hole-topic-label {
+        color: rgba(20, 24, 40, 0.32);
+      }
+      [data-os-theme="light"] .hole-topic {
+        color: #a06a00;
+      }
+      [data-os-theme="light"] .hole-input {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .hole-count {
+        color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .hole-item {
+        border-color: rgba(20, 24, 40, 0.06);
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .hole-text {
+        color: rgba(20, 24, 40, 0.86);
+      }
+      [data-os-theme="light"] .hole-meta {
+        color: rgba(20, 24, 40, 0.34);
+      }
+      [data-os-theme="light"] .hole-nick {
+        color: #4a5d2e;
+      }
+      [data-os-theme="light"] .hole-reply-toggle {
+        border-color: rgba(20, 24, 40, 0.1);
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .hole-reply-toggle:hover {
+        border-color: rgba(20, 24, 40, 0.25);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .hole-replies {
+        border-top-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .hole-reply {
+        color: rgba(20, 24, 40, 0.7);
+      }
+      [data-os-theme="light"] .hole-reply-nick {
+        color: #4a5d2e;
+      }
+      [data-os-theme="light"] .hole-reply-empty {
+        color: rgba(20, 24, 40, 0.28);
+      }
+      [data-os-theme="light"] .hole-reply-input {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .hole-reply-form button {
+        background: rgba(168, 191, 133, 0.35);
+        color: #3c4a26;
+      }
+      [data-os-theme="light"] .hole-empty {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .hole-status {
+        color: rgba(20, 24, 40, 0.32);
+      }
+
+      /* 新闻联播 */
+      [data-os-theme="light"] .news-head {
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .news-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .news-date {
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .news-tag {
+        background: rgba(20, 24, 40, 0.08);
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .news-text {
+        color: rgba(20, 24, 40, 0.82);
+      }
+      [data-os-theme="light"] .news-foot {
+        border-top-color: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.28);
+      }
+
+      /* 社会网络 */
+      [data-os-theme="light"] .social-card {
+        border-color: rgba(126, 34, 206, 0.2);
+        background: linear-gradient(150deg, rgba(240, 171, 252, 0.18), rgba(126, 34, 206, 0.08));
+      }
+      [data-os-theme="light"] .social-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .social-bio {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .social-meta {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .social-role {
+        background: rgba(20, 24, 40, 0.1);
+        color: rgba(20, 24, 40, 0.62);
+      }
+      [data-os-theme="light"] .social-edit {
+        border-color: rgba(20, 24, 40, 0.16);
+        color: rgba(20, 24, 40, 0.7);
+      }
+      [data-os-theme="light"] .social-edit:hover {
+        border-color: rgba(240, 171, 252, 0.6);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .social-edit.is-quiet {
+        border-color: transparent;
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .auth-form {
+        border-color: rgba(126, 34, 206, 0.22);
+        background: rgba(126, 34, 206, 0.06);
+      }
+      [data-os-theme="light"] .auth-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .auth-note {
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .auth-btn.is-ghost {
+        background: rgba(20, 24, 40, 0.08);
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .social-head {
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .social-tip {
+        color: rgba(20, 24, 40, 0.28);
+      }
+      [data-os-theme="light"] .social-row {
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .social-row-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .social-row-bio {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .social-row-role {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .social-follow {
+        border-color: rgba(126, 34, 206, 0.4);
+        background: rgba(240, 171, 252, 0.18);
+        color: #6d3a9e;
+      }
+      [data-os-theme="light"] .social-follow.is-on {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: transparent;
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .social-form {
+        border-color: rgba(20, 24, 40, 0.1);
+        background: rgba(20, 24, 40, 0.04);
+      }
+      [data-os-theme="light"] .social-pick {
+        border-color: transparent;
+        background: rgba(20, 24, 40, 0.04);
+      }
+      [data-os-theme="light"] .social-pick.is-on {
+        border-color: rgba(240, 171, 252, 0.7);
+        background: rgba(240, 171, 252, 0.18);
+      }
+      [data-os-theme="light"] .social-input {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .social-cancel {
+        background: rgba(20, 24, 40, 0.07);
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .social-empty {
+        color: rgba(20, 24, 40, 0.35);
+      }
+
+      /* 通知中心：浅色 */
+      [data-os-theme="light"] .notif-center {
+        background: rgba(252, 253, 255, 0.96);
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 24px 60px -20px rgba(30, 40, 70, 0.4);
+      }
+      [data-os-theme="light"] .notif-head {
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .notif-head-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .notif-clear {
+        background: rgba(20, 24, 40, 0.08);
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .notif-clear:hover {
+        background: rgba(20, 24, 40, 0.14);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .notif-item {
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .notif-item.is-new {
+        background: rgba(111, 140, 255, 0.1);
+        border-color: rgba(111, 140, 255, 0.2);
+      }
+      [data-os-theme="light"] .notif-icon {
+        background: rgba(20, 24, 40, 0.07);
+        color: rgba(20, 24, 40, 0.82);
+      }
+      [data-os-theme="light"] .notif-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .notif-text {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .notif-time {
+        color: rgba(20, 24, 40, 0.32);
+      }
+      [data-os-theme="light"] .notif-empty {
+        color: rgba(20, 24, 40, 0.4);
       }
     </style>
   </body>
