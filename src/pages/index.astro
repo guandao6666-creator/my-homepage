@@ -1201,13 +1201,10 @@ const data = {
 
         const COUNCIL_VOTER_KEY = "guandao.council.voter";
 
+        // 投票人 = 登录用户的 uid；没登录返回空串，界面会拦住不让投
         const councilVoter = (): string => {
-          let id = localStorage.getItem(COUNCIL_VOTER_KEY);
-          if (!id) {
-            id = makeId();
-            localStorage.setItem(COUNCIL_VOTER_KEY, id);
-          }
-          return id;
+          const auth = readAuth();
+          return auth ? auth.uid : "";
         };
 
         const renderCouncil = () => `
@@ -1275,8 +1272,11 @@ const data = {
               return;
             }
 
+            const canVote = Boolean(councilVoter());
             const grand = polls.reduce((sum, p) => sum + totalOf(p), 0);
-            status.textContent = `${polls.length} 项在议 · ${grand} 票`;
+            status.textContent = canVote
+              ? `${polls.length} 项在议 · ${grand} 票`
+              : `${polls.length} 项在议 · 登录后才能投票`;
 
             list.innerHTML = polls
               .map((poll) => {
@@ -1290,7 +1290,7 @@ const data = {
                     const pct = total ? Math.round((n / total) * 100) : 0;
                     return `
                       <button class="council-opt ${chosen === i ? "is-mine" : ""}" type="button"
-                        data-poll="${poll.id}" data-opt="${i}" ${locked ? "disabled" : ""}>
+                        data-poll="${poll.id}" data-opt="${i}" ${locked || !canVote ? "disabled" : ""}>
                         <span class="council-bar" style="width:${pct}%"></span>
                         <span class="council-label">${escapeHtml(label)}</span>
                         <span class="council-num">${n}</span>
@@ -1313,6 +1313,12 @@ const data = {
           const vote = (pollId: string, optIdx: number) => {
             if (mine[pollId] !== undefined) return;
 
+            const auth = readAuth();
+            if (!auth) {
+              status.textContent = "先登录才能投票";
+              return;
+            }
+
             // 先在本地记下并刷新，网络再慢也不耽误
             mine[pollId] = optIdx;
             liveVotes[pollId] = optIdx;
@@ -1334,11 +1340,11 @@ const data = {
                 method: "POST",
                 headers: {
                   apikey: sb!.key!,
-                  Authorization: `Bearer ${sb!.key}`,
+                  Authorization: `Bearer ${auth.token}`,
                   "Content-Type": "application/json",
                   Prefer: "return=minimal",
                 },
-                body: JSON.stringify({ poll_id: pollId, option_index: optIdx, voter }),
+                body: JSON.stringify({ poll_id: pollId, option_index: optIdx, voter: auth.uid }),
               },
               8000,
             )
@@ -1573,6 +1579,18 @@ const data = {
             }
           };
 
+          // 没登录就锁住输入框
+          const syncInputState = () => {
+            const auth = readAuth();
+            input.disabled = !auth;
+            send.disabled = !auth;
+            input.placeholder = auth
+              ? "想说什么就说，页面上只显示随机昵称"
+              : "登录后才能说话（去「社会网络」登录）";
+          };
+          syncInputState();
+          window.addEventListener("guandao:auth-change", syncInputState);
+
           input.addEventListener("input", () => {
             count.textContent = `${input.value.length} / 500`;
           });
@@ -1582,6 +1600,12 @@ const data = {
 
             const text = input.value.trim();
             if (!text) return;
+
+            const auth = readAuth();
+            if (!auth) {
+              status.textContent = "登录后才能说话";
+              return;
+            }
 
             const nick = holeNick();
             const optimistic: Hole = {
@@ -1613,11 +1637,11 @@ const data = {
                   method: "POST",
                   headers: {
                     apikey: sb!.key!,
-                    Authorization: `Bearer ${sb!.key}`,
+                    Authorization: `Bearer ${auth.token}`,
                     "Content-Type": "application/json",
                     Prefer: "return=minimal",
                   },
-                  body: JSON.stringify({ content: text, nick }),
+                  body: JSON.stringify({ content: text, nick, author_id: auth.uid }),
                 },
                 10000,
               );
@@ -1655,6 +1679,12 @@ const data = {
             const text = inputEl?.value.trim();
             if (!holeId || !text || !ready) return;
 
+            const auth = readAuth();
+            if (!auth) {
+              status.textContent = "登录后才能回应";
+              return;
+            }
+
             const nick = holeNick();
             const optimistic: Reply = {
               id: `local-${Date.now()}`,
@@ -1675,11 +1705,11 @@ const data = {
                   method: "POST",
                   headers: {
                     apikey: sb!.key!,
-                    Authorization: `Bearer ${sb!.key}`,
+                    Authorization: `Bearer ${auth.token}`,
                     "Content-Type": "application/json",
                     Prefer: "return=minimal",
                   },
-                  body: JSON.stringify({ hole_id: holeId, content: text, nick }),
+                  body: JSON.stringify({ hole_id: holeId, content: text, nick, author_id: auth.uid }),
                 },
                 10000,
               );
@@ -1827,6 +1857,9 @@ const data = {
           } catch {
             /* 隐私模式忽略 */
           }
+          // 同一个页面里 localStorage 的改动不会触发 storage 事件，
+          // 所以自己广播一下，让树洞 / 议会这些窗口即时刷新状态。
+          window.dispatchEvent(new CustomEvent("guandao:auth-change"));
         };
 
         const SOCIAL_AVATARS: Record<string, string> = {
@@ -2272,6 +2305,8 @@ const data = {
             if (!name) return;
             void saveProfile(name, bio, avatar);
           });
+
+          window.addEventListener("guandao:auth-change", () => render());
 
           void load();
         };
