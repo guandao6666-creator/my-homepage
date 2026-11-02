@@ -20,9 +20,10 @@ const trackFiles = existsSync(musicDir)
 const sbUrlBuild = import.meta.env.PUBLIC_SUPABASE_URL;
 const sbKeyBuild = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-let councilSeed: { polls: unknown[]; counts: Record<string, Record<string, number>> } = {
+let councilSeed: { polls: unknown[]; counts: Record<string, Record<string, number>>; builtAt: number } = {
   polls: [],
   counts: {},
+  builtAt: 0,
 };
 
 if (sbUrlBuild && sbKeyBuild) {
@@ -45,7 +46,7 @@ if (sbUrlBuild && sbKeyBuild) {
         counts[v.poll_id][v.option_index] = (counts[v.poll_id][v.option_index] ?? 0) + 1;
       }
 
-      councilSeed = { polls, counts };
+      councilSeed = { polls, counts, builtAt: Date.now() };
     }
   } catch {
     /* 构建时连不上就留空，前端会退回运行时请求 */
@@ -1353,15 +1354,33 @@ const data = {
           return auth ? `${COUNCIL_MINE_KEY}.${auth.uid}` : `${COUNCIL_MINE_KEY}.anon`;
         };
 
-        const readCouncilMine = (): Record<string, number> => {
+        interface CouncilMineEntry {
+          opt: number;
+          at: number;
+        }
+
+        /** 兼容旧格式（直接存数字）和新格式（{opt, at}） */
+        const readCouncilMine = (): Record<string, CouncilMineEntry> => {
           try {
-            return JSON.parse(localStorage.getItem(councilMineKey()) || "{}");
+            const raw = JSON.parse(localStorage.getItem(councilMineKey()) || "{}") as Record<string, unknown>;
+            const out: Record<string, CouncilMineEntry> = {};
+
+            for (const [k, v] of Object.entries(raw)) {
+              if (typeof v === "number") {
+                out[k] = { opt: v, at: 0 };
+              } else if (v && typeof v === "object") {
+                const obj = v as { opt?: number; at?: number };
+                if (typeof obj.opt === "number") out[k] = { opt: obj.opt, at: obj.at ?? 0 };
+              }
+            }
+
+            return out;
           } catch {
             return {};
           }
         };
 
-        const writeCouncilMine = (mine: Record<string, number>) => {
+        const writeCouncilMine = (mine: Record<string, CouncilMineEntry>) => {
           try {
             localStorage.setItem(councilMineKey(), JSON.stringify(mine));
           } catch {
@@ -1390,22 +1409,24 @@ const data = {
           const seed = (DATA.council ?? { polls: [], counts: {} }) as {
             polls: Poll[];
             counts: Record<string, Record<string, number>>;
+            builtAt?: number;
           };
 
           const polls: Poll[] = seed.polls ?? [];
           const baseCounts = seed.counts ?? {};
+          // 构建时间：晚于这个时间投的票，还没进 baseCounts
+          const builtAt = seed.builtAt ?? 0;
 
-          // 我投过哪些，记在本地，不靠网络
-          let mine: Record<string, number> = readCouncilMine();
-
-          // 本次会话新投的票（还没进构建时的统计）
-          const liveVotes: Record<string, number> = {};
+          // 我投过哪些，记在本地（含投票时间，用来判断要不要补这一票）
+          let mine: Record<string, CouncilMineEntry> = readCouncilMine();
 
           let lastAuthed: boolean | null = null;
 
           const countOf = (pollId: string, optIdx: number) => {
             let n = baseCounts[pollId]?.[String(optIdx)] ?? 0;
-            if (liveVotes[pollId] === optIdx && mine[pollId] === optIdx) n += 1;
+            const entry = mine[pollId];
+            // 构建之后投的票还没算进 baseCounts，这里补上，刷新也不会丢
+            if (entry && entry.opt === optIdx && entry.at > builtAt) n += 1;
             return n;
           };
 
@@ -1439,7 +1460,7 @@ const data = {
             list.innerHTML = polls
               .map((poll) => {
                 const total = totalOf(poll);
-                const chosen = mine[poll.id];
+                const chosen = mine[poll.id]?.opt;
                 const locked = chosen !== undefined;
 
                 const rows = poll.options
@@ -1486,8 +1507,7 @@ const data = {
             }
 
             // 先在本地记下并刷新，网络再慢也不耽误
-            mine[pollId] = optIdx;
-            liveVotes[pollId] = optIdx;
+            mine[pollId] = { opt: optIdx, at: Date.now() };
             try {
               writeCouncilMine(mine);
             } catch {
@@ -1520,7 +1540,6 @@ const data = {
               .catch(() => {
                 // 没提交成功就撤销这票，让人还能重投
                 delete mine[pollId];
-                delete liveVotes[pollId];
                 try {
                   writeCouncilMine(mine);
                 } catch {
@@ -1577,8 +1596,6 @@ const data = {
 
           render();
           window.addEventListener("guandao:auth-change", () => {
-            // 切账号后，上一轮会话里投的票不该继续算在这个号头上
-            for (const k of Object.keys(liveVotes)) delete liveVotes[k];
             render();
           });
         };
