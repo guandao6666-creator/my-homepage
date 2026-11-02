@@ -330,9 +330,17 @@ const data = {
       </main>
 
       <div class="launchpad" id="launchpad" hidden aria-hidden="true">
+        <div class="lp-top">
+          <span class="lp-title">启动台</span>
+          <div class="lp-top-actions">
+            <button class="lp-reset" id="lp-reset" type="button" hidden>恢复默认</button>
+            <button class="lp-done" id="lp-done" type="button" hidden>完成</button>
+          </div>
+        </div>
         <button class="lp-close" id="lp-close" type="button" aria-label="关闭启动台">✕</button>
         <div class="lp-inner">
           <div class="lp-grid" id="lp-grid"></div>
+          <p class="lp-hint" id="lp-hint" hidden>长按或拖动图标排序 · 点 ✕ 移除 · 完成后点「完成」</p>
         </div>
       </div>
 
@@ -5284,13 +5292,45 @@ const data = {
         const lpGrid = document.getElementById("lp-grid");
         const lpClose = document.getElementById("lp-close");
 
+        const LP_ORDER_KEY = "guandao.os.lp.order.v1";
+        const LP_HIDDEN_KEY = "guandao.os.lp.hidden.v1";
+        const LP_LONGPRESS = 420;
+        let lpOrder: string[] = [];
+        let lpHidden: string[] = [];
+        let lpEditing = false;
+        let lpDidDrag = false;
+        let lpDragEl: HTMLElement | null = null;
+        let lpPlaceholder: HTMLElement | null = null;
+        let lpDragFromEdit = false;
+        let lpGrabX = 0, lpGrabY = 0;
+        let lpLongTimer: number | null = null;
+        let lpStartX = 0, lpStartY = 0;
+        const lpDone = document.getElementById("lp-done");
+        const lpReset = document.getElementById("lp-reset");
+        const lpHint = document.getElementById("lp-hint");
+
+        try { lpOrder = JSON.parse(localStorage.getItem(LP_ORDER_KEY) || "[]"); } catch {}
+        try { lpHidden = JSON.parse(localStorage.getItem(LP_HIDDEN_KEY) || "[]"); } catch {}
+
+        const persistLpOrder = () => { try { localStorage.setItem(LP_ORDER_KEY, JSON.stringify(lpOrder)); } catch {} };
+        const persistLpHidden = () => { try { localStorage.setItem(LP_HIDDEN_KEY, JSON.stringify(lpHidden)); } catch {} };
+
+        const orderedApps = (): string[] => {
+          const ids = Object.keys(APPS).filter((id) => APPS[id] && APPS[id].title);
+          const seen = new Set<string>();
+          const out: string[] = [];
+          for (const id of lpOrder) if (ids.includes(id) && !seen.has(id)) { out.push(id); seen.add(id); }
+          for (const id of ids) if (!seen.has(id)) out.push(id);
+          return out.filter((id) => !lpHidden.includes(id));
+        };
+
         const fillLaunchpad = () => {
           if (!lpGrid) return;
-          lpGrid.innerHTML = Object.keys(APPS)
-            .filter((id) => APPS[id] && APPS[id].title)
-            .map((id) => {
+          lpGrid.innerHTML = orderedApps()
+            .map((id, i) => {
               const icon = APP_ICON[id] ?? "di-folder";
-              return `<button class="lp-icon" type="button" data-app="${id}">
+              return `<button class="lp-icon" type="button" data-app="${id}" data-idx="${i}">
+                <span class="lp-remove" aria-label="从启动台移除">✕</span>
                 <span class="di-glyph ${icon}"></span>
                 <span class="lp-label">${APPS[id].title}</span>
               </button>`;
@@ -5299,8 +5339,26 @@ const data = {
         };
         fillLaunchpad();
 
+        const exitEditMode = () => {
+          lpEditing = false;
+          launchpad?.classList.remove("lp-editing");
+          if (lpDone) lpDone.hidden = true;
+          if (lpReset) lpReset.hidden = true;
+          if (lpHint) lpHint.hidden = true;
+        };
+
+        const enterEditMode = () => {
+          if (lpEditing) return;
+          lpEditing = true;
+          launchpad?.classList.add("lp-editing");
+          if (lpDone) lpDone.hidden = false;
+          if (lpReset) lpReset.hidden = false;
+          if (lpHint) lpHint.hidden = false;
+        };
+
         const closeLaunchpad = () => {
           if (!launchpad) return;
+          exitEditMode();
           launchpad.hidden = true;
           launchpad.setAttribute("aria-hidden", "true");
         };
@@ -5309,18 +5367,136 @@ const data = {
           if (!launchpad) return;
           closeMenus();
           closeMobilePanel();
+          fillLaunchpad();
           launchpad.hidden = false;
           launchpad.setAttribute("aria-hidden", "false");
         };
 
+        const resetLpDragEl = () => {
+          if (!lpDragEl) return;
+          lpDragEl.classList.remove("lp-dragging");
+          lpDragEl.style.position = "";
+          lpDragEl.style.left = lpDragEl.style.top = lpDragEl.style.width = lpDragEl.style.height = "";
+          lpDragEl.style.zIndex = lpDragEl.style.pointerEvents = "";
+        };
+
+        const onLpMove = (e: PointerEvent) => {
+          if (!lpDragEl || !lpPlaceholder || !lpGrid) return;
+          lpDragEl.style.left = `${e.clientX - lpGrabX}px`;
+          lpDragEl.style.top = `${e.clientY - lpGrabY}px`;
+          const siblings = Array.from(lpGrid.querySelectorAll<HTMLElement>(".lp-icon:not(.lp-dragging)"));
+          const pKey = Math.round(e.clientY) * 10000 + Math.round(e.clientX);
+          let ref: HTMLElement | null = null;
+          for (const s of siblings) {
+            const r = s.getBoundingClientRect();
+            const key = Math.round(r.top + r.height / 2) * 10000 + Math.round(r.left + r.width / 2);
+            if (pKey < key) { ref = s; break; }
+          }
+          if (ref) lpGrid.insertBefore(lpPlaceholder, ref);
+          else lpGrid.appendChild(lpPlaceholder);
+        };
+
+        const onLpUp = () => {
+          document.removeEventListener("pointermove", onLpMove);
+          if (lpDragEl && lpPlaceholder) {
+            lpPlaceholder.parentNode?.insertBefore(lpDragEl, lpPlaceholder);
+            lpPlaceholder.remove();
+            resetLpDragEl();
+            lpOrder = Array.from(lpGrid.querySelectorAll<HTMLElement>(".lp-icon")).map((el) => el.dataset.app ?? "");
+            persistLpOrder();
+          }
+          lpDragEl = null;
+          lpPlaceholder = null;
+          lpDragFromEdit = false;
+        };
+
+        const beginLpDrag = (iconEl: HTMLElement, ev: PointerEvent) => {
+          if (!lpGrid) return;
+          lpDidDrag = true;
+          const rect = iconEl.getBoundingClientRect();
+          lpGrabX = ev.clientX - rect.left;
+          lpGrabY = ev.clientY - rect.top;
+          const ph = document.createElement("div");
+          ph.className = "lp-icon lp-ph";
+          ph.style.width = `${rect.width}px`;
+          ph.style.height = `${rect.height}px`;
+          iconEl.parentNode?.insertBefore(ph, iconEl);
+          iconEl.classList.add("lp-dragging");
+          iconEl.style.position = "fixed";
+          iconEl.style.width = `${rect.width}px`;
+          iconEl.style.height = `${rect.height}px`;
+          iconEl.style.left = `${rect.left}px`;
+          iconEl.style.top = `${rect.top}px`;
+          iconEl.style.zIndex = "300";
+          iconEl.style.pointerEvents = "none";
+          lpDragEl = iconEl;
+          lpPlaceholder = ph;
+          document.addEventListener("pointermove", onLpMove);
+          document.addEventListener("pointerup", onLpUp, { once: true });
+        };
+
         if (lpGrid) {
+          lpGrid.addEventListener("pointerdown", (event) => {
+            const target = event.target as HTMLElement;
+            if (target.closest(".lp-remove")) return;
+            const icon = target.closest<HTMLElement>(".lp-icon");
+            if (!icon) return;
+            event.preventDefault();
+            lpDidDrag = false;
+            lpStartX = event.clientX;
+            lpStartY = event.clientY;
+            const startIcon = icon;
+            let moved = false;
+            const cleanup = () => {
+              if (lpLongTimer) { clearTimeout(lpLongTimer); lpLongTimer = null; }
+              document.removeEventListener("pointermove", onMove);
+              document.removeEventListener("pointerup", cleanup);
+            };
+            const onMove = (e: PointerEvent) => {
+              if (moved) return;
+              if (Math.hypot(e.clientX - lpStartX, e.clientY - lpStartY) > 8) {
+                moved = true;
+                cleanup();
+                beginLpDrag(startIcon, e);
+              }
+            };
+            lpLongTimer = window.setTimeout(() => {
+              lpLongTimer = null;
+              document.removeEventListener("pointermove", onMove);
+              document.removeEventListener("pointerup", cleanup);
+              enterEditMode();
+              beginLpDrag(startIcon, event as unknown as PointerEvent);
+            }, LP_LONGPRESS);
+            document.addEventListener("pointermove", onMove);
+            document.addEventListener("pointerup", cleanup, { once: true });
+          });
+
           lpGrid.addEventListener("click", (event) => {
+            const rm = (event.target as HTMLElement).closest(".lp-remove");
+            if (rm) {
+              const icon = rm.closest<HTMLElement>(".lp-icon");
+              const id = icon?.dataset.app;
+              if (id && !lpHidden.includes(id)) { lpHidden.push(id); persistLpHidden(); fillLaunchpad(); }
+              return;
+            }
+            if (lpDidDrag) { lpDidDrag = false; return; }
+            if (lpEditing) return;
             const btn = (event.target as HTMLElement).closest<HTMLElement>("[data-app]");
             if (!btn) return;
             openApp(btn.dataset.app ?? "");
             closeLaunchpad();
           });
         }
+
+        if (lpDone) lpDone.addEventListener("click", exitEditMode);
+        if (lpReset) lpReset.addEventListener("click", () => {
+          lpOrder = [];
+          lpHidden = [];
+          persistLpOrder();
+          persistLpHidden();
+          fillLaunchpad();
+          exitEditMode();
+        });
         if (lpClose) lpClose.addEventListener("click", closeLaunchpad);
         if (launchpad) {
           launchpad.addEventListener("click", (event) => {
@@ -13051,6 +13227,86 @@ const data = {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+      /* 启动台顶栏（标题 / 完成 / 恢复默认） */
+      .lp-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding-right: 46px;
+      }
+      .lp-title {
+        font-size: 17px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .lp-top-actions { display: flex; gap: 8px; }
+      .lp-done,
+      .lp-reset {
+        border: 0;
+        border-radius: 999px;
+        padding: 7px 16px;
+        font-size: 13px;
+        line-height: 1;
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        cursor: pointer;
+      }
+      .lp-done { background: #2f7cf6; }
+      .lp-done:hover,
+      .lp-reset:hover { filter: brightness(1.08); }
+      .lp-hint {
+        margin: 16px auto 0;
+        text-align: center;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      /* 图标内的移除角标（仅编辑态显示） */
+      .lp-icon { position: relative; }
+      .lp-remove {
+        position: absolute;
+        top: -5px;
+        left: -5px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ff3b30;
+        color: #fff;
+        border: 0;
+        font-size: 11px;
+        line-height: 20px;
+        text-align: center;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        z-index: 2;
+      }
+      .lp-editing .lp-remove { display: flex; }
+      /* 拖拽时的占位符 */
+      .lp-ph {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1.5px dashed rgba(255, 255, 255, 0.45);
+      }
+      .lp-ph .di-glyph,
+      .lp-ph .lp-label,
+      .lp-ph .lp-remove { visibility: hidden; }
+      /* 正在被拖动的图标 */
+      .lp-icon.lp-dragging {
+        transform: scale(1.12);
+        box-shadow: 0 16px 38px rgba(0, 0, 0, 0.55);
+        transition: none;
+        touch-action: none;
+      }
+      /* 编辑态：图标轻微抖动（被拖动的那个不抖） */
+      .lp-editing .lp-icon:not(.lp-dragging) {
+        animation: lp-jiggle 0.32s ease-in-out infinite;
+      }
+      @keyframes lp-jiggle {
+        0%, 100% { transform: rotate(-1.2deg); }
+        50% { transform: rotate(1.2deg); }
       }
       /* 启动台触发图标（dock 上的 2×2 点阵） */
       .di-grid {
