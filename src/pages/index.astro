@@ -195,6 +195,36 @@ const data = {
             <button type="button" data-power="restart">重新启动</button>
             <button type="button" data-power="shutdown">关机</button>
           </div>
+
+          <button class="mb-desktop-toggle" id="mb-desktop-toggle" type="button" aria-pressed="false" title="切换桌面 / 手机布局">
+            <span class="mbdt-icon" aria-hidden="true">▦</span>
+            <span class="mbdt-text">桌面模式</span>
+          </button>
+
+          <button class="mb-mobile-menu" id="mb-mobile-menu" type="button" aria-label="打开菜单" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" />
+            </svg>
+          </button>
+          <div class="mb-mobile-panel" id="mb-mobile-panel" hidden>
+            <p class="mb-mp-cat">文件</p>
+            <button type="button" data-menu-action="posts">打开「文章」</button>
+            <button type="button" data-menu-action="terminal">打开「终端」</button>
+            <button type="button" data-menu-action="shutdown">关机…</button>
+            <p class="mb-mp-cat">编辑</p>
+            <button type="button" data-menu-action="settings">打开「设置」</button>
+            <button type="button" data-menu-action="reset">重置桌面布局</button>
+            <p class="mb-mp-cat">视图</p>
+            <button type="button" data-menu-action="search">搜索（Spotlight）</button>
+            <button type="button" data-menu-action="wallpaper">下一张壁纸</button>
+            <button type="button" data-menu-action="theme">切换外观</button>
+            <button type="button" data-menu-action="fullscreen">进入全屏</button>
+            <p class="mb-mp-cat">窗口</p>
+            <button type="button" data-menu-action="mission">任务视图</button>
+            <button type="button" data-menu-action="minimize-all">全部最小化</button>
+            <button type="button" data-menu-action="restore-all">全部还原</button>
+            <button type="button" data-menu-action="close-all">全部关闭</button>
+          </div>
         </div>
       </header>
 
@@ -4178,7 +4208,9 @@ const data = {
           win.dataset.space = String(currentSpace);
 
           const offset = (cascade++ % 5) * 26;
-          const narrow = window.innerWidth <= 720;
+          // 手机上「桌面模式」开启时，按真正的桌面窗口来摆放，而非强制全宽
+          const touchDesktop = document.body.classList.contains("is-touch-desktop");
+          const narrow = window.innerWidth <= 720 && !touchDesktop;
           const saved = readState().windows?.[id];
 
           if (saved?.space) win.dataset.space = String(saved.space);
@@ -4187,8 +4219,13 @@ const data = {
           win.style.height = `${saved?.height ?? app.height}px`;
 
           if (narrow) {
-            // 手机上位置固定，不要级联偏移，否则窗口会一路往下跑
+            // 紧凑模式：位置固定，不要级联偏移，否则窗口会一路往下跑
             win.style.top = "110px";
+          } else if (touchDesktop && window.innerWidth <= 720) {
+            // 手机上的桌面模式：窗口放在左侧图标栏右侧，宽度自适应
+            win.style.left = "148px";
+            win.style.top = "44px";
+            win.style.width = `${Math.min(saved?.width ?? app.width, window.innerWidth - 160)}px`;
           } else if (saved) {
             // 沿用上次的位置，越界就拉回可视范围
             win.style.left = `${Math.max(-40, Math.min(window.innerWidth - 140, saved.left))}px`;
@@ -5060,6 +5097,83 @@ const data = {
         try {
           if (localStorage.getItem(THEME_KEY) === "light") document.body.dataset.osTheme = "light";
         } catch {}
+
+        /* ---- 手机端桌面模式（持久化） ---- */
+        const MOBILE_DESKTOP_KEY = "guandao.os.mobileDesktop";
+        const applyMobileDesktop = (on: boolean) => {
+          document.body.classList.toggle("is-touch-desktop", on);
+          const btn = document.getElementById("mb-desktop-toggle") as HTMLButtonElement | null;
+          if (btn) {
+            btn.setAttribute("aria-pressed", on ? "true" : "false");
+            const txt = btn.querySelector<HTMLElement>(".mbdt-text");
+            if (txt) txt.textContent = on ? "标准模式" : "桌面模式";
+            btn.title = on ? "已开启桌面模式 · 点此切回手机布局" : "切换为桌面布局";
+          }
+        };
+        try {
+          if (localStorage.getItem(MOBILE_DESKTOP_KEY) === "1") applyMobileDesktop(true);
+        } catch {}
+
+        /* 切换布局模式后，重新摆放已打开的窗口 */
+        const relayoutWindows = () => {
+          const touchDesktop = document.body.classList.contains("is-touch-desktop");
+          const narrow = window.innerWidth <= 720 && !touchDesktop;
+          let i = 0;
+          windows.querySelectorAll<HTMLElement>(".window").forEach((win) => {
+            if (win.classList.contains("is-maximized")) return;
+            const app = APPS[win.dataset.app ?? ""];
+            if (!app) return;
+            if (narrow) {
+              win.style.left = "8px";
+              win.style.right = "8px";
+              win.style.top = "110px";
+            } else if (touchDesktop && window.innerWidth <= 720) {
+              win.style.left = "148px";
+              win.style.top = "44px";
+              const curW = Number(win.style.width.replace("px", "")) || app.width;
+              win.style.width = `${Math.min(curW, window.innerWidth - 160)}px`;
+              win.style.right = "auto";
+            } else {
+              const offset = (i % 5) * 26;
+              win.style.left = `${Math.max(16, (window.innerWidth - app.width) / 2 + offset - 60)}px`;
+              win.style.top = `${Math.max(52, 96 + offset)}px`;
+              win.style.right = "auto";
+            }
+            i++;
+          });
+        };
+
+        /* 桌面模式开关 */
+        const desktopToggle = document.getElementById("mb-desktop-toggle") as HTMLButtonElement | null;
+        desktopToggle?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const on = !document.body.classList.contains("is-touch-desktop");
+          applyMobileDesktop(on);
+          try {
+            localStorage.setItem(MOBILE_DESKTOP_KEY, on ? "1" : "0");
+          } catch {}
+          relayoutWindows();
+          pushNotif({
+            icon: on ? "🖥" : "📱",
+            title: on ? "桌面模式已开启" : "已切回手机布局",
+            body: on ? "现在以桌面形态呈现，可自由拖动、缩放窗口。" : "已恢复紧凑的手机布局。",
+          });
+        });
+
+        /* 手机端汉堡菜单（紧凑模式下替代顶部菜单） */
+        const mobileMenuBtn = document.getElementById("mb-mobile-menu") as HTMLButtonElement | null;
+        const mobilePanel = document.getElementById("mb-mobile-panel");
+        const closeMobilePanel = () => {
+          if (mobilePanel) mobilePanel.hidden = true;
+          mobileMenuBtn?.setAttribute("aria-expanded", "false");
+        };
+        mobileMenuBtn?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (!mobilePanel) return;
+          const show = mobilePanel.hidden;
+          mobilePanel.hidden = !show;
+          mobileMenuBtn.setAttribute("aria-expanded", show ? "true" : "false");
+        });
         const applyOsTheme = (theme: string) => {
           document.body.dataset.osTheme = theme;
           try {
@@ -5148,6 +5262,7 @@ const data = {
 
         const runMenuAction = (action: string) => {
           closeMenus();
+          closeMobilePanel();
           switch (action) {
             case "mission":
               openMission();
@@ -5185,6 +5300,9 @@ const data = {
             case "close-all":
               closeAll();
               break;
+            case "search":
+              openSpot();
+              break;
           }
         };
 
@@ -5215,6 +5333,8 @@ const data = {
           const t = event.target as HTMLElement;
           if (clockPanel && !t.closest("#mb-time-btn") && !t.closest("#clock-panel")) clockPanel.hidden = true;
           if (notifCenter && !t.closest("#mb-bell") && !t.closest("#notif-center")) notifCenter.hidden = true;
+          if (mobilePanel && !mobilePanel.hidden && !t.closest("#mb-mobile-menu") && !t.closest("#mb-mobile-panel"))
+            closeMobilePanel();
         });
 
         /* ---------------- 电源 ---------------- */
@@ -6395,6 +6515,93 @@ const data = {
       }
 
       .power-menu button:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      /* ---- 手机端专属控件：桌面模式切换 / 汉堡菜单 ---- */
+      .mb-desktop-toggle,
+      .mb-mobile-menu {
+        display: none; /* 桌面端默认隐藏，仅手机端显示 */
+        align-items: center;
+        gap: 5px;
+        height: 26px;
+        padding: 0 9px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--os-dim);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+      }
+      .mb-desktop-toggle:hover,
+      .mb-mobile-menu:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+      }
+      .mb-desktop-toggle .mbdt-icon,
+      .mb-mobile-menu svg {
+        width: 15px;
+        height: 15px;
+        display: block;
+      }
+      .mb-desktop-toggle[aria-pressed="true"] {
+        color: #fff;
+        border-color: rgba(143, 166, 255, 0.7);
+        background: rgba(143, 166, 255, 0.18);
+      }
+      .mb-mobile-menu {
+        padding: 0;
+        width: 30px;
+        justify-content: center;
+      }
+
+      .mb-mobile-panel {
+        position: absolute;
+        top: 32px;
+        right: 8px;
+        z-index: 90;
+        display: grid;
+        align-content: start;
+        gap: 2px;
+        width: 224px;
+        max-height: calc(100dvh - 48px);
+        overflow-y: auto;
+        padding: 8px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.98);
+        box-shadow: 0 20px 48px -16px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(24px);
+        animation: menuIn 0.16s var(--os-ease);
+      }
+      .mb-mobile-panel[hidden] {
+        display: none;
+      }
+      .mb-mp-cat {
+        margin: 9px 2px 2px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.35);
+      }
+      .mb-mp-cat:first-child {
+        margin-top: 2px;
+      }
+      .mb-mobile-panel button {
+        padding: 9px 10px;
+        border: 0;
+        border-radius: 8px;
+        background: none;
+        color: #eef1f7;
+        font: inherit;
+        font-size: 13px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .mb-mobile-panel button:hover,
+      .mb-mobile-panel button:active {
         background: rgba(255, 255, 255, 0.1);
       }
 
@@ -10493,7 +10700,17 @@ const data = {
       /* ---------------- 响应式 ---------------- */
 
       @media (max-width: 720px) {
-        .desk-icons {
+        /* 手机端状态栏专属控件：桌面模式开关常驻显示 */
+        .mb-desktop-toggle {
+          display: inline-flex;
+        }
+        /* 窄屏只留图标，节省空间 */
+        .mbdt-text {
+          display: none;
+        }
+
+        /* —— 紧凑模式（手机默认布局）：仅在未开启桌面模式时生效 —— */
+        body:not(.is-touch-desktop) .desk-icons {
           display: flex;
           flex-direction: row;
           flex-wrap: wrap;
@@ -10503,21 +10720,21 @@ const data = {
           gap: 6px;
         }
 
-        .desk-icon {
+        body:not(.is-touch-desktop) .desk-icon {
           width: 58px;
           padding: 6px 2px;
         }
 
-        .di-glyph {
+        body:not(.is-touch-desktop) .di-glyph {
           width: 30px;
           height: 30px;
         }
 
-        .di-label {
+        body:not(.is-touch-desktop) .di-label {
           font-size: 10px;
         }
 
-        .window {
+        body:not(.is-touch-desktop) .window {
           left: 8px !important;
           right: 8px;
           width: auto !important;
@@ -10525,6 +10742,52 @@ const data = {
           max-height: calc(100dvh - 190px);
         }
 
+        body:not(.is-touch-desktop) .desk-hint {
+          display: none;
+        }
+
+        body:not(.is-touch-desktop) .widgets {
+          display: none;
+        }
+
+        /* —— 桌面模式：手机上还原真正的桌面形态 —— */
+        body.is-touch-desktop .desk-icons {
+          position: absolute;
+          top: 44px;
+          left: 12px;
+          right: auto;
+          bottom: 92px;
+          display: grid;
+          grid-template-columns: repeat(2, 64px);
+          grid-auto-rows: min-content;
+          gap: 10px 4px;
+          overflow-y: auto;
+          scrollbar-width: none;
+        }
+        body.is-touch-desktop .desk-icons::-webkit-scrollbar {
+          display: none;
+        }
+        body.is-touch-desktop .window {
+          left: auto;
+          right: auto;
+          width: auto;
+          max-width: calc(100vw - 160px);
+          max-height: calc(100dvh - 140px);
+        }
+        body.is-touch-desktop .widgets {
+          display: block;
+        }
+        body.is-touch-desktop .desk-hint {
+          display: block;
+        }
+        body.is-touch-desktop .mb-menu {
+          display: flex;
+        }
+        body.is-touch-desktop .mb-mobile-menu {
+          display: none;
+        }
+
+        /* 两类模式共用的手机端适配 */
         .finder {
           grid-template-columns: 1fr;
         }
@@ -10568,19 +10831,18 @@ const data = {
           right: 10px;
           bottom: calc(86px + env(safe-area-inset-bottom, 0px));
         }
-
-        .desk-hint {
-          display: none;
-        }
-
-        .widgets {
-          display: none;
-        }
       }
 
       /* ---------------- 手机端：菜单栏收窄 ---------------- */
       @media (max-width: 640px) {
-        .mb-menu {
+        /* 紧凑模式下隐藏顶部菜单，改用汉堡菜单；桌面模式下仍显示原菜单 */
+        body:not(.is-touch-desktop) .mb-menu {
+          display: none;
+        }
+        .mb-mobile-menu {
+          display: inline-flex;
+        }
+        body.is-touch-desktop .mb-mobile-menu {
           display: none;
         }
         .mb-version,
