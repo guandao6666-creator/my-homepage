@@ -278,6 +278,127 @@ const data = {
         const DATA = window.__OS__;
         if (!DATA) return;
 
+        /** 通用的登录 / 注册表单，树洞、议会、社会网络共用一份 */
+        const authFormHtml = () => `
+          <form class="auth-form" data-auth="1">
+            <p class="auth-title">登录 / 注册</p>
+            <p class="auth-note">邮箱加密码就行，不用收验证码，注册完直接能用。</p>
+            <input class="social-input" data-auth-email type="email" placeholder="邮箱" autocomplete="username" />
+            <input class="social-input" data-auth-password type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
+            <div class="auth-bar">
+              <button class="auth-btn" type="submit">登录</button>
+              <button class="auth-btn is-ghost" type="button" data-auth-signup>注册</button>
+            </div>
+            <p class="auth-msg" data-auth-msg></p>
+          </form>`;
+
+        /** 首次登录自动建一份空资料 */
+        const ensureMyProfile = async (token: string, uid: string, email: string) => {
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          if (!sb?.url || !sb?.key) return;
+
+          const headers = { apikey: sb.key, Authorization: `Bearer ${token}` };
+
+          try {
+            const check = await fetchWithTimeout(
+              `${sb.url}/rest/v1/profiles?id=eq.${encodeURIComponent(uid)}&select=id`,
+              { headers },
+              8000,
+            );
+            if (check.ok) {
+              const rows = (await check.json()) as Array<{ id: string }>;
+              if (rows.length) return;
+            }
+
+            const name = email.split("@")[0].slice(0, 16) || "访客";
+
+            await fetchWithTimeout(
+              `${sb.url}/rest/v1/profiles`,
+              {
+                method: "POST",
+                headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
+                body: JSON.stringify({
+                  id: uid,
+                  nickname: name,
+                  avatar: "whale",
+                  bio: "",
+                  last_seen: new Date().toISOString(),
+                }),
+              },
+              10000,
+            );
+          } catch {
+            /* 建资料失败不影响登录 */
+          }
+        };
+
+        /** 提交登录或注册，成功返回 true */
+        const runAuth = async (win: HTMLElement, mode: "in" | "up"): Promise<boolean> => {
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          const email = win.querySelector<HTMLInputElement>("[data-auth-email]")?.value.trim() ?? "";
+          const password = win.querySelector<HTMLInputElement>("[data-auth-password]")?.value ?? "";
+          const msg = win.querySelector("[data-auth-msg]");
+
+          if (!email || !email.includes("@")) {
+            if (msg) msg.textContent = "请填一个有效的邮箱";
+            return false;
+          }
+          if (password.length < 6) {
+            if (msg) msg.textContent = "密码至少 6 位";
+            return false;
+          }
+          if (!sb?.url || !sb?.key) {
+            if (msg) msg.textContent = "云端没接上";
+            return false;
+          }
+
+          if (msg) msg.textContent = mode === "in" ? "正在登录…" : "正在注册…";
+
+          try {
+            const path = mode === "in" ? "/auth/v1/token?grant_type=password" : "/auth/v1/signup";
+            const res = await fetchWithTimeout(
+              `${sb.url}${path}`,
+              {
+                method: "POST",
+                headers: { apikey: sb.key, "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+              },
+              15000,
+            );
+
+            const data = (await res.json()) as {
+              access_token?: string;
+              refresh_token?: string;
+              user?: { id: string; email: string };
+              error_description?: string;
+              msg?: string;
+              error?: string;
+            };
+
+            if (!res.ok) {
+              const raw = data.error_description || data.msg || data.error || "操作失败";
+              throw new Error(String(raw).replace(/^\w+:\s*/, ""));
+            }
+            if (!data.access_token || !data.user) {
+              throw new Error("注册成功但没拿到登录状态，点一下登录试试");
+            }
+
+            writeAuth({
+              token: data.access_token,
+              refresh: data.refresh_token ?? "",
+              uid: data.user.id,
+              email: data.user.email ?? email,
+              at: Date.now(),
+            });
+
+            await ensureMyProfile(data.access_token, data.user.id, data.user.email ?? email);
+            return true;
+          } catch (err) {
+            if (msg) msg.textContent = (err as Error).message;
+            return false;
+          }
+        };
+
         /**
          * 生成一个随机 ID。
          * crypto.randomUUID 要 Safari 15.4 以上才有，老浏览器会直接抛错，
@@ -1214,6 +1335,7 @@ const data = {
               <button class="council-retry" id="council-retry" type="button" hidden>重试</button>
               <span class="council-tip">一人一票 · 投完看结果</span>
             </div>
+            <div class="council-auth" id="council-auth"></div>
             <div class="council-list" id="council-list"></div>
           </div>`;
 
@@ -1256,6 +1378,8 @@ const data = {
           // 本次会话新投的票（还没进构建时的统计）
           const liveVotes: Record<string, number> = {};
 
+          let lastAuthed: boolean | null = null;
+
           const countOf = (pollId: string, optIdx: number) => {
             let n = baseCounts[pollId]?.[String(optIdx)] ?? 0;
             if (liveVotes[pollId] === optIdx && mine[pollId] === optIdx) n += 1;
@@ -1272,7 +1396,15 @@ const data = {
               return;
             }
 
-            const canVote = Boolean(councilVoter());
+            const authed = Boolean(councilVoter());
+            const canVote = authed;
+
+            const authBox = win.querySelector("#council-auth");
+            if (authBox && authed !== lastAuthed) {
+              authBox.innerHTML = authed ? "" : authFormHtml();
+              lastAuthed = authed;
+            }
+
             const grand = polls.reduce((sum, p) => sum + totalOf(p), 0);
             status.textContent = canVote
               ? `${polls.length} 项在议 · ${grand} 票`
@@ -1439,6 +1571,7 @@ const data = {
               <p class="hole-topic-label">今日话题</p>
               <p class="hole-topic" id="hole-topic">今天有什么小事让你开心？</p>
             </div>
+            <div class="hole-auth" id="hole-auth"></div>
             <form class="hole-form" id="hole-form">
               <textarea class="hole-input" id="hole-input" rows="2" maxlength="500" placeholder="想说什么就说，没人知道你是谁"></textarea>
               <div class="hole-form-bar">
@@ -1482,7 +1615,19 @@ const data = {
           let replies: Reply[] = [];
           const openReplies = new Set<string>();
 
+          const authBox = win.querySelector("#hole-auth");
+          let lastAuthed: boolean | null = null;
+
           const render = () => {
+            const authed = Boolean(readAuth());
+            // 只在登录状态真正变化时重绘，否则会把正在输入的邮箱密码清掉
+            if (authBox && authed !== lastAuthed) {
+              authBox.innerHTML = authed
+                ? ""
+                : `${authFormHtml()}<p class="hole-auth-tip">登录后才能说话和回应，页面上仍只显示随机昵称。</p>`;
+              lastAuthed = authed;
+            }
+
             if (!holes.length) {
               list.innerHTML = '<p class="hole-empty">还没有人说话。做第一个吧。</p>';
               return;
@@ -1539,6 +1684,9 @@ const data = {
               return;
             }
 
+            // 未登录也要能看到别人说的，所以照常拉数据
+
+
             status.textContent = "正在连…";
 
             try {
@@ -1586,10 +1734,13 @@ const data = {
             send.disabled = !auth;
             input.placeholder = auth
               ? "想说什么就说，页面上只显示随机昵称"
-              : "登录后才能说话（去「社会网络」登录）";
+              : "登录后就能在这里说话";
           };
           syncInputState();
-          window.addEventListener("guandao:auth-change", syncInputState);
+          window.addEventListener("guandao:auth-change", () => {
+            syncInputState();
+            render();
+          });
 
           input.addEventListener("input", () => {
             count.textContent = `${input.value.length} / 500`;
@@ -1924,18 +2075,7 @@ const data = {
 
           const renderMe = () => {
             if (!auth) {
-              meEl.innerHTML = `
-                <form class="auth-form" id="auth-form">
-                  <p class="auth-title">登录 / 注册</p>
-                  <p class="auth-note">邮箱加密码就行，不用收验证码，注册完直接能用。</p>
-                  <input class="social-input" id="auth-email" type="email" placeholder="邮箱" autocomplete="username" />
-                  <input class="social-input" id="auth-password" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
-                  <div class="auth-bar">
-                    <button class="auth-btn" type="submit">登录</button>
-                    <button class="auth-btn is-ghost" type="button" id="auth-signup">注册</button>
-                  </div>
-                  <p class="auth-msg" id="auth-msg"></p>
-                </form>`;
+              meEl.innerHTML = authFormHtml();
               return;
             }
 
@@ -2011,106 +2151,6 @@ const data = {
                   </div>`;
               })
               .join("");
-          };
-
-          const doAuth = async (mode: "in" | "up") => {
-            const email = win.querySelector<HTMLInputElement>("#auth-email")?.value.trim() ?? "";
-            const password = win.querySelector<HTMLInputElement>("#auth-password")?.value ?? "";
-            const msg = win.querySelector("#auth-msg");
-
-            if (!email || !email.includes("@")) {
-              if (msg) msg.textContent = "请填一个有效的邮箱";
-              return;
-            }
-            if (password.length < 6) {
-              if (msg) msg.textContent = "密码至少 6 位";
-              return;
-            }
-            if (!ready) {
-              if (msg) msg.textContent = "云端没接上";
-              return;
-            }
-
-            if (msg) msg.textContent = mode === "in" ? "正在登录…" : "正在注册…";
-
-            try {
-              const path = mode === "in" ? "/auth/v1/token?grant_type=password" : "/auth/v1/signup";
-              const res = await fetchWithTimeout(
-                `${sb!.url}${path}`,
-                {
-                  method: "POST",
-                  headers: { apikey: sb!.key!, "Content-Type": "application/json" },
-                  body: JSON.stringify({ email, password }),
-                },
-                15000,
-              );
-              const data = (await res.json()) as {
-                access_token?: string;
-                refresh_token?: string;
-                user?: { id: string; email: string };
-                error_description?: string;
-                msg?: string;
-                error?: string;
-              };
-
-              if (!res.ok) {
-                const raw = data.error_description || data.msg || data.error || "操作失败";
-                throw new Error(String(raw).replace(/^\w+:\s*/, ""));
-              }
-
-              if (!data.access_token || !data.user) {
-                throw new Error("注册成功但没拿到登录状态，点一下登录试试");
-              }
-
-              const next: AuthState = {
-                token: data.access_token,
-                refresh: data.refresh_token ?? "",
-                uid: data.user.id,
-                email: data.user.email ?? email,
-                at: Date.now(),
-              };
-
-              writeAuth(next);
-              auth = next;
-
-              await ensureProfile();
-              await load();
-            } catch (err) {
-              if (msg) msg.textContent = (err as Error).message;
-            }
-          };
-
-          const ensureProfile = async () => {
-            if (!auth) return;
-
-            const check = await fetchWithTimeout(
-              `${sb!.url}/rest/v1/profiles?id=eq.${encodeURIComponent(auth.uid)}&select=id`,
-              { headers: headers() },
-              8000,
-            );
-
-            if (check.ok) {
-              const rows = (await check.json()) as Array<{ id: string }>;
-              if (rows.length) return;
-            }
-
-            const fallback = (auth.email || "访客").split("@")[0].slice(0, 16) || "访客";
-
-            await fetchWithTimeout(
-              `${sb!.url}/rest/v1/profiles`,
-              {
-                method: "POST",
-                headers: headers({ "Content-Type": "application/json", Prefer: "return=minimal" }),
-                body: JSON.stringify({
-                  id: auth.uid,
-                  nickname: fallback,
-                  avatar: "whale",
-                  bio: "",
-                  last_seen: new Date().toISOString(),
-                }),
-              },
-              10000,
-            );
           };
 
           const signOut = () => {
@@ -2248,11 +2288,6 @@ const data = {
           win.addEventListener("click", (event) => {
             const target = event.target as HTMLElement;
 
-            if (target.closest("#auth-signup")) {
-              void doAuth("up");
-              return;
-            }
-
             if (target.closest("#social-signout")) {
               signOut();
               return;
@@ -2289,12 +2324,6 @@ const data = {
           win.addEventListener("submit", (event) => {
             const form = event.target as HTMLFormElement;
 
-            if (form.id === "auth-form") {
-              event.preventDefault();
-              void doAuth("in");
-              return;
-            }
-
             if (!form.classList.contains("social-form")) return;
             event.preventDefault();
 
@@ -2308,6 +2337,7 @@ const data = {
 
           window.addEventListener("guandao:auth-change", () => render());
 
+          render();
           void load();
         };
 
@@ -2884,6 +2914,24 @@ const data = {
           if (!trigger) return;
           const id = trigger.dataset.app;
           if (id) openApp(id);
+        });
+
+        // 登录 / 注册表单在各个窗口里都可能出现，统一在 document 层处理
+        document.addEventListener("submit", async (event) => {
+          const form = (event.target as HTMLElement).closest("[data-auth]");
+          if (!form) return;
+          event.preventDefault();
+
+          const win = form.closest(".window") as HTMLElement | null;
+          if (win) await runAuth(win, "in");
+        });
+
+        document.addEventListener("click", async (event) => {
+          const btn = (event.target as HTMLElement).closest("[data-auth-signup]");
+          if (!btn) return;
+
+          const win = btn.closest(".window") as HTMLElement | null;
+          if (win) await runAuth(win, "up");
         });
 
         // 按保存的配置重建程序坞
@@ -5773,6 +5821,23 @@ const data = {
         margin: 2px 0 0;
         font-size: 10.5px;
         color: #ffb4b4;
+      }
+
+      .hole-auth,
+      .council-auth {
+        margin-bottom: 12px;
+      }
+
+      .hole-auth:empty,
+      .council-auth:empty {
+        display: none;
+      }
+
+      .hole-auth-tip {
+        margin: 8px 0 0;
+        font-size: 10.5px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.4);
       }
 
       .social-head {
