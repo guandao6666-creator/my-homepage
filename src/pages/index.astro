@@ -383,6 +383,10 @@ const data = {
               throw new Error("注册成功但没拿到登录状态，点一下登录试试");
             }
 
+            // 先把资料建好再写登录状态：writeAuth 会广播 auth-change，
+            // 各个窗口收到就立刻拉数据，如果资料还没建出来会显示「还没起名字」
+            await ensureMyProfile(data.access_token, data.user.id, data.user.email ?? email);
+
             writeAuth({
               token: data.access_token,
               refresh: data.refresh_token ?? "",
@@ -391,7 +395,6 @@ const data = {
               at: Date.now(),
             });
 
-            await ensureMyProfile(data.access_token, data.user.id, data.user.email ?? email);
             return true;
           } catch (err) {
             if (msg) msg.textContent = (err as Error).message;
@@ -1341,6 +1344,31 @@ const data = {
 
         const COUNCIL_MINE_KEY = "guandao.council.mine";
 
+        /**
+         * 投票记录按账号分开存。
+         * 之前是一个固定 key，换个号登录还会读到上一个号的「已投」，导致新号投不了票。
+         */
+        const councilMineKey = () => {
+          const auth = readAuth();
+          return auth ? `${COUNCIL_MINE_KEY}.${auth.uid}` : `${COUNCIL_MINE_KEY}.anon`;
+        };
+
+        const readCouncilMine = (): Record<string, number> => {
+          try {
+            return JSON.parse(localStorage.getItem(councilMineKey()) || "{}");
+          } catch {
+            return {};
+          }
+        };
+
+        const writeCouncilMine = (mine: Record<string, number>) => {
+          try {
+            localStorage.setItem(councilMineKey(), JSON.stringify(mine));
+          } catch {
+            /* 隐私模式忽略 */
+          }
+        };
+
         const initCouncil = (win: HTMLElement) => {
           const list = win.querySelector("#council-list");
           const status = win.querySelector("#council-status");
@@ -1368,12 +1396,7 @@ const data = {
           const baseCounts = seed.counts ?? {};
 
           // 我投过哪些，记在本地，不靠网络
-          let mine: Record<string, number> = {};
-          try {
-            mine = JSON.parse(localStorage.getItem(COUNCIL_MINE_KEY) || "{}");
-          } catch {
-            mine = {};
-          }
+          let mine: Record<string, number> = readCouncilMine();
 
           // 本次会话新投的票（还没进构建时的统计）
           const liveVotes: Record<string, number> = {};
@@ -1389,6 +1412,9 @@ const data = {
           const totalOf = (poll: Poll) => poll.options.reduce((sum, _, i) => sum + countOf(poll.id, i), 0);
 
           const render = () => {
+            // 登录账号可能换了，重读一次投票记录
+            mine = readCouncilMine();
+
             if (!polls.length) {
               status.textContent = "暂无议题";
               list.innerHTML =
@@ -1463,7 +1489,7 @@ const data = {
             mine[pollId] = optIdx;
             liveVotes[pollId] = optIdx;
             try {
-              localStorage.setItem(COUNCIL_MINE_KEY, JSON.stringify(mine));
+              writeCouncilMine(mine);
             } catch {
               /* 隐私模式忽略 */
             }
@@ -1496,7 +1522,7 @@ const data = {
                 delete mine[pollId];
                 delete liveVotes[pollId];
                 try {
-                  localStorage.setItem(COUNCIL_MINE_KEY, JSON.stringify(mine));
+                  writeCouncilMine(mine);
                 } catch {
                   /* 忽略 */
                 }
@@ -1550,7 +1576,11 @@ const data = {
           });
 
           render();
-          window.addEventListener("guandao:auth-change", () => render());
+          window.addEventListener("guandao:auth-change", () => {
+            // 切账号后，上一轮会话里投的票不该继续算在这个号头上
+            for (const k of Object.keys(liveVotes)) delete liveVotes[k];
+            render();
+          });
         };
 
 
@@ -2427,6 +2457,12 @@ const data = {
 
             if (!name) return;
             void saveProfile(name, bio, avatar);
+          });
+
+          // 登录状态变了（比如在这个窗口切号），重新读身份并拉数据
+          window.addEventListener("guandao:auth-change", () => {
+            auth = readAuth();
+            void load();
           });
 
           void load();
