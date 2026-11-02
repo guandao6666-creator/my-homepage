@@ -1442,12 +1442,20 @@ const data = {
               .join("");
           };
 
-          const vote = (pollId: string, optIdx: number) => {
+          const vote = async (pollId: string, optIdx: number) => {
             if (mine[pollId] !== undefined) return;
 
-            const auth = readAuth();
-            if (!auth) {
+            if (!readAuth()) {
               status.textContent = "先登录才能投票";
+              return;
+            }
+
+            // token 可能已经过期，先换一个可用的再用
+            const token = await ensureFreshToken();
+            const auth = readAuth();
+            if (!token || !auth) {
+              status.textContent = "登录过期了，重新登录一下";
+              render();
               return;
             }
 
@@ -1472,7 +1480,7 @@ const data = {
                 method: "POST",
                 headers: {
                   apikey: sb!.key!,
-                  Authorization: `Bearer ${auth.token}`,
+                  Authorization: `Bearer ${token}`,
                   "Content-Type": "application/json",
                   Prefer: "return=minimal",
                 },
@@ -1753,9 +1761,15 @@ const data = {
             const text = input.value.trim();
             if (!text) return;
 
-            const auth = readAuth();
-            if (!auth) {
+            if (!readAuth()) {
               status.textContent = "登录后才能说话";
+              return;
+            }
+
+            const token = await ensureFreshToken();
+            const auth = readAuth();
+            if (!token || !auth) {
+              status.textContent = "登录过期了，重新登录一下";
               return;
             }
 
@@ -1789,7 +1803,7 @@ const data = {
                   method: "POST",
                   headers: {
                     apikey: sb!.key!,
-                    Authorization: `Bearer ${auth.token}`,
+                    Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                     Prefer: "return=minimal",
                   },
@@ -1831,9 +1845,15 @@ const data = {
             const text = inputEl?.value.trim();
             if (!holeId || !text || !ready) return;
 
-            const auth = readAuth();
-            if (!auth) {
+            if (!readAuth()) {
               status.textContent = "登录后才能回应";
+              return;
+            }
+
+            const token = await ensureFreshToken();
+            const auth = readAuth();
+            if (!token || !auth) {
+              status.textContent = "登录过期了，重新登录一下";
               return;
             }
 
@@ -1857,7 +1877,7 @@ const data = {
                   method: "POST",
                   headers: {
                     apikey: sb!.key!,
-                    Authorization: `Bearer ${auth.token}`,
+                    Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                     Prefer: "return=minimal",
                   },
@@ -2015,6 +2035,59 @@ const data = {
           window.dispatchEvent(new CustomEvent("guandao:auth-change"));
         };
 
+        /**
+         * 拿一个还能用的 token。
+         * Supabase 的 access_token 默认 1 小时过期，过期后写操作会被 RLS 拒掉，
+         * 表现就是「点了投票但没投上」。这里在快过期前用 refresh_token 换新的。
+         */
+        const ensureFreshToken = async (): Promise<string | null> => {
+          const cur = readAuth();
+          if (!cur) return null;
+          if (!cur.refresh) return cur.token;
+
+          // 50 分钟内直接复用，超过就先刷新
+          if (Date.now() - cur.at < 50 * 60 * 1000) return cur.token;
+
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          if (!sb?.url || !sb?.key) return cur.token;
+
+          try {
+            const res = await fetchWithTimeout(
+              `${sb.url}/auth/v1/token?grant_type=refresh_token`,
+              {
+                method: "POST",
+                headers: { apikey: sb.key, "Content-Type": "application/json" },
+                body: JSON.stringify({ refresh_token: cur.refresh }),
+              },
+              15000,
+            );
+
+            if (!res.ok) throw new Error("refresh failed");
+
+            const data = (await res.json()) as {
+              access_token?: string;
+              refresh_token?: string;
+              user?: { id: string; email: string };
+            };
+            if (!data.access_token) throw new Error("no token");
+
+            const next: AuthState = {
+              token: data.access_token,
+              refresh: data.refresh_token ?? cur.refresh,
+              uid: data.user?.id ?? cur.uid,
+              email: data.user?.email ?? cur.email,
+              at: Date.now(),
+            };
+
+            writeAuth(next);
+            return next.token;
+          } catch {
+            // 连 refresh 都失败，说明会话彻底没了，清掉让用户重新登录
+            writeAuth(null);
+            return null;
+          }
+        };
+
         const SOCIAL_AVATARS: Record<string, string> = {
           whale: "/pet/whale-girl.webp",
           tshirt: "/pet/tshirt.webp",
@@ -2068,12 +2141,15 @@ const data = {
           let following = new Set<string>();
           let editing = false;
 
-          const headers = (extra: Record<string, string> = {}) => ({
-            apikey: sb!.key!,
-            // 登录后带用户 token，RLS 才会认 auth.uid()
-            Authorization: `Bearer ${auth ? auth.token : sb!.key}`,
-            ...extra,
-          });
+          const headers = (extra: Record<string, string> = {}) => {
+            // 每次都重新读，续期之后能立刻拿到新 token
+            const cur = readAuth();
+            return {
+              apikey: sb!.key!,
+              Authorization: `Bearer ${cur ? cur.token : sb!.key}`,
+              ...extra,
+            };
+          };
 
           const renderMe = () => {
             if (!auth) {
@@ -2212,6 +2288,14 @@ const data = {
           const saveProfile = async (nickname: string, bio: string, avatar: string) => {
             if (!ready) return;
 
+            await ensureFreshToken();
+            auth = readAuth();
+            if (!auth) {
+              countEl.textContent = "登录过期了，重新登录一下";
+              renderMe();
+              return;
+            }
+
             const body = {
               id: auth.uid,
               nickname,
@@ -2249,6 +2333,14 @@ const data = {
 
           const toggleFollow = async (toId: string) => {
             if (!ready) return;
+
+            await ensureFreshToken();
+            auth = readAuth();
+            if (!auth) {
+              countEl.textContent = "登录过期了，重新登录一下";
+              renderMe();
+              return;
+            }
 
             const on = following.has(toId);
 
