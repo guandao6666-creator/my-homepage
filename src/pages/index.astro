@@ -252,6 +252,34 @@ const data = {
             <span class="di-glyph di-net"></span>
             <span class="di-label">社会网络</span>
           </button>
+          <button class="desk-icon" type="button" data-app="calc">
+            <span class="di-glyph di-calc"></span>
+            <span class="di-label">计算器</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="notes">
+            <span class="di-glyph di-note"></span>
+            <span class="di-label">便签</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="monitor">
+            <span class="di-glyph di-mon"></span>
+            <span class="di-label">监视器</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="calendar">
+            <span class="di-glyph di-cal"></span>
+            <span class="di-label">日历</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="viewer">
+            <span class="di-glyph di-viewer"></span>
+            <span class="di-label">图片</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="browser">
+            <span class="di-glyph di-browser"></span>
+            <span class="di-label">浏览器</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="files">
+            <span class="di-glyph di-files"></span>
+            <span class="di-label">文件</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -2957,24 +2985,903 @@ const data = {
           void load();
         };
 
+        /* ---------------- 计算器 ---------------- */
+        const renderCalc = () => `
+          <div class="calc">
+            <div class="calc-display" id="calc-display">0</div>
+            <div class="calc-history" id="calc-history"></div>
+            <div class="calc-pad">
+              ${[
+                ["C", "(", ")", "÷"],
+                ["7", "8", "9", "×"],
+                ["4", "5", "6", "−"],
+                ["1", "2", "3", "+"],
+                ["0", ".", "%", "="],
+              ]
+                .map((row) =>
+                  row
+                    .map((k) => `<button class="calc-key ${"÷×−+=".includes(k) ? "is-op" : ""} ${k === "C" ? "is-clear" : ""}" data-k="${k}">${k}</button>`)
+                    .join(""),
+                )
+                .join("")}
+            </div>
+          </div>`;
+
+        const initCalc = (win: HTMLElement) => {
+          const display = win.querySelector("#calc-display");
+          const historyEl = win.querySelector("#calc-history");
+          let expr = "";
+          const setDisplay = (v: string) => {
+            if (display) display.textContent = v || "0";
+          };
+          const evaluate = (s: string) => {
+            const clean = s.replace(/×/g, "*").replace(/−/g, "-").replace(/÷/g, "/").replace(/%/g, "/100");
+            if (!/^[\d+\-*/.() ]+$/.test(clean)) return null;
+            try {
+              const v = Function('"use strict";return(' + clean + ")")();
+              return typeof v === "number" && isFinite(v) ? v : null;
+            } catch {
+              return null;
+            }
+          };
+          const push = (k: string) => {
+            if (k === "C") {
+              expr = "";
+              setDisplay("0");
+              return;
+            }
+            if (k === "=") {
+              const v = evaluate(expr);
+              if (v !== null) {
+                if (historyEl) {
+                  const li = document.createElement("div");
+                  li.className = "calc-h-item";
+                  li.textContent = `${expr} = ${v}`;
+                  historyEl.prepend(li);
+                }
+                expr = String(v);
+                setDisplay(expr);
+              } else {
+                setDisplay("错误");
+                expr = "";
+              }
+              return;
+            }
+            expr += k;
+            setDisplay(expr);
+          };
+          win.querySelectorAll<HTMLButtonElement>(".calc-key").forEach((b) => b.addEventListener("click", () => push(b.dataset.k ?? "")));
+          // 键盘输入（事件从聚焦的后代冒泡到窗口）
+          win.tabIndex = -1;
+          win.addEventListener("keydown", (e) => {
+            const map: Record<string, string> = { "*": "×", "/": "÷", "-": "−", "+": "+", Enter: "=", "=": "=", Backspace: "C" };
+            if (/^[0-9.()%]$/.test(e.key)) push(e.key);
+            else if (map[e.key]) {
+              e.preventDefault();
+              push(map[e.key]);
+            }
+          });
+        };
+
+        /* ---------------- 便签 ---------------- */
+        const NOTES_KEY = "guandao.os.notes.v1";
+        const NOTE_COLORS = ["#ffd479", "#a8bf85", "#7dd3fc", "#f0abfc", "#ff9ec2", "#c3c4b8"];
+
+        interface NoteItem {
+          id: string;
+          text: string;
+          color: string;
+          pinned: boolean;
+          at: number;
+        }
+
+        const readNotes = (): NoteItem[] => {
+          try {
+            return JSON.parse(localStorage.getItem(NOTES_KEY) || "[]");
+          } catch {
+            return [];
+          }
+        };
+
+        const writeNotes = (list: NoteItem[]) => {
+          try {
+            localStorage.setItem(NOTES_KEY, JSON.stringify(list));
+          } catch {
+            /* 忽略 */
+          }
+        };
+
+        const renderNotes = () => `
+          <div class="notes-app">
+            <div class="notes-bar">
+              <input class="notes-search" id="notes-search" placeholder="搜索便签…" />
+              <button class="notes-add" id="notes-add" type="button">＋ 新建</button>
+            </div>
+            <div class="notes-grid" id="notes-grid"></div>
+          </div>`;
+
+        const initNotes = (win: HTMLElement) => {
+          const grid = win.querySelector("#notes-grid");
+          const search = win.querySelector("#notes-search") as HTMLInputElement | null;
+
+          const paint = () => {
+            if (!grid) return;
+            const q = (search?.value ?? "").trim().toLowerCase();
+            let list = readNotes();
+            if (q) list = list.filter((n) => n.text.toLowerCase().includes(q));
+            list = list.slice().sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.at - a.at);
+            grid.innerHTML = list.length
+              ? list
+                  .map(
+                    (n) => `
+                  <div class="note-card ${n.pinned ? "is-pinned" : ""}" data-note="${n.id}" style="--note-color:${n.color}">
+                    <div class="note-tools">
+                      <button class="note-pin" data-note-pin="${n.id}" title="${n.pinned ? "取消置顶" : "置顶"}">${n.pinned ? "📌" : "📍"}</button>
+                      <button class="note-del" data-note-del="${n.id}" title="删除">×</button>
+                    </div>
+                    <textarea class="note-text" data-note-text="${n.id}" placeholder="写点什么…">${escapeHtml(n.text)}</textarea>
+                    <div class="note-colors">
+                      ${NOTE_COLORS.map((c) => `<button class="note-color ${c === n.color ? "is-on" : ""}" style="--nc:${c}" data-note-color="${n.id}:${c}" title="换色"></button>`).join("")}
+                    </div>
+                  </div>`,
+                  )
+                  .join("")
+              : `<div class="notes-empty">还没有便签，点右上角「＋ 新建」。</div>`;
+          };
+
+          const mutate = (id: string, fn: (n: NoteItem) => void) => {
+            const list = readNotes();
+            const it = list.find((n) => n.id === id);
+            if (it) {
+              fn(it);
+              writeNotes(list);
+            }
+          };
+
+          win.querySelector("#notes-add")?.addEventListener("click", () => {
+            const list = readNotes();
+            list.unshift({ id: makeId(), text: "", color: NOTE_COLORS[list.length % NOTE_COLORS.length], pinned: false, at: Date.now() });
+            writeNotes(list);
+            paint();
+          });
+
+          search?.addEventListener("input", paint);
+
+          grid?.addEventListener("input", (e) => {
+            const t = (e.target as HTMLElement).closest("[data-note-text]");
+            if (t) {
+              const id = t.getAttribute("data-note-text") ?? "";
+              mutate(id, (n) => {
+                n.text = (t as HTMLTextAreaElement).value;
+              });
+            }
+          });
+
+          grid?.addEventListener("click", (e) => {
+            const t = e.target as HTMLElement;
+            const del = t.closest("[data-note-del]");
+            const pin = t.closest("[data-note-pin]");
+            const color = t.closest("[data-note-color]");
+            if (del) {
+              writeNotes(readNotes().filter((n) => n.id !== del.getAttribute("data-note-del")));
+              paint();
+            } else if (pin) {
+              mutate(pin.getAttribute("data-note-pin") ?? "", (n) => {
+                n.pinned = !n.pinned;
+              });
+              paint();
+            } else if (color) {
+              const [id, c] = (color.getAttribute("data-note-color") ?? "").split(":");
+              mutate(id, (n) => {
+                n.color = c;
+              });
+              paint();
+            }
+          });
+
+          paint();
+        };
+
+        /* ---------------- 系统监视器 ---------------- */
+        const renderMonitor = () => `
+          <div class="monitor">
+            <div class="mon-cards">
+              <div class="mon-card"><span class="mon-label">CPU（模拟）</span><b class="mon-val" data-mon-cpu>—</b><div class="mon-bar"><i data-mon-cpu-bar></i></div></div>
+              <div class="mon-card"><span class="mon-label">内存（模拟）</span><b class="mon-val" data-mon-mem>—</b><div class="mon-bar"><i data-mon-mem-bar></i></div></div>
+            </div>
+            <p class="mon-note">CPU/内存为模拟数据，浏览器无法读取真实硬件占用。</p>
+            <div class="mon-rows">
+              <div class="mon-row"><span>运行窗口</span><b data-mon-win>0</b></div>
+              <div class="mon-row"><span>虚拟桌面</span><b data-mon-desks>0</b></div>
+              <div class="mon-row"><span>已开启</span><b data-mon-uptime>0 分钟</b></div>
+              <div class="mon-row"><span>本地存储（真实）</span><b data-mon-storage>—</b></div>
+            </div>
+            <p class="mon-label mon-apps-label">运行中的应用</p>
+            <div class="mon-apps" data-mon-apps></div>
+          </div>`;
+
+        const initMonitor = (win: HTMLElement) => {
+          const cpuEl = win.querySelector("[data-mon-cpu]");
+          const memEl = win.querySelector("[data-mon-mem]");
+          const cpuBar = win.querySelector("[data-mon-cpu-bar]") as HTMLElement | null;
+          const memBar = win.querySelector("[data-mon-mem-bar]") as HTMLElement | null;
+          let cpu = 18;
+          let mem = 42;
+          const tick = () => {
+            if (!win.isConnected) {
+              window.clearInterval(timer);
+              return;
+            }
+            cpu = Math.max(4, Math.min(92, cpu + (Math.random() - 0.5) * 16));
+            mem = Math.max(28, Math.min(88, mem + (Math.random() - 0.5) * 8));
+            if (cpuEl) cpuEl.textContent = `${Math.round(cpu)}%`;
+            if (memEl) memEl.textContent = `${Math.round(mem)}%`;
+            if (cpuBar) cpuBar.style.width = `${cpu}%`;
+            if (memBar) memBar.style.width = `${mem}%`;
+          };
+          const timer = window.setInterval(tick, 1500);
+          tick();
+
+          let bytes = 0;
+          try {
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i) || "";
+              if (k.startsWith("guandao.")) bytes += (localStorage.getItem(k) || "").length;
+            }
+          } catch {
+            /* 忽略 */
+          }
+          const storageEl = win.querySelector("[data-mon-storage]");
+          if (storageEl) storageEl.textContent = `${(bytes / 1024).toFixed(1)} KB`;
+
+          const update = () => {
+            if (!win.isConnected) {
+              window.clearInterval(infoTimer);
+              return;
+            }
+            const w = win.querySelector("[data-mon-win]");
+            const d = win.querySelector("[data-mon-desks]");
+            const u = win.querySelector("[data-mon-uptime]");
+            if (w) w.textContent = String(windows.querySelectorAll(".window").length);
+            if (d) d.textContent = String(desks.length);
+            if (u) u.textContent = `${Math.max(1, Math.floor((Date.now() - OS_BOOT) / 60000))} 分钟`;
+            const appsEl = win.querySelector("[data-mon-apps]");
+            if (appsEl) {
+              const list = Array.from(windows.querySelectorAll<HTMLElement>(".window")).map(
+                (el) => APPS[el.dataset.app ?? ""]?.title ?? el.dataset.app ?? "",
+              );
+              appsEl.innerHTML = list.length
+                ? list.map((t) => `<span class="mon-app-chip">${escapeHtml(t)}</span>`).join("")
+                : `<span class="mon-note">暂无</span>`;
+            }
+          };
+          const infoTimer = window.setInterval(update, 2000);
+          update();
+        };
+
+        /* ---------------- 日历与日程 ---------------- */
+        const EVENTS_KEY = "guandao.os.events.v1";
+
+        interface CalEvent {
+          id: string;
+          date: string;
+          title: string;
+          time: string;
+        }
+
+        const readEvents = (): CalEvent[] => {
+          try {
+            return JSON.parse(localStorage.getItem(EVENTS_KEY) || "[]");
+          } catch {
+            return [];
+          }
+        };
+
+        const writeEvents = (list: CalEvent[]) => {
+          try {
+            localStorage.setItem(EVENTS_KEY, JSON.stringify(list));
+          } catch {
+            /* 忽略 */
+          }
+        };
+
+        const pad2 = (n: number) => String(n).padStart(2, "0");
+        const dayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+        const renderCalendar = () => `
+          <div class="cal-app">
+            <div class="cal-head">
+              <button class="cal-nav" data-cal-nav="-1" type="button">‹</button>
+              <span class="cal-title" data-cal-title></span>
+              <button class="cal-nav" data-cal-nav="1" type="button">›</button>
+              <button class="cal-today" data-cal-today type="button">今天</button>
+            </div>
+            <div class="cal-week">${["日", "一", "二", "三", "四", "五", "六"].map((d) => `<span>${d}</span>`).join("")}</div>
+            <div class="cal-grid" data-cal-grid></div>
+            <div class="cal-events">
+              <div class="cal-events-head">
+                <span data-cal-selected></span>
+                <button class="cal-add" data-cal-add type="button">＋ 添加日程</button>
+              </div>
+              <div class="cal-event-list" data-cal-list></div>
+            </div>
+          </div>`;
+
+        const initCalendar = (win: HTMLElement) => {
+          const grid = win.querySelector("[data-cal-grid]");
+          const titleEl = win.querySelector("[data-cal-title]");
+          const listEl = win.querySelector("[data-cal-list]");
+          const selectedEl = win.querySelector("[data-cal-selected]");
+          let view = new Date();
+          let selected = dayKey(new Date());
+
+          const paint = () => {
+            if (!grid || !titleEl) return;
+            const y = view.getFullYear();
+            const m = view.getMonth();
+            titleEl.textContent = `${y}年${m + 1}月`;
+            const first = new Date(y, m, 1).getDay();
+            const days = new Date(y, m + 1, 0).getDate();
+            const today = dayKey(new Date());
+            const events = readEvents();
+            let html = "";
+            for (let i = 0; i < first; i++) html += `<span class="cal-cell is-empty"></span>`;
+            for (let d = 1; d <= days; d++) {
+              const key = `${y}-${pad2(m + 1)}-${pad2(d)}`;
+              const has = events.some((e) => e.date === key);
+              html += `<button class="cal-cell ${key === today ? "is-today" : ""} ${key === selected ? "is-selected" : ""} ${has ? "has-event" : ""}" data-day="${key}">${d}</button>`;
+            }
+            grid.innerHTML = html;
+
+            if (selectedEl) selectedEl.textContent = `${selected} 的日程`;
+            if (listEl) {
+              const dayEvents = readEvents().filter((e) => e.date === selected);
+              listEl.innerHTML = dayEvents.length
+                ? dayEvents
+                    .map(
+                      (e) => `<div class="cal-event"><span class="cal-event-time">${escapeHtml(e.time || "全天")}</span><span class="cal-event-title">${escapeHtml(e.title)}</span><button class="cal-event-del" data-event-del="${e.id}" title="删除">×</button></div>`,
+                    )
+                    .join("")
+                : `<div class="cal-event-empty">这一天还没有日程</div>`;
+            }
+          };
+
+          win.querySelectorAll("[data-cal-nav]").forEach((b) =>
+            b.addEventListener("click", () => {
+              view = new Date(view.getFullYear(), view.getMonth() + Number(b.getAttribute("data-cal-nav")), 1);
+              paint();
+            }),
+          );
+          win.querySelector("[data-cal-today]")?.addEventListener("click", () => {
+            view = new Date();
+            selected = dayKey(new Date());
+            paint();
+          });
+
+          grid?.addEventListener("click", (e) => {
+            const cell = (e.target as HTMLElement).closest("[data-day]");
+            if (cell) {
+              selected = cell.getAttribute("data-day") ?? selected;
+              paint();
+            }
+          });
+
+          win.querySelector("[data-cal-add]")?.addEventListener("click", () => {
+            const title = window.prompt("日程内容：", "");
+            if (!title || !title.trim()) return;
+            const time = window.prompt("时间（如 14:00，留空为全天）：", "") ?? "";
+            const list = readEvents();
+            list.push({ id: makeId(), date: selected, title: title.trim(), time: time.trim() });
+            writeEvents(list);
+            paint();
+          });
+
+          listEl?.addEventListener("click", (e) => {
+            const del = (e.target as HTMLElement).closest("[data-event-del]");
+            if (del) {
+              writeEvents(readEvents().filter((ev) => ev.id !== del.getAttribute("data-event-del")));
+              paint();
+            }
+          });
+
+          paint();
+        };
+
+        /* ---------------- 图片查看器 ---------------- */
+        const renderViewer = () => `
+          <div class="viewer">
+            <div class="viewer-bar">
+              <button class="view-btn" data-view-open type="button">打开图片</button>
+              <span class="view-sep"></span>
+              <button class="view-btn" data-view-prev type="button" title="上一张">‹</button>
+              <button class="view-btn" data-view-next type="button" title="下一张">›</button>
+              <span class="view-sep"></span>
+              <button class="view-btn" data-view-zoom="out" type="button" title="缩小">−</button>
+              <button class="view-btn" data-view-zoom="in" type="button" title="放大">＋</button>
+              <button class="view-btn" data-view-rotate type="button" title="旋转">⟳</button>
+              <button class="view-btn" data-view-full type="button" title="全屏">全屏</button>
+            </div>
+            <div class="viewer-stage" data-view-stage>
+              <div class="viewer-empty" data-view-empty>还没有图片。<br/>点「打开图片」选择本地图片（不会上传）。</div>
+              <img class="viewer-img" data-view-img hidden alt="" />
+            </div>
+            <div class="viewer-info" data-view-info></div>
+          </div>`;
+
+        const initViewer = (win: HTMLElement) => {
+          const img = win.querySelector("[data-view-img]") as HTMLImageElement | null;
+          const empty = win.querySelector("[data-view-empty]") as HTMLElement | null;
+          const info = win.querySelector("[data-view-info]");
+          const stage = win.querySelector("[data-view-stage]") as HTMLElement | null;
+          const gallery: { src: string; name: string; size: number }[] = [];
+          let idx = -1;
+          let zoom = 1;
+          let deg = 0;
+
+          const apply = () => {
+            if (img) img.style.transform = `scale(${zoom}) rotate(${deg}deg)`;
+          };
+          const show = () => {
+            const item = gallery[idx];
+            if (!item || !img) return;
+            img.src = item.src;
+            img.hidden = false;
+            if (empty) empty.hidden = true;
+            zoom = 1;
+            deg = 0;
+            apply();
+            if (info) info.textContent = `${item.name} · ${(item.size / 1024).toFixed(0)} KB · ${idx + 1}/${gallery.length}`;
+          };
+
+          win.querySelector("[data-view-open]")?.addEventListener("click", () => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
+            input.multiple = true;
+            input.onchange = () => {
+              const files = Array.from(input.files ?? []);
+              for (const f of files) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  gallery.push({ src: String(reader.result), name: f.name, size: f.size });
+                  idx = gallery.length - 1;
+                  show();
+                };
+                reader.readAsDataURL(f);
+              }
+            };
+            input.click();
+          });
+
+          win.querySelector("[data-view-prev]")?.addEventListener("click", () => {
+            if (gallery.length) {
+              idx = (idx - 1 + gallery.length) % gallery.length;
+              show();
+            }
+          });
+          win.querySelector("[data-view-next]")?.addEventListener("click", () => {
+            if (gallery.length) {
+              idx = (idx + 1) % gallery.length;
+              show();
+            }
+          });
+          win.querySelectorAll("[data-view-zoom]").forEach((b) =>
+            b.addEventListener("click", () => {
+              zoom = Math.max(0.3, Math.min(5, zoom + (b.getAttribute("data-view-zoom") === "in" ? 0.2 : -0.2)));
+              apply();
+            }),
+          );
+          win.querySelector("[data-view-rotate]")?.addEventListener("click", () => {
+            deg = (deg + 90) % 360;
+            apply();
+          });
+          win.querySelector("[data-view-full]")?.addEventListener("click", () => {
+            stage?.requestFullscreen?.().catch(() => undefined);
+          });
+        };
+
+        /* ---------------- 浏览器 ---------------- */
+        const BROWSER_HISTORY_KEY = "guandao.os.browser.v1";
+
+        const renderBrowser = () => `
+          <div class="browser">
+            <div class="browser-bar">
+              <input class="browser-url" data-browser-url placeholder="输入网址或搜索关键词…" />
+              <button class="browser-go" data-browser-go type="button">前往</button>
+            </div>
+            <div class="browser-home">
+              <p class="browser-sec">快捷入口</p>
+              <div class="browser-links">
+                <a class="browser-link" href="/home/">我的博客</a>
+                <a class="browser-link" href="/blog/">文章</a>
+                <a class="browser-link" href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
+                <a class="browser-link" href="https://www.bilibili.com/" target="_blank" rel="noreferrer">Bilibili</a>
+                <a class="browser-link" href="https://www.bing.com/" target="_blank" rel="noreferrer">必应</a>
+              </div>
+              <p class="browser-tip">外部网站会在新标签页打开，浏览器安全策略不允许嵌入第三方页面。</p>
+            </div>
+            <p class="browser-sec">历史记录</p>
+            <div class="browser-history" data-browser-history></div>
+          </div>`;
+
+        const initBrowser = (win: HTMLElement) => {
+          const urlEl = win.querySelector("[data-browser-url]") as HTMLInputElement | null;
+          const historyEl = win.querySelector("[data-browser-history]");
+
+          const readHistory = (): { url: string; at: number }[] => {
+            try {
+              return JSON.parse(localStorage.getItem(BROWSER_HISTORY_KEY) || "[]");
+            } catch {
+              return [];
+            }
+          };
+          const paint = () => {
+            if (!historyEl) return;
+            const list = readHistory();
+            historyEl.innerHTML = list.length
+              ? list.map((h) => `<button class="browser-h-item" data-h="${escapeHtml(h.url)}">${escapeHtml(h.url)}</button>`).join("")
+              : `<div class="browser-h-empty">暂无历史</div>`;
+          };
+          const go = (raw: string) => {
+            const q = raw.trim();
+            if (!q) return;
+            const isUrl = /^(https?:\/\/)/i.test(q) || /^[\w-]+(\.[\w-]+)+/.test(q);
+            const url = isUrl ? (/^https?:\/\//i.test(q) ? q : `https://${q}`) : `https://www.bing.com/search?q=${encodeURIComponent(q)}`;
+            window.open(url, "_blank", "noreferrer");
+            const list = readHistory();
+            list.unshift({ url, at: Date.now() });
+            try {
+              localStorage.setItem(BROWSER_HISTORY_KEY, JSON.stringify(list.slice(0, 30)));
+            } catch {
+              /* 忽略 */
+            }
+            paint();
+          };
+          win.querySelector("[data-browser-go]")?.addEventListener("click", () => go(urlEl?.value ?? ""));
+          urlEl?.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") go(urlEl.value);
+          });
+          historyEl?.addEventListener("click", (e) => {
+            const b = (e.target as HTMLElement).closest("[data-h]");
+            if (b) window.open(b.getAttribute("data-h") ?? "", "_blank", "noreferrer");
+          });
+          paint();
+        };
+
+        /* ---------------- 文件管理器（虚拟文件系统） ---------------- */
+        const FS_KEY = "guandao.os.fs.v1";
+
+        interface FsNode {
+          id: string;
+          name: string;
+          type: "folder" | "file";
+          parent: string;
+          content?: string;
+          href?: string;
+          starred?: boolean;
+          at: number;
+        }
+
+        const readFs = (): FsNode[] => {
+          try {
+            const raw = JSON.parse(localStorage.getItem(FS_KEY) || "null");
+            if (Array.isArray(raw) && raw.length) return raw;
+          } catch {
+            /* 忽略 */
+          }
+          return seedFs();
+        };
+
+        const writeFs = (list: FsNode[]) => {
+          try {
+            localStorage.setItem(FS_KEY, JSON.stringify(list));
+          } catch {
+            /* 忽略 */
+          }
+        };
+
+        const seedFs = (): FsNode[] => {
+          const now = Date.now();
+          const list: FsNode[] = [
+            { id: "f-posts", name: "文章", type: "folder", parent: "root", at: now },
+            { id: "f-images", name: "图片", type: "folder", parent: "root", at: now },
+            { id: "f-docs", name: "文档", type: "folder", parent: "root", at: now },
+          ];
+          for (const post of DATA.posts) {
+            list.push({ id: `post-${post.href}`, name: post.title, type: "file", parent: "f-posts", href: post.href, at: now });
+          }
+          list.push({
+            id: "note-welcome",
+            name: "欢迎使用.txt",
+            type: "file",
+            parent: "f-docs",
+            content: "这是 Guandao OS 的虚拟文件系统。\n\n所有文件都保存在浏览器 localStorage 中，不会访问你的真实电脑文件。\n你可以新建文件夹、重命名、删除、收藏，也可以直接打开「文章」里的博客。",
+            at: now,
+          });
+          writeFs(list);
+          return list;
+        };
+
+        const renderFiles = () => `
+          <div class="fs-app">
+            <aside class="fs-side">
+              <button class="fs-side-item" data-fs-view="starred">★ 收藏</button>
+              <button class="fs-side-item" data-fs-view="recent">◷ 最近</button>
+              <button class="fs-side-item is-active" data-fs-view="root">▤ 全部文件</button>
+            </aside>
+            <div class="fs-main">
+              <div class="fs-bar">
+                <input class="fs-search" data-fs-search placeholder="搜索当前目录…" />
+                <select class="fs-sort" data-fs-sort>
+                  <option value="name">按名称</option>
+                  <option value="time">按时间</option>
+                </select>
+                <button class="fs-new" data-fs-newfolder type="button">＋ 新建文件夹</button>
+              </div>
+              <div class="fs-crumb" data-fs-crumb></div>
+              <div class="fs-grid" data-fs-grid></div>
+              <div class="fs-detail" data-fs-detail></div>
+            </div>
+          </div>`;
+
+        const initFiles = (win: HTMLElement) => {
+          const grid = win.querySelector("[data-fs-grid]");
+          const crumb = win.querySelector("[data-fs-crumb]");
+          const detail = win.querySelector("[data-fs-detail]");
+          const search = win.querySelector("[data-fs-search]") as HTMLInputElement | null;
+          const sort = win.querySelector("[data-fs-sort]") as HTMLSelectElement | null;
+          let view = "root";
+          let folder = "root";
+          let selected = "";
+          let editingId = "";
+          let confirmDel = "";
+
+          const paint = () => {
+            if (!grid || !crumb) return;
+            const all = readFs();
+            const q = (search?.value ?? "").trim().toLowerCase();
+            let nodes: FsNode[];
+            if (view === "starred") nodes = all.filter((n) => n.starred);
+            else if (view === "recent") nodes = all.slice().sort((a, b) => b.at - a.at).slice(0, 30);
+            else nodes = all.filter((n) => n.parent === folder);
+            if (q) nodes = nodes.filter((n) => n.name.toLowerCase().includes(q));
+            if (sort?.value === "time") nodes = nodes.slice().sort((a, b) => b.at - a.at);
+            else nodes = nodes.slice().sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name, "zh") : a.type === "folder" ? -1 : 1));
+
+            const current = all.find((n) => n.id === folder);
+            crumb.textContent = view === "root" ? `全部文件${current && folder !== "root" ? ` / ${current.name}` : ""}` : view === "starred" ? "收藏" : "最近打开";
+
+            grid.innerHTML = nodes.length
+              ? nodes
+                  .map((n) => {
+                    const editing = n.id === editingId;
+                    return `
+                  <div class="fs-node ${n.id === selected ? "is-selected" : ""} ${editing ? "is-editing" : ""}" data-fs-id="${n.id}" data-fs-type="${n.type}">
+                    <div class="fs-node-icon ${n.type === "folder" ? "is-folder" : "is-file"}">${n.type === "folder" ? "📁" : "📄"}</div>
+                    ${editing
+                      ? `<input class="fs-rename-input" data-fs-rename-input value="${escapeHtml(n.name)}" />`
+                      : `<span class="fs-node-name">${escapeHtml(n.name)}</span>`}
+                    ${n.starred ? '<span class="fs-star">★</span>' : ""}
+                  </div>`;
+                  })
+                  .join("")
+              : `<div class="fs-empty">这个目录是空的</div>`;
+
+            if (editingId) {
+              const inp = grid.querySelector<HTMLInputElement>(".fs-rename-input");
+              inp?.focus();
+              inp?.select();
+            }
+          };
+
+          const paintDetail = () => {
+            if (!detail) return;
+            const n = readFs().find((x) => x.id === selected);
+            if (!n) {
+              detail.innerHTML = "";
+              return;
+            }
+            if (confirmDel === n.id) {
+              detail.innerHTML = `
+                <span class="fs-detail-name">${escapeHtml(n.name)}</span>
+                <div class="fs-detail-actions">
+                  <span class="fs-confirm-text">确定删除吗？</span>
+                  <button class="fs-act is-danger" data-fs-del-yes="${n.id}">确认删除</button>
+                  <button class="fs-act" data-fs-del-no>取消</button>
+                </div>`;
+              return;
+            }
+            detail.innerHTML = `
+              <span class="fs-detail-name">${escapeHtml(n.name)}</span>
+              <div class="fs-detail-actions">
+                ${n.href ? `<a class="fs-act" href="${n.href}">打开</a>` : ""}
+                ${n.content ? `<button class="fs-act" data-fs-read="${n.id}">查看</button>` : ""}
+                <button class="fs-act" data-fs-star="${n.id}">${n.starred ? "取消收藏" : "收藏"}</button>
+                <button class="fs-act" data-fs-rename="${n.id}">重命名</button>
+                <button class="fs-act is-danger" data-fs-delete="${n.id}">删除</button>
+              </div>`;
+          };
+
+          const commitRename = () => {
+            if (!editingId) return;
+            const inp = grid?.querySelector<HTMLInputElement>(".fs-rename-input");
+            const all = readFs();
+            const n = all.find((x) => x.id === editingId);
+            const val = (inp?.value ?? "").trim();
+            if (n) {
+              if (val) {
+                n.name = val;
+              } else if (n.name === "新建文件夹") {
+                // 起了空名就放弃新建
+                const idx = all.indexOf(n);
+                if (idx >= 0) all.splice(idx, 1);
+              }
+            }
+            writeFs(all);
+            editingId = "";
+            paint();
+            paintDetail();
+          };
+
+          grid?.addEventListener("click", (e) => {
+            const node = (e.target as HTMLElement).closest("[data-fs-id]");
+            if (!node) return;
+            const id = node.getAttribute("data-fs-id") ?? "";
+            if (editingId && editingId === id) return; // 正在重命名该节点，忽略点击
+            if (selected === id) {
+              // 再次点击 = 进入/打开
+              const n = readFs().find((x) => x.id === id);
+              if (n?.type === "folder") {
+                view = "root";
+                folder = id;
+                selected = "";
+                confirmDel = "";
+              } else if (n?.href) {
+                location.href = n.href;
+              }
+            } else {
+              selected = id;
+              confirmDel = "";
+            }
+            paint();
+            paintDetail();
+          });
+
+          // 内联重命名：Enter 确认 / Esc 取消
+          grid?.addEventListener("keydown", (e) => {
+            if (!editingId) return;
+            const inp = e.target as HTMLElement;
+            if (inp.classList.contains("fs-rename-input")) {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitRename();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                editingId = "";
+                paint();
+                paintDetail();
+              }
+            }
+          });
+          grid?.addEventListener(
+            "focusout",
+            (e) => {
+              const t = e.target as HTMLElement;
+              if (t.classList.contains("fs-rename-input")) commitRename();
+            },
+            true,
+          );
+
+          win.querySelectorAll("[data-fs-view]").forEach((b) =>
+            b.addEventListener("click", () => {
+              view = b.getAttribute("data-fs-view") ?? "root";
+              if (view === "root") folder = "root";
+              selected = "";
+              editingId = "";
+              confirmDel = "";
+              win.querySelectorAll("[data-fs-view]").forEach((x) => x.classList.toggle("is-active", x === b));
+              paint();
+              paintDetail();
+            }),
+          );
+
+          win.querySelector("[data-fs-newfolder]")?.addEventListener("click", () => {
+            const all = readFs();
+            const id = makeId();
+            all.push({ id, name: "新建文件夹", type: "folder", parent: view === "root" ? folder : "root", at: Date.now() });
+            writeFs(all);
+            editingId = id;
+            selected = id;
+            confirmDel = "";
+            paint();
+            paintDetail();
+          });
+
+          search?.addEventListener("input", paint);
+          sort?.addEventListener("change", paint);
+
+          detail?.addEventListener("click", (e) => {
+            const t = e.target as HTMLElement;
+            const all = readFs();
+            const star = t.closest("[data-fs-star]");
+            const rename = t.closest("[data-fs-rename]");
+            const del = t.closest("[data-fs-delete]");
+            const read = t.closest("[data-fs-read]");
+            const delYes = t.closest("[data-fs-del-yes]");
+            const delNo = t.closest("[data-fs-del-no]");
+            const back = t.closest("[data-fs-back]");
+            if (delNo) {
+              confirmDel = "";
+              paintDetail();
+              return;
+            }
+            if (delYes) {
+              const id = delYes.getAttribute("data-fs-del-yes");
+              writeFs(all.filter((x) => x.id !== id && x.parent !== id));
+              selected = "";
+              confirmDel = "";
+              paint();
+              paintDetail();
+              return;
+            }
+            if (back) {
+              paintDetail();
+              return;
+            }
+            if (star) {
+              const n = all.find((x) => x.id === star.getAttribute("data-fs-star"));
+              if (n) n.starred = !n.starred;
+              writeFs(all);
+            } else if (rename) {
+              editingId = rename.getAttribute("data-fs-rename") ?? "";
+              paint();
+              paintDetail();
+              return;
+            } else if (del) {
+              confirmDel = del.getAttribute("data-fs-delete") ?? "";
+              paintDetail();
+              return;
+            } else if (read) {
+              const n = all.find((x) => x.id === read.getAttribute("data-fs-read"));
+              if (n?.content) {
+                detail.innerHTML = `<span class="fs-detail-name">${escapeHtml(n.name)}</span><pre class="fs-file-content">${escapeHtml(n.content)}</pre><div class="fs-detail-actions"><button class="fs-act" data-fs-back>返回</button></div>`;
+                detail.querySelector("[data-fs-back]")?.addEventListener("click", paintDetail);
+                return;
+              }
+            }
+            paint();
+            paintDetail();
+          });
+
+          paint();
+          paintDetail();
+        };
+
         const APPS: Record<
           string,
-          { title: string; width: number; height: number; body: () => string }
+          { title: string; width: number; height: number; body: () => string; glyph?: string }
         > = {
-          posts: { title: "文章", width: 660, height: 440, body: renderPosts },
-          about: { title: "关于", width: 460, height: 380, body: renderAbout },
-          music: { title: "音乐", width: 430, height: 470, body: renderMusic },
-          terminal: { title: "终端", width: 560, height: 360, body: renderTerminal },
-          settings: { title: "设置", width: 460, height: 470, body: renderSettings },
-          achievements: { title: "成就", width: 540, height: 476, body: renderAchievements },
-          aquarium: { title: "水族箱", width: 720, height: 480, body: renderAquarium },
-          visitors: { title: "访客墙", width: 640, height: 460, body: renderVisitors },
-          rank: { title: "排行榜", width: 480, height: 460, body: renderRank },
-          draw: { title: "每日抽奖", width: 440, height: 420, body: renderDraw },
-          council: { title: "议会", width: 600, height: 540, body: renderCouncil },
-          treehole: { title: "树洞", width: 560, height: 620, body: renderTreehole },
-          news: { title: "新闻联播", width: 500, height: 560, body: renderNews },
-          social: { title: "社会网络", width: 560, height: 600, body: renderSocial },
+          posts: { title: "文章", width: 660, height: 440, body: renderPosts, glyph: "di-folder" },
+          about: { title: "关于", width: 460, height: 380, body: renderAbout, glyph: "di-person" },
+          music: { title: "音乐", width: 430, height: 470, body: renderMusic, glyph: "di-music" },
+          terminal: { title: "终端", width: 560, height: 360, body: renderTerminal, glyph: "di-term" },
+          settings: { title: "设置", width: 460, height: 470, body: renderSettings, glyph: "di-gear" },
+          achievements: { title: "成就", width: 540, height: 476, body: renderAchievements, glyph: "di-ach" },
+          aquarium: { title: "水族箱", width: 720, height: 480, body: renderAquarium, glyph: "di-tank" },
+          visitors: { title: "访客墙", width: 640, height: 460, body: renderVisitors, glyph: "di-wall" },
+          rank: { title: "排行榜", width: 480, height: 460, body: renderRank, glyph: "di-rank" },
+          draw: { title: "每日抽奖", width: 440, height: 420, body: renderDraw, glyph: "di-draw" },
+          council: { title: "议会", width: 600, height: 540, body: renderCouncil, glyph: "di-vote" },
+          treehole: { title: "树洞", width: 560, height: 620, body: renderTreehole, glyph: "di-hole" },
+          news: { title: "新闻联播", width: 500, height: 560, body: renderNews, glyph: "di-tv" },
+          social: { title: "社会网络", width: 560, height: 600, body: renderSocial, glyph: "di-net" },
+          calc: { title: "计算器", width: 300, height: 470, body: renderCalc, glyph: "di-calc" },
+          notes: { title: "便签", width: 560, height: 480, body: renderNotes, glyph: "di-note" },
+          monitor: { title: "系统监视器", width: 420, height: 500, body: renderMonitor, glyph: "di-mon" },
+          calendar: { title: "日历", width: 420, height: 560, body: renderCalendar, glyph: "di-cal" },
+          viewer: { title: "图片查看器", width: 640, height: 500, body: renderViewer, glyph: "di-viewer" },
+          browser: { title: "浏览器", width: 560, height: 480, body: renderBrowser, glyph: "di-browser" },
+          files: { title: "文件管理器", width: 640, height: 500, body: renderFiles, glyph: "di-files" },
         };
 
         /* ---------------- 窗口系统 ---------------- */
@@ -3361,6 +4268,13 @@ const data = {
           if (id === "treehole") initTreehole(win);
           if (id === "news") initNews(win);
           if (id === "social") initSocial(win);
+          if (id === "calc") initCalc(win);
+          if (id === "notes") initNotes(win);
+          if (id === "monitor") initMonitor(win);
+          if (id === "calendar") initCalendar(win);
+          if (id === "viewer") initViewer(win);
+          if (id === "browser") initBrowser(win);
+          if (id === "files") initFiles(win);
         };
 
         /* ---------------- 终端 ---------------- */
@@ -3378,21 +4292,83 @@ const data = {
             out.scrollTop = out.scrollHeight;
           };
 
+          const COMMANDS = [
+            "help",
+            "ls",
+            "open",
+            "whoami",
+            "date",
+            "time",
+            "version",
+            "apps",
+            "theme",
+            "wallpaper",
+            "neofetch",
+            "matrix",
+            "echo",
+            "about",
+            "clear",
+            "exit",
+          ];
+
+          const history: string[] = [];
+          let historyIdx = -1;
+
+          const neofetch = () => {
+            const art = [
+              "   ██████╗  ",
+              "  ██╔════╝  ",
+              "  ██║  ███╗ ",
+              "  ██║   ██║ ",
+              "  ╚██████╔╝ ",
+              "   ╚═════╝  ",
+            ];
+            const info = [
+              `${DATA.site.author}@guandao.xin`,
+              "-----------------",
+              "OS: Guandao OS 1.2 (Desktop Evolution)",
+              "引擎: Astro 静态渲染",
+              `运行窗口: ${windows.querySelectorAll(".window").length}`,
+              `虚拟桌面: ${desks.length}`,
+              `已开启: ${Math.max(1, Math.floor((Date.now() - OS_BOOT) / 60000))} 分钟`,
+            ];
+            for (let i = 0; i < Math.max(art.length, info.length); i++) {
+              print(`${art[i] ?? "          "}  ${info[i] ?? ""}`, "term-ok");
+            }
+          };
+
+          const matrix = () => {
+            const chars = "アイウエオカキクケコサシスセソ01";
+            for (let r = 0; r < 8; r++) {
+              let line = "";
+              for (let c = 0; c < 34; c++) line += chars[Math.floor(Math.random() * chars.length)];
+              print(line, "term-matrix");
+            }
+          };
+
           const run = (raw: string) => {
             const cmd = raw.trim();
             if (!cmd) return;
             unlock("hack");
+            history.push(cmd);
+            historyIdx = history.length;
             print(`~ $ ${cmd}`, "term-echo");
 
             const [name, ...rest] = cmd.split(/\s+/);
+            const arg = rest.join(" ");
             switch (name) {
               case "help":
-                print("ls              列出文章");
-                print("open <序号>     打开第 N 篇");
-                print("whoami          我是谁");
-                print("date            当前时间");
-                print("clear           清空");
-                print("exit            关掉终端");
+                print("ls / open <n>   列出并打开文章");
+                print("whoami / about  关于我");
+                print("apps            全部应用");
+                print("theme <dark|light>  切换外观");
+                print("wallpaper <nebula|dusk|deep>  换壁纸");
+                print("date / time     当前时间");
+                print("version         系统版本");
+                print("neofetch        系统信息");
+                print("matrix          黑客帝国");
+                print("echo <文本>     回声");
+                print("clear / exit    清空 / 关闭");
                 break;
               case "ls":
                 DATA.posts.forEach((post, index) => print(`${String(index + 1).padStart(2, "0")}  ${post.title}`));
@@ -3409,10 +4385,42 @@ const data = {
                 break;
               }
               case "whoami":
+              case "about":
                 print(`${DATA.site.author} · 大连理工大学 · 智能制造`);
                 break;
               case "date":
-                print(new Date().toLocaleString("zh-CN", { hour12: false }));
+                print(new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" }));
+                break;
+              case "time":
+                print(new Date().toLocaleTimeString("zh-CN", { hour12: false }));
+                break;
+              case "version":
+                print("Guandao OS 1.2 · Desktop Evolution", "term-accent");
+                break;
+              case "apps":
+                print(Object.values(APPS).map((a) => a.title).join("  "), "term-accent");
+                break;
+              case "theme": {
+                const t = arg === "light" ? "light" : "dark";
+                applyOsTheme(t);
+                print(`已切换到${t === "light" ? "浅色" : "深色"}模式。`, "term-ok");
+                break;
+              }
+              case "wallpaper": {
+                const w = ["nebula", "dusk", "deep"].includes(arg) ? arg : "nebula";
+                os.dataset.wall = w;
+                writeState({ wall: w });
+                print(`壁纸已切换：${w}`, "term-ok");
+                break;
+              }
+              case "neofetch":
+                neofetch();
+                break;
+              case "matrix":
+                matrix();
+                break;
+              case "echo":
+                print(arg);
                 break;
               case "clear":
                 out.innerHTML = "";
@@ -3429,6 +4437,24 @@ const data = {
             if (event.key === "Enter") {
               run(input.value);
               input.value = "";
+            } else if (event.key === "ArrowUp") {
+              event.preventDefault();
+              if (history.length) {
+                historyIdx = Math.max(0, historyIdx - 1);
+                input.value = history[historyIdx] ?? "";
+              }
+            } else if (event.key === "ArrowDown") {
+              event.preventDefault();
+              if (history.length) {
+                historyIdx = Math.min(history.length, historyIdx + 1);
+                input.value = history[historyIdx] ?? "";
+              }
+            } else if (event.key === "Tab") {
+              event.preventDefault();
+              const v = input.value.trim();
+              const hit = COMMANDS.filter((c) => c.startsWith(v));
+              if (hit.length === 1) input.value = hit[0] + " ";
+              else if (hit.length > 1) print(hit.join("  "), "term-muted");
             }
           });
 
@@ -9610,6 +10636,959 @@ const data = {
       }
 
       /* ============================================================
+         1.2 新应用：图标 + 界面
+         ============================================================ */
+
+      /* 图标：计算器 */
+      .di-calc {
+        background: linear-gradient(160deg, #9aa7bd 0%, #4a5568 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+      .di-calc::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 18px;
+        height: 22px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .di-calc::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 12px;
+        height: 4px;
+        margin-top: -7px;
+        border-radius: 1px;
+        background: #4a5568;
+        box-shadow: 0 0 0 0 transparent;
+      }
+
+      /* 图标：便签 */
+      .di-note {
+        background: linear-gradient(160deg, #ffd479 0%, #e0a73e 100%);
+      }
+      .di-note::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(-4deg);
+        width: 18px;
+        height: 20px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.95);
+      }
+      .di-note::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) rotate(-4deg);
+        width: 12px;
+        height: 2px;
+        margin-top: -4px;
+        background: #caa14a;
+        box-shadow: 0 4px 0 #caa14a, 0 8px 0 #caa14a;
+      }
+
+      /* 图标：监视器 */
+      .di-mon {
+        background: linear-gradient(160deg, #5eead4 0%, #0f766e 100%);
+      }
+      .di-mon::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: 9px;
+        transform: translateX(-50%);
+        width: 3px;
+        height: 8px;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: -8px 0 0 rgba(255, 255, 255, 0.9), 8px 0 0 rgba(255, 255, 255, 0.9), -4px -6px 0 rgba(255, 255, 255, 0.9), 4px -10px 0 rgba(255, 255, 255, 0.9);
+      }
+
+      /* 图标：日历 */
+      .di-cal {
+        background: linear-gradient(160deg, #f9a8d4 0%, #be3455 100%);
+      }
+      .di-cal::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 18px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.95);
+      }
+      .di-cal::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 6px;
+        margin-top: -9px;
+        border-radius: 3px 3px 0 0;
+        background: #be3455;
+      }
+
+      /* 图标：图片查看器 */
+      .di-viewer {
+        background: linear-gradient(160deg, #a5b4fc 0%, #4338ca 100%);
+      }
+      .di-viewer::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 16px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .di-viewer::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 5px;
+        height: 5px;
+        margin: -5px 0 0 -5px;
+        border-radius: 50%;
+        background: #4338ca;
+        box-shadow: 2px 5px 0 1px #6a5ae0;
+      }
+
+      /* 图标：浏览器 */
+      .di-browser {
+        background: linear-gradient(160deg, #7dd3fc 0%, #0369a1 100%);
+      }
+      .di-browser::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.92);
+      }
+      .di-browser::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 18px;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      /* 图标：文件管理器 */
+      .di-files {
+        background: linear-gradient(160deg, #fcd34d 0%, #d97706 100%);
+      }
+      .di-files::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 14px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: -2px -4px 0 -1px rgba(255, 255, 255, 0.75);
+      }
+
+      /* ---------------- 计算器 ---------------- */
+      .calc {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 14px;
+        height: 100%;
+      }
+      .calc-display {
+        font-family: var(--font-mono);
+        font-size: 30px;
+        font-weight: 600;
+        color: #fff;
+        text-align: right;
+        padding: 8px 6px;
+        word-break: break-all;
+        min-height: 46px;
+      }
+      .calc-history {
+        max-height: 60px;
+        overflow-y: auto;
+        display: grid;
+        gap: 2px;
+      }
+      .calc-h-item {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: right;
+      }
+      .calc-pad {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+      }
+      .calc-key {
+        border: 0;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.15s ease, transform 0.1s ease;
+      }
+      .calc-key:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+      .calc-key:active {
+        transform: scale(0.94);
+      }
+      .calc-key.is-op {
+        background: rgba(111, 140, 255, 0.28);
+        color: #cdd8ff;
+      }
+      .calc-key.is-clear {
+        background: rgba(255, 95, 87, 0.22);
+        color: #ffb0aa;
+      }
+
+      /* ---------------- 便签 ---------------- */
+      .notes-app {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 14px;
+      }
+      .notes-bar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .notes-search {
+        flex: 1;
+        padding: 7px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        outline: none;
+      }
+      .notes-add {
+        padding: 7px 14px;
+        border: 0;
+        border-radius: 8px;
+        background: linear-gradient(150deg, #6f8cff, #b06eff);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .notes-grid {
+        flex: 1;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 12px;
+        align-content: start;
+      }
+      .note-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        border-radius: 11px;
+        padding: 10px;
+        background: color-mix(in srgb, var(--note-color) 22%, transparent);
+        border: 1px solid color-mix(in srgb, var(--note-color) 45%, transparent);
+      }
+      .note-card.is-pinned {
+        border-color: var(--note-color);
+      }
+      .note-tools {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+      }
+      .note-pin,
+      .note-del {
+        border: 0;
+        background: none;
+        cursor: pointer;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+        padding: 0;
+      }
+      .note-del:hover {
+        color: #ff5f57;
+      }
+      .note-text {
+        flex: 1;
+        min-height: 60px;
+        border: 0;
+        background: none;
+        resize: none;
+        outline: none;
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .note-colors {
+        display: flex;
+        gap: 5px;
+        margin-top: 6px;
+      }
+      .note-color {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: var(--nc);
+        cursor: pointer;
+        padding: 0;
+      }
+      .note-color.is-on {
+        box-shadow: 0 0 0 2px #fff;
+      }
+      .notes-empty {
+        grid-column: 1 / -1;
+        padding: 40px 0;
+        text-align: center;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* ---------------- 系统监视器 ---------------- */
+      .monitor {
+        padding: 16px;
+        height: 100%;
+        overflow-y: auto;
+      }
+      .mon-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .mon-card {
+        padding: 12px;
+        border-radius: 11px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .mon-label {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .mon-val {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 24px;
+        color: #fff;
+        margin: 4px 0 6px;
+      }
+      .mon-bar {
+        height: 5px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+      }
+      .mon-bar i {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #6ee7a8, #6f8cff);
+        transition: width 0.6s ease;
+      }
+      .mon-note {
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.35);
+        margin: 10px 0 14px;
+      }
+      .mon-rows {
+        display: grid;
+        gap: 2px;
+      }
+      .mon-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 7px 0;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.07);
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .mon-row b {
+        color: #fff;
+        font-weight: 600;
+      }
+      .mon-apps-label {
+        margin: 14px 0 8px;
+      }
+      .mon-apps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .mon-app-chip {
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(111, 140, 255, 0.2);
+        color: #cdd8ff;
+        font-size: 11px;
+      }
+
+      .mon-app-chip {
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(111, 140, 255, 0.2);
+        color: #cdd8ff;
+        font-size: 11px;
+      }
+
+      /* ---------------- 日历 ---------------- */
+      .cal-app {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 14px;
+      }
+      .cal-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .cal-title {
+        font-size: 15px;
+        font-weight: 650;
+        color: #fff;
+        flex: 1;
+        text-align: center;
+      }
+      .cal-nav,
+      .cal-today,
+      .cal-add {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.8);
+        border-radius: 7px;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        padding: 4px 10px;
+      }
+      .cal-nav {
+        padding: 2px 11px;
+        font-size: 15px;
+      }
+      .cal-week {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        text-align: center;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+        padding-bottom: 6px;
+      }
+      .cal-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 3px;
+      }
+      .cal-cell {
+        aspect-ratio: 1;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 7px;
+        background: none;
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 12px;
+        cursor: pointer;
+        position: relative;
+      }
+      .cal-cell:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .cal-cell.is-empty {
+        pointer-events: none;
+      }
+      .cal-cell.is-today {
+        background: rgba(111, 140, 255, 0.3);
+        color: #fff;
+        font-weight: 700;
+      }
+      .cal-cell.is-selected {
+        outline: 1.5px solid var(--os-accent);
+      }
+      .cal-cell.has-event::after {
+        content: "";
+        position: absolute;
+        bottom: 4px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--os-warning);
+      }
+      .cal-events {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      .cal-events-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 8px;
+      }
+      .cal-event {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        margin-bottom: 6px;
+        font-size: 12px;
+      }
+      .cal-event-time {
+        font-family: var(--font-mono);
+        color: var(--os-accent);
+        font-size: 11px;
+        flex: none;
+      }
+      .cal-event-title {
+        flex: 1;
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .cal-event-del {
+        border: 0;
+        background: none;
+        color: rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .cal-event-del:hover {
+        color: #ff5f57;
+      }
+      .cal-event-empty {
+        font-size: 11.5px;
+        color: rgba(255, 255, 255, 0.35);
+        text-align: center;
+        padding: 12px 0;
+      }
+
+      /* ---------------- 图片查看器 ---------------- */
+      .viewer {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .viewer-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        flex-wrap: wrap;
+      }
+      .view-btn {
+        padding: 5px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.8);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .view-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .view-sep {
+        width: 1px;
+        height: 16px;
+        background: rgba(255, 255, 255, 0.1);
+        margin: 0 2px;
+      }
+      .viewer-stage {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.3);
+      }
+      .viewer-img {
+        max-width: 100%;
+        max-height: 100%;
+        transition: transform 0.2s ease;
+      }
+      .viewer-empty {
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+        line-height: 2;
+      }
+      .viewer-info {
+        padding: 8px 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      /* ---------------- 浏览器 ---------------- */
+      .browser {
+        padding: 14px;
+        height: 100%;
+        overflow-y: auto;
+      }
+      .browser-bar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .browser-url {
+        flex: 1;
+        padding: 9px 13px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font: inherit;
+        font-size: 12.5px;
+        outline: none;
+      }
+      .browser-url:focus {
+        border-color: var(--os-accent);
+      }
+      .browser-go {
+        padding: 9px 16px;
+        border: 0;
+        border-radius: 9px;
+        background: linear-gradient(150deg, #6f8cff, #b06eff);
+        color: #fff;
+        font: inherit;
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      .browser-sec {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        margin: 14px 0 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .browser-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .browser-link {
+        padding: 8px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 12px;
+        text-decoration: none;
+        transition: all 0.15s ease;
+      }
+      .browser-link:hover {
+        border-color: var(--os-accent);
+        color: #fff;
+      }
+      .browser-tip {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.35);
+        margin-top: 12px;
+        line-height: 1.8;
+      }
+      .browser-history {
+        display: grid;
+        gap: 4px;
+      }
+      .browser-h-item {
+        padding: 8px 12px;
+        border: 0;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(255, 255, 255, 0.7);
+        font: inherit;
+        font-size: 11.5px;
+        text-align: left;
+        cursor: pointer;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .browser-h-item:hover {
+        background: rgba(255, 255, 255, 0.09);
+      }
+      .browser-h-empty {
+        font-size: 11.5px;
+        color: rgba(255, 255, 255, 0.35);
+        padding: 8px 0;
+      }
+
+      .browser-h-empty {
+        font-size: 11.5px;
+        color: rgba(255, 255, 255, 0.35);
+        padding: 8px 0;
+      }
+
+      /* ---------------- 文件管理器 ---------------- */
+      .fs-app {
+        display: grid;
+        grid-template-columns: 128px 1fr;
+        height: 100%;
+        min-height: 0;
+      }
+      .fs-side {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 14px 10px;
+        border-right: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .fs-side-item {
+        padding: 7px 11px;
+        border: 0;
+        border-radius: 7px;
+        background: none;
+        color: rgba(255, 255, 255, 0.62);
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .fs-side-item.is-active {
+        background: rgba(111, 140, 255, 0.24);
+        color: #fff;
+      }
+      .fs-main {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        padding: 12px 14px;
+      }
+      .fs-bar {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .fs-search {
+        flex: 1;
+        min-width: 0;
+        padding: 6px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font: inherit;
+        font-size: 11.5px;
+        outline: none;
+      }
+      .fs-sort {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.8);
+        font: inherit;
+        font-size: 11px;
+        padding: 4px 6px;
+      }
+      .fs-new {
+        padding: 6px 11px;
+        border: 0;
+        border-radius: 7px;
+        background: rgba(111, 140, 255, 0.28);
+        color: #cdd8ff;
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .fs-crumb {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.45);
+        margin-bottom: 10px;
+      }
+      .fs-grid {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+        gap: 8px;
+        align-content: start;
+      }
+      .fs-node {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 12px 6px 10px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        text-align: center;
+      }
+      .fs-node:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .fs-node.is-selected {
+        border-color: rgba(111, 140, 255, 0.6);
+        background: rgba(111, 140, 255, 0.14);
+      }
+      .fs-node-icon {
+        font-size: 30px;
+        line-height: 1;
+      }
+      .fs-node-name {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+      }
+      .fs-star {
+        position: absolute;
+        top: 5px;
+        right: 7px;
+        font-size: 10px;
+        color: var(--os-warning);
+      }
+      .fs-empty {
+        grid-column: 1 / -1;
+        padding: 40px 0;
+        text-align: center;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+      .fs-detail {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-top: 8px;
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        min-height: 0;
+      }
+      .fs-detail:empty {
+        display: none;
+      }
+      .fs-detail-name {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.8);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .fs-detail-actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .fs-act {
+        padding: 4px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.75);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .fs-act:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .fs-act.is-danger {
+        color: #ff9b95;
+      }
+      .fs-node.is-editing .fs-node-name,
+      .fs-node.is-editing .fs-star {
+        display: none;
+      }
+      .fs-rename-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 2px 4px;
+        border: 1px solid var(--os-accent, rgba(143, 166, 255, 0.9));
+        border-radius: 4px;
+        background: rgba(20, 24, 40, 0.5);
+        color: #fff;
+        font: inherit;
+        font-size: 11px;
+        outline: none;
+      }
+      .fs-confirm-text {
+        font-size: 11.5px;
+        color: rgba(255, 255, 255, 0.65);
+      }
+      .fs-file-content {
+        width: 100%;
+        max-height: 180px;
+        overflow: auto;
+        margin: 0;
+        padding: 8px 10px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.28);
+        color: rgba(255, 255, 255, 0.82);
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      /* ---------------- 终端：彩色输出 ---------------- */
+      .term-line.term-ok {
+        color: #6ee7a8;
+      }
+      .term-line.term-accent {
+        color: #8fa6ff;
+      }
+      .term-line.term-matrix {
+        color: #4ade80;
+        text-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+      }
+      .term-line.term-error {
+        color: #ff8f8f;
+      }
+
+      /* ============================================================
          浅色主题
          ============================================================ */
       [data-os-theme="light"] body {
@@ -10441,6 +12420,222 @@ const data = {
       [data-os-theme="light"] .w-wx-sub,
       [data-os-theme="light"] .w-todo-empty {
         color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* 1.2 新应用：浅色 */
+      [data-os-theme="light"] .calc-display,
+      [data-os-theme="light"] .mon-val {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .calc-key {
+        background: rgba(20, 24, 40, 0.06);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .calc-key:hover {
+        background: rgba(20, 24, 40, 0.12);
+      }
+      [data-os-theme="light"] .calc-key.is-op {
+        background: rgba(111, 140, 255, 0.24);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .calc-h-item {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .notes-search {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .note-text {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .note-pin,
+      [data-os-theme="light"] .note-del {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .note-color.is-on {
+        box-shadow: 0 0 0 2px #1c2030;
+      }
+      [data-os-theme="light"] .notes-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .mon-card {
+        border-color: rgba(20, 24, 40, 0.1);
+        background: rgba(20, 24, 40, 0.04);
+      }
+      [data-os-theme="light"] .mon-label {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .mon-bar {
+        background: rgba(20, 24, 40, 0.1);
+      }
+      [data-os-theme="light"] .mon-note {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .mon-row {
+        border-bottom-color: rgba(20, 24, 40, 0.07);
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .mon-row b {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .mon-app-chip {
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+
+      /* 日历/图片查看器/浏览器：浅色 */
+      [data-os-theme="light"] .cal-title,
+      [data-os-theme="light"] .cal-event-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .cal-nav,
+      [data-os-theme="light"] .cal-today,
+      [data-os-theme="light"] .cal-add,
+      [data-os-theme="light"] .view-btn {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .cal-week {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .cal-cell {
+        color: rgba(20, 24, 40, 0.75);
+      }
+      [data-os-theme="light"] .cal-cell:hover {
+        background: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .cal-cell.is-today {
+        color: #fff;
+      }
+      [data-os-theme="light"] .cal-events {
+        border-top-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .cal-events-head {
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .cal-event {
+        background: rgba(20, 24, 40, 0.04);
+      }
+      [data-os-theme="light"] .cal-event-empty {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .viewer-bar,
+      [data-os-theme="light"] .viewer-info {
+        border-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .view-sep {
+        background: rgba(20, 24, 40, 0.1);
+      }
+      [data-os-theme="light"] .viewer-stage {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .viewer-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .viewer-info {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .browser-url {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.05);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .browser-sec {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .browser-link {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .browser-link:hover {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .browser-tip {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .browser-h-item {
+        background: rgba(20, 24, 40, 0.04);
+        color: rgba(20, 24, 40, 0.7);
+      }
+      [data-os-theme="light"] .browser-h-item:hover {
+        background: rgba(20, 24, 40, 0.09);
+      }
+      [data-os-theme="light"] .browser-h-empty {
+        color: rgba(20, 24, 40, 0.35);
+      }
+
+      /* 文件管理器：浅色 */
+      [data-os-theme="light"] .fs-side {
+        background: rgba(20, 24, 40, 0.03);
+        border-right-color: rgba(20, 24, 40, 0.07);
+      }
+      [data-os-theme="light"] .fs-side-item {
+        color: rgba(20, 24, 40, 0.62);
+      }
+      [data-os-theme="light"] .fs-side-item.is-active {
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .fs-search {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.05);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .fs-sort {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .fs-new {
+        background: rgba(111, 140, 255, 0.24);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .fs-crumb {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .fs-node:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .fs-node.is-selected {
+        border-color: rgba(111, 140, 255, 0.6);
+        background: rgba(111, 140, 255, 0.14);
+      }
+      [data-os-theme="light"] .fs-node-name {
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .fs-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .fs-detail {
+        border-top-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .fs-detail-name {
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .fs-act {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.05);
+        color: rgba(20, 24, 40, 0.75);
+      }
+      [data-os-theme="light"] .fs-act:hover {
+        background: rgba(20, 24, 40, 0.12);
+      }
+      [data-os-theme="light"] .fs-act.is-danger {
+        color: #b03028;
+      }
+      [data-os-theme="light"] .fs-rename-input {
+        background: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.9);
+      }
+      [data-os-theme="light"] .fs-confirm-text {
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .fs-file-content {
+        background: rgba(20, 24, 40, 0.05);
+        color: rgba(20, 24, 40, 0.82);
       }
     </style>
   </body>
