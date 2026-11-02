@@ -193,6 +193,10 @@ const data = {
             <span class="di-glyph di-tv"></span>
             <span class="di-label">新闻联播</span>
           </button>
+          <button class="desk-icon" type="button" data-app="social">
+            <span class="di-glyph di-net"></span>
+            <span class="di-label">社会网络</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -376,6 +380,7 @@ const data = {
           council: "di-vote",
           treehole: "di-hole",
           news: "di-tv",
+          social: "di-net",
         };
 
         const readDock = (): string[] => {
@@ -1793,6 +1798,319 @@ const data = {
             .join("");
         };
 
+        /* ---------------- 社会网络 ---------------- */
+
+        const SOCIAL_ID_KEY = "guandao.social.id";
+
+        const SOCIAL_AVATARS: Record<string, string> = {
+          whale: "/pet/whale-girl.webp",
+          tshirt: "/pet/tshirt.webp",
+          hoodie: "/pet/hoodie.webp",
+          suit: "/pet/suit.webp",
+          pajamas: "/pet/pajamas.webp",
+          swimsuit: "/pet/swimsuit.webp",
+          yukata: "/pet/yukata.webp",
+          uniform: "/pet/uniform.webp",
+        };
+
+        const socialId = (): string => {
+          let id = localStorage.getItem(SOCIAL_ID_KEY);
+          if (!id) {
+            id = makeId();
+            localStorage.setItem(SOCIAL_ID_KEY, id);
+          }
+          return id;
+        };
+
+        const socialRole = (createdAt: string) => {
+          const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
+          if (days < 1) return "刚来";
+          if (days < 7) return "新面孔";
+          if (days < 30) return "常客";
+          return "老熟人";
+        };
+
+        const renderSocial = () => `
+          <div class="social">
+            <div class="social-me" id="social-me"></div>
+            <div class="social-head">
+              <span class="social-count" id="social-count">正在加载…</span>
+              <span class="social-tip">认识一下常来的人</span>
+            </div>
+            <div class="social-list" id="social-list"></div>
+          </div>`;
+
+        const initSocial = (win: HTMLElement) => {
+          const meEl = win.querySelector("#social-me");
+          const listEl = win.querySelector("#social-list");
+          const countEl = win.querySelector("#social-count");
+          if (!meEl || !listEl || !countEl) return;
+
+          const sb = DATA.supabase as { url?: string; key?: string } | undefined;
+          const ready = Boolean(sb?.url && sb?.key);
+          const myId = socialId();
+
+          interface Person {
+            id: string;
+            nickname: string;
+            avatar: string;
+            bio: string;
+            created_at: string;
+            last_seen: string;
+          }
+
+          let me: Person | null = null;
+          let people: Person[] = [];
+          let following = new Set<string>();
+          let editing = false;
+
+          const headers = (extra: Record<string, string> = {}) => ({
+            apikey: sb!.key!,
+            Authorization: `Bearer ${sb!.key}`,
+            ...extra,
+          });
+
+          const renderMe = () => {
+            if (editing) {
+              const avatarBtns = Object.entries(SOCIAL_AVATARS)
+                .map(
+                  ([key, src]) => `
+                    <button class="social-pick ${me?.avatar === key ? "is-on" : ""}" type="button" data-avatar="${key}">
+                      <img src="${src}" alt="" />
+                    </button>`,
+                )
+                .join("");
+
+              meEl.innerHTML = `
+                <form class="social-form" id="social-form">
+                  <div class="social-picks" id="social-picks">${avatarBtns}</div>
+                  <input class="social-input" id="social-name" maxlength="16" placeholder="昵称（1–16 字）" value="${escapeHtml(me?.nickname ?? "")}" />
+                  <input class="social-input" id="social-bio" maxlength="80" placeholder="一句话介绍自己（可不填）" value="${escapeHtml(me?.bio ?? "")}" />
+                  <div class="social-form-bar">
+                    <button class="social-cancel" type="button" id="social-cancel">算了</button>
+                    <button class="social-save" type="submit">保存</button>
+                  </div>
+                </form>`;
+              return;
+            }
+
+            const src = SOCIAL_AVATARS[me?.avatar ?? "whale"] ?? SOCIAL_AVATARS.whale;
+
+            meEl.innerHTML = `
+              <div class="social-card">
+                <img class="social-face" src="${src}" alt="" />
+                <div class="social-info">
+                  <p class="social-name">${escapeHtml(me?.nickname ?? "还没起名字")}</p>
+                  <p class="social-bio">${escapeHtml(me?.bio || "这个人很懒，什么都没写")}</p>
+                  <p class="social-meta">
+                    <span class="social-role">${me ? socialRole(me.created_at) : "新面孔"}</span>
+                    <span>关注 ${following.size}</span>
+                  </p>
+                </div>
+                <button class="social-edit" type="button" id="social-edit">${me ? "改" : "起名"}</button>
+              </div>`;
+          };
+
+          const renderList = () => {
+            const others = people.filter((p) => p.id !== myId);
+
+            if (!others.length) {
+              listEl.innerHTML = '<p class="social-empty">还没有别的访客留下名字。</p>';
+              countEl.textContent = "0 位访客";
+              return;
+            }
+
+            countEl.textContent = `${others.length} 位访客`;
+
+            listEl.innerHTML = others
+              .map((p) => {
+                const src = SOCIAL_AVATARS[p.avatar] ?? SOCIAL_AVATARS.whale;
+                const isFollowing = following.has(p.id);
+                return `
+                  <div class="social-row">
+                    <img class="social-row-face" src="${src}" alt="" />
+                    <div class="social-row-info">
+                      <p class="social-row-name">${escapeHtml(p.nickname)}</p>
+                      <p class="social-row-bio">${escapeHtml(p.bio || "没写介绍")}</p>
+                    </div>
+                    <span class="social-row-role">${socialRole(p.created_at)}</span>
+                    <button class="social-follow ${isFollowing ? "is-on" : ""}" type="button" data-follow="${p.id}">
+                      ${isFollowing ? "已关注" : "关注"}
+                    </button>
+                  </div>`;
+              })
+              .join("");
+          };
+
+          const load = async () => {
+            if (!ready) {
+              countEl.textContent = "云端没接上";
+              return;
+            }
+
+            try {
+              // 我的资料
+              const meRes = await fetchWithTimeout(
+                `${sb!.url}/rest/v1/profiles?id=eq.${encodeURIComponent(myId)}&select=*`,
+                { headers: headers() },
+                8000,
+              );
+              if (meRes.ok) {
+                const rows = (await meRes.json()) as Person[];
+                me = rows[0] ?? null;
+              }
+
+              // 所有人
+              const pRes = await fetchWithTimeout(
+                `${sb!.url}/rest/v1/profiles?select=*&order=last_seen.desc&limit=50`,
+                { headers: headers() },
+                10000,
+              );
+              if (pRes.ok) people = (await pRes.json()) as Person[];
+
+              // 我关注了谁
+              const fRes = await fetchWithTimeout(
+                `${sb!.url}/rest/v1/follows?select=to_id&from_id=eq.${encodeURIComponent(myId)}`,
+                { headers: headers() },
+                8000,
+              );
+              if (fRes.ok) {
+                const rows = (await fRes.json()) as Array<{ to_id: string }>;
+                following = new Set(rows.map((r) => r.to_id));
+              }
+
+              renderMe();
+              renderList();
+            } catch {
+              countEl.textContent = "连不上，关掉重开试试";
+            }
+          };
+
+          const saveProfile = async (nickname: string, bio: string, avatar: string) => {
+            if (!ready) return;
+
+            const body = {
+              id: myId,
+              nickname,
+              bio,
+              avatar,
+              last_seen: new Date().toISOString(),
+            };
+
+            try {
+              await fetchWithTimeout(
+                `${sb!.url}/rest/v1/profiles?on_conflict=id`,
+                {
+                  method: "POST",
+                  headers: headers({
+                    "Content-Type": "application/json",
+                    Prefer: "resolution=merge-duplicates,return=minimal",
+                  }),
+                  body: JSON.stringify(body),
+                },
+                10000,
+              );
+
+              me = {
+                ...(me ?? { created_at: new Date().toISOString() }),
+                ...body,
+              } as Person;
+              editing = false;
+              renderMe();
+              renderList();
+              countEl.textContent = "资料已保存";
+            } catch {
+              countEl.textContent = "保存失败，再试一次";
+            }
+          };
+
+          const toggleFollow = async (toId: string) => {
+            if (!ready) return;
+
+            const on = following.has(toId);
+
+            // 先改界面
+            if (on) following.delete(toId);
+            else following.add(toId);
+            renderMe();
+            renderList();
+
+            try {
+              if (on) {
+                await fetchWithTimeout(
+                  `${sb!.url}/rest/v1/follows?from_id=eq.${encodeURIComponent(myId)}&to_id=eq.${encodeURIComponent(toId)}`,
+                  { method: "DELETE", headers: headers({ Prefer: "return=minimal" }) },
+                  8000,
+                );
+              } else {
+                await fetchWithTimeout(
+                  `${sb!.url}/rest/v1/follows`,
+                  {
+                    method: "POST",
+                    headers: headers({ "Content-Type": "application/json", Prefer: "return=minimal" }),
+                    body: JSON.stringify({ from_id: myId, to_id: toId }),
+                  },
+                  8000,
+                );
+              }
+            } catch {
+              // 回滚
+              if (on) following.add(toId);
+              else following.delete(toId);
+              renderMe();
+              renderList();
+              countEl.textContent = "操作没成功，再试一次";
+            }
+          };
+
+          // 事件：编辑 / 保存 / 选头像 / 关注
+          win.addEventListener("click", (event) => {
+            const target = event.target as HTMLElement;
+
+            if (target.closest("#social-edit")) {
+              editing = true;
+              renderMe();
+              return;
+            }
+
+            if (target.closest("#social-cancel")) {
+              editing = false;
+              renderMe();
+              return;
+            }
+
+            const pick = target.closest<HTMLElement>(".social-pick");
+            if (pick) {
+              const key = pick.dataset.avatar;
+              if (!key) return;
+              meEl.querySelectorAll(".social-pick").forEach((el) => el.classList.remove("is-on"));
+              pick.classList.add("is-on");
+              return;
+            }
+
+            const followBtn = target.closest<HTMLElement>(".social-follow");
+            if (followBtn) {
+              const id = followBtn.dataset.follow;
+              if (id) void toggleFollow(id);
+            }
+          });
+
+          win.addEventListener("submit", (event) => {
+            const form = event.target as HTMLFormElement;
+            if (!form.classList.contains("social-form")) return;
+            event.preventDefault();
+
+            const name = win.querySelector<HTMLInputElement>("#social-name")?.value.trim() ?? "";
+            const bio = win.querySelector<HTMLInputElement>("#social-bio")?.value.trim() ?? "";
+            const avatar = meEl.querySelector<HTMLElement>(".social-pick.is-on")?.dataset.avatar ?? "whale";
+
+            if (!name) return;
+            void saveProfile(name, bio, avatar);
+          });
+
+          void load();
+        };
+
         const APPS: Record<
           string,
           { title: string; width: number; height: number; body: () => string }
@@ -1810,6 +2128,7 @@ const data = {
           council: { title: "议会", width: 600, height: 540, body: renderCouncil },
           treehole: { title: "树洞", width: 560, height: 620, body: renderTreehole },
           news: { title: "新闻联播", width: 500, height: 560, body: renderNews },
+          social: { title: "社会网络", width: 560, height: 600, body: renderSocial },
         };
 
         /* ---------------- 窗口系统 ---------------- */
@@ -1985,6 +2304,7 @@ const data = {
             "council",
             "treehole",
             "news",
+            "social",
           ];
           if (ALL_APPS.every((app) => achState.apps.includes(app))) unlock("roam");
 
@@ -2003,6 +2323,7 @@ const data = {
           if (id === "council") initCouncil(win);
           if (id === "treehole") initTreehole(win);
           if (id === "news") initNews(win);
+          if (id === "social") initSocial(win);
         };
 
         /* ---------------- 终端 ---------------- */
@@ -3104,6 +3425,35 @@ const data = {
         bottom: 10px;
         border-radius: 1px;
         background: #0369a1;
+      }
+
+      /* 图标：网络 */
+      .di-net {
+        background: linear-gradient(160deg, #f0abfc 0%, #7e22ce 100%);
+      }
+      .di-net::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 9px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow:
+          9px 5px 0 rgba(255, 255, 255, 0.95),
+          2px 13px 0 rgba(255, 255, 255, 0.95);
+      }
+      .di-net::after {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 12px;
+        width: 11px;
+        height: 9px;
+        border-top: 1.5px solid rgba(255, 255, 255, 0.45);
+        border-right: 1.5px solid rgba(255, 255, 255, 0.45);
+        transform: skewY(-32deg);
       }
 
       /* 图标：齿轮 */
@@ -5073,6 +5423,261 @@ const data = {
         text-align: right;
       }
 
+      /* ---------------- 社会网络 ---------------- */
+
+      .social {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 14px 18px 10px;
+      }
+
+      .social-me {
+        margin-bottom: 14px;
+      }
+
+      .social-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border: 1px solid rgba(240, 171, 252, 0.22);
+        border-radius: 12px;
+        background: linear-gradient(150deg, rgba(240, 171, 252, 0.13), rgba(126, 34, 206, 0.09));
+      }
+
+      .social-face {
+        flex: none;
+        width: 52px;
+        height: 66px;
+        object-fit: contain;
+      }
+
+      .social-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .social-name {
+        margin: 0 0 3px;
+        font-size: 14px;
+        color: #fff;
+      }
+
+      .social-bio {
+        margin: 0 0 5px;
+        overflow: hidden;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.55);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .social-meta {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin: 0;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .social-role {
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.62);
+      }
+
+      .social-edit {
+        flex: none;
+        padding: 5px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 7px;
+        background: none;
+        color: rgba(255, 255, 255, 0.7);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .social-edit:hover {
+        border-color: rgba(240, 171, 252, 0.5);
+        color: #fff;
+      }
+
+      .social-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .social-tip {
+        margin-left: auto;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.28);
+      }
+
+      .social-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 7px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .social-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 11px;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .social-row-face {
+        flex: none;
+        width: 32px;
+        height: 40px;
+        object-fit: contain;
+      }
+
+      .social-row-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .social-row-name {
+        margin: 0 0 2px;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .social-row-bio {
+        margin: 0;
+        overflow: hidden;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.4);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .social-row-role {
+        flex: none;
+        font-size: 9.5px;
+        color: rgba(255, 255, 255, 0.35);
+      }
+
+      .social-follow {
+        flex: none;
+        padding: 4px 11px;
+        border: 1px solid rgba(240, 171, 252, 0.4);
+        border-radius: 6px;
+        background: rgba(240, 171, 252, 0.14);
+        color: #f3d9ff;
+        font: inherit;
+        font-size: 10.5px;
+        cursor: pointer;
+      }
+
+      .social-follow.is-on {
+        border-color: rgba(255, 255, 255, 0.14);
+        background: transparent;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .social-form {
+        display: grid;
+        gap: 8px;
+        padding: 12px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .social-picks {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .social-pick {
+        width: 38px;
+        height: 46px;
+        padding: 2px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+      }
+
+      .social-pick img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .social-pick.is-on {
+        border-color: rgba(240, 171, 252, 0.7);
+        background: rgba(240, 171, 252, 0.15);
+      }
+
+      .social-input {
+        padding: 7px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        outline: none;
+      }
+
+      .social-input:focus {
+        border-color: rgba(240, 171, 252, 0.6);
+      }
+
+      .social-form-bar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .social-cancel {
+        padding: 6px 14px;
+        border: 0;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.07);
+        color: rgba(255, 255, 255, 0.6);
+        font: inherit;
+        font-size: 11.5px;
+        cursor: pointer;
+      }
+
+      .social-save {
+        padding: 6px 16px;
+        border: 0;
+        border-radius: 7px;
+        background: linear-gradient(150deg, #c084fc, #7e22ce);
+        color: #fff;
+        font: inherit;
+        font-size: 11.5px;
+        cursor: pointer;
+      }
+
+      .social-empty {
+        margin: 0;
+        padding: 40px 0;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.35);
+        text-align: center;
+      }
+
       /* ---------------- 关机画面 ---------------- */
 
       .power-screen {
@@ -5276,6 +5881,7 @@ const data = {
       .dock-glyph.di-hole::before,
       .dock-glyph.di-tv::before,
       .dock-glyph.di-tv::after,
+      .dock-glyph.di-net::before,
       .dock-glyph.di-gear::before,
       .dock-glyph.di-gear::after,
       .dock-glyph.di-home::before,
@@ -5435,6 +6041,21 @@ const data = {
         height: 20px;
         border-radius: 50%;
         background: radial-gradient(circle at 38% 32%, #2a1f16 0%, #0f0a06 78%);
+      }
+
+      .dock-glyph.di-net {
+        background: linear-gradient(160deg, #f0abfc 0%, #7e22ce 100%);
+      }
+      .dock-glyph.di-net::before {
+        left: 12px;
+        top: 12px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow:
+          12px 7px 0 rgba(255, 255, 255, 0.95),
+          3px 17px 0 rgba(255, 255, 255, 0.95);
       }
 
       .dock-glyph.di-tv {
