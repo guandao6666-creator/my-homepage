@@ -1800,7 +1800,34 @@ const data = {
 
         /* ---------------- 社会网络 ---------------- */
 
-        const SOCIAL_ID_KEY = "guandao.social.id";
+        const AUTH_KEY = "guandao.auth";
+
+        interface AuthState {
+          token: string;
+          refresh: string;
+          uid: string;
+          email: string;
+          at: number;
+        }
+
+        const readAuth = (): AuthState | null => {
+          try {
+            const raw = JSON.parse(localStorage.getItem(AUTH_KEY) || "null");
+            if (raw && raw.token && raw.uid) return raw as AuthState;
+          } catch {
+            /* 坏数据当没登录 */
+          }
+          return null;
+        };
+
+        const writeAuth = (state: AuthState | null) => {
+          try {
+            if (state) localStorage.setItem(AUTH_KEY, JSON.stringify(state));
+            else localStorage.removeItem(AUTH_KEY);
+          } catch {
+            /* 隐私模式忽略 */
+          }
+        };
 
         const SOCIAL_AVATARS: Record<string, string> = {
           whale: "/pet/whale-girl.webp",
@@ -1811,15 +1838,6 @@ const data = {
           swimsuit: "/pet/swimsuit.webp",
           yukata: "/pet/yukata.webp",
           uniform: "/pet/uniform.webp",
-        };
-
-        const socialId = (): string => {
-          let id = localStorage.getItem(SOCIAL_ID_KEY);
-          if (!id) {
-            id = makeId();
-            localStorage.setItem(SOCIAL_ID_KEY, id);
-          }
-          return id;
         };
 
         const socialRole = (createdAt: string) => {
@@ -1848,7 +1866,7 @@ const data = {
 
           const sb = DATA.supabase as { url?: string; key?: string } | undefined;
           const ready = Boolean(sb?.url && sb?.key);
-          const myId = socialId();
+          let auth = readAuth();
 
           interface Person {
             id: string;
@@ -1866,11 +1884,28 @@ const data = {
 
           const headers = (extra: Record<string, string> = {}) => ({
             apikey: sb!.key!,
-            Authorization: `Bearer ${sb!.key}`,
+            // 登录后带用户 token，RLS 才会认 auth.uid()
+            Authorization: `Bearer ${auth ? auth.token : sb!.key}`,
             ...extra,
           });
 
           const renderMe = () => {
+            if (!auth) {
+              meEl.innerHTML = `
+                <form class="auth-form" id="auth-form">
+                  <p class="auth-title">登录 / 注册</p>
+                  <p class="auth-note">邮箱加密码就行，不用收验证码，注册完直接能用。</p>
+                  <input class="social-input" id="auth-email" type="email" placeholder="邮箱" autocomplete="username" />
+                  <input class="social-input" id="auth-password" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
+                  <div class="auth-bar">
+                    <button class="auth-btn" type="submit">登录</button>
+                    <button class="auth-btn is-ghost" type="button" id="auth-signup">注册</button>
+                  </div>
+                  <p class="auth-msg" id="auth-msg"></p>
+                </form>`;
+              return;
+            }
+
             if (editing) {
               const avatarBtns = Object.entries(SOCIAL_AVATARS)
                 .map(
@@ -1907,12 +1942,15 @@ const data = {
                     <span>关注 ${following.size}</span>
                   </p>
                 </div>
-                <button class="social-edit" type="button" id="social-edit">${me ? "改" : "起名"}</button>
+                <div class="social-card-btns">
+                  <button class="social-edit" type="button" id="social-edit">${me ? "改" : "起名"}</button>
+                  <button class="social-edit is-quiet" type="button" id="social-signout">退出</button>
+                </div>
               </div>`;
           };
 
           const renderList = () => {
-            const others = people.filter((p) => p.id !== myId);
+            const others = people.filter((p) => p.id !== (auth ? auth.uid : ""));
 
             if (!others.length) {
               listEl.innerHTML = '<p class="social-empty">还没有别的访客留下名字。</p>';
@@ -1942,6 +1980,116 @@ const data = {
               .join("");
           };
 
+          const doAuth = async (mode: "in" | "up") => {
+            const email = win.querySelector<HTMLInputElement>("#auth-email")?.value.trim() ?? "";
+            const password = win.querySelector<HTMLInputElement>("#auth-password")?.value ?? "";
+            const msg = win.querySelector("#auth-msg");
+
+            if (!email || !email.includes("@")) {
+              if (msg) msg.textContent = "请填一个有效的邮箱";
+              return;
+            }
+            if (password.length < 6) {
+              if (msg) msg.textContent = "密码至少 6 位";
+              return;
+            }
+            if (!ready) {
+              if (msg) msg.textContent = "云端没接上";
+              return;
+            }
+
+            if (msg) msg.textContent = mode === "in" ? "正在登录…" : "正在注册…";
+
+            try {
+              const path = mode === "in" ? "/auth/v1/token?grant_type=password" : "/auth/v1/signup";
+              const res = await fetchWithTimeout(
+                `${sb!.url}${path}`,
+                {
+                  method: "POST",
+                  headers: { apikey: sb!.key!, "Content-Type": "application/json" },
+                  body: JSON.stringify({ email, password }),
+                },
+                15000,
+              );
+              const data = (await res.json()) as {
+                access_token?: string;
+                refresh_token?: string;
+                user?: { id: string; email: string };
+                error_description?: string;
+                msg?: string;
+                error?: string;
+              };
+
+              if (!res.ok) {
+                const raw = data.error_description || data.msg || data.error || "操作失败";
+                throw new Error(String(raw).replace(/^\w+:\s*/, ""));
+              }
+
+              if (!data.access_token || !data.user) {
+                throw new Error("注册成功但没拿到登录状态，点一下登录试试");
+              }
+
+              const next: AuthState = {
+                token: data.access_token,
+                refresh: data.refresh_token ?? "",
+                uid: data.user.id,
+                email: data.user.email ?? email,
+                at: Date.now(),
+              };
+
+              writeAuth(next);
+              auth = next;
+
+              await ensureProfile();
+              await load();
+            } catch (err) {
+              if (msg) msg.textContent = (err as Error).message;
+            }
+          };
+
+          const ensureProfile = async () => {
+            if (!auth) return;
+
+            const check = await fetchWithTimeout(
+              `${sb!.url}/rest/v1/profiles?id=eq.${encodeURIComponent(auth.uid)}&select=id`,
+              { headers: headers() },
+              8000,
+            );
+
+            if (check.ok) {
+              const rows = (await check.json()) as Array<{ id: string }>;
+              if (rows.length) return;
+            }
+
+            const fallback = (auth.email || "访客").split("@")[0].slice(0, 16) || "访客";
+
+            await fetchWithTimeout(
+              `${sb!.url}/rest/v1/profiles`,
+              {
+                method: "POST",
+                headers: headers({ "Content-Type": "application/json", Prefer: "return=minimal" }),
+                body: JSON.stringify({
+                  id: auth.uid,
+                  nickname: fallback,
+                  avatar: "whale",
+                  bio: "",
+                  last_seen: new Date().toISOString(),
+                }),
+              },
+              10000,
+            );
+          };
+
+          const signOut = () => {
+            writeAuth(null);
+            auth = null;
+            me = null;
+            following = new Set();
+            renderMe();
+            renderList();
+            countEl.textContent = "已退出";
+          };
+
           const load = async () => {
             if (!ready) {
               countEl.textContent = "云端没接上";
@@ -1951,7 +2099,7 @@ const data = {
             try {
               // 我的资料
               const meRes = await fetchWithTimeout(
-                `${sb!.url}/rest/v1/profiles?id=eq.${encodeURIComponent(myId)}&select=*`,
+                `${sb!.url}/rest/v1/profiles?id=eq.${encodeURIComponent(auth ? auth.uid : "")}&select=*`,
                 { headers: headers() },
                 8000,
               );
@@ -1970,7 +2118,7 @@ const data = {
 
               // 我关注了谁
               const fRes = await fetchWithTimeout(
-                `${sb!.url}/rest/v1/follows?select=to_id&from_id=eq.${encodeURIComponent(myId)}`,
+                `${sb!.url}/rest/v1/follows?select=to_id&from_id=eq.${encodeURIComponent(auth ? auth.uid : "")}`,
                 { headers: headers() },
                 8000,
               );
@@ -1990,7 +2138,7 @@ const data = {
             if (!ready) return;
 
             const body = {
-              id: myId,
+              id: auth.uid,
               nickname,
               bio,
               avatar,
@@ -2038,7 +2186,7 @@ const data = {
             try {
               if (on) {
                 await fetchWithTimeout(
-                  `${sb!.url}/rest/v1/follows?from_id=eq.${encodeURIComponent(myId)}&to_id=eq.${encodeURIComponent(toId)}`,
+                  `${sb!.url}/rest/v1/follows?from_id=eq.${encodeURIComponent(auth ? auth.uid : "")}&to_id=eq.${encodeURIComponent(toId)}`,
                   { method: "DELETE", headers: headers({ Prefer: "return=minimal" }) },
                   8000,
                 );
@@ -2048,7 +2196,7 @@ const data = {
                   {
                     method: "POST",
                     headers: headers({ "Content-Type": "application/json", Prefer: "return=minimal" }),
-                    body: JSON.stringify({ from_id: myId, to_id: toId }),
+                    body: JSON.stringify({ from_id: auth ? auth.uid : "", to_id: toId }),
                   },
                   8000,
                 );
@@ -2066,6 +2214,16 @@ const data = {
           // 事件：编辑 / 保存 / 选头像 / 关注
           win.addEventListener("click", (event) => {
             const target = event.target as HTMLElement;
+
+            if (target.closest("#auth-signup")) {
+              void doAuth("up");
+              return;
+            }
+
+            if (target.closest("#social-signout")) {
+              signOut();
+              return;
+            }
 
             if (target.closest("#social-edit")) {
               editing = true;
@@ -2097,6 +2255,13 @@ const data = {
 
           win.addEventListener("submit", (event) => {
             const form = event.target as HTMLFormElement;
+
+            if (form.id === "auth-form") {
+              event.preventDefault();
+              void doAuth("in");
+              return;
+            }
+
             if (!form.classList.contains("social-form")) return;
             event.preventDefault();
 
@@ -5504,6 +5669,75 @@ const data = {
       .social-edit:hover {
         border-color: rgba(240, 171, 252, 0.5);
         color: #fff;
+      }
+
+      .social-card-btns {
+        display: grid;
+        gap: 5px;
+        flex: none;
+      }
+
+      .social-edit.is-quiet {
+        border-color: transparent;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 10px;
+      }
+
+      .auth-form {
+        display: grid;
+        gap: 8px;
+        padding: 14px 16px;
+        border: 1px solid rgba(240, 171, 252, 0.26);
+        border-radius: 12px;
+        background: rgba(240, 171, 252, 0.07);
+      }
+
+      .auth-title {
+        margin: 0;
+        font-size: 14px;
+        color: #fff;
+      }
+
+      .auth-note {
+        margin: 0 0 2px;
+        font-size: 10.5px;
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .auth-bar {
+        display: flex;
+        gap: 8px;
+        margin-top: 2px;
+      }
+
+      .auth-btn {
+        flex: 1;
+        padding: 7px 0;
+        border: 0;
+        border-radius: 7px;
+        background: linear-gradient(150deg, #c084fc, #7e22ce);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .auth-btn.is-ghost {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .auth-btn:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+
+      .auth-msg {
+        min-height: 14px;
+        margin: 2px 0 0;
+        font-size: 10.5px;
+        color: #ffb4b4;
       }
 
       .social-head {
