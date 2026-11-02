@@ -1542,6 +1542,7 @@ const data = {
           });
 
           render();
+          window.addEventListener("guandao:auth-change", () => render());
         };
 
 
@@ -1872,6 +1873,7 @@ const data = {
             }
           });
 
+          render();
           void load();
         };
 
@@ -2335,9 +2337,6 @@ const data = {
             void saveProfile(name, bio, avatar);
           });
 
-          window.addEventListener("guandao:auth-change", () => render());
-
-          render();
           void load();
         };
 
