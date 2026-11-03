@@ -319,6 +319,18 @@ const data = {
 
         <div class="windows" id="windows"></div>
 
+        <!-- 手机桌面模式：卡片开关入口（紧凑布局下隐藏） -->
+        <button class="card-tools" id="card-tools" type="button" title="选择桌面卡片" aria-haspopup="dialog">
+          <svg class="ct-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="1.6" y="1.6" width="5.3" height="5.3" rx="1.6" stroke="currentColor" stroke-width="1.3" />
+            <rect x="9.1" y="1.6" width="5.3" height="5.3" rx="1.6" stroke="currentColor" stroke-width="1.3" />
+            <rect x="1.6" y="9.1" width="5.3" height="5.3" rx="1.6" stroke="currentColor" stroke-width="1.3" />
+            <rect x="9.1" y="9.1" width="5.3" height="5.3" rx="1.6" stroke="currentColor" stroke-width="1.3" />
+          </svg>
+          <span>卡片</span>
+          <b class="ct-badge" id="ct-badge" hidden></b>
+        </button>
+
         <div class="desk-pet" id="desk-pet" title="摸摸">
           <p class="pet-say" id="pet-say"></p>
           <img class="pet-img" src="/pet/whale-girl.webp" alt="" draggable="false" />
@@ -348,25 +360,40 @@ const data = {
 
       <footer class="dock" id="dock">
         <button class="dock-item" type="button" data-app="posts" title="文章">
-          <span class="dock-glyph di-folder"></span>
+          <span class="di-glyph di-folder"></span>
         </button>
         <button class="dock-item" type="button" data-app="about" title="关于">
-          <span class="dock-glyph di-person"></span>
+          <span class="di-glyph di-person"></span>
         </button>
         <button class="dock-item" type="button" data-app="terminal" title="终端">
-          <span class="dock-glyph di-term"></span>
+          <span class="di-glyph di-term"></span>
         </button>
         <button class="dock-item" type="button" data-app="settings" title="设置">
-          <span class="dock-glyph di-gear"></span>
+          <span class="di-glyph di-gear"></span>
         </button>
         <span class="dock-sep"></span>
         <a class="dock-item dock-link" href="/home/" title="回到博客">
-          <span class="dock-glyph di-home"></span>
+          <span class="di-glyph di-home"></span>
         </a>
       </footer>
     </div>
 
     <div class="toast-stack" id="toast-stack"></div>
+
+    <!-- 桌面卡片选择器（手机桌面模式） -->
+    <div class="card-picker" id="card-picker" hidden>
+      <div class="cp-backdrop" id="cp-backdrop"></div>
+      <div class="cp-sheet" role="dialog" aria-modal="true" aria-label="选择桌面卡片">
+        <span class="cp-grip" aria-hidden="true"></span>
+        <div class="cp-head">
+          <span class="cp-title">桌面卡片</span>
+          <button class="cp-done" id="cp-done" type="button">完成</button>
+        </div>
+        <p class="cp-sub">勾选想放在桌面上的卡片，屏幕上放不下的会自动收起。</p>
+        <div class="cp-list" id="cp-list"></div>
+        <p class="cp-note" id="cp-note" hidden></p>
+      </div>
+    </div>
 
     <div class="power-screen" id="power-screen" hidden>
       <div class="power-inner">
@@ -742,6 +769,14 @@ const data = {
         const hint = document.getElementById("desk-hint");
         if (!os || !windows || !hint) return;
 
+        /* 输入框聚焦时，浏览器会把 overflow:hidden 的容器滚到「可见」位置，
+           整个桌面会跟着上移（手机上打开终端最明显）。这里把它钉死在原点。 */
+        const lockDeskScroll = () => {
+          if (os.scrollTop !== 0) os.scrollTop = 0;
+          if (os.scrollLeft !== 0) os.scrollLeft = 0;
+        };
+        os.addEventListener("scroll", lockDeskScroll, { passive: true });
+
         let zTop = 10;
         let cascade = 0;
 
@@ -1007,19 +1042,19 @@ const data = {
             .map(
               (id) => `
                 <button class="dock-item" type="button" data-app="${id}" title="${APPS[id].title}">
-                  <span class="dock-glyph ${APP_ICON[id] ?? "di-folder"}"></span>
+                  <span class="di-glyph ${APP_ICON[id] ?? "di-folder"}"></span>
                 </button>`,
             )
             .join("");
 
           dock.innerHTML = `
             <button class="dock-item dock-launch" type="button" data-launchpad title="启动台">
-              <span class="dock-glyph di-grid"></span>
+              <span class="di-glyph di-grid"></span>
             </button>
             ${items}
             <span class="dock-sep"></span>
             <a class="dock-item dock-link" href="/home/" title="回到博客">
-              <span class="dock-glyph di-home"></span>
+              <span class="di-glyph di-home"></span>
             </a>`;
 
           // 重建后把运行中的小圆点补回去
@@ -4082,6 +4117,10 @@ const data = {
 
         const snapPreview = document.getElementById("snap-preview");
 
+        /* 手机「桌面模式」：屏宽只有几百像素，窗口必须接近满宽才可用 */
+        const phoneDesktopMode = () =>
+          document.body.classList.contains("is-touch-desktop") && window.innerWidth <= 720;
+
         // 计算当前指针指向的贴靠区域（null 表示不贴靠）
         const snapZone = (x: number, y: number) => {
           const W = window.innerWidth;
@@ -4089,14 +4128,17 @@ const data = {
           const EDGE = 26;
           const CORNER = 48;
           const TOP = 42;
-          if (x < CORNER && y < TOP) return "tl";
-          if (x > W - CORNER && y < TOP) return "tr";
-          if (x < CORNER && y > H - 60) return "bl";
-          if (x > W - CORNER && y > H - 60) return "br";
-          if (x < EDGE) return "left";
-          if (x > W - EDGE) return "right";
-          if (y < TOP) return "full";
-          return null;
+          let zone: string | null = null;
+          if (x < CORNER && y < TOP) zone = "tl";
+          else if (x > W - CORNER && y < TOP) zone = "tr";
+          else if (x < CORNER && y > H - 60) zone = "bl";
+          else if (x > W - CORNER && y > H - 60) zone = "br";
+          else if (x < EDGE) zone = "left";
+          else if (x > W - EDGE) zone = "right";
+          else if (y < TOP) zone = "full";
+          // 手机桌面模式下左右半屏只有 190px 宽，吸过去反而不可用，只保留全屏吸附
+          if (zone && zone !== "full" && phoneDesktopMode()) return null;
+          return zone;
         };
 
         // 贴靠目标矩形（桌面坐标，顶栏下方）
@@ -4168,10 +4210,13 @@ const data = {
           let snapTarget: string | null = null;
 
           const onMove = (event: PointerEvent) => {
+            // 手机桌面模式窗口接近满宽，左边界不允许拖出屏幕，
+            // 否则标题栏上的三个按钮会被推出可视区
+            const phone = phoneDesktopMode();
             const maxX = window.innerWidth - 140;
             const maxY = window.innerHeight - 110;
-            win.style.left = `${Math.max(-40, Math.min(maxX, originX + event.clientX - startX))}px`;
-            win.style.top = `${Math.max(32, Math.min(maxY, originY + event.clientY - startY))}px`;
+            win.style.left = `${Math.max(phone ? 0 : -40, Math.min(maxX, originX + event.clientX - startX))}px`;
+            win.style.top = `${Math.max(phone ? 36 : 32, Math.min(maxY, originY + event.clientY - startY))}px`;
 
             snapTarget = snapZone(event.clientX, event.clientY);
             showSnapPreview(snapTarget);
@@ -4213,6 +4258,28 @@ const data = {
           });
         };
 
+        /* 手机「桌面模式」下的窗口摆放：屏幕只有几百像素宽，
+           窗口按接近满宽打开才有可用性，靠纵向错位体现是多个窗口 */
+        const placePhoneDesktopWin = (
+          win: HTMLElement,
+          app: { width: number; height: number },
+          step: number,
+          saved?: { width?: number; height?: number },
+        ) => {
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          const top = 44 + (step % 4) * 32;
+          const w = Math.min(Math.max(saved?.width ?? app.width, 240), vw - 24);
+          const maxH = vh - top - 36 - 96; // 36 状态栏 + 96 程序坞
+          const h = Math.min(saved?.height ?? app.height, maxH);
+          win.style.width = `${w}px`;
+          // 极矮的屏幕上宁可比 240 更矮，也不要顶出屏幕
+          win.style.height = `${Math.max(Math.min(240, maxH), h)}px`;
+          win.style.left = "12px";
+          win.style.right = "auto";
+          win.style.top = `${top}px`;
+        };
+
         const openApp = (id: string) => {
           const app = APPS[id];
           if (!app) return;
@@ -4234,7 +4301,8 @@ const data = {
           win.dataset.app = id;
           win.dataset.space = String(currentSpace);
 
-          const offset = (cascade++ % 5) * 26;
+          const step = cascade++;
+          const offset = (step % 5) * 26;
           // 手机上「桌面模式」开启时，按真正的桌面窗口来摆放，而非强制全宽
           const touchDesktop = document.body.classList.contains("is-touch-desktop");
           const narrow = window.innerWidth <= 720 && !touchDesktop;
@@ -4248,19 +4316,26 @@ const data = {
           if (narrow) {
             // 紧凑模式：位置固定，不要级联偏移，否则窗口会一路往下跑
             win.style.top = "110px";
-          } else if (touchDesktop && window.innerWidth <= 720) {
-            // 手机上的桌面模式：窗口放在左侧图标栏右侧，宽度自适应
-            win.style.left = "148px";
-            win.style.top = "44px";
-            win.style.width = `${Math.min(saved?.width ?? app.width, window.innerWidth - 160)}px`;
+          } else if (phoneDesktopMode()) {
+            placePhoneDesktopWin(win, app, step, saved);
           } else if (saved) {
             // 沿用上次的位置，越界就拉回可视范围
             win.style.left = `${Math.max(-40, Math.min(window.innerWidth - 140, saved.left))}px`;
             win.style.top = `${Math.max(32, Math.min(window.innerHeight - 110, saved.top))}px`;
           } else {
             win.style.left = `${Math.max(16, (window.innerWidth - app.width) / 2 + offset - 60)}px`;
-            win.style.top = `${Math.max(52, 96 + offset)}px`;
+            // 矮屏（横屏手机）没有多余的纵向空间，窗口贴着状态栏往下排
+            win.style.top = `${Math.max(52, window.innerHeight < 520 ? 48 : 96 + offset)}px`;
           }
+
+          /* 统一收口：窗口不能超出可视区。
+             横屏手机只有 390px 高，按默认高度开出来会顶到屏幕外。 */
+          const winTop = Number.parseFloat(win.style.top) || 0;
+          const maxH = window.innerHeight - 36 - winTop - 88;
+          const curH = Number.parseFloat(win.style.height) || 0;
+          if (maxH >= 120 && curH > maxH) win.style.height = `${maxH}px`;
+          const curW = Number.parseFloat(win.style.width) || 0;
+          if (curW > window.innerWidth - 24) win.style.width = `${window.innerWidth - 24}px`;
 
           win.innerHTML = `
             <div class="titlebar">
@@ -4522,7 +4597,8 @@ const data = {
             }
           });
 
-          input.focus();
+          // preventScroll：否则浏览器会把 overflow:hidden 的桌面容器整体滚上去
+          input.focus({ preventScroll: true });
         };
 
         /* ---------------- 设置 ---------------- */
@@ -4587,16 +4663,19 @@ const data = {
             document.body.classList.toggle("os-reduce-motion", on);
           });
 
-          // 桌面小组件开关
+          // 桌面小组件开关（统一的 setWidgetEnabled，手机卡片选择器会同步）
           win.querySelectorAll<HTMLInputElement>("[data-widget-toggle]").forEach((box) => {
             box.addEventListener("change", () => {
-              const id = box.dataset.widgetToggle ?? "";
-              const all = readWidgets();
-              all[id] = { ...all[id], enabled: box.checked };
-              localStorage.setItem(WIDGET_KEY, JSON.stringify(all));
-              renderWidget(id);
+              setWidgetEnabled(box.dataset.widgetToggle ?? "", box.checked);
             });
           });
+          // 在手机卡片选择器里改过之后，回到设置面板要显示最新状态
+          const syncWidgetBoxes = () => {
+            win.querySelectorAll<HTMLInputElement>("[data-widget-toggle]").forEach((box) => {
+              box.checked = widgetOn(box.dataset.widgetToggle ?? "");
+            });
+          };
+          window.addEventListener("guandao:widgets-change", syncWidgetBoxes);
 
           // 数据管理
           win.querySelector("#data-export")?.addEventListener("click", exportData);
@@ -4871,7 +4950,11 @@ const data = {
 
         // 用事件委托，程序坞重建后不用重新绑定
         document.addEventListener("click", (event) => {
-          const trigger = (event.target as HTMLElement).closest<HTMLElement>("[data-app]");
+          const target = event.target as HTMLElement;
+          // 窗口本身也带 data-app，窗口内部的点击不能再走一遍 openApp，
+          // 否则点「收起」时会被随后的 openApp 立刻还原
+          if (target.closest(".window")) return;
+          const trigger = target.closest<HTMLElement>("[data-app]");
           if (!trigger) return;
           const id = trigger.dataset.app;
           if (id) openApp(id);
@@ -5143,8 +5226,8 @@ const data = {
 
         /* 切换布局模式后，重新摆放已打开的窗口 */
         const relayoutWindows = () => {
-          const touchDesktop = document.body.classList.contains("is-touch-desktop");
-          const narrow = window.innerWidth <= 720 && !touchDesktop;
+          const phoneDesktop = phoneDesktopMode();
+          const narrow = window.innerWidth <= 720 && !phoneDesktop;
           let i = 0;
           windows.querySelectorAll<HTMLElement>(".window").forEach((win) => {
             if (win.classList.contains("is-maximized")) return;
@@ -5154,12 +5237,9 @@ const data = {
               win.style.left = "8px";
               win.style.right = "8px";
               win.style.top = "110px";
-            } else if (touchDesktop && window.innerWidth <= 720) {
-              win.style.left = "148px";
-              win.style.top = "44px";
-              const curW = Number(win.style.width.replace("px", "")) || app.width;
-              win.style.width = `${Math.min(curW, window.innerWidth - 160)}px`;
-              win.style.right = "auto";
+            } else if (phoneDesktop) {
+              // 切到桌面模式时把窗口按新规则重摆一遍，越界的自然回位
+              placePhoneDesktopWin(win, app, i);
             } else {
               const offset = (i % 5) * 26;
               win.style.left = `${Math.max(16, (window.innerWidth - app.width) / 2 + offset - 60)}px`;
@@ -5180,6 +5260,8 @@ const data = {
             localStorage.setItem(MOBILE_DESKTOP_KEY, on ? "1" : "0");
           } catch {}
           relayoutWindows();
+          // 两套布局的图标列数、卡片堆叠都不一样，切完重新算一遍
+          window.setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
           pushNotif({
             icon: on ? "🖥" : "📱",
             title: on ? "桌面模式已开启" : "已切回手机布局",
@@ -5370,6 +5452,7 @@ const data = {
           fillLaunchpad();
           launchpad.hidden = false;
           launchpad.setAttribute("aria-hidden", "false");
+          layoutLaunchpad();
         };
 
         const resetLpDragEl = () => {
@@ -5867,7 +5950,7 @@ const data = {
                     <span class="mc-card-title">${escapeHtml(title)}</span>
                     <button class="mc-card-close" data-close="${id}" title="关闭">×</button>
                   </div>
-                  <div class="mc-card-body"><span class="mc-glyph dock-glyph ${glyph}"></span></div>
+                  <div class="mc-card-body"><span class="mc-glyph di-glyph ${glyph}"></span></div>
                   <span class="mc-card-space">${escapeHtml(desks.find((d) => d.id === Number(w.dataset.space))?.name ?? "")}</span>
                 </div>`;
             })
@@ -5993,8 +6076,44 @@ const data = {
           todo: "待办",
           sys: "系统信息",
         };
+        const WIDGET_DESC: Record<string, string> = {
+          clock: "时间与日期",
+          calendar: "当月日历",
+          weather: "大连实时天气",
+          todo: "每天的小任务",
+          sys: "存储与运行状态",
+        };
 
         const widgetOn = (id: string) => readWidgets()[id]?.enabled !== false;
+
+        /* ---- 手机桌面模式的卡片入口：角标显示被屏幕高度挤掉的张数 ---- */
+        const cardTools = document.getElementById("card-tools");
+        const ctBadge = document.getElementById("ct-badge");
+        const cardPicker = document.getElementById("card-picker");
+        const cpList = document.getElementById("cp-list");
+        const cpNote = document.getElementById("cp-note");
+
+        const widgetShown = (id: string) => {
+          const el = widgetHost?.querySelector(`[data-widget="${id}"]`);
+          return !!el && !el.classList.contains("is-squeezed");
+        };
+        const hiddenWidgets = () => WIDGET_IDS.filter((id) => widgetOn(id) && !widgetShown(id));
+
+        const refreshCardTools = () => {
+          const hidden = hiddenWidgets().length;
+          if (ctBadge) {
+            ctBadge.textContent = hidden ? `+${hidden}` : "";
+            ctBadge.hidden = !hidden;
+          }
+          if (cardTools) {
+            cardTools.title = hidden ? `有 ${hidden} 张卡片被屏幕高度收起，点此调整` : "选择桌面卡片";
+          }
+          if (cpNote) {
+            const names = hiddenWidgets().map((id) => WIDGET_TITLES[id]).join("、");
+            cpNote.textContent = names ? `屏幕高度放不下：${names} 已自动收起` : "";
+            cpNote.hidden = !names;
+          }
+        };
 
         const widgetBody = (id: string) => {
           switch (id) {
@@ -6013,22 +6132,71 @@ const data = {
           }
         };
 
+        /* 没被手动拖过的卡片：右对齐，自上而下依次堆叠。
+           以前用固定 120px 步长，日历比这个高，天气就会压在日历身上。
+           现在按每张卡的实际高度累加，任何屏幕都不会重叠。
+           竖向空间不足时按优先级从后往前收起，卡片不会掉到屏幕外。 */
+        const WIDGET_GAP = 12;
+        const WIDGET_MARGIN = 20;
+        const WIDGET_PRIORITY = ["clock", "calendar", "weather", "todo", "sys"];
+
+        const stackWidgets = () => {
+          if (!widgetHost) return;
+          // 手机紧凑模式下卡片区是 display:none，量不到高度，
+          // 这时候排版只会把卡片全叠在同一个坐标上
+          if (widgetHost.offsetParent === null) return;
+          const vw = window.innerWidth;
+          const deskH = document.getElementById("desk")?.clientHeight ?? window.innerHeight;
+          // 底部只留一点点余量：卡片栏本来就避开程序坞的水平范围；
+          // 手机桌面模式多留一截，卡片不要一路顶到程序坞，桌面才有呼吸感
+          const bottomLimit = deskH - (phoneDesktopMode() ? 120 : 12);
+          // 手机桌面模式下与图标栏同一条基线，窗口盖上来时不会露出半截卡片
+          let y = phoneDesktopMode() ? 44 : 24;
+          let overflowed = false;
+          for (const id of WIDGET_PRIORITY) {
+            const el = widgetHost.querySelector<HTMLElement>(`[data-widget="${id}"]`);
+            if (!el) continue;
+            const st = readWidgets()[id];
+            const w = el.offsetWidth || 184;
+            /* 手动拖过位置的不参与自动排版，也不该被收起。
+               但宽屏上拖出来的坐标搬到手机上会落到屏幕外，这种要重新排版。 */
+            const outside = st?.y != null && (st.x == null || st.x > vw - 60 || st.y > deskH - 60 || st.x < -40);
+            if (st?.y != null && !outside) {
+              el.classList.remove("is-squeezed");
+              y = Math.max(y, el.offsetTop + el.offsetHeight + WIDGET_GAP);
+              continue;
+            }
+            if (overflowed || y + el.offsetHeight > bottomLimit) {
+              overflowed = true;
+              el.classList.add("is-squeezed");
+              continue;
+            }
+            el.classList.remove("is-squeezed");
+            el.style.top = `${y}px`;
+            el.style.left = `${Math.max(12, vw - w - WIDGET_MARGIN)}px`;
+            y += el.offsetHeight + WIDGET_GAP;
+          }
+          refreshCardTools();
+        };
+
         const renderWidget = (id: string) => {
           if (!widgetHost) return;
           const old = widgetHost.querySelector(`[data-widget="${id}"]`);
           old?.remove();
-          if (!widgetOn(id)) return;
+          if (!widgetOn(id)) {
+            // 关掉一张卡后其余卡片要补位，否则会留下一条空档
+            requestAnimationFrame(stackWidgets);
+            return;
+          }
 
           const st = readWidgets()[id];
-          const idx = WIDGET_IDS.indexOf(id);
-          const x = st?.x ?? Math.max(12, window.innerWidth - 200);
-          const y = st?.y ?? 24 + idx * 120;
 
           const el = document.createElement("div");
           el.className = "widget";
           el.dataset.widget = id;
-          el.style.left = `${x}px`;
-          el.style.top = `${y}px`;
+          // 只有手动拖过的卡片才认坐标，其余交给 stackWidgets 统一排版
+          if (st?.x != null) el.style.left = `${st.x}px`;
+          if (st?.y != null) el.style.top = `${st.y}px`;
           el.innerHTML = `
             <div class="widget-head">
               <span class="widget-title">${WIDGET_TITLES[id]}</span>
@@ -6037,13 +6205,112 @@ const data = {
             <div class="widget-body">${widgetBody(id)}</div>`;
           widgetHost.appendChild(el);
           initWidget(id, el);
+          // 内容渲染完高度才算得准（天气是异步来的）
+          requestAnimationFrame(stackWidgets);
         };
 
         const renderAllWidgets = () => {
           if (!widgetHost) return;
           widgetHost.innerHTML = "";
           for (const id of WIDGET_IDS) renderWidget(id);
+          requestAnimationFrame(stackWidgets);
         };
+
+        /* 统一的卡片开关：设置面板和手机卡片选择器都走这里 */
+        const setWidgetEnabled = (id: string, on: boolean) => {
+          const all = readWidgets();
+          all[id] = { ...all[id], enabled: on };
+          try {
+            localStorage.setItem(WIDGET_KEY, JSON.stringify(all));
+          } catch {
+            /* 忽略 */
+          }
+          renderWidget(id);
+          window.dispatchEvent(new CustomEvent("guandao:widgets-change", { detail: { id, on } }));
+        };
+
+        /* ---------------- 卡片选择器（手机桌面模式） ---------------- */
+
+        /* 手机端默认只摆最常用的三张卡：时钟 / 天气 / 待办。
+           只在触屏小屏设备上写入一次，之后完全以用户的选择为准；
+           电脑端默认仍是五张全开。 */
+        const WIDGET_PRESET_KEY = "guandao.os.widgetPreset.v1";
+        const PHONE_WIDGET_PRESET = ["clock", "weather", "todo"];
+        const applyPhoneWidgetPreset = () => {
+          const touchable = window.matchMedia?.("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+          if (!touchable || window.innerWidth > 720) return;
+          try {
+            if (localStorage.getItem(WIDGET_PRESET_KEY) === "1") return;
+          } catch {
+            return;
+          }
+          const all = readWidgets();
+          for (const id of WIDGET_IDS) {
+            // 保留已有的坐标，只改开关
+            all[id] = { ...all[id], enabled: PHONE_WIDGET_PRESET.includes(id) };
+          }
+          try {
+            localStorage.setItem(WIDGET_KEY, JSON.stringify(all));
+            localStorage.setItem(WIDGET_PRESET_KEY, "1");
+          } catch {
+            /* 隐私模式写不进去就按默认五张走 */
+          }
+        };
+
+        const renderCardPicker = () => {
+          if (!cpList) return;
+          const all = readWidgets();
+          cpList.innerHTML = WIDGET_IDS.map(
+            (id) => `
+              <label class="cp-row">
+                <span class="cp-main">
+                  <span class="cp-name">${WIDGET_TITLES[id]}</span>
+                  <span class="cp-desc">${WIDGET_DESC[id] ?? ""}</span>
+                </span>
+                <span class="cp-switch">
+                  <input type="checkbox" data-cp-toggle="${id}" ${all[id]?.enabled !== false ? "checked" : ""} />
+                  <i aria-hidden="true"></i>
+                </span>
+              </label>`,
+          ).join("");
+          cpList.querySelectorAll<HTMLInputElement>("[data-cp-toggle]").forEach((box) => {
+            box.addEventListener("change", () => {
+              setWidgetEnabled(box.dataset.cpToggle ?? "", box.checked);
+              window.setTimeout(refreshCardTools, 60);
+            });
+          });
+          refreshCardTools();
+        };
+
+        const openCardPicker = () => {
+          if (!cardPicker) return;
+          renderCardPicker();
+          cardPicker.hidden = false;
+          cardPicker.setAttribute("aria-hidden", "false");
+        };
+        const closeCardPicker = () => {
+          if (!cardPicker || cardPicker.hidden) return;
+          cardPicker.hidden = true;
+          cardPicker.setAttribute("aria-hidden", "true");
+        };
+
+        cardTools?.addEventListener("click", openCardPicker);
+        document.getElementById("cp-backdrop")?.addEventListener("click", closeCardPicker);
+        document.getElementById("cp-done")?.addEventListener("click", closeCardPicker);
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") closeCardPicker();
+        });
+        // 手机桌面模式之外没有这个入口，模式切走时顺手关掉
+        window.addEventListener("resize", () => {
+          if (!phoneDesktopMode()) closeCardPicker();
+        });
+        // 设置面板里改了开关，选择器开着时同步勾选状态
+        window.addEventListener("guandao:widgets-change", (e) => {
+          const id = (e as CustomEvent<{ id: string; on: boolean }>).detail?.id;
+          const box = cpList?.querySelector<HTMLInputElement>(`[data-cp-toggle="${id}"]`);
+          if (box) box.checked = widgetOn(id);
+          refreshCardTools();
+        });
 
         /* 小组件拖动 */
         const initWidgetDrag = (el: HTMLElement) => {
@@ -6124,6 +6391,7 @@ const data = {
                 const clear = d.code <= 2;
                 const rain = (d.code >= 51 && d.code <= 67) || d.code >= 95;
                 box.innerHTML = `<div class="w-wx-main"><span class="w-wx-temp">${d.temp}°C</span><span class="w-wx-desc">${clear ? "晴" : rain ? "有雨" : "多云"} · 大连</span></div><div class="w-wx-sub">风 ${d.wind} km/h</div>`;
+                requestAnimationFrame(stackWidgets);
               };
               try {
                 const raw = localStorage.getItem(CACHE);
@@ -6183,6 +6451,7 @@ const data = {
                     )
                     .join("")
                 : `<li class="w-todo-empty">还没有待办</li>`;
+              requestAnimationFrame(stackWidgets);
             };
             inputEl?.addEventListener("keydown", (e) => {
               if (e.key !== "Enter" || !inputEl.value.trim()) return;
@@ -6255,7 +6524,69 @@ const data = {
         updateBell();
 
         // 桌面小组件：在全部定义之后渲染，避免 TDZ
+        applyPhoneWidgetPreset();
         renderAllWidgets();
+
+        /* ---------------- 桌面排版 ----------------
+           图标列数、启动台列数都跟着可视区算，不再写死，
+           换台显示器 / 转个屏幕方向都不会溢出或留一大片空白。 */
+
+        const layoutDeskIcons = () => {
+          const host = document.querySelector<HTMLElement>(".desk-icons");
+          const desk = document.getElementById("desk");
+          if (!host || !desk) return;
+          // 手机端固定 5 列，交给 CSS
+          if (window.innerWidth <= 720) {
+            host.style.removeProperty("--di-rows");
+            return;
+          }
+          const n = host.children.length;
+          if (!n) return;
+          const cell = host.querySelector<HTMLElement>(".desk-icon");
+          const rowH = (cell?.offsetHeight || 80) + 12;
+          // 顶部留白 22，底部给程序坞和提示语让位
+          const avail = desk.clientHeight - 22 - 92;
+          const maxRows = Math.max(3, Math.floor(avail / rowH));
+          // 尽量找能把图标平均分满的列数（21 个 → 3 列 × 7 行）
+          let rows = Math.ceil(n / Math.ceil(n / maxRows));
+          for (let cols = Math.ceil(n / maxRows); cols <= Math.min(5, n); cols++) {
+            if (n % cols === 0) {
+              rows = n / cols;
+              break;
+            }
+          }
+          host.style.setProperty("--di-rows", String(rows));
+        };
+
+        const layoutLaunchpad = () => {
+          const grid = document.querySelector<HTMLElement>(".lp-grid");
+          if (!grid) return;
+          const n = grid.children.length;
+          if (!n) return;
+          const vw = window.innerWidth;
+          // 桌面上 7 列正好 3 行排满 21 个应用，手机上 4 列更好点按
+          let cols = vw >= 900 ? 7 : vw >= 700 ? 6 : vw >= 520 ? 5 : 4;
+          while (cols > 3 && vw / cols < 76) cols--;
+          grid.style.setProperty("--lp-cols", String(cols));
+          // 最后一行只剩一个图标时居中，别让它孤零零挂在最左边
+          grid.classList.toggle("is-orphan", n % cols === 1);
+        };
+
+        let layoutRaf = 0;
+        const relayout = () => {
+          if (layoutRaf) return;
+          layoutRaf = requestAnimationFrame(() => {
+            layoutRaf = 0;
+            layoutDeskIcons();
+            layoutLaunchpad();
+            stackWidgets();
+          });
+        };
+
+        layoutDeskIcons();
+        layoutLaunchpad();
+        window.addEventListener("resize", relayout);
+        window.addEventListener("orientationchange", relayout);
 
         // 桌面端自动打开文章窗口作为欢迎；手机上先让人看到图标
         if (window.innerWidth > 720) {
@@ -6309,6 +6640,9 @@ const data = {
         /* 动效曲线 */
         --os-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
         --os-ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.3);
+
+        /* 桌面小组件栏宽度：短屏会收紧，桌宠与窗口排版都读这一个值 */
+        --wg-w: 184px;
       }
 
       /* 移动端地址栏会伸缩，这里把滚动彻底锁死：
@@ -6867,29 +7201,68 @@ const data = {
 
       .desk-icons {
         position: absolute;
-        top: 24px;
+        top: 22px;
         left: 20px;
         display: grid;
-        grid-template-columns: repeat(2, 66px);
-        gap: 10px 4px;
+        /* 列数由 JS 按可用高度算好后写进 --di-rows：
+           先竖向排满一列，再往右开新列，永远不会溢出屏幕 */
+        grid-auto-flow: column;
+        grid-template-rows: repeat(var(--di-rows, 7), min-content);
+        grid-auto-columns: 78px;
+        gap: 12px 4px;
+        align-content: start;
+        justify-content: start;
       }
 
       .desk-icon {
-        width: 68px;
+        width: 78px;
         display: grid;
         justify-items: center;
-        gap: 6px;
-        padding: 8px 4px;
+        align-content: start;
+        gap: 8px;
+        padding: 8px 6px 7px;
         border: 0;
-        border-radius: 10px;
+        border-radius: 14px;
         background: none;
         color: inherit;
         cursor: pointer;
-        transition: background-color 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+        transition:
+          background-color 0.2s ease,
+          box-shadow 0.2s ease,
+          transform 0.2s var(--os-ease);
       }
 
+      .desk-icon .di-glyph {
+        zoom: 1.294; /* 34 → 44px */
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.28));
+        transition:
+          transform 0.2s var(--os-ease),
+          filter 0.2s ease;
+      }
+
+      /* 悬停：整格给出可点区域，图形单独浮起，层次比单纯变色清晰 */
       .desk-icon:hover {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .desk-icon:hover .di-glyph {
+        transform: translateY(-2px) scale(1.05);
+        filter: drop-shadow(0 8px 15px rgba(0, 0, 0, 0.38));
+      }
+
+      .desk-icon:active {
+        transform: scale(0.96);
+      }
+
+      .desk-icon:active .di-glyph {
+        transform: scale(0.98);
+      }
+
+      .desk-icon:focus-visible {
+        outline: 2px solid rgba(143, 166, 255, 0.9);
+        outline-offset: 1px;
       }
 
       a.desk-icon {
@@ -6897,17 +7270,58 @@ const data = {
         color: inherit;
       }
 
+      /* 图标基准尺寸：内部所有 ::before/::after 都按 34px 画。
+         桌面 44 / 程序坞 44 / 启动台 68 都靠 zoom 等比放大，
+         保证同一套图形在任何位置都长得一样。 */
       .di-glyph {
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
+        --di-base: 34px;
+        width: var(--di-base);
+        height: var(--di-base);
+        border-radius: 8px; /* 34px 下约 23%，接近系统图标比例 */
         position: relative;
+        box-sizing: border-box;
+        flex: none;
+        overflow: hidden;
+        /* 统一材质：顶部高光 + 内侧一圈极淡描边 + 底部压暗，
+           避免有的图标有立体感、有的扁平 */
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.32),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.2);
       }
 
       .di-label {
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.82);
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+        font-size: 11.5px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        line-height: 1.3;
+        max-width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: rgba(255, 255, 255, 0.9);
+        text-shadow:
+          0 1px 2px rgba(0, 0, 0, 0.72),
+          0 0 12px rgba(0, 0, 0, 0.32);
+      }
+
+      /* 大屏（2K/4K）上图标和卡片都放大一档，否则整片桌面会显得空 */
+      @media (min-width: 1700px) {
+        :root {
+          --wg-w: 196px;
+        }
+        .desk-icons {
+          grid-auto-columns: 88px;
+        }
+        .desk-icon {
+          width: 88px;
+        }
+        .desk-icon .di-glyph {
+          zoom: 1.53; /* 34 → 52px */
+        }
+        .di-label {
+          font-size: 12px;
+        }
       }
 
       /* 图标：文件夹 */
@@ -6935,7 +7349,7 @@ const data = {
 
       /* 图标：人 */
       .di-person {
-        background: linear-gradient(180deg, #9bb0d8 0%, #5f7398 100%);
+        background: linear-gradient(180deg, #93b6e4 0%, #4f6a94 100%);
       }
       .di-person::before {
         content: "";
@@ -7127,18 +7541,22 @@ const data = {
 
       /* 图标：树洞 */
       .di-hole {
-        background: linear-gradient(160deg, #a8bf85 0%, #3f5230 100%);
+        background: linear-gradient(160deg, #cfe0a8 0%, #7f9955 100%);
       }
       .di-hole::before {
         content: "";
         position: absolute;
-        left: 9px;
-        top: 10px;
-        width: 16px;
+        left: 8px;
+        top: 9px;
+        width: 18px;
         height: 16px;
         border-radius: 50%;
-        background: radial-gradient(circle at 38% 32%, #2a1f16 0%, #0f0a06 78%);
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.85);
+        /* 纯深色 + 左上内阴影，读起来才像「挖出来的洞」而不是一颗球 */
+        background: #0c0805;
+        box-shadow:
+          inset 2px 3px 5px rgba(0, 0, 0, 0.95),
+          inset -1px -1px 2px rgba(255, 255, 255, 0.07),
+          0 0 0 1.5px rgba(255, 255, 255, 0.3);
       }
 
       /* 图标：电视机 */
@@ -7253,7 +7671,8 @@ const data = {
 
       .desk-pet {
         position: absolute;
-        right: 26px;
+        /* 让开右侧小组件栏，避免默认位置压住「系统信息」卡片 */
+        right: calc(var(--wg-w, 184px) + 40px);
         bottom: 100px;
         z-index: 24;
         width: 86px;
@@ -8730,8 +9149,7 @@ const data = {
       }
 
       .mc-glyph {
-        width: 44px;
-        height: 44px;
+        zoom: 1.294; /* 34 → 44px，与程序坞同尺寸 */
         border-radius: 11px;
       }
 
@@ -8763,20 +9181,41 @@ const data = {
 
       .widget {
         position: absolute;
-        width: 172px;
-        border-radius: 14px;
+        width: var(--wg-w, 184px);
+        border-radius: 16px;
         border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(20, 23, 33, 0.6);
+        background: rgba(20, 23, 33, 0.62);
         backdrop-filter: blur(20px) saturate(1.5);
-        box-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+        box-shadow:
+          0 12px 32px -14px rgba(0, 0, 0, 0.7),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
         pointer-events: auto;
         overflow: hidden;
+        transition:
+          border-color 0.2s ease,
+          box-shadow 0.2s ease,
+          opacity 0.18s ease;
         animation: widgetIn 0.3s var(--os-ease);
       }
 
+      /* 竖向空间不够时，低优先级卡片先收起：保留高度可测量，避免反复跳动 */
+      .widget.is-squeezed {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .widget:hover {
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow:
+          0 18px 40px -16px rgba(0, 0, 0, 0.8),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+
       .widget.is-dragging {
-        opacity: 0.85;
+        opacity: 0.9;
         cursor: grabbing;
+        box-shadow: 0 26px 54px -18px rgba(0, 0, 0, 0.9);
       }
 
       @keyframes widgetIn {
@@ -8794,7 +9233,8 @@ const data = {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 8px 12px 0;
+        gap: 8px;
+        padding: 10px 13px 0;
         cursor: grab;
         user-select: none;
       }
@@ -8802,17 +9242,24 @@ const data = {
       .widget-title {
         font-size: 11px;
         font-weight: 600;
-        color: rgba(255, 255, 255, 0.6);
+        letter-spacing: 0.04em;
+        color: rgba(255, 255, 255, 0.62);
       }
 
       .widget-grip {
         font-size: 10px;
-        color: rgba(255, 255, 255, 0.3);
+        line-height: 1;
+        color: rgba(255, 255, 255, 0.28);
         letter-spacing: -2px;
+        transition: color 0.2s ease;
+      }
+
+      .widget:hover .widget-grip {
+        color: rgba(255, 255, 255, 0.45);
       }
 
       .widget-body {
-        padding: 8px 12px 12px;
+        padding: 9px 13px 13px;
       }
 
       /* 时钟 */
@@ -8972,6 +9419,64 @@ const data = {
       .w-sys-row b {
         color: #fff;
         font-weight: 600;
+      }
+
+      /* 短屏（13 寸笔记本 768/800）收紧卡片内部留白，
+         让 5 张卡尽量都能排下；再矮就由 stackWidgets 按优先级收纳 */
+      @media (max-height: 820px) and (min-width: 721px) {
+        :root {
+          --wg-w: 176px;
+        }
+        .widget-head {
+          padding: 8px 12px 0;
+        }
+        .widget-title {
+          font-size: 10.5px;
+        }
+        .widget-body {
+          padding: 7px 12px 10px;
+        }
+        .w-time {
+          font-size: 24px;
+        }
+        .w-cal-title {
+          margin-bottom: 3px;
+        }
+        .w-cal-h {
+          padding-bottom: 1px;
+        }
+        .w-cal-grid span {
+          padding: 1px 0;
+        }
+        .w-wx-temp {
+          font-size: 21px;
+        }
+        .w-todo-list {
+          max-height: 76px;
+          margin-top: 6px;
+        }
+        .w-sys-row {
+          padding: 1px 0;
+        }
+      }
+
+      @media (max-height: 700px) and (min-width: 721px) {
+        :root {
+          --wg-w: 168px;
+        }
+        .w-time {
+          font-size: 23px;
+        }
+        .w-cal-grid {
+          gap: 1px;
+        }
+        .w-cal-grid span {
+          font-size: 9.5px;
+          padding: 1px 0;
+        }
+        .w-todo-list {
+          max-height: 66px;
+        }
       }
 
       /* ---------------- 水族箱 ---------------- */
@@ -10636,6 +11141,8 @@ const data = {
         border: 0;
         border-radius: 12px;
         background: none;
+        display: grid;
+        place-items: center;
         cursor: pointer;
         will-change: transform;
         transition: transform 0.12s ease-out;
@@ -10647,270 +11154,9 @@ const data = {
         transition-duration: 0.05s;
       }
 
-      .dock-glyph {
-        display: block;
-        width: 100%;
-        height: 100%;
-        border-radius: 12px;
-        position: relative;
-      }
-
-      .dock-glyph.di-folder::before,
-      .dock-glyph.di-folder::after,
-      .dock-glyph.di-person::before,
-      .dock-glyph.di-person::after,
-      .dock-glyph.di-music::before,
-      .dock-glyph.di-music::after,
-      .dock-glyph.di-ach::before,
-      .dock-glyph.di-ach::after,
-      .dock-glyph.di-tank::before,
-      .dock-glyph.di-tank::after,
-      .dock-glyph.di-wall::before,
-      .dock-glyph.di-rank::before,
-      .dock-glyph.di-draw::before,
-      .dock-glyph.di-draw::after,
-      .dock-glyph.di-vote::before,
-      .dock-glyph.di-vote::after,
-      .dock-glyph.di-hole::before,
-      .dock-glyph.di-tv::before,
-      .dock-glyph.di-tv::after,
-      .dock-glyph.di-net::before,
-      .dock-glyph.di-gear::before,
-      .dock-glyph.di-gear::after,
-      .dock-glyph.di-home::before,
-      .dock-glyph.di-home::after {
-        content: "";
-        position: absolute;
-      }
-
-      .dock-glyph.di-folder::before {
-        left: 5px;
-        top: 9px;
-        width: 19px;
-        height: 6px;
-        border-radius: 2px 2px 0 0;
-        background: rgba(255, 255, 255, 0.55);
-      }
-      .dock-glyph.di-folder::after {
-        inset: 14px 6px 8px;
-        border-radius: 3px;
-        background: rgba(255, 255, 255, 0.88);
-      }
-      .dock-glyph.di-person::before {
-        left: 50%;
-        top: 9px;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.9);
-        transform: translateX(-50%);
-      }
-      .dock-glyph.di-person::after {
-        left: 50%;
-        bottom: 8px;
-        width: 26px;
-        height: 15px;
-        border-radius: 13px 13px 4px 4px;
-        background: rgba(255, 255, 255, 0.9);
-        transform: translateX(-50%);
-      }
-      .dock-glyph.di-term::before {
-        content: ">_";
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        font-family: ui-monospace, Consolas, monospace;
-        font-size: 17px;
-        color: #7ef0b0;
-      }
-      .dock-glyph.di-music {
-        background: linear-gradient(140deg, #ff9ec2 0%, #a83f74 100%);
-      }
-      .dock-glyph.di-music::before {
-        inset: 9px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.92);
-      }
-      .dock-glyph.di-music::after {
-        inset: 17px;
-        border-radius: 50%;
-        background: #a83f74;
-      }
-
-      .dock-glyph.di-ach {
-        background: linear-gradient(160deg, #ffd479 0%, #d1902a 100%);
-      }
-      .dock-glyph.di-ach::before {
-        left: 13px;
-        top: 10px;
-        width: 20px;
-        height: 19px;
-        border-radius: 0 0 11px 11px;
-        background: rgba(255, 255, 255, 0.94);
-      }
-      .dock-glyph.di-ach::after {
-        left: 18px;
-        bottom: 9px;
-        width: 10px;
-        height: 9px;
-        border-radius: 0 0 2px 2px;
-        background: rgba(255, 255, 255, 0.94);
-      }
-
-      .dock-glyph.di-tank {
-        background: linear-gradient(160deg, #66d6ff 0%, #1a72b8 100%);
-      }
-      .dock-glyph.di-tank::before {
-        left: 12px;
-        top: 10px;
-        width: 22px;
-        height: 16px;
-        border-radius: 11px 11px 6px 6px;
-        background: rgba(255, 255, 255, 0.92);
-      }
-      .dock-glyph.di-tank::after {
-        left: 16px;
-        top: 25px;
-        width: 14px;
-        height: 9px;
-        border-radius: 0 0 7px 7px;
-        background: rgba(255, 255, 255, 0.72);
-      }
-
-      .dock-glyph.di-wall {
-        background: linear-gradient(160deg, #ffb47a 0%, #d9603a 100%);
-      }
-      .dock-glyph.di-wall::before {
-        inset: 10px;
-        background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 4px, transparent 4.4px);
-        background-size: 12px 12px;
-      }
-
-      .dock-glyph.di-rank {
-        background: linear-gradient(160deg, #8ee6a8 0%, #2f9a5e 100%);
-      }
-      .dock-glyph.di-rank::before {
-        left: 13px;
-        bottom: 9px;
-        width: 6px;
-        height: 10px;
-        border-radius: 1px;
-        background: rgba(255, 255, 255, 0.95);
-        box-shadow:
-          9px -7px 0 rgba(255, 255, 255, 0.95),
-          18px -14px 0 rgba(255, 255, 255, 0.95);
-      }
-
-      .dock-glyph.di-draw {
-        background: linear-gradient(160deg, #ff7a86 0%, #c02848 100%);
-      }
-      .dock-glyph.di-draw::before {
-        inset: 17px 7px 8px;
-        border-radius: 3px;
-        background: rgba(255, 255, 255, 0.92);
-        box-shadow: 0 -6px 0 -1px rgba(255, 255, 255, 0.92);
-      }
-      .dock-glyph.di-draw::after {
-        left: 50%;
-        top: 11px;
-        width: 5px;
-        height: 25px;
-        margin-left: -2.5px;
-        background: #c02848;
-      }
-
-      .dock-glyph.di-vote {
-        background: linear-gradient(160deg, #a78bfa 0%, #6d28d9 100%);
-      }
-
-      .dock-glyph.di-hole {
-        background: linear-gradient(160deg, #a8bf85 0%, #3f5230 100%);
-      }
-      .dock-glyph.di-hole::before {
-        left: 12px;
-        top: 13px;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background: radial-gradient(circle at 38% 32%, #2a1f16 0%, #0f0a06 78%);
-      }
-
-      .dock-glyph.di-net {
-        background: linear-gradient(160deg, #f0abfc 0%, #7e22ce 100%);
-      }
-      .dock-glyph.di-net::before {
-        left: 12px;
-        top: 12px;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.95);
-        box-shadow:
-          12px 7px 0 rgba(255, 255, 255, 0.95),
-          3px 17px 0 rgba(255, 255, 255, 0.95);
-      }
-
-      .dock-glyph.di-tv {
-        background: linear-gradient(160deg, #7dd3fc 0%, #0369a1 100%);
-      }
-      .dock-glyph.di-tv::before {
-        inset: 15px 6px 9px;
-        border-radius: 3px;
-        background: rgba(255, 255, 255, 0.94);
-      }
-      .dock-glyph.di-tv::after {
-        left: 10px;
-        right: 10px;
-        top: 19px;
-        bottom: 13px;
-        border-radius: 1px;
-        background: #0369a1;
-      }
-      .dock-glyph.di-vote::before {
-        left: 11px;
-        top: 17px;
-        width: 24px;
-        height: 15px;
-        border-radius: 2px;
-        background: rgba(255, 255, 255, 0.94);
-      }
-      .dock-glyph.di-vote::after {
-        left: 15px;
-        top: 12px;
-        width: 16px;
-        height: 4px;
-        border-radius: 1px;
-        background: #6d28d9;
-      }
-
-      .dock-glyph.di-gear::before {
-        inset: 11px;
-        border-radius: 50%;
-        border: 4px solid rgba(255, 255, 255, 0.9);
-      }
-      .dock-glyph.di-gear::after {
-        inset: 19px;
-        border-radius: 50%;
-        background: rgba(40, 44, 56, 0.92);
-      }
-      .dock-glyph.di-home::before {
-        left: 50%;
-        top: 9px;
-        width: 21px;
-        height: 21px;
-        background: rgba(255, 255, 255, 0.92);
-        transform: translateX(-50%) rotate(45deg);
-        border-radius: 3px;
-      }
-      .dock-glyph.di-home::after {
-        left: 50%;
-        bottom: 8px;
-        width: 21px;
-        height: 14px;
-        background: rgba(255, 255, 255, 0.92);
-        transform: translateX(-50%);
-        border-radius: 0 0 4px 4px;
+      /* 程序坞图标：同一套 34px 图形放大到 44px，与桌面/启动台完全一致 */
+      .dock-item .di-glyph {
+        zoom: 1.294; /* 34 → 44px */
       }
 
       .dock-sep {
@@ -10921,7 +11167,9 @@ const data = {
       }
 
       .dock-link {
-        display: block;
+        display: grid;
+        place-items: center;
+        text-decoration: none;
       }
 
       /* Dock 下方的运行指示点 */
@@ -10950,6 +11198,247 @@ const data = {
         box-shadow: 0 0 8px rgba(143, 166, 255, 0.9);
       }
 
+      /* ---------------- 手机卡片选择器 ---------------- */
+
+      /* 入口按钮：只有手机桌面模式才出现 */
+      .card-tools {
+        display: none;
+      }
+
+      .ct-icon {
+        width: 13px;
+        height: 13px;
+        flex: none;
+      }
+
+      .ct-badge {
+        min-width: 15px;
+        height: 15px;
+        padding: 0 4px;
+        border-radius: 999px;
+        background: rgba(143, 166, 255, 0.9);
+        color: #0d1020;
+        font-size: 9.5px;
+        font-weight: 700;
+        line-height: 15px;
+        text-align: center;
+      }
+
+      .card-picker {
+        position: fixed;
+        inset: 0;
+        z-index: 320;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+
+      .card-picker[hidden] {
+        display: none;
+      }
+
+      .cp-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(6, 8, 14, 0.5);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        animation: cpFade 0.18s ease;
+      }
+
+      .cp-sheet {
+        position: relative;
+        width: 100%;
+        max-width: 460px;
+        max-height: calc(100dvh - 80px);
+        margin: 0 8px;
+        padding: 8px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px 20px 18px 18px;
+        background: rgba(24, 27, 38, 0.97);
+        box-shadow: 0 26px 60px -20px rgba(0, 0, 0, 0.9);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        animation: cpUp 0.24s var(--os-ease);
+      }
+
+      .cp-grip {
+        display: block;
+        width: 36px;
+        height: 4px;
+        margin: 0 auto 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      .cp-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .cp-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .cp-done {
+        padding: 5px 14px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--os-accent);
+        color: #fff;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .cp-done:active {
+        transform: scale(0.96);
+      }
+
+      .cp-sub {
+        margin: 6px 0 4px;
+        font-size: 11.5px;
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .cp-list {
+        display: grid;
+      }
+
+      .cp-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 2px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        cursor: pointer;
+      }
+
+      .cp-row:last-child {
+        border-bottom: 0;
+      }
+
+      .cp-main {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .cp-name {
+        font-size: 13.5px;
+        color: #fff;
+      }
+
+      .cp-desc {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.38);
+      }
+
+      .cp-switch {
+        position: relative;
+        flex: none;
+        width: 44px;
+        height: 26px;
+        margin-left: auto;
+      }
+
+      .cp-switch input {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      .cp-switch i {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.16);
+        transition: background-color 0.18s ease;
+        pointer-events: none;
+      }
+
+      .cp-switch i::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        transition: transform 0.18s var(--os-ease);
+      }
+
+      .cp-switch input:checked + i {
+        background: #4f7cff;
+      }
+
+      .cp-switch input:checked + i::after {
+        transform: translateX(18px);
+      }
+
+      .cp-switch input:focus-visible + i {
+        outline: 2px solid rgba(143, 166, 255, 0.9);
+        outline-offset: 2px;
+      }
+
+      .cp-note {
+        margin: 10px 0 0;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(255, 212, 121, 0.1);
+        color: rgba(255, 212, 121, 0.9);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      @keyframes cpFade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes cpUp {
+        from { opacity: 0; transform: translateY(16px); }
+        to { opacity: 1; transform: none; }
+      }
+
+      /* 浅色主题 */
+      [data-os-theme="light"] .cp-sheet {
+        background: rgba(250, 251, 255, 0.98);
+        border-color: rgba(20, 24, 40, 0.1);
+      }
+      [data-os-theme="light"] .cp-grip {
+        background: rgba(20, 24, 40, 0.16);
+      }
+      [data-os-theme="light"] .cp-title,
+      [data-os-theme="light"] .cp-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .cp-sub,
+      [data-os-theme="light"] .cp-desc {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .cp-row {
+        border-bottom-color: rgba(20, 24, 40, 0.07);
+      }
+      [data-os-theme="light"] .cp-switch i {
+        background: rgba(20, 24, 40, 0.16);
+      }
+      [data-os-theme="light"] .cp-note {
+        background: rgba(190, 130, 20, 0.12);
+        color: #8a5a10;
+      }
+
       /* ---------------- 响应式 ---------------- */
 
       @media (max-width: 720px) {
@@ -10964,27 +11453,37 @@ const data = {
 
         /* —— 紧凑模式（手机默认布局）：仅在未开启桌面模式时生效 —— */
         body:not(.is-touch-desktop) .desk-icons {
-          display: flex;
-          flex-direction: row;
-          flex-wrap: wrap;
-          top: 10px;
+          /* 5 列等宽铺满，不再是 flex 换行后右边空出一大条 */
+          display: grid;
+          grid-auto-flow: row;
+          grid-template-rows: none;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          top: 14px;
           left: 10px;
           right: 10px;
-          gap: 6px;
+          gap: 14px 0;
+          align-content: start;
+        }
+
+        /* 21 个图标最后一行只剩一个：放进中间一列并保持单格宽度，
+           不再横跨三列（原来的点击热区有三倍宽） */
+        body:not(.is-touch-desktop) .desk-icons > .desk-icon:last-child {
+          grid-column: 3 / 4;
         }
 
         body:not(.is-touch-desktop) .desk-icon {
-          width: 58px;
-          padding: 6px 2px;
+          width: 100%;
+          padding: 9px 2px 7px;
+          gap: 8px;
+          border-radius: 16px;
         }
 
-        body:not(.is-touch-desktop) .di-glyph {
-          width: 30px;
-          height: 30px;
+        body:not(.is-touch-desktop) .desk-icon .di-glyph {
+          zoom: 1.47; /* 34 → 50px，拇指够得着又不至于挤成一团 */
         }
 
         body:not(.is-touch-desktop) .di-label {
-          font-size: 10px;
+          font-size: 11.5px;
         }
 
         body:not(.is-touch-desktop) .window {
@@ -11004,18 +11503,28 @@ const data = {
         }
 
         /* —— 桌面模式：手机上还原真正的桌面形态 —— */
+        body.is-touch-desktop {
+          /* 卡片栏收窄，别把整块桌面占满 */
+          --wg-w: 158px;
+        }
         body.is-touch-desktop .desk-icons {
           position: absolute;
           top: 44px;
           left: 12px;
           right: auto;
-          bottom: 92px;
+          bottom: 96px;
           display: grid;
-          grid-template-columns: repeat(2, 64px);
+          grid-auto-flow: row;
+          grid-template-rows: none;
+          grid-template-columns: repeat(2, 72px);
           grid-auto-rows: min-content;
-          gap: 10px 4px;
+          gap: 8px 4px;
+          align-content: start;
           overflow-y: auto;
           scrollbar-width: none;
+          /* 底部渐隐，提示这一列还能继续往下滑 */
+          -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 36px), transparent);
+          mask-image: linear-gradient(180deg, #000 calc(100% - 36px), transparent);
         }
         body.is-touch-desktop .desk-icons::-webkit-scrollbar {
           display: none;
@@ -11024,8 +11533,90 @@ const data = {
           left: auto;
           right: auto;
           width: auto;
-          max-width: calc(100vw - 160px);
-          max-height: calc(100dvh - 140px);
+          /* 窗口接近满宽才有可用性，位置由 placePhoneDesktopWin 统一给 */
+          max-width: calc(100vw - 16px);
+          max-height: calc(100dvh - 156px);
+        }
+
+        /* 卡片入口：夹在状态栏和卡片之间，只有桌面模式才出现 */
+        body.is-touch-desktop .card-tools {
+          position: absolute;
+          top: 8px;
+          right: 12px;
+          z-index: 7;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          height: 26px;
+          padding: 0 10px;
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          border-radius: 999px;
+          background: rgba(30, 34, 48, 0.55);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 11px;
+          font-weight: 500;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          transition:
+            transform 0.15s ease,
+            background-color 0.2s ease;
+        }
+        body.is-touch-desktop .card-tools:active {
+          transform: scale(0.95);
+          background: rgba(44, 50, 70, 0.72);
+        }
+        [data-os-theme="light"] body.is-touch-desktop .card-tools {
+          border-color: rgba(20, 24, 40, 0.12);
+          background: rgba(255, 255, 255, 0.78);
+          color: rgba(20, 24, 40, 0.72);
+          box-shadow: 0 6px 16px -10px rgba(30, 40, 70, 0.6);
+        }
+        [data-os-theme="light"] body.is-touch-desktop .card-tools:active {
+          background: rgba(255, 255, 255, 0.95);
+        }
+        [data-os-theme="light"] body.is-touch-desktop .ct-badge {
+          background: #6f8cff;
+          color: #fff;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          body.is-touch-desktop .card-tools {
+            transition: none;
+          }
+        }
+
+        /* 手机上卡片整体收紧一档，几张卡也不至于一路顶到程序坞 */
+        body.is-touch-desktop .widget-head {
+          padding: 8px 12px 0;
+        }
+        body.is-touch-desktop .widget-title {
+          font-size: 10.5px;
+        }
+        body.is-touch-desktop .widget-body {
+          padding: 6px 12px 9px;
+        }
+        body.is-touch-desktop .w-time {
+          font-size: 25px;
+        }
+        body.is-touch-desktop .w-cal-title {
+          margin-bottom: 3px;
+        }
+        body.is-touch-desktop .w-cal-h {
+          padding-bottom: 1px;
+        }
+        body.is-touch-desktop .w-cal-grid span {
+          padding: 1px 0;
+        }
+        body.is-touch-desktop .w-wx-temp {
+          font-size: 21px;
+        }
+        body.is-touch-desktop .w-todo-list {
+          max-height: 68px;
+          margin-top: 6px;
+        }
+        body.is-touch-desktop .w-sys-row {
+          padding: 1px 0;
         }
         body.is-touch-desktop .widgets {
           display: block;
@@ -11050,8 +11641,8 @@ const data = {
         }
 
         .dock {
-          gap: 6px;
-          padding: 7px 10px;
+          gap: 5px;
+          padding: 6px 9px;
           border-radius: 16px;
           max-width: calc(100vw - 20px);
           overflow-x: auto;
@@ -11064,8 +11655,8 @@ const data = {
         }
 
         .dock-item {
-          width: 38px;
-          height: 38px;
+          width: 42px;
+          height: 42px;
         }
 
         .desk-pet {
@@ -11115,6 +11706,28 @@ const data = {
           gap: 4px;
           padding: 3px 6px;
         }
+        .mb-menu-btn {
+          white-space: nowrap;
+        }
+      }
+
+      /* 太窄的屏幕上，桌面模式也不再摆完整菜单栏：
+         四个菜单项会各自折成两行，把状态栏顶成两层 */
+      @media (max-width: 520px) {
+        body.is-touch-desktop .mb-menu {
+          display: none;
+        }
+        body.is-touch-desktop .mb-mobile-menu {
+          display: inline-flex;
+        }
+        /* 提示语在窄屏会和图标列叠在一起，直接不显示 */
+        body.is-touch-desktop .desk-hint {
+          display: none;
+        }
+        /* 窄屏桌面模式里卡片栏已经贴到右侧，桌宠没有立足之地，先收起 */
+        body.is-touch-desktop .desk-pet {
+          display: none;
+        }
       }
 
       /* ---------------- 减少动态效果 ---------------- */
@@ -11156,7 +11769,7 @@ const data = {
 
       /* 图标：计算器 */
       .di-calc {
-        background: linear-gradient(160deg, #9aa7bd 0%, #4a5568 100%);
+        background: linear-gradient(160deg, #7c8ba3 0%, #333e4f 100%);
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
       }
       .di-calc::before {
@@ -12223,6 +12836,16 @@ const data = {
         box-shadow: 0 18px 44px -18px rgba(30, 40, 70, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
       }
 
+      /* 浅色主题下白色点阵几乎看不见，换成深色点 + 淡底 */
+      [data-os-theme="light"] .di-grid {
+        background:
+          radial-gradient(circle at 33% 33%, #3c4763 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 67% 33%, #3c4763 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 33% 67%, #3c4763 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 67% 67%, #3c4763 0 2.4px, transparent 2.6px),
+          rgba(40, 48, 70, 0.08);
+      }
+
       [data-os-theme="light"] .dock-item.has-open::after {
         background: rgba(20, 24, 40, 0.45);
       }
@@ -13160,10 +13783,13 @@ const data = {
         z-index: 200;
         display: flex;
         flex-direction: column;
-        padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
-        background: rgba(10, 12, 22, 0.82);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        padding: calc(env(safe-area-inset-top, 0px) + 22px) 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+        /* 底色够实，桌面图标和窗口不会从背后透出来糊成一片 */
+        background:
+          radial-gradient(120% 90% at 50% 0%, rgba(38, 42, 62, 0.97), rgba(8, 10, 17, 0.97) 70%),
+          #080a11;
+        backdrop-filter: blur(30px) saturate(1.2);
+        -webkit-backdrop-filter: blur(30px) saturate(1.2);
         overflow-y: auto;
         animation: lp-in 0.18s ease;
       }
@@ -13190,43 +13816,79 @@ const data = {
       .lp-inner {
         margin: auto 0;
         width: 100%;
-        max-width: 560px;
+        max-width: 880px;
         align-self: center;
       }
       .lp-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 20px 8px;
+        /* 列数由 JS 写进 --lp-cols：默认 7 列正好 3 行排满 21 个应用 */
+        grid-template-columns: repeat(var(--lp-cols, 7), minmax(0, 1fr));
+        gap: 32px 10px;
         justify-items: center;
+      }
+      /* 最后一行只剩一个图标时居中摆放，避免孤零零挂在最左边 */
+      .lp-grid.is-orphan > .lp-icon:last-child {
+        grid-column: 2 / -2;
       }
       .lp-icon {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 7px;
-        width: 76px;
-        padding: 6px;
+        gap: 10px;
+        width: 100%;
+        max-width: 120px;
+        padding: 10px 6px;
         border: 0;
         background: transparent;
         color: rgba(255, 255, 255, 0.92);
         cursor: pointer;
-        border-radius: 14px;
+        border-radius: 16px;
+        transition:
+          background-color 0.18s ease,
+          transform 0.18s var(--os-ease);
+      }
+      .lp-icon:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-2px);
       }
       .lp-icon:active {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.12);
+        transform: scale(0.97);
       }
       .lp-icon .di-glyph {
-        width: 58px;
-        height: 58px;
-        border-radius: 15px;
+        zoom: 2; /* 34 → 68px，启动台是「大图标」场景 */
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
       }
       .lp-label {
-        font-size: 11px;
-        max-width: 70px;
+        font-size: 12.5px;
+        line-height: 1.3;
+        max-width: 100%;
         text-align: center;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      }
+      /* 手机上启动台用 4 列，图标小一号，21 个应用正好排进一屏 */
+      @media (max-width: 720px) {
+        .lp-inner {
+          max-width: 100%;
+        }
+        .lp-grid {
+          gap: 18px 6px;
+        }
+        .lp-icon {
+          gap: 8px;
+          max-width: 88px;
+          padding: 8px 4px;
+          border-radius: 14px;
+        }
+        .lp-icon .di-glyph {
+          zoom: 1.47; /* 34 → 50px */
+        }
+        .lp-label {
+          font-size: 11.5px;
+        }
       }
       /* 启动台顶栏（标题 / 完成 / 恢复默认） */
       .lp-top {
@@ -13324,13 +13986,33 @@ const data = {
       body.is-touch-desktop .titlebar {
         touch-action: none;
         height: 46px;
+        padding: 0 12px;
+      }
+      body.is-touch-desktop .dots {
+        gap: 12px;
+      }
+      body.is-touch-desktop .dot {
+        width: 14px;
+        height: 14px;
+      }
+      /* 视觉仍是小球，热区向外扩 6px，拇指不用瞄 */
+      body.is-touch-desktop .dot::after {
+        content: "";
+        position: absolute;
+        inset: -6px;
+        border-radius: 50%;
+      }
+      body.is-touch-desktop .resize-handle {
+        width: 28px;
+        height: 28px;
       }
       body.is-touch-desktop .desk-icon {
         min-height: 64px;
+        width: 100%;
       }
 
       @media (max-width: 360px) {
-        .lp-grid { grid-template-columns: repeat(3, 1fr); }
+        .lp-grid { --lp-cols: 3; }
       }
 
     </style>
