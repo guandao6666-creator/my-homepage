@@ -1,0 +1,194 @@
+{
+  "ridge": {
+    "accent": "#477bae",
+    "accent2": "#6365ba",
+    "luminance": 0.522,
+    "bytes": 250472,
+    "w": 1600,
+    "h": 1067
+  },
+  "snow": {
+    "accent": "#4674af",
+    "accent2": "#6662bb",
+    "luminance": 0.213,
+    "bytes": 240868,
+    "w": 1600,
+    "h": 1067
+  },
+  "forest": {
+    "accent": "#47ae93",
+    "accent2": "#63a7ba",
+    "luminance": 0.219,
+    "bytes": 212818,
+    "w": 1600,
+    "h": 1067
+  },
+  "coast": {
+    "accent": "#22abd3",
+    "accent2": "#4470d9",
+    "luminance": 0.547,
+    "bytes": 344446,
+    "w": 1600,
+    "h": 1067
+  },
+  "sunset": {
+    "accent": "#c97f62",
+    "accent2": "#d0be84",
+    "luminance": 0.375,
+    "bytes": 99010,
+    "w": 1600,
+    "h": 1067
+  },
+  "stars": {
+    "accent": "#447cb1",
+    "accent2": "#6164bd",
+    "luminance": 0.112,
+    "bytes": 222476,
+    "w": 1600,
+    "h": 1067
+  },
+  "aurora": {
+    "accent": "#2acb7b",
+    "accent2": "#4bd3d1",
+    "luminance": 0.169,
+    "bytes": 195184,
+    "w": 1600,
+    "h": 1067
+  },
+  "lake": {
+    "accent": "#ddaa7e",
+    "accent2": "#e0dc99",
+    "luminance": 0.637,
+    "bytes": 128688,
+    "w": 1600,
+    "h": 1067
+  },
+  "city-night": {
+    "accent": "#4377b2",
+    "accent2": "#6160be",
+    "luminance": 0.152,
+    "bytes": 271520,
+    "w": 1600,
+    "h": 1067
+  },
+  "tokyo": {
+    "accent": "#b37241",
+    "accent2": "#bfb65f",
+    "luminance": 0.151,
+    "bytes": 215304,
+    "w": 1600,
+    "h": 1067
+  },
+  "future-arch": {
+    "accent": "#4380b2",
+    "accent2": "#6066be",
+    "luminance": 0.563,
+    "bytes": 122164,
+    "w": 1600,
+    "h": 1067
+  },
+  "skyline": {
+    "accent": "#3d76b8",
+    "accent2": "#5d5bc3",
+    "luminance": 0.481,
+    "bytes": 68884,
+    "w": 1600,
+    "h": 1067
+  },
+  "arch-min": {
+    "accent": "#b57740",
+    "accent2": "#c0bb5d",
+    "luminance": 0.381,
+    "bytes": 71672,
+    "w": 1600,
+    "h": 1067
+  },
+  "gradient": {
+    "accent": "#455cb0",
+    "accent2": "#7962bc",
+    "luminance": 0.219,
+    "bytes": 38316,
+    "w": 1600,
+    "h": 1067
+  },
+  "fluid": {
+    "accent": "#4494b1",
+    "accent2": "#6178bd",
+    "luminance": 0.196,
+    "bytes": 143734,
+    "w": 1600,
+    "h": 1067
+  },
+  "glass": {
+    "accent": "#e29b79",
+    "accent2": "#e4d596",
+    "luminance": 0.805,
+    "bytes": 44608,
+    "w": 1600,
+    "h": 1067
+  },
+  "geo": {
+    "accent": "#d2b889",
+    "accent2": "#d1d8a2",
+    "luminance": 0.8,
+    "bytes": 63202,
+    "w": 1600,
+    "h": 1067
+  },
+  "digital": {
+    "accent": "#477dae",
+    "accent2": "#6367ba",
+    "luminance": 0.137,
+    "bytes": 109548,
+    "w": 1600,
+    "h": 1067
+  },
+  "tech": {
+    "accent": "#477aae",
+    "accent2": "#6365ba",
+    "luminance": 0.058,
+    "bytes": 44740,
+    "w": 1600,
+    "h": 1067
+  },
+  "space": {
+    "accent": "#47ae98",
+    "accent2": "#63a3ba",
+    "luminance": 0.122,
+    "bytes": 236016,
+    "w": 1600,
+    "h": 1067
+  },
+  "ocean": {
+    "accent": "#1aaadb",
+    "accent2": "#3e69e0",
+    "luminance": 0.265,
+    "bytes": 132158,
+    "w": 1600,
+    "h": 1067
+  },
+  "ink": {
+    "accent": "#d0b18b",
+    "accent2": "#d5d6a3",
+    "luminance": 0.75,
+    "bytes": 242058,
+    "w": 1600,
+    "h": 1067
+  },
+  "harbor": {
+    "accent": "#4294b3",
+    "accent2": "#5f76bf",
+    "luminance": 0.189,
+    "bytes": 203246,
+    "w": 1600,
+    "h": 1067
+  },
+  "dunes": {
+    "accent": "#c87758",
+    "accent2": "#ceba7a",
+    "luminance": 0.545,
+    "bytes": 68924,
+    "w": 1600,
+    "h": 1067
+  }
+}

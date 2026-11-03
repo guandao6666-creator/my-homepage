@@ -11,6 +11,8 @@
     "preview": "astro preview",
     "astro": "astro",
     "sync": "node scripts/sync-content.mjs",
+    "walls": "node scripts/build-wallpapers.mjs",
+    "qa:os13": "node scripts/os13-functional.mjs",
     "prebuild": "node scripts/sync-content.mjs --soft"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
+    "puppeteer-core": "^25.16.0",
     "satori": "^0.63.2"
   }
 }
