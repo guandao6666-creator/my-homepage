@@ -13,7 +13,9 @@
     "sync": "node scripts/sync-content.mjs",
     "walls": "node scripts/build-wallpapers.mjs",
     "qa:os13": "node scripts/os13-functional.mjs",
-    "prebuild": "node scripts/sync-content.mjs --soft"
+    "prebuild": "node scripts/sync-content.mjs --soft",
+    "qa:os14": "node scripts/os14-qa.mjs",
+    "qa:os14:full": "astro build && node scripts/os14-qa.mjs"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "^7.3.5",

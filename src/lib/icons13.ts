@@ -130,6 +130,63 @@ export const ICON_SVG: Record<string, string> = {
   home: `
     ${A("M24 10.6 38.4 23.2h-4.9V34a3.4 3.4 0 0 1-3.4 3.4H18a3.4 3.4 0 0 1-3.4-3.4V23.2h-5L24 10.6Z")}
     <rect x="21" y="28.5" width="6" height="8.9" rx="1.5" fill="#0b1020" opacity=".24"/>`,
+
+  /* ---------------- 1.4 ---------------- */
+
+  appcenter: `
+    ${A("M13 17.5h22l-2.2 18.2a4.6 4.6 0 0 1-4.6 4.1h-8.4a4.6 4.6 0 0 1-4.6-4.1L13 17.5Z")}
+    <path d="M18.4 17.5v-3.2a5.6 5.6 0 0 1 11.2 0v3.2" stroke="currentColor" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+    <path d="M20.6 26.2h6.8M24 22.8v6.8" stroke="#0b1020" stroke-opacity=".34" stroke-width="2.6" stroke-linecap="round"/>`,
+
+  themes: `
+    ${A("M24 10.8c7.3 0 13.2 5.6 13.2 12.5 0 3.6-2.6 5.5-5.6 5.5h-2.3c-2.2 0-3.4 1.4-3.4 3.1 0 2.2 1.8 2.7 1.8 5.1 0 2-1.7 3.4-4.3 3.4-6.8 0-12.6-5.7-12.6-13.2S16.6 10.8 24 10.8Z")}
+    <circle cx="19.2" cy="21.2" r="2.5" fill="#0b1020" opacity=".34"/>
+    <circle cx="27.2" cy="18.6" r="2.2" fill="#0b1020" opacity=".26"/>
+    <circle cx="16.6" cy="28.8" r="2" fill="#0b1020" opacity=".26"/>`,
+
+  widgets: `
+    ${A("M11.5 12.5h10.2v10.2H11.5z", 0.95)}
+    ${A("M26.3 12.5h10.2v6.6H26.3z", 0.7)}
+    ${A("M26.3 22.7h10.2v12.8H26.3z", 0.95)}
+    ${A("M11.5 26.3h10.2v9.2H11.5z", 0.7)}`,
+
+  play: `
+    ${A("M14.4 18.2h19.2a5.4 5.4 0 0 1 5.4 5.4v5.6a5.4 5.4 0 0 1-5.4 5.4H14.4A5.4 5.4 0 0 1 9 29.2v-5.6a5.4 5.4 0 0 1 5.4-5.4Z")}
+    <circle cx="31.6" cy="23.4" r="2.1" fill="#0b1020" opacity=".34"/>
+    <circle cx="35.6" cy="27.4" r="2.1" fill="#0b1020" opacity=".34"/>
+    <path d="M16.4 21.6v6.6M13.2 24.9h6.6" stroke="#0b1020" stroke-opacity=".34" stroke-width="2.4" stroke-linecap="round"/>`,
+
+  space: `
+    ${A("M24 10.8 40 19l-16 8.2L8 19l16-8.2Z")}
+    ${A("M8 25.4 24 33.6l16-8.2v3.4L24 37 8 28.8v-3.4Z", 0.72)}
+    ${A("M8 32.8 24 41l16-8.2v3.2L24 44.2 8 36v-3.2Z", 0.45)}`,
+
+  control: `
+    <path d="M12 16h24M12 24h24M12 32h24" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity=".42"/>
+    <circle cx="19" cy="16" r="3.6" fill="currentColor"/>
+    <circle cx="30" cy="24" r="3.6" fill="currentColor"/>
+    <circle cx="17" cy="32" r="3.6" fill="currentColor"/>`,
+
+  tasks: `
+    ${A("M13 12.6h22a3.4 3.4 0 0 1 3.4 3.4v16a3.4 3.4 0 0 1-3.4 3.4H13a3.4 3.4 0 0 1-3.4-3.4V16a3.4 3.4 0 0 1 3.4-3.4Z", 0.28)}
+    <path d="M16.6 20.2 19.8 23.4 25 18.2" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M28.6 20.8h6.4M16.6 29.6l3.2 3.2 5.2-5.2M28.6 30.2h6.4" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".62"/>`,
+
+  data: `
+    <ellipse cx="24" cy="15.4" rx="12.4" ry="4.8" fill="currentColor"/>
+    ${A("M11.6 15.4v17.2c0 2.7 5.6 4.8 12.4 4.8s12.4-2.1 12.4-4.8V15.4c0 2.7-5.6 4.8-12.4 4.8S11.6 18.1 11.6 15.4Z", 0.72)}
+    <path d="M11.6 24c0 2.7 5.6 4.8 12.4 4.8s12.4-2.1 12.4-4.8" stroke="#0b1020" stroke-opacity=".26" stroke-width="2.2" fill="none"/>`,
+
+  gallery: `
+    ${A("M10.5 17.4A3.4 3.4 0 0 1 13.9 14h20.2a3.4 3.4 0 0 1 3.4 3.4v15.2a3.4 3.4 0 0 1-3.4 3.4H13.9a3.4 3.4 0 0 1-3.4-3.4V17.4Z")}
+    <circle cx="18.4" cy="21.6" r="2.6" fill="#0b1020" opacity=".32"/>
+    <path d="M14.4 32.2l6.6-7.6 4.6 5.2 3.8-3.2 5 5.6v1a2 2 0 0 1-2 2H16.4a2 2 0 0 1-2-2v-1Z" fill="#0b1020" opacity=".24"/>
+    <path d="M16 10.8h18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".4"/>`,
+
+  reader: `
+    ${A("M11 15.2c4.2-1.8 8.6-1.5 13 1.2v20.4c-4.4-2.7-8.8-3-13-1.2V15.2Z")}
+    ${A("M37 15.2c-4.2-1.8-8.6-1.5-13 1.2v20.4c4.4-2.7 8.8-3 13-1.2V15.2Z", 0.72)}
+    <path d="M24 16.4v20.4" stroke="#0b1020" stroke-opacity=".3" stroke-width="1.8"/>`,
 };
 
 const CLASS_MAP: Record<string, string> = {
@@ -155,6 +212,16 @@ const CLASS_MAP: Record<string, string> = {
   "di-files": "files",
   "di-gear": "gear",
   "di-home": "home",
+  "di-appcenter": "appcenter",
+  "di-themes": "themes",
+  "di-widgets": "widgets",
+  "di-play": "play",
+  "di-space": "space",
+  "di-control": "control",
+  "di-tasks": "tasks",
+  "di-data": "data",
+  "di-gallery": "gallery",
+  "di-reader": "reader",
 };
 
 const paint = (glyph: HTMLElement) => {

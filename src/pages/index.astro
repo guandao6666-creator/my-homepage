@@ -1,5 +1,10 @@
 ---
 import "../styles/global.css";
+import "../styles/os14.css";
+import "../styles/os14-apps.css";
+import "../styles/os14-games.css";
+import "../styles/os14-apps.css";
+import "../styles/os14-games.css";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { getAllPosts } from "../lib/posts";
@@ -124,7 +129,7 @@ const data = {
         <span class="mb-brand">
           <span class="mb-logo" aria-hidden="true">管</span>
           <span class="mb-brand-text">Guandao OS</span>
-          <span class="mb-version">1.3</span>
+          <span class="mb-version">1.4</span>
         </span>
         <span class="mb-current" id="mb-current" hidden></span>
         <nav class="mb-menu">
@@ -144,6 +149,21 @@ const data = {
             <div class="mb-dropdown" data-menu-panel="edit" hidden>
               <button type="button" data-menu-action="settings">打开「设置」</button>
               <button type="button" data-menu-action="reset">重置桌面布局</button>
+            </div>
+          </div>
+          <div class="mb-menu-item">
+            <button class="mb-menu-btn" type="button" data-menu-btn="apps">应用</button>
+            <div class="mb-dropdown" data-menu-panel="apps" hidden>
+              <button type="button" data-menu-action="appcenter">应用中心</button>
+              <button type="button" data-menu-action="themes">主题中心</button>
+              <button type="button" data-menu-action="widgetstore">组件中心</button>
+              <span class="mb-sep"></span>
+              <button type="button" data-menu-action="playground">游乐场</button>
+              <button type="button" data-menu-action="workspaces">工作空间</button>
+              <button type="button" data-menu-action="tasks">任务与通知</button>
+              <span class="mb-sep"></span>
+              <button type="button" data-menu-action="control">控制中心</button>
+              <button type="button" data-menu-action="datacenter">数据中心</button>
             </div>
           </div>
           <div class="mb-menu-item">
@@ -312,6 +332,30 @@ const data = {
             <span class="di-glyph di-files"></span>
             <span class="di-label">文件</span>
           </button>
+          <button class="desk-icon" type="button" data-app="appcenter">
+            <span class="di-glyph di-appcenter"></span>
+            <span class="di-label">应用中心</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="themes">
+            <span class="di-glyph di-themes"></span>
+            <span class="di-label">主题中心</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="widgetstore">
+            <span class="di-glyph di-widgets"></span>
+            <span class="di-label">组件中心</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="playground">
+            <span class="di-glyph di-play"></span>
+            <span class="di-label">游乐场</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="workspaces">
+            <span class="di-glyph di-space"></span>
+            <span class="di-label">工作空间</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="tasks">
+            <span class="di-glyph di-tasks"></span>
+            <span class="di-label">任务</span>
+          </button>
           <a class="desk-icon" href="/home/">
             <span class="di-glyph di-home"></span>
             <span class="di-label">回博客</span>
@@ -446,6 +490,7 @@ const data = {
 
     <script>
       import { initOs13 } from "../lib/os13";
+      import { initOs14 } from "../lib/os14";
 
       (() => {
         /* ---------------- 开机动画 ---------------- */
@@ -1041,7 +1086,7 @@ const data = {
           if (!dock || !DATA) return;
 
           const items = readDock()
-            .filter((id) => APPS[id])
+            .filter((id) => APPS[id] && (!dockFilter || dockFilter(id)))
             .map(
               (id) => `
                 <button class="dock-item" type="button" data-app="${id}" title="${APPS[id].title}">
@@ -3985,6 +4030,38 @@ const data = {
           files: { title: "文件管理器", width: 640, height: 500, body: renderFiles, glyph: "di-files" },
         };
 
+        /* ---------------- 应用扩展点（1.4） ----------------
+           生态应用由 src/lib/os14 注册进来，复用同一套窗口 / 焦点 / 最小化逻辑。
+           这里只留最小的注册口与守卫，避免每个应用各写一套窗口管理。 */
+        const APP_INIT: Record<string, (win: HTMLElement) => void | (() => void)> = {};
+        const APP_GUARD = {
+          blocked: (_id: string) => false,
+          onBlocked: (_id: string) => undefined,
+        };
+        const EXT_WIDGETS: Record<string, { title: string; desc: string; body: () => string; init?: (el: HTMLElement) => void }> = {};
+        let dockFilter: ((id: string) => boolean) | null = null;
+        const beforeCloseHooks: Array<(win: HTMLElement) => void> = [];
+
+        const registerApp = (spec: {
+          id: string;
+          title: string;
+          width: number;
+          height: number;
+          glyph?: string;
+          body: () => string;
+          init?: (win: HTMLElement) => void | (() => void);
+        }) => {
+          APPS[spec.id] = {
+            title: spec.title,
+            width: spec.width,
+            height: spec.height,
+            body: spec.body,
+            glyph: spec.glyph,
+          };
+          if (spec.glyph) APP_ICON[spec.id] = spec.glyph;
+          if (spec.init) APP_INIT[spec.id] = spec.init;
+        };
+
         /* ---------------- 窗口系统 ---------------- */
 
         const focusWin = (win: HTMLElement) => {
@@ -3993,6 +4070,16 @@ const data = {
         };
 
         const closeWin = (win: HTMLElement) => {
+          // 1.4：窗口级清理必须在移除 DOM 之前跑，游戏循环 / 计时器才能真的停
+          try {
+            win.dispatchEvent(new CustomEvent("guandao:before-close"));
+            const cleanup = (win as unknown as { __gosCleanup?: () => void }).__gosCleanup;
+            if (typeof cleanup === "function") cleanup();
+            (win as unknown as { __gosCleanup?: () => void }).__gosCleanup = undefined;
+            for (const hook of beforeCloseHooks) hook(win);
+          } catch (err) {
+            console.warn("[Guandao OS] 窗口清理失败", err);
+          }
           win.classList.add("is-closing");
           const dockItem = document.querySelector(`.dock-item[data-app="${win.dataset.app}"]`);
           dockItem?.classList.remove("has-open", "has-hidden");
@@ -4379,6 +4466,12 @@ const data = {
           const app = APPS[id];
           if (!app) return;
 
+          // 1.4：未安装的应用不允许被图标 / 搜索直接启动
+          if (APP_GUARD.blocked(id)) {
+            APP_GUARD.onBlocked(id);
+            return;
+          }
+
           const existing = windows.querySelector(`.window[data-app="${id}"]`) as HTMLElement | null;
           if (existing) {
             // 窗口在另一个工作区：先切过去，再还原 / 聚焦
@@ -4432,6 +4525,14 @@ const data = {
           const curW = Number.parseFloat(win.style.width) || 0;
           if (curW > window.innerWidth - 24) win.style.width = `${window.innerWidth - 24}px`;
 
+          let bodyHtml = "";
+          try {
+            bodyHtml = app.body();
+          } catch (err) {
+            console.error(`[Guandao OS] 应用「${id}」渲染失败`, err);
+            bodyHtml = `<div class="app-crash"><b>「${app.title}」没有正常加载</b><p>可能是本地数据损坏或版本不兼容。可以关闭窗口后重试，或在「数据中心」恢复默认设置。</p></div>`;
+          }
+
           win.innerHTML = `
             <div class="titlebar">
               <span class="dots">
@@ -4441,7 +4542,7 @@ const data = {
               </span>
               <span class="win-title">${app.title}</span>
             </div>
-            <div class="win-body">${app.body()}</div>
+            <div class="win-body" data-app-body="${id}">${bodyHtml}</div>
             <span class="resize-handle" aria-hidden="true"></span>`;
 
           windows.appendChild(win);
@@ -4461,6 +4562,13 @@ const data = {
 
           document.querySelector(`.dock-item[data-app="${id}"]`)?.classList.add("has-open");
           saveWindows();
+
+          // 1.4：打开次数用于应用中心的「热门」排序（真实使用记录）
+          try {
+            (window as unknown as { GOS14?: { onOpen?: (id: string) => void } }).GOS14?.onOpen?.(id);
+          } catch {
+            /* 忽略 */
+          }
 
           // 1.3：记录最近打开，供「最近打开」组件使用
           try {
@@ -4503,24 +4611,36 @@ const data = {
           win.querySelector(".dot-max")?.addEventListener("click", () => toggleMaximize(win));
           win.addEventListener("pointerdown", () => focusWin(win));
 
-          if (id === "terminal") initTerminal(win);
-          if (id === "settings") initSettings(win);
-          if (id === "music") initMusic(win);
-          if (id === "aquarium") initAquarium(win);
-          if (id === "visitors") initVisitors(win);
-          if (id === "rank") initRank(win);
-          if (id === "draw") initDraw(win);
-          if (id === "council") initCouncil(win);
-          if (id === "treehole") initTreehole(win);
-          if (id === "news") initNews(win);
-          if (id === "social") initSocial(win);
-          if (id === "calc") initCalc(win);
-          if (id === "notes") initNotes(win);
-          if (id === "monitor") initMonitor(win);
-          if (id === "calendar") initCalendar(win);
-          if (id === "viewer") initViewer(win);
-          if (id === "browser") initBrowser(win);
-          if (id === "files") initFiles(win);
+          const extInit = APP_INIT[id];
+          if (extInit) {
+            try {
+              const cleanup = extInit(win);
+              if (typeof cleanup === "function") {
+                (win as unknown as { __gosCleanup?: () => void }).__gosCleanup = cleanup;
+              }
+            } catch (err) {
+              console.error(`[Guandao OS] 应用「${id}」初始化失败`, err);
+            }
+          } else {
+            if (id === "terminal") initTerminal(win);
+            if (id === "settings") initSettings(win);
+            if (id === "music") initMusic(win);
+            if (id === "aquarium") initAquarium(win);
+            if (id === "visitors") initVisitors(win);
+            if (id === "rank") initRank(win);
+            if (id === "draw") initDraw(win);
+            if (id === "council") initCouncil(win);
+            if (id === "treehole") initTreehole(win);
+            if (id === "news") initNews(win);
+            if (id === "social") initSocial(win);
+            if (id === "calc") initCalc(win);
+            if (id === "notes") initNotes(win);
+            if (id === "monitor") initMonitor(win);
+            if (id === "calendar") initCalendar(win);
+            if (id === "viewer") initViewer(win);
+            if (id === "browser") initBrowser(win);
+            if (id === "files") initFiles(win);
+          }
         };
 
         /* ---------------- 终端 ---------------- */
@@ -4641,7 +4761,7 @@ const data = {
                 print(new Date().toLocaleTimeString("zh-CN", { hour12: false }));
                 break;
               case "version":
-                print("Guandao OS 1.2 · Desktop Evolution", "term-accent");
+                print("Guandao OS 1.4 · Ecosystem Evolution", "term-accent");
                 break;
               case "apps":
                 print(Object.values(APPS).map((a) => a.title).join("  "), "term-accent");
@@ -4674,8 +4794,13 @@ const data = {
               case "exit":
                 closeWin(win);
                 break;
-              default:
-                print(`未知命令：${name}，试试 help`, "term-error");
+              default: {
+                // 1.4：生态层的隐藏命令交给 os14 处理，未命中再报未知命令
+                const hook = (window as unknown as { GOS14?: { terminal?: (cmd: string) => string | null } }).GOS14;
+                const extra = hook?.terminal?.(name);
+                if (extra) print(extra, "term-accent");
+                else print(`未知命令：${name}，试试 help`, "term-error");
+              }
             }
           };
 
@@ -5721,6 +5846,16 @@ const data = {
             case "launchpad":
               openLaunchpad();
               break;
+            case "appcenter":
+            case "themes":
+            case "widgetstore":
+            case "playground":
+            case "workspaces":
+            case "tasks":
+            case "control":
+            case "datacenter":
+              openApp(action);
+              break;
           }
         };
 
@@ -6271,7 +6406,8 @@ const data = {
                 </div>
                 <div class="w-profile-tags"><i>骑行</i><i>写作</i><i>AI</i><i>Vic3</i></div>`;
             default:
-              return "";
+              // 1.4：组件中心注册的扩展组件
+              return EXT_WIDGETS[id]?.body() ?? "";
           }
         };
 
@@ -6391,6 +6527,25 @@ const data = {
           }
           renderWidget(id);
           window.dispatchEvent(new CustomEvent("guandao:widgets-change", { detail: { id, on } }));
+        };
+
+        /** 1.4：组件中心注册新组件。同一 id 只认第一次，避免热重载式重复注册 */
+        const registerWidget = (spec: {
+          id: string;
+          title: string;
+          desc: string;
+          body: () => string;
+          init?: (el: HTMLElement) => void;
+          defaultOn?: boolean;
+        }) => {
+          if (!spec.id || WIDGET_IDS.includes(spec.id)) return;
+          WIDGET_IDS.push(spec.id);
+          WIDGET_TITLES[spec.id] = spec.title;
+          WIDGET_DESC[spec.id] = spec.desc;
+          if (!spec.defaultOn) WIDGET_OFF_BY_DEFAULT.push(spec.id);
+          WIDGET_PRIORITY.push(spec.id);
+          EXT_WIDGETS[spec.id] = { title: spec.title, desc: spec.desc, body: spec.body, init: spec.init };
+          renderWidget(spec.id);
         };
 
         /* ---------------- 卡片选择器（手机桌面模式） ---------------- */
@@ -6741,6 +6896,12 @@ const data = {
               });
             }
           }
+          // 1.4：扩展组件自己的初始化
+          try {
+            EXT_WIDGETS[id]?.init?.(el);
+          } catch (err) {
+            console.error(`[Guandao OS] 组件「${id}」初始化失败`, err);
+          }
         };
 
         // 小组件定时刷新：时钟每秒、系统信息每秒
@@ -6790,6 +6951,11 @@ const data = {
         // 通知中心：先渲染已保存的通知，铃铛红点即时可见
         renderNotifs();
         updateBell();
+        // 1.4 的任务中心 / 勿扰模式也会改同一份通知数据，收到广播就重绘
+        window.addEventListener("guandao:notif-change", () => {
+          renderNotifs();
+          updateBell();
+        });
 
         // 桌面小组件：在全部定义之后渲染，避免 TDZ
         applyPhoneWidgetPreset();
@@ -6862,6 +7028,7 @@ const data = {
         }
 
         /* ---------------- Guandao OS 1.3 · Beyond the Desktop ---------------- */
+        let api13Ref: any = null;
         try {
           const api13 = initOs13({
             os,
@@ -6895,6 +7062,7 @@ const data = {
             },
           });
           (window as unknown as { GOS13?: unknown }).GOS13 = api13;
+          api13Ref = api13;
           // 旧的「下一张壁纸」菜单动作交给 1.3 的壁纸引擎
           document.querySelectorAll<HTMLElement>('[data-menu-action="wallpaper"]').forEach((btn) => {
             btn.dataset.wallNext = "1";
@@ -6912,6 +7080,103 @@ const data = {
           );
         } catch (err) {
           console.error("[Guandao OS 1.3]", err);
+        }
+
+        /* ---------------- Guandao OS 1.4 · Ecosystem Evolution ----------------
+           生态层只拿这里暴露的少量能力，窗口 / 通知 / 组件 / 外观全部复用现有实现，
+           避免出现第二套互不兼容的窗口管理。 */
+        let boot14: any = null;
+        try {
+          const api13 = api13Ref;
+          const notifKey = "guandao.os.notif.v1";
+
+          /** 勿扰模式：通知照常入库，但直接标为已读，不亮红点也不打扰 */
+          const dndOn = () => {
+            try {
+              return Boolean(JSON.parse(localStorage.getItem("guandao.os14.prefs.v1") || "{}").dnd);
+            } catch {
+              return false;
+            }
+          };
+
+          const buildShortcut = (id: string, title: string, glyph: string) => {
+            const btn = document.createElement("button");
+            btn.className = "desk-icon";
+            btn.type = "button";
+            btn.dataset.app = id;
+            btn.innerHTML = `<span class="di-glyph ${glyph || "di-folder"}"></span><span class="di-label">${escapeHtml(title)}</span>`;
+            return btn;
+          };
+
+          const ctx14 = {
+            os,
+            windows,
+            desk: document.getElementById("desk") as HTMLElement,
+            openApp,
+            closeWin,
+            focusWin,
+            openSettings: (tab?: string) => api13?.openSettings(tab),
+            pushNotif: (n: { icon: string; title: string; body: string }) => {
+              pushNotif(n);
+              if (!dndOn()) return;
+              try {
+                const list = JSON.parse(localStorage.getItem(notifKey) || "[]");
+                if (list[0]) list[0].read = true;
+                localStorage.setItem(notifKey, JSON.stringify(list));
+                window.dispatchEvent(new CustomEvent("guandao:notif-change"));
+              } catch {
+                /* 忽略 */
+              }
+            },
+            toast: (msg: string) => api13?.toast?.(msg),
+            escapeHtml,
+            registerApp,
+            unregisterApp: (id: string) => {
+              delete APPS[id];
+              delete APP_ICON[id];
+            },
+            APPS,
+            APP_ICON,
+            readState,
+            writeState,
+            dock: { read: readDock, save: saveDock, render: renderDock },
+            widgets: {
+              ids: WIDGET_IDS,
+              titles: WIDGET_TITLES,
+              desc: WIDGET_DESC,
+              on: widgetOn,
+              setEnabled: setWidgetEnabled,
+              render: renderWidget,
+              renderAll: renderAllWidgets,
+              stack: stackWidgets,
+              register: registerWidget,
+              state: readWidgets,
+            },
+            api13,
+            setDockFilter: (fn: ((id: string) => boolean) | null) => {
+              dockFilter = fn;
+              renderDock();
+            },
+            setLaunchGuard: (fn: (id: string) => boolean) => {
+              APP_GUARD.blocked = fn;
+              APP_GUARD.onBlocked = () => openApp("appcenter");
+            },
+            onBeforeClose: (cb: (win: HTMLElement) => void) => beforeCloseHooks.push(cb),
+            buildShortcut,
+            relayoutIcons: () => {
+              layoutDeskIcons();
+              layoutLaunchpad();
+              stackWidgets();
+            },
+            restoreWindows: (map: Record<string, unknown>, ids: string[]) =>
+              boot14 ? boot14.sys.restoreWindows(map, ids) : Promise.resolve(),
+            closeAllWindows: () => boot14?.sys.closeAppAll(),
+          };
+
+          boot14 = initOs14(ctx14 as never);
+          (window as unknown as { GOS14_READY?: boolean }).GOS14_READY = true;
+        } catch (err) {
+          console.error("[Guandao OS 1.4]", err);
         }
       })();
     </script>

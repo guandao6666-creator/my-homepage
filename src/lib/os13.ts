@@ -1466,6 +1466,36 @@ export function initOs13(ctx: Os13Context) {
     syncSettings();
   };
 
+  /** 1.4 主题引擎用：按任意一组外观参数落盘并应用 */
+  const applyLook = (look: {
+    mode?: "dark" | "light";
+    material?: "glass" | "frost" | "solid";
+    radius?: "soft" | "round" | "sharp";
+    accent?: string;
+    accent2?: string;
+    wall?: string;
+    darken?: number;
+    kenburns?: boolean;
+    dock?: Partial<Cfg["dock"]>;
+    preset?: string;
+  }) => {
+    if (look.mode) cfg.appearance.mode = look.mode;
+    if (look.material) cfg.appearance.material = look.material;
+    if (look.radius) cfg.appearance.radius = look.radius;
+    if (look.accent && /^#[0-9a-f]{6}$/i.test(look.accent)) cfg.appearance.accent = look.accent;
+    if (look.accent2 && /^#[0-9a-f]{6}$/i.test(look.accent2)) cfg.appearance.accent2 = look.accent2;
+    if (typeof look.darken === "number") cfg.wall.darken = Math.max(0, Math.min(80, look.darken));
+    if (typeof look.kenburns === "boolean") cfg.wall.kenburns = look.kenburns;
+    if (look.dock) cfg.dock = { ...cfg.dock, ...look.dock };
+    // 主题自己带强调色，别再被壁纸主色覆盖
+    cfg.appearance.autoAccent = false;
+    cfg.preset = look.preset ?? "custom";
+    save();
+    if (look.wall) setWallpaper(look.wall);
+    applyAll();
+    syncSettings();
+  };
+
   /* ============================================================
      设置 2.0
      ============================================================ */
@@ -2296,8 +2326,8 @@ export function initOs13(ctx: Os13Context) {
     if (cfg.motion.particles) startParticles();
 
     // 版本号统一到 1.3
-    qsa<HTMLElement>(document, ".mb-version").forEach((el) => (el.textContent = "1.3"));
-    os.dataset.osVersion = "1.3";
+    qsa<HTMLElement>(document, ".mb-version").forEach((el) => (el.textContent = "1.4"));
+    os.dataset.osVersion = "1.4";
 
     window.setInterval(tickAuto, 60_000);
     tickAuto();
@@ -2334,6 +2364,7 @@ export function initOs13(ctx: Os13Context) {
   return {
     cfg: () => cfg,
     setWallpaper,
+    applyLook,
     nextWallpaper: () => stepWallpaper(1),
     prevWallpaper: () => stepWallpaper(-1),
     applyPreset,
