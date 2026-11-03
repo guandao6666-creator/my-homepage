@@ -4199,57 +4199,143 @@ const data = {
           win.style.height = `${r.h}px`;
         };
 
+        /* ---------------- 通用指针拖拽 ----------------
+           1. 4~5px 阈值：轻点不会把元素挪走，也不会误触发
+           2. setPointerCapture：手指滑出元素/窗口边界也不断线
+           3. 拖动用 transform 跟随（GPU 合成，不触发布局），松手才写回 left/top
+           4. pointercancel 兜底，不会卡在「拖动中」状态 */
+        interface DragOptions {
+          threshold?: number;
+          ignore?: string;
+          canStart?: () => boolean;
+          clamp: (x: number, y: number) => { x: number; y: number };
+          onStart?: (event: PointerEvent) => void;
+          onMove?: (event: PointerEvent, pos: { x: number; y: number }) => void;
+          onEnd?: (moved: boolean) => void;
+        }
+
+        const makeDraggable = (handle: HTMLElement, target: HTMLElement, opts: DragOptions) => {
+          let active = false;
+          let moved = false;
+          let pointerId = -1;
+          let startX = 0;
+          let startY = 0;
+          let lastX = 0;
+          let lastY = 0;
+          let baseX = 0;
+          let baseY = 0;
+
+          const onMove = (event: PointerEvent) => {
+            if (!active || event.pointerId !== pointerId) return;
+            lastX = event.clientX;
+            lastY = event.clientY;
+            const dx = lastX - startX;
+            const dy = lastY - startY;
+            if (!moved) {
+              if (Math.hypot(dx, dy) < (opts.threshold ?? 4)) return;
+              moved = true;
+              target.classList.add("is-dragging");
+            }
+            const p = opts.clamp(baseX + dx, baseY + dy);
+            target.style.transform = `translate3d(${p.x - baseX}px, ${p.y - baseY}px, 0)`;
+            opts.onMove?.(event, p);
+          };
+
+          const finish = (event: PointerEvent) => {
+            if (!active) return;
+            active = false;
+            if (pointerId >= 0) {
+              try {
+                handle.releasePointerCapture(pointerId);
+              } catch {
+                /* 指针已释放 */
+              }
+            }
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", finish);
+            window.removeEventListener("pointercancel", finish);
+
+            if (moved) {
+              // pointercancel 的坐标可能是 0，退回最后一次有效位置
+              const dx = (event.type === "pointercancel" ? lastX : event.clientX) - startX;
+              const dy = (event.type === "pointercancel" ? lastY : event.clientY) - startY;
+              const p = opts.clamp(baseX + dx, baseY + dy);
+              // 先落位再清 transform，避免松手瞬间闪一下
+              target.style.left = `${p.x}px`;
+              target.style.top = `${p.y}px`;
+              target.style.transform = "";
+              // 下一帧才解除 dragging：这一帧里 transition 仍是 none，
+              // 否则 transform 复位会被 window 的过渡动画播一遍
+              window.requestAnimationFrame(() => target.classList.remove("is-dragging"));
+            } else {
+              target.style.transform = "";
+              target.classList.remove("is-dragging");
+            }
+            opts.onEnd?.(moved);
+            moved = false;
+            pointerId = -1;
+          };
+
+          handle.addEventListener("pointerdown", (event) => {
+            if (opts.ignore && (event.target as HTMLElement).closest(opts.ignore)) return;
+            if (opts.canStart && !opts.canStart()) return;
+            if (event.button > 0) return;
+            event.preventDefault();
+
+            active = true;
+            moved = false;
+            pointerId = event.pointerId;
+            startX = lastX = event.clientX;
+            startY = lastY = event.clientY;
+            baseX = target.offsetLeft;
+            baseY = target.offsetTop;
+            try {
+              handle.setPointerCapture(pointerId);
+            } catch {
+              /* 某些环境不支持捕获，退回 window 监听 */
+            }
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", finish);
+            window.addEventListener("pointercancel", finish);
+            opts.onStart?.(event);
+          });
+        };
+
         const bindDrag = (win: HTMLElement) => {
           const bar = win.querySelector(".titlebar") as HTMLElement | null;
           if (!bar) return;
 
-          let startX = 0;
-          let startY = 0;
-          let originX = 0;
-          let originY = 0;
           let snapTarget: string | null = null;
+          let allowSnap = true;
 
-          const onMove = (event: PointerEvent) => {
-            // 手机桌面模式窗口接近满宽，左边界不允许拖出屏幕，
-            // 否则标题栏上的三个按钮会被推出可视区
-            const phone = phoneDesktopMode();
-            const maxX = window.innerWidth - 140;
-            const maxY = window.innerHeight - 110;
-            win.style.left = `${Math.max(phone ? 0 : -40, Math.min(maxX, originX + event.clientX - startX))}px`;
-            win.style.top = `${Math.max(phone ? 36 : 32, Math.min(maxY, originY + event.clientY - startY))}px`;
-
-            snapTarget = snapZone(event.clientX, event.clientY);
-            showSnapPreview(snapTarget);
-          };
-
-          const onUp = () => {
-            win.classList.remove("is-dragging");
-            window.removeEventListener("pointermove", onMove);
-            window.removeEventListener("pointerup", onUp);
-            window.removeEventListener("pointercancel", onUp);
-            if (snapTarget) applySnap(win, snapTarget);
-            hideSnapPreview();
-            snapTarget = null;
-            saveWindows();
-          };
-
-          bar.addEventListener("pointerdown", (event) => {
-            if ((event.target as HTMLElement).closest(".dot")) return;
-            if (win.classList.contains("is-maximized")) return;
-            event.preventDefault();
-
-            startX = event.clientX;
-            startY = event.clientY;
-            originX = win.offsetLeft;
-            originY = win.offsetTop;
-
-            win.classList.add("is-dragging");
-            focusWin(win);
-
-            // 挂在 window 上，指针移出窗口也能继续拖
-            window.addEventListener("pointermove", onMove);
-            window.addEventListener("pointerup", onUp);
-            window.addEventListener("pointercancel", onUp);
+          makeDraggable(bar, win, {
+            threshold: 4,
+            ignore: ".dot",
+            canStart: () => !win.classList.contains("is-maximized"),
+            clamp: (x, y) => {
+              // 手机桌面模式窗口接近满宽，左边界不允许拖出屏幕，
+              // 否则标题栏上的三个按钮会被推出可视区
+              const phone = phoneDesktopMode();
+              return {
+                x: Math.max(phone ? 0 : -40, Math.min(window.innerWidth - 140, x)),
+                y: Math.max(phone ? 36 : 32, Math.min(window.innerHeight - 110, y)),
+              };
+            },
+            onStart: (event) => {
+              // 只有鼠标才参与贴边吸附：手指往上滑一点就触发全屏，手感很差
+              allowSnap = event.pointerType === "mouse";
+            },
+            onMove: (event) => {
+              if (!allowSnap) return;
+              snapTarget = snapZone(event.clientX, event.clientY);
+              showSnapPreview(snapTarget);
+            },
+            onEnd: (moved) => {
+              if (moved && snapTarget) applySnap(win, snapTarget);
+              hideSnapPreview();
+              snapTarget = null;
+              if (moved) saveWindows();
+            },
           });
 
           bar.addEventListener("dblclick", (event) => {
@@ -5026,7 +5112,6 @@ const data = {
           ];
 
           let sayTimer: number | undefined;
-          let drag: { x: number; y: number; left: number; top: number; moved: boolean } | null = null;
 
           const say = (text: string) => {
             petSay.textContent = text;
@@ -5035,51 +5120,27 @@ const data = {
             sayTimer = window.setTimeout(() => petSay.classList.remove("show"), 2400);
           };
 
-          pet.addEventListener("pointerdown", (event) => {
-            const rect = pet.getBoundingClientRect();
-            const desk = pet.parentElement?.getBoundingClientRect();
-            if (!desk) return;
-
-            // 从 right/bottom 定位切成 left/top，后面才好拖
-            pet.style.left = `${rect.left - desk.left}px`;
-            pet.style.top = `${rect.top - desk.top}px`;
-            pet.style.right = "auto";
-            pet.style.bottom = "auto";
-
-            drag = {
-              x: event.clientX,
-              y: event.clientY,
-              left: rect.left - desk.left,
-              top: rect.top - desk.top,
-              moved: false,
-            };
-            pet.classList.add("is-dragging");
-          });
-
-          window.addEventListener("pointermove", (event) => {
-            if (!drag) return;
-            const dx = event.clientX - drag.x;
-            const dy = event.clientY - drag.y;
-            if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
-            if (!drag.moved) return;
-
-            const maxX = window.innerWidth - 110;
-            const maxY = window.innerHeight - 150;
-            pet.style.left = `${Math.max(0, Math.min(maxX, drag.left + dx))}px`;
-            pet.style.top = `${Math.max(34, Math.min(maxY, drag.top + dy))}px`;
-          });
-
-          window.addEventListener("pointerup", () => {
-            if (drag && !drag.moved) {
+          makeDraggable(pet, pet, {
+            threshold: 4,
+            clamp: (x, y) => ({
+              x: Math.max(0, Math.min(window.innerWidth - 110, x)),
+              y: Math.max(34, Math.min(window.innerHeight - 150, y)),
+            }),
+            onEnd: (moved) => {
+              if (moved) {
+                // 拖过之后改用 left/top 定位，免得和 right/bottom 打架
+                pet.style.right = "auto";
+                pet.style.bottom = "auto";
+                return;
+              }
+              // 没拖动 = 点了一下，说句话并记一次互动
               say(LINES[Math.floor(Math.random() * LINES.length)]);
 
               const ach = readAch();
               ach.petClicks += 1;
               saveAch(ach);
               if (ach.petClicks >= 10) unlock("rice");
-            }
-            pet.classList.remove("is-dragging");
-            drag = null;
+            },
           });
         }
 
@@ -6316,38 +6377,23 @@ const data = {
         const initWidgetDrag = (el: HTMLElement) => {
           const head = el.querySelector<HTMLElement>(".widget-head");
           if (!head) return;
-          let sx = 0,
-            sy = 0,
-            ox = 0,
-            oy = 0;
-          const onMove = (e: PointerEvent) => {
-            const W = window.innerWidth;
-            const H = window.innerHeight;
-            el.style.left = `${Math.max(0, Math.min(W - el.offsetWidth, ox + e.clientX - sx))}px`;
-            el.style.top = `${Math.max(36, Math.min(H - 60, oy + e.clientY - sy))}px`;
-          };
-          const onUp = () => {
-            el.classList.remove("is-dragging");
-            window.removeEventListener("pointermove", onMove);
-            window.removeEventListener("pointerup", onUp);
-            const id = el.dataset.widget ?? "";
-            const all = readWidgets();
-            all[id] = { ...all[id], x: el.offsetLeft, y: el.offsetTop };
-            try {
-              localStorage.setItem(WIDGET_KEY, JSON.stringify(all));
-            } catch {
-              /* 忽略 */
-            }
-          };
-          head.addEventListener("pointerdown", (e) => {
-            e.preventDefault();
-            sx = e.clientX;
-            sy = e.clientY;
-            ox = el.offsetLeft;
-            oy = el.offsetTop;
-            el.classList.add("is-dragging");
-            window.addEventListener("pointermove", onMove);
-            window.addEventListener("pointerup", onUp);
+          makeDraggable(head, el, {
+            threshold: 5,
+            clamp: (x, y) => ({
+              x: Math.max(0, Math.min(window.innerWidth - el.offsetWidth, x)),
+              y: Math.max(36, Math.min(window.innerHeight - 60, y)),
+            }),
+            onEnd: (moved) => {
+              if (!moved) return;
+              const id = el.dataset.widget ?? "";
+              const all = readWidgets();
+              all[id] = { ...all[id], x: el.offsetLeft, y: el.offsetTop };
+              try {
+                localStorage.setItem(WIDGET_KEY, JSON.stringify(all));
+              } catch {
+                /* 忽略 */
+              }
+            },
           });
         };
 
@@ -7777,6 +7823,14 @@ const data = {
 
       .window.is-dragging {
         transition: none;
+        /* 入场动画也写 transform，拖动时先停掉，否则前 0.2s 拖不动 */
+        animation: none;
+        /* 拖起来的时候抬一层，视觉上「拿起来了」 */
+        box-shadow:
+          0 40px 80px -26px rgba(0, 0, 0, 0.92),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        cursor: grabbing;
+        will-change: transform;
       }
 
       .window.is-resizing {
@@ -7860,6 +7914,8 @@ const data = {
         background: rgba(255, 255, 255, 0.04);
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         cursor: grab;
+        /* 标题栏只负责拖窗口，触摸时不要触发页面/容器的滚动手势 */
+        touch-action: none;
         transition: opacity 0.2s ease;
       }
 
@@ -9213,9 +9269,15 @@ const data = {
       }
 
       .widget.is-dragging {
-        opacity: 0.9;
         cursor: grabbing;
-        box-shadow: 0 26px 54px -18px rgba(0, 0, 0, 0.9);
+        /* 入场动画也会写 transform，拖动时先停掉，避免抢控制权 */
+        animation: none;
+        opacity: 1;
+        border-color: rgba(255, 255, 255, 0.24);
+        box-shadow:
+          0 32px 60px -18px rgba(0, 0, 0, 0.92),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        will-change: transform;
       }
 
       @keyframes widgetIn {
@@ -9237,6 +9299,8 @@ const data = {
         padding: 10px 13px 0;
         cursor: grab;
         user-select: none;
+        /* 交给指针事件处理，别让浏览器把拖拽当成滚动手势抢走 */
+        touch-action: none;
       }
 
       .widget-title {
@@ -11588,7 +11652,13 @@ const data = {
 
         /* 手机上卡片整体收紧一档，几张卡也不至于一路顶到程序坞 */
         body.is-touch-desktop .widget-head {
+          /* 手指比鼠标粗，拖拽热区给到 32px 高 */
+          min-height: 32px;
           padding: 8px 12px 0;
+        }
+        body.is-touch-desktop .widget-grip {
+          color: rgba(255, 255, 255, 0.42);
+          font-size: 11px;
         }
         body.is-touch-desktop .widget-title {
           font-size: 10.5px;
