@@ -138,6 +138,70 @@ anon key 会出现在前端代码里，这是设计如此——**密钥公开不
 之后每次 push 到 `main` 都会自动构建发布。注意 `scripts/sync-content.mjs` 在 `prebuild`
 里跑，云端拉取失败时会**静默跳过**（`--soft` 模式），不会阻断发布。
 
+> 线上实际入口是 **Worker + Static Assets**（`wrangler.jsonc` → `worker/index.js`），
+> 不是 Pages Functions。`functions/` 目录在 Worker 部署模式下不会被执行，
+> 因此 `/api/*` 与 `/sb/*` 都实现在 Worker 入口里。
+
+## 后端基础设施（Guandao OS 1.5）
+
+静态资源和 API 走同一个 Worker，同一套域名，不需要额外的服务：
+
+| 路径 | 处理方 | 说明 |
+| --- | --- | --- |
+| `/api/*` | `worker/api/router.js` | 统一 JSON 接口，目前只有健康检查 |
+| `/sb/*` | `worker/index.js` | 反代 Supabase，绕开国内直连卡死 |
+| 其他 | `env.ASSETS` | Astro 构建出的静态页面 |
+
+### GET /api/health
+
+```json
+{
+  "success": true,
+  "status": "ok",
+  "services": { "d1": "connected", "r2": "available" },
+  "details": {
+    "d1": { "latencyMs": 3 },
+    "r2": { "capabilities": { "put": true, "get": true, "head": true, "delete": true } }
+  },
+  "checkedAt": "2026-11-04T05:15:05.979Z",
+  "durationMs": 30
+}
+```
+
+- D1：真实执行只读的 `SELECT 1 AS ok`，2 秒超时；
+- R2：只检查 `put/get/head/delete` 四个方法是否存在，**不做任何读写**，也不返回 Binding 对象；
+- 任一服务异常时返回 HTTP 503、`status: "degraded"`，并把对应服务标成
+  `unconfigured`（没绑定）或 `error`（查询失败）；静态页面不受影响；
+- 错误统一为 `{ "success": false, "error": { "code", "message" } }`，
+  非 GET/HEAD 返回 405 + `Allow` 头，未知 `/api/*` 返回 JSON 404 而不是 HTML。
+
+接口只服务同源页面，刻意没有开 CORS；本阶段也没有任何读写业务数据的路由，
+表结构和迁移见 [`migrations/README.md`](migrations/README.md)。
+
+### 本地运行
+
+```bash
+npx wrangler login          # 只需一次，用于读取 D1 真实 ID
+npm run cf:link             # 把 guandao-db 的 UUID 写进 wrangler.jsonc
+npm run db:migrate:local    # 初始化本地 D1（.wrangler/state）
+npm run cf:dev              # Worker + 静态资源，默认 http://127.0.0.1:8787
+npm run verify:cloudflare -- --base http://127.0.0.1:8787
+```
+
+`npm run dev`（Astro）仍然只跑静态页面，不含 `/api` 与 `/sb`；要连后端就用 `cf:dev`。
+
+### 部署
+
+```bash
+npm run cf:deploy           # 先 build，再 wrangler deploy
+```
+
+- `wrangler.jsonc` 里写 R2 的 bucket 名；D1 的 `database_id` 由 `npm run cf:link`
+  从账号读取后写入（只是资源标识，不是密钥），换账号或重建数据库时重新执行即可；
+- 用 `wrangler deploy` 发布前确认配置里的 `d1_databases[].database_id` 已填，
+  否则 D1 绑定不会随部署上传，`/api/health` 会报 `d1: unconfigured`；
+- 部署后校验：`npm run verify:cloudflare`（默认打 `https://guandao.xin`）。
+
 ## 内容约定
 
 文章 frontmatter：

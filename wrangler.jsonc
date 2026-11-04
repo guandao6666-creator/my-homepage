@@ -8,5 +8,22 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page"
-  }
+  },
+  // R2：bucket 名不是账号私有信息，直接写进配置，保证任何一次 deploy 都带上绑定。
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "guandao-files"
+    }
+  ],
+  // D1：database_id 由 `npm run cf:link` 从账号读取后写入（资源标识，不是密钥）。
+  // 换账号或重建数据库时重新执行 cf:link；在此之前 /api/health 会报 d1=unconfigured。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "guandao-db",
+      "database_id": "9c89b111-bd89-47a6-8615-2c838993ede5",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

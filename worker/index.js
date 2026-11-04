@@ -1,18 +1,27 @@
 /**
- * Cloudflare Worker 入口。
+ * Cloudflare Worker 入口（Worker + Static Assets）。
  *
- * 这里只做一件事：把 /sb/* 反向代理到 Supabase。
- * 起因是国内直连 *.supabase.co 经常挂住，页面会一直卡在「正在加载」。
- * 站点本身走 Cloudflare 能访问，所以让数据库请求也走同一个域名。
+ * 注意架构：本项目不是 Cloudflare Pages，也不使用 Pages Functions。
+ * `functions/` 目录在 Worker 部署模式下不会被执行（历史提交已踩过这个坑），
+ * 所以后端接口统一挂在这里，由 worker/api/* 处理。
  *
- * 其余请求原样交给静态资源（env.ASSETS）。
+ * 职责：
+ * 1. /api/*      → worker/api/router.js（D1 / R2 连通性等）
+ * 2. /sb/*       → 反向代理到 Supabase（国内直连 *.supabase.co 容易挂住）
+ * 3. 其余请求    → 原样交给静态资源（env.ASSETS）
  */
+
+import { handleApiRequest } from "./api/router.js";
 
 const SUPABASE_HOST = "mkcnftjhftpiofnhenjf.supabase.co";
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+      return handleApiRequest(request, env);
+    }
 
     if (url.pathname === "/sb" || url.pathname.startsWith("/sb/")) {
       const rest = url.pathname.slice(3) || "/";
