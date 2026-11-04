@@ -105,6 +105,13 @@ export async function authStatus({ env, request }) {
 export async function authStart({ env, request }) {
   const config = authConfig(env, request);
 
+  // 统一在 APP_ORIGIN 上发起：否则从 www 进入时 state Cookie 落在 www，
+  // GitHub 回调到 apex 会读不到 Cookie，表现为 invalid_state。
+  const requestOrigin = new URL(request.url).origin;
+  if (requestOrigin !== config.origin) {
+    return redirect(`${config.origin}/api/auth/github`);
+  }
+
   if (!isOAuthConfigured(config)) {
     return redirect(authError(config.origin, "not_configured"));
   }
