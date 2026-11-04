@@ -9,7 +9,8 @@
 migrations/
   0001_init.sql          基础表结构（users / devices / notes / files / sync_changes / backups）
   0002_account.sql       GitHub 身份字段、sessions、oauth_states、setup_tickets
-  0003_xxx.sql           下一次变更
+  0003_cloud_drive.sql   files 扩展、folders、multipart_uploads、file_events
+  0004_xxx.sql           下一次变更
 ```
 
 - 文件名必须符合 `^[0-9]{4}_[a-z0-9_]+\.sql$`，Wrangler 按编号顺序执行；

@@ -25,6 +25,7 @@ import { renderGallery, initGallery } from "./apps/gallery";
 import { renderMusic, initMusic } from "./apps/music";
 import { renderReader, initReader } from "./apps/reader";
 import { renderFiles, initFiles } from "./files";
+import { renderDrive, initDrive } from "./drive";
 
 export const VERSION = "1.4.0";
 
@@ -56,6 +57,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
     { id: "notes", title: "Guandao Notes", width: 920, height: 600, glyph: "di-note", render: renderNotes, init: (w) => initNotes(w, ctx) },
     { id: "calendar", title: "Guandao Calendar", width: 900, height: 620, glyph: "di-cal", render: renderCalendar, init: (w) => initCalendar(w, ctx) },
     { id: "files", title: "文件管理器", width: 900, height: 600, glyph: "di-files", render: renderFiles, init: (w) => initFiles(w, ctx) },
+    { id: "drive", title: "Guandao Cloud Drive", width: 1040, height: 680, glyph: "di-files", render: renderDrive, init: (w) => initDrive(w) },
     { id: "music", title: "Guandao Music", width: 720, height: 560, glyph: "di-music", render: renderMusic, init: (w) => initMusic(w, ctx) },
     { id: "gallery", title: "Guandao Gallery", width: 880, height: 600, glyph: "di-gallery", render: renderGallery, init: (w) => initGallery(w, ctx), optional: true },
     { id: "reader", title: "Guandao Reader", width: 880, height: 620, glyph: "di-reader", render: renderReader, init: (w) => initReader(w, ctx), optional: true },
@@ -78,9 +80,12 @@ export const initOs14 = (ctx: Ctx): BootResult => {
     }
   }
 
-  ctx.setDockFilter((id) => sys.isInstalled(id));
+  // Cloud Drive 属于 1.5 的内置云端能力，不参与 1.4 的安装/卸载流程。
+  const ALWAYS_AVAILABLE = new Set(["drive"]);
+
+  ctx.setDockFilter((id) => ALWAYS_AVAILABLE.has(id) || sys.isInstalled(id));
   ctx.setLaunchGuard((id) => {
-    if (sys.isInstalled(id)) return false;
+    if (ALWAYS_AVAILABLE.has(id) || sys.isInstalled(id)) return false;
     ctx.toast("这个应用还没安装，去应用中心看看");
     ctx.openApp("appcenter");
     return true;

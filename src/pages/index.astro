@@ -6,6 +6,7 @@ import "../styles/os14-games.css";
 import "../styles/os14-apps.css";
 import "../styles/os14-games.css";
 import "../styles/account.css";
+import "../styles/drive.css";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { getAllPosts } from "../lib/posts";
@@ -337,6 +338,10 @@ const data = {
           <button class="desk-icon" type="button" data-app="files">
             <span class="di-glyph di-files"></span>
             <span class="di-label">文件</span>
+          </button>
+          <button class="desk-icon" type="button" data-app="drive">
+            <span class="di-glyph di-files"></span>
+            <span class="di-label">云盘</span>
           </button>
           <button class="desk-icon" type="button" data-app="appcenter">
             <span class="di-glyph di-appcenter"></span>
@@ -1141,7 +1146,7 @@ const data = {
         /* ---------------- 程序坞配置 ---------------- */
 
         const DOCK_KEY = "guandao.os.dock";
-        const DOCK_DEFAULT = ["posts", "about", "terminal", "settings"];
+        const DOCK_DEFAULT = ["posts", "about", "drive", "terminal", "settings"];
 
         const APP_ICON: Record<string, string> = {
           posts: "di-folder",

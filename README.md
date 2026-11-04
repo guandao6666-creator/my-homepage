@@ -276,6 +276,57 @@ npx wrangler secret put INITIAL_ADMIN_SETUP_TOKEN
 - 设备管理、云同步仅保留入口，未实现的功能在界面上明确标注“即将开放”；
 - 未配置 OAuth Secret 时，登录界面会明确显示“GitHub 登录未配置”，不会伪造登录状态。
 
+## Guandao Cloud Drive
+
+个人云端文件空间：文件本体在 R2，元数据在 D1，所有接口要求 Guandao Account Session。
+
+### 存储设计
+
+- R2 Object Key：`users/{userId}/files/{fileId}`，`fileId` 为服务端 UUID，原始文件名只存 D1；
+- 重命名/移动只改 D1 的 `display_name` / `parent_id`，不移动 R2 对象；
+- `files` 记录状态：`pending / ready / trash / pending_delete`，另有 `folders`、`multipart_uploads`（预留）、`file_events`。
+
+### API
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/files?view=&folderId=&search=&sort=&limit=&offset=` | 列表 / 分类 / 搜索 |
+| GET | `/api/files/quota` | 容量与分类统计（不含 pending） |
+| GET | `/api/files/folders` | 全部文件夹 |
+| POST | `/api/files/folders` | 新建文件夹 |
+| PATCH/DELETE | `/api/files/folders/:id` | 重命名/移动/收藏；删除需 `?recursive=1` |
+| POST | `/api/files/folders/:id/restore` | 恢复文件夹 |
+| DELETE | `/api/files/folders/:id/permanent` | 永久删除文件夹 |
+| POST | `/api/files/upload?name=&parentId=` | 单文件上传（原始 body） |
+| GET/PATCH/DELETE | `/api/files/:id` | 详情 / 改名移动收藏 / 移入回收站 |
+| GET | `/api/files/:id/content` | 预览（安全类型 inline） |
+| GET | `/api/files/:id/download` | 强制下载 |
+| POST | `/api/files/:id/restore` | 恢复文件 |
+| DELETE | `/api/files/:id/permanent` | 永久删除 |
+| POST | `/api/files/trash/empty` | 清空回收站 |
+| GET | `/api/files/recent` / `favorites` | 最近 / 收藏 |
+
+### 上传与下载
+
+- 单文件上限 25 MiB，账号默认 5 GiB（`CLOUD_QUOTA_BYTES` 可覆盖）；
+- 服务端读取文件头校验真实类型，声明为图片/音视频/PDF 但内容不符直接 415；
+- HTML、SVG 等不安全类型强制 `Content-Disposition: attachment`，不内联执行；
+- 下载支持 `Range`（206、`Content-Range`、`Accept-Ranges`），完整请求返回 200；
+- 所有查询以 Session 用户 ID 为条件，跨账号读取/删除返回 404。
+
+### 界面
+
+- 新应用 `Guandao Cloud Drive`（`src/lib/os14/drive.ts`），桌面图标、启动台可打开；
+- 侧边栏、网格/列表、搜索、排序、上传进度、拖拽上传、文件夹、收藏、回收站、图片/PDF/音频/视频/文本预览；
+- 与本地「文件管理器」完全分离，本地虚拟文件不会进入云端。
+
+### 已知限制
+
+- 超过 25 MiB 的分片上传尚未实现（`multipart_uploads` 表已预留）；
+- 图片缩略图直接使用受保护的 content 接口，没有服务端缩略图生成；
+- 文件夹拖拽移动、ZIP 打包下载、公开分享未实现；
+- 文本/Markdown 预览为纯文本，不渲染 HTML，避免 XSS。
+
 ## 内容约定
 
 文章 frontmatter：

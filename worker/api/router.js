@@ -12,6 +12,7 @@
 
 import { ApiError, fail, toApiError } from "./http.js";
 import { healthHandler } from "./health.js";
+import { handleFilesRequest } from "./files/handlers.js";
 import {
   authCallback,
   authDevices,
@@ -47,6 +48,12 @@ export async function handleApiRequest(request, env) {
   const route = ROUTES.get(path);
 
   try {
+    const filesResponse = await handleFilesRequest({ request, env, url, path });
+    if (filesResponse) {
+      filesResponse.headers.set("x-request-id", requestId);
+      return filesResponse;
+    }
+
     if (!route) {
       throw new ApiError("NOT_FOUND", "接口不存在", 404);
     }
