@@ -64,6 +64,22 @@ export default {
       });
     }
 
-    return env.ASSETS.fetch(request);
+    const asset = await env.ASSETS.fetch(request);
+
+    // 404 页面绝不能被边缘缓存：
+    // 部署前访问过某个路径的人，否则会在部署后继续拿到缓存里的 404
+    // （/api/health 就这样被"记住"过）。CDN-Cache-Control 直接约束 Cloudflare 边缘。
+    if (asset.status === 404) {
+      const headers = new Headers(asset.headers);
+      headers.set("cache-control", "no-store");
+      headers.set("cdn-cache-control", "no-store");
+      return new Response(asset.body, {
+        status: 404,
+        statusText: asset.statusText,
+        headers,
+      });
+    }
+
+    return asset;
   },
 };
