@@ -342,6 +342,10 @@ export function initAccount(): void {
     const target = (event.target as HTMLElement).closest<HTMLElement>("[data-account-action]");
     if (!target) return;
     const action = target.dataset.accountAction;
+    if (action === "profile") {
+      openCenter();
+      window.setTimeout(() => refs.nameInput?.focus(), 140);
+    }
     if (action === "center") openCenter();
     if (action === "auth") {
       if (me.authenticated) void logout();
