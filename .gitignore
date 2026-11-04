@@ -48,3 +48,6 @@ src/content/blog/.sync-manifest.json
 
 # 壁纸原始 PNG（本地重新生成时才需要）
 .tmp-walls/
+
+# 首次管理员初始化临时令牌（用完删除）
+.initial-admin-token
