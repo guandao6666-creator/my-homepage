@@ -5594,6 +5594,8 @@ const data = {
         let lpGrabX = 0, lpGrabY = 0;
         let lpLongTimer: number | null = null;
         let lpStartX = 0, lpStartY = 0;
+        let lpPointerY = 0;
+        let lpScrollRaf = 0;
         const lpDone = document.getElementById("lp-done");
         const lpReset = document.getElementById("lp-reset");
         const lpHint = document.getElementById("lp-hint");
@@ -5672,6 +5674,7 @@ const data = {
 
         const onLpMove = (e: PointerEvent) => {
           if (!lpDragEl || !lpPlaceholder || !lpGrid) return;
+          lpPointerY = e.clientY;
           lpDragEl.style.left = `${e.clientX - lpGrabX}px`;
           lpDragEl.style.top = `${e.clientY - lpGrabY}px`;
           const siblings = Array.from(lpGrid.querySelectorAll<HTMLElement>(".lp-icon:not(.lp-dragging)"));
@@ -5688,6 +5691,12 @@ const data = {
 
         const onLpUp = () => {
           document.removeEventListener("pointermove", onLpMove);
+          document.removeEventListener("pointercancel", onLpUp);
+          document.removeEventListener("touchmove", lpBlockScroll);
+          if (lpScrollRaf) {
+            cancelAnimationFrame(lpScrollRaf);
+            lpScrollRaf = 0;
+          }
           if (lpDragEl && lpPlaceholder) {
             lpPlaceholder.parentNode?.insertBefore(lpDragEl, lpPlaceholder);
             lpPlaceholder.remove();
@@ -5700,8 +5709,28 @@ const data = {
           lpDragFromEdit = false;
         };
 
+        // 拖动期间禁止原生滚动：手指一动页面就跟着走，图标会「粘」在原地
+        const lpBlockScroll = (e: TouchEvent) => {
+          if (lpDragEl) e.preventDefault();
+        };
+
+        // 拖到屏幕上下边缘时自动滚一屏，手机上才能把图标移到看不见的位置
+        const lpAutoScroll = () => {
+          if (!lpDragEl || !launchpad) {
+            lpScrollRaf = 0;
+            return;
+          }
+          const r = launchpad.getBoundingClientRect();
+          const edge = 96;
+          let dv = 0;
+          if (lpPointerY < r.top + edge) dv = -Math.ceil((r.top + edge - lpPointerY) / 7);
+          else if (lpPointerY > r.bottom - edge) dv = Math.ceil((lpPointerY - (r.bottom - edge)) / 7);
+          if (dv) launchpad.scrollTop += dv;
+          lpScrollRaf = requestAnimationFrame(lpAutoScroll);
+        };
+
         const beginLpDrag = (iconEl: HTMLElement, ev: PointerEvent) => {
-          if (!lpGrid) return;
+          if (!lpGrid || lpDragEl) return;
           lpDidDrag = true;
           const rect = iconEl.getBoundingClientRect();
           lpGrabX = ev.clientX - rect.left;
@@ -5721,44 +5750,71 @@ const data = {
           iconEl.style.pointerEvents = "none";
           lpDragEl = iconEl;
           lpPlaceholder = ph;
+          lpPointerY = ev.clientY;
           document.addEventListener("pointermove", onLpMove);
           document.addEventListener("pointerup", onLpUp, { once: true });
+          document.addEventListener("pointercancel", onLpUp, { once: true });
+          document.addEventListener("touchmove", lpBlockScroll, { passive: false });
+          if (!lpScrollRaf) lpScrollRaf = requestAnimationFrame(lpAutoScroll);
         };
 
         if (lpGrid) {
+          // 触摸屏：手指按下不能立刻进入拖动，否则想往下滑一屏时会先拖走图标。
+          // 规则改成「长按 420ms 才拖」，手指只要先动起来就判定为滚动并彻底放弃拖动。
           lpGrid.addEventListener("pointerdown", (event) => {
+            if (lpDragEl) return;
             const target = event.target as HTMLElement;
             if (target.closest(".lp-remove")) return;
             const icon = target.closest<HTMLElement>(".lp-icon");
             if (!icon) return;
-            event.preventDefault();
+            const startIcon = icon;
+            // 只有手指需要「长按才拖」；鼠标和触控笔仍然按下即拖
+            const touch = event.pointerType === "touch";
             lpDidDrag = false;
             lpStartX = event.clientX;
             lpStartY = event.clientY;
-            const startIcon = icon;
             let moved = false;
+
             const cleanup = () => {
-              if (lpLongTimer) { clearTimeout(lpLongTimer); lpLongTimer = null; }
+              if (lpLongTimer) {
+                clearTimeout(lpLongTimer);
+                lpLongTimer = null;
+              }
               document.removeEventListener("pointermove", onMove);
               document.removeEventListener("pointerup", cleanup);
+              document.removeEventListener("pointercancel", cleanup);
             };
+
             const onMove = (e: PointerEvent) => {
+              const dist = Math.hypot(e.clientX - lpStartX, e.clientY - lpStartY);
+              if (touch) {
+                // 超过 10px 就是滑动手势，直接收工，交给浏览器滚动
+                if (dist > 10) cleanup();
+                return;
+              }
               if (moved) return;
-              if (Math.hypot(e.clientX - lpStartX, e.clientY - lpStartY) > 8) {
+              if (dist > 8) {
                 moved = true;
                 cleanup();
                 beginLpDrag(startIcon, e);
               }
             };
+
             lpLongTimer = window.setTimeout(() => {
               lpLongTimer = null;
               document.removeEventListener("pointermove", onMove);
               document.removeEventListener("pointerup", cleanup);
+              document.removeEventListener("pointercancel", cleanup);
+              if (touch) navigator.vibrate?.(12);
               enterEditMode();
-              beginLpDrag(startIcon, event as unknown as PointerEvent);
+              beginLpDrag(startIcon, event);
             }, LP_LONGPRESS);
+
+            // 鼠标 / 触控笔保留「按下即可拖」的桌面手感
+            if (!touch) event.preventDefault();
             document.addEventListener("pointermove", onMove);
             document.addEventListener("pointerup", cleanup, { once: true });
+            document.addEventListener("pointercancel", cleanup, { once: true });
           });
 
           lpGrid.addEventListener("click", (event) => {
@@ -14422,7 +14478,8 @@ const data = {
         to { opacity: 1; transform: none; }
       }
       .lp-close {
-        position: absolute;
+        position: fixed;
+        z-index: 6;
         top: calc(env(safe-area-inset-top, 0px) + 12px);
         right: 16px;
         width: 36px;
@@ -14464,6 +14521,12 @@ const data = {
         color: rgba(255, 255, 255, 0.92);
         cursor: pointer;
         border-radius: 16px;
+        /* 竖向滑动交给浏览器滚动，横向不抢；长按后才由脚本接管拖动 */
+        touch-action: pan-y;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
         transition:
           background-color 0.18s ease,
           transform 0.18s var(--os-ease);
@@ -14494,6 +14557,21 @@ const data = {
       @media (max-width: 720px) {
         .lp-inner {
           max-width: 100%;
+        }
+        /* 手机上应用多到要滚动，标题栏吸顶，图标不会从标题上方露出来 */
+        .lp-top {
+          position: sticky;
+          top: calc(-22px - env(safe-area-inset-top, 0px));
+          z-index: 4;
+          margin: calc(-22px - env(safe-area-inset-top, 0px)) -20px 14px;
+          padding: calc(30px + env(safe-area-inset-top, 0px)) 62px 12px 20px;
+          background: linear-gradient(180deg, #0a0c13 0%, #0a0c13 calc(100% - 12px), rgba(10, 12, 19, 0));
+        }
+        .launchpad {
+          /* 应用变多时靠滚动查看，底部留白把最后一行托出来 */
+          padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 36px);
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
         }
         .lp-grid {
           gap: 18px 6px;
