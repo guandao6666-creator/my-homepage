@@ -12,12 +12,29 @@
 
 import { ApiError, fail, toApiError } from "./http.js";
 import { healthHandler } from "./health.js";
+import {
+  authCallback,
+  authDevices,
+  authInitialize,
+  authLogout,
+  authMe,
+  authStart,
+  authStatus,
+  authUpdateProfile,
+} from "./auth/handlers.js";
 
 const ROUTES = new Map([
   ["/api/health", { handler: healthHandler, methods: ["GET", "HEAD"] }],
-]);
 
-const ALLOWED_METHODS = "GET, HEAD";
+  ["/api/auth/status", { handler: authStatus, methods: ["GET"] }],
+  ["/api/auth/github", { handler: authStart, methods: ["GET"] }],
+  ["/api/auth/github/callback", { handler: authCallback, methods: ["GET"] }],
+  ["/api/auth/me", { handler: authMe, methods: ["GET"] }],
+  ["/api/auth/logout", { handler: authLogout, methods: ["POST"] }],
+  ["/api/auth/initialize", { handler: authInitialize, methods: ["POST"] }],
+  ["/api/auth/profile", { handler: authUpdateProfile, methods: ["PATCH"] }],
+  ["/api/auth/devices", { handler: authDevices, methods: ["GET"] }],
+]);
 
 /**
  * @param {Request} request
@@ -35,13 +52,14 @@ export async function handleApiRequest(request, env) {
     }
 
     if (!route.methods.includes(request.method)) {
-      return fail(new ApiError("METHOD_NOT_ALLOWED", `该接口仅支持 ${ALLOWED_METHODS}`, 405), {
+      const allow = route.methods.join(", ");
+      return fail(new ApiError("METHOD_NOT_ALLOWED", `该接口仅支持 ${allow}`, 405), {
         requestId,
-        headers: { allow: ALLOWED_METHODS },
+        headers: { allow },
       });
     }
 
-    const response = await route.handler({ request, env, requestId });
+    const response = await route.handler({ request, env, requestId, url });
     response.headers.set("x-request-id", requestId);
 
     // HEAD 与 GET 同状态、同头部，但不返回响应体。

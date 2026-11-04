@@ -207,6 +207,75 @@ npm run cf:deploy           # 先 build，再 wrangler deploy
   否则 D1 绑定不会随部署上传，`/api/health` 会报 `d1: unconfigured`；
 - 部署后校验：`npm run verify:cloudflare`（默认打 `https://guandao.xin`）。
 
+## 账号与身份（Guandao Account）
+
+### 方案
+
+GitHub OAuth Web Application Flow + PKCE S256，只申请 `read:user`：
+
+- 不申请 `repo` / `gist` / `workflow`，不读取任何仓库；
+- Access Token 只在服务端内存里用于拉取一次用户资料，不写数据库、不下发前端；
+- 登录许可由服务端判断：数据库里没有管理员时进入初始化；初始化后只有该管理员的
+  GitHub 数字 ID 能登录，用户名变化不影响身份。
+
+### API
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/auth/status` | 是否已配置 OAuth、是否已初始化（不返回任何密钥） |
+| GET | `/api/auth/github` | 生成 state + PKCE，跳转 GitHub 授权 |
+| GET | `/api/auth/github/callback` | 校验 state、交换 code、建立 Session |
+| GET | `/api/auth/me` | `{ authenticated, user, session }`，未登录返回 `user: null` |
+| POST | `/api/auth/logout` | 删除服务端 Session 并清 Cookie |
+| POST | `/api/auth/initialize` | 首次管理员初始化（JSON body 提交 setup token） |
+| PATCH | `/api/auth/profile` | 修改显示昵称 |
+| GET | `/api/auth/devices` | 当前账号的登录会话（设备能力后续开放） |
+
+### Session 与 CSRF
+
+- Token：32 字节密码学随机数，Base64URL；浏览器只保存于 HttpOnly Cookie；
+- D1 只保存 SHA-256 哈希，数据库泄露也无法直接复用 Session；
+- Cookie：`HttpOnly`、`SameSite=Lax`、`Path=/`、生产环境 `Secure`，有效期 30 天；
+- 所有写操作（POST/PATCH）校验 `Origin` 或 `Sec-Fetch-Site: same-origin`；
+- 退出登录会删除服务端 Session，不只是清 Cookie。
+
+### 首次管理员初始化
+
+1. 配置好下面的 Secrets 并部署；
+2. 打开站点 → 右上角头像 → 使用 GitHub 登录；
+3. 授权后回到 `/?setup=1`，输入 `INITIAL_ADMIN_SETUP_TOKEN`；
+4. 服务端确认“当前没有任何管理员”后创建管理员并登录；
+5. 初始化入口随即失效（再次调用返回 409），数据库中只会有一个 admin。
+
+### GitHub OAuth App
+
+生产：
+
+- Homepage URL：`https://guandao.xin`
+- Authorization callback URL：`https://guandao.xin/api/auth/github/callback`
+
+本地（建议单独建一个 App）：
+
+- Homepage URL：`http://127.0.0.1:8787`
+- Authorization callback URL：`http://127.0.0.1:8787/api/auth/github/callback`
+
+### Cloudflare Secrets
+
+```bash
+npx wrangler secret put GITHUB_CLIENT_ID
+npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler secret put APP_ORIGIN              # https://guandao.xin
+npx wrangler secret put INITIAL_ADMIN_SETUP_TOKEN
+```
+
+本地开发复制 `.dev.vars.example` 为 `.dev.vars`（已被 `.gitignore` 忽略）。
+
+### 当前边界
+
+- 不开放公开注册，也没有密码 / 邮箱登录；
+- 设备管理、云同步仅保留入口，未实现的功能在界面上明确标注“即将开放”；
+- 未配置 OAuth Secret 时，登录界面会明确显示“GitHub 登录未配置”，不会伪造登录状态。
+
 ## 内容约定
 
 文章 frontmatter：

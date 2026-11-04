@@ -5,6 +5,7 @@ import "../styles/os14-apps.css";
 import "../styles/os14-games.css";
 import "../styles/os14-apps.css";
 import "../styles/os14-games.css";
+import "../styles/account.css";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { getAllPosts } from "../lib/posts";
@@ -205,6 +206,11 @@ const data = {
               <path d="M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <span class="mb-bell-dot" id="mb-bell-dot" hidden></span>
+          </button>
+          <button class="mb-account" id="mb-account" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="账号">
+            <img id="mb-account-img" alt="" hidden />
+            <span class="mb-account-glyph" id="mb-account-glyph" aria-hidden="true">管</span>
+            <span class="mb-account-dot" id="mb-account-dot" hidden></span>
           </button>
           <button class="mb-power" id="mb-power" type="button" aria-label="电源">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -484,6 +490,102 @@ const data = {
       <div class="mission-grid" id="mission-grid"></div>
     </div>
 
+    <!-- Guandao Account：菜单 / 登录层 / 账号中心 -->
+    <div class="mb-account-menu" id="mb-account-menu" hidden>
+      <div class="mbam-head">
+        <img id="mbam-avatar-img" alt="" hidden />
+        <span class="mbam-avatar" id="mbam-avatar-glyph" aria-hidden="true">管</span>
+        <div>
+          <b id="mbam-name">本地模式</b>
+          <span id="mbam-sub">未登录</span>
+        </div>
+      </div>
+      <button type="button" data-account-action="center">账号中心</button>
+      <button type="button" disabled>云同步 <em>即将开放</em></button>
+      <button type="button" disabled>设备管理 <em>即将开放</em></button>
+      <button type="button" class="mbam-auth" id="mbam-auth" data-account-action="auth">使用 GitHub 登录</button>
+    </div>
+
+    <div class="gauth" id="gauth" hidden>
+      <section class="gauth-card" role="dialog" aria-modal="true" aria-labelledby="gauth-title">
+        <button class="gauth-close" id="gauth-close" type="button" aria-label="关闭登录">×</button>
+        <div class="gauth-logo" aria-hidden="true">管</div>
+        <p class="gauth-eyebrow">Guandao Account</p>
+        <h1 id="gauth-title">Welcome Back</h1>
+        <p class="gauth-desc">用 GitHub 身份进入你的数字世界。只读取公开资料，不接触任何仓库。</p>
+
+        <button class="gauth-github" id="gauth-github" type="button">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.17c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z" />
+          </svg>
+          <span id="gauth-github-label">Continue with GitHub</span>
+        </button>
+
+        <p class="gauth-status" id="gauth-status" role="status"></p>
+        <p class="gauth-error" id="gauth-error" hidden></p>
+
+        <div class="gauth-setup" id="gauth-setup" hidden>
+          <p class="gauth-setup-title">首次管理员初始化</p>
+          <p class="gauth-setup-hint">
+            已通过 GitHub 验证。输入 Cloudflare 中配置的 <code>INITIAL_ADMIN_SETUP_TOKEN</code> 完成创建。
+          </p>
+          <form id="gauth-setup-form">
+            <input id="gauth-setup-token" type="password" autocomplete="off" spellcheck="false" placeholder="初始化密钥" />
+            <button type="submit" id="gauth-setup-submit">完成初始化</button>
+          </form>
+        </div>
+
+        <div class="gauth-foot">
+          <button class="gauth-local" id="gauth-local" type="button">以本地模式继续</button>
+          <p class="gauth-privacy">仅请求 GitHub 公开资料（read:user）。不保存 Access Token，不读取私有仓库。</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="gacct" id="gacct" hidden>
+      <section class="gacct-card" role="dialog" aria-modal="true" aria-labelledby="gacct-title">
+        <button class="gacct-close" id="gacct-close" type="button" aria-label="关闭账号中心">×</button>
+        <header class="gacct-head">
+          <div class="gacct-avatar" id="gacct-avatar">
+            <img id="gacct-avatar-img" alt="" hidden />
+            <span id="gacct-avatar-glyph" aria-hidden="true">管</span>
+          </div>
+          <div>
+            <h2 id="gacct-title">账号中心</h2>
+            <p class="gacct-handle" id="gacct-handle">本地模式</p>
+          </div>
+        </header>
+
+        <span class="gacct-badge" id="gacct-badge">Local</span>
+
+        <dl class="gacct-grid">
+          <div><dt>账号 ID</dt><dd id="gacct-id">—</dd></div>
+          <div><dt>GitHub</dt><dd id="gacct-username">—</dd></div>
+          <div><dt>角色</dt><dd id="gacct-role">—</dd></div>
+          <div><dt>注册时间</dt><dd id="gacct-created">—</dd></div>
+          <div><dt>最后登录</dt><dd id="gacct-last">—</dd></div>
+          <div><dt>当前会话</dt><dd id="gacct-session">—</dd></div>
+        </dl>
+
+        <form class="gacct-name" id="gacct-name-form">
+          <label for="gacct-name">显示昵称</label>
+          <div>
+            <input id="gacct-name" type="text" maxlength="60" autocomplete="nickname" placeholder="显示昵称" />
+            <button type="submit" id="gacct-name-save">保存</button>
+          </div>
+          <p class="gacct-name-msg" id="gacct-name-msg"></p>
+        </form>
+
+        <div class="gacct-actions">
+          <button type="button" disabled>设备管理 <em>即将开放</em></button>
+          <button type="button" disabled>云同步 <em>即将开放</em></button>
+          <button type="button" class="danger" id="gacct-logout">退出登录</button>
+        </div>
+
+        <p class="gacct-foot">账号只用于识别身份。本地便签、主题和桌面布局仍然保存在这台设备上。</p>
+      </section>
+    </div>
+
     <script is:inline define:vars={{ OS_DATA: data }}>
       window.__OS__ = OS_DATA;
     </script>
@@ -491,6 +593,7 @@ const data = {
     <script>
       import { initOs13 } from "../lib/os13";
       import { initOs14 } from "../lib/os14";
+      import { initAccount } from "../lib/account/client";
 
       (() => {
         /* ---------------- 开机动画 ---------------- */
@@ -7235,6 +7338,12 @@ const data = {
           console.error("[Guandao OS 1.4]", err);
         }
       })();
+
+      try {
+        initAccount();
+      } catch (err) {
+        console.error("[Guandao Account]", err);
+      }
     </script>
 
     <style is:global>

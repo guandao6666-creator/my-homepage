@@ -1,0 +1,861 @@
+/* ============================================================
+   Guandao Account · 1.5
+   登录层与账号中心：玻璃材质、低饱和渐变、与 OS 1.3/1.4 一致的圆角与描边
+   ============================================================ */
+
+.gauth,
+.gacct {
+  --acc-card: rgba(15, 18, 28, 0.95);
+  --acc-card-2: rgba(24, 28, 40, 0.97);
+  --acc-line: rgba(255, 255, 255, 0.12);
+  --acc-line-2: rgba(255, 255, 255, 0.2);
+  --acc-text: #eef1f7;
+  --acc-dim: rgba(238, 241, 247, 0.62);
+  --acc-faint: rgba(238, 241, 247, 0.4);
+  --acc-accent: #8aa4ff;
+  --acc-accent-2: #b79bff;
+  --acc-danger: #ff7a72;
+  --acc-ok: #6ee7a8;
+}
+
+body[data-os-theme="light"] .gauth,
+body[data-os-theme="light"] .gacct {
+  --acc-card: rgba(255, 255, 255, 0.96);
+  --acc-card-2: rgba(255, 255, 255, 0.98);
+  --acc-line: rgba(24, 30, 42, 0.12);
+  --acc-line-2: rgba(24, 30, 42, 0.2);
+  --acc-text: #1b2130;
+  --acc-dim: rgba(27, 33, 48, 0.64);
+  --acc-faint: rgba(27, 33, 48, 0.44);
+  --acc-accent: #4767d6;
+  --acc-accent-2: #7c5cd6;
+  --acc-danger: #c0392b;
+}
+
+.gauth[hidden],
+.gacct[hidden],
+.mb-account-menu[hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 菜单栏账号入口                                                      */
+/* ------------------------------------------------------------------ */
+
+.mb-account {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.86);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  overflow: visible;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.mb-account:hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
+}
+
+.mb-account img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.mb-account-glyph {
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.mb-account-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 18, 28, 0.8);
+  background: var(--acc-ok, #6ee7a8);
+  box-shadow: 0 0 6px rgba(110, 231, 168, 0.8);
+}
+
+body[data-os-theme="light"] .mb-account {
+  background: rgba(24, 30, 42, 0.1);
+  color: #1b2130;
+}
+
+.mb-account-menu {
+  --acc-card-2: rgba(24, 28, 40, 0.97);
+  --acc-line: rgba(255, 255, 255, 0.14);
+  --acc-text: #eef1f7;
+  --acc-dim: rgba(238, 241, 247, 0.62);
+  --acc-faint: rgba(238, 241, 247, 0.4);
+  --acc-accent: #8aa4ff;
+  position: fixed;
+  top: 36px;
+  right: 12px;
+  z-index: 9700;
+  width: 232px;
+  padding: 8px;
+  border: 1px solid var(--acc-line, rgba(255, 255, 255, 0.14));
+  border-radius: 16px;
+  background: var(--acc-card-2, rgba(28, 32, 46, 0.92));
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.8);
+  color: var(--acc-text, #eef1f7);
+  animation: acc-pop 0.18s ease-out;
+}
+
+body[data-os-theme="light"] .mb-account-menu {
+  --acc-card-2: rgba(255, 255, 255, 0.94);
+  --acc-line: rgba(24, 30, 42, 0.12);
+  --acc-text: #1b2130;
+  --acc-dim: rgba(27, 33, 48, 0.64);
+  --acc-faint: rgba(27, 33, 48, 0.44);
+  --acc-accent: #4767d6;
+}
+
+.mbam-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-bottom: 1px solid var(--acc-line, rgba(255, 255, 255, 0.12));
+  margin-bottom: 6px;
+}
+
+.mbam-head img,
+.mbam-head .mbam-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+
+.mbam-head b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.mbam-head span {
+  display: block;
+  font-size: 11px;
+  color: var(--acc-dim, rgba(238, 241, 247, 0.62));
+  margin-top: 2px;
+}
+
+.mb-account-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--acc-text, #eef1f7);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mb-account-menu button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.mb-account-menu button:disabled {
+  color: var(--acc-faint, rgba(238, 241, 247, 0.4));
+  cursor: default;
+}
+
+.mb-account-menu button em {
+  font-style: normal;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--acc-faint, rgba(238, 241, 247, 0.4));
+}
+
+.mb-account-menu .mbam-auth {
+  color: var(--acc-accent, #8aa4ff);
+}
+
+body[data-os-theme="light"] .mb-account-menu button:hover:not(:disabled) {
+  background: rgba(24, 30, 42, 0.06);
+}
+
+body[data-os-theme="light"] .mb-account-menu button em {
+  background: rgba(24, 30, 42, 0.06);
+}
+
+/* ------------------------------------------------------------------ */
+/* 全屏遮罩与卡片                                                      */
+/* ------------------------------------------------------------------ */
+
+.gauth,
+.gacct {
+  position: fixed;
+  inset: 0;
+  z-index: 9800;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--acc-text);
+  overflow: auto;
+  isolation: isolate;
+}
+
+.gauth::before,
+.gacct::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(60% 50% at 20% 15%, rgba(122, 148, 255, 0.22), transparent 70%),
+    radial-gradient(55% 55% at 82% 78%, rgba(167, 139, 250, 0.18), transparent 72%),
+    rgba(7, 9, 15, 0.58);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  z-index: -1;
+}
+
+body[data-os-theme="light"] .gauth::before,
+body[data-os-theme="light"] .gacct::before {
+  background:
+    radial-gradient(60% 50% at 20% 15%, rgba(90, 120, 240, 0.16), transparent 70%),
+    radial-gradient(55% 55% at 82% 78%, rgba(150, 120, 240, 0.14), transparent 72%),
+    rgba(240, 243, 250, 0.58);
+}
+
+.gauth-card,
+.gacct-card {
+  position: relative;
+  width: min(410px, 100%);
+  padding: 30px 28px 24px;
+  border: 1px solid var(--acc-line);
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 42%), var(--acc-card);
+  backdrop-filter: blur(28px) saturate(1.25);
+  -webkit-backdrop-filter: blur(28px) saturate(1.25);
+  box-shadow:
+    0 40px 100px -40px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: acc-in 0.36s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.gacct-card {
+  width: min(560px, 100%);
+  max-height: min(86vh, 720px);
+  overflow: auto;
+  padding: 26px 26px 22px;
+}
+
+.gauth-close,
+.gacct-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--acc-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.gauth-close:hover,
+.gacct-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--acc-text);
+}
+
+body[data-os-theme="light"] .gauth-close,
+body[data-os-theme="light"] .gacct-close {
+  background: rgba(24, 30, 42, 0.06);
+}
+
+/* ------------------------------------------------------------------ */
+/* 登录卡片                                                            */
+/* ------------------------------------------------------------------ */
+
+.gauth-logo {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(138, 164, 255, 0.95), rgba(183, 155, 255, 0.9));
+  color: #11141f;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  box-shadow: 0 14px 30px -14px rgba(120, 144, 255, 0.9);
+}
+
+.gauth-eyebrow {
+  margin: 20px 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--acc-faint);
+}
+
+.gauth-card h1 {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.gauth-desc {
+  margin: 10px 0 22px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--acc-dim);
+}
+
+.gauth-github {
+  width: 100%;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #f6f8fa;
+  color: #10131c;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.gauth-github:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px -16px rgba(0, 0, 0, 0.8);
+  background: #fff;
+}
+
+.gauth-github:active {
+  transform: translateY(0);
+}
+
+.gauth-github:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none;
+}
+
+.gauth-github svg {
+  width: 18px;
+  height: 18px;
+}
+
+body[data-os-theme="light"] .gauth-github {
+  background: #161a24;
+  color: #f6f8fa;
+}
+
+body[data-os-theme="light"] .gauth-github:hover {
+  background: #0d1017;
+}
+
+.gauth-status {
+  min-height: 18px;
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--acc-dim);
+}
+
+.gauth-status.is-busy::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: acc-spin 0.7s linear infinite;
+}
+
+.gauth-error {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 122, 114, 0.28);
+  border-radius: 9px;
+  background: rgba(255, 122, 114, 0.1);
+  color: var(--acc-danger);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.gauth-setup {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--acc-line);
+}
+
+.gauth-setup-title {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.gauth-setup-hint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--acc-dim);
+}
+
+.gauth-setup-hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 10.5px;
+}
+
+.gauth-setup form {
+  display: flex;
+  gap: 8px;
+}
+
+.gauth-setup input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--acc-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--acc-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.gauth-setup input:focus {
+  outline: none;
+  border-color: var(--acc-accent);
+  box-shadow: 0 0 0 3px rgba(138, 164, 255, 0.16);
+}
+
+.gauth-setup button {
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--acc-accent);
+  color: #10131c;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+body[data-os-theme="light"] .gauth-setup button {
+  color: #fff;
+}
+
+.gauth-foot {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--acc-line);
+}
+
+.gauth-local {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--acc-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--acc-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.gauth-local:hover {
+  color: var(--acc-text);
+  border-color: var(--acc-line-2);
+}
+
+.gauth-privacy {
+  margin: 12px 0 0;
+  font-size: 10.5px;
+  line-height: 1.65;
+  color: var(--acc-faint);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* 账号中心                                                            */
+/* ------------------------------------------------------------------ */
+
+.gacct-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 28px;
+}
+
+.gacct-avatar {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, rgba(138, 164, 255, 0.9), rgba(183, 155, 255, 0.85));
+  color: #11141f;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.gacct-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gacct-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.gacct-handle {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--acc-dim);
+}
+
+.gacct-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 3px 9px;
+  border: 1px solid rgba(138, 164, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(138, 164, 255, 0.12);
+  color: var(--acc-accent);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gacct-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 18px 0;
+  border: 1px solid var(--acc-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--acc-line);
+}
+
+.gacct-grid > div {
+  padding: 11px 13px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+body[data-os-theme="light"] .gacct-grid > div {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.gacct-grid dt {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--acc-faint);
+}
+
+.gacct-grid dd {
+  margin: 5px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--acc-text);
+  word-break: break-all;
+}
+
+.gacct-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.gacct-name {
+  margin: 0 0 18px;
+}
+
+.gacct-name label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--acc-faint);
+}
+
+.gacct-name > div {
+  display: flex;
+  gap: 8px;
+}
+
+.gacct-name input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--acc-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--acc-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+body[data-os-theme="light"] .gacct-name input {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.gacct-name input:focus {
+  outline: none;
+  border-color: var(--acc-accent);
+  box-shadow: 0 0 0 3px rgba(138, 164, 255, 0.16);
+}
+
+.gacct-name button {
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--acc-accent);
+  color: #10131c;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+body[data-os-theme="light"] .gacct-name button {
+  color: #fff;
+}
+
+.gacct-name-msg {
+  min-height: 16px;
+  margin: 7px 0 0;
+  font-size: 11px;
+  color: var(--acc-dim);
+}
+
+.gacct-name-msg.is-error {
+  color: var(--acc-danger);
+}
+
+.gacct-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--acc-line);
+}
+
+.gacct-actions button {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--acc-line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--acc-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.gacct-actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.gacct-actions button:disabled {
+  color: var(--acc-faint);
+  cursor: default;
+}
+
+.gacct-actions button em {
+  font-style: normal;
+  font-size: 9.5px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--acc-faint);
+}
+
+.gacct-actions .danger {
+  grid-column: 1 / -1;
+  border-color: rgba(255, 122, 114, 0.26);
+  color: var(--acc-danger);
+}
+
+.gacct-actions .danger:hover {
+  background: rgba(255, 122, 114, 0.1);
+}
+
+.gacct-foot {
+  margin: 14px 0 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--acc-faint);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* 动画                                                                */
+/* ------------------------------------------------------------------ */
+
+@keyframes acc-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes acc-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes acc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 轻量提示：退出、登录成功、昵称保存 */
+.acc-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 9900;
+  padding: 9px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(20, 23, 34, 0.92);
+  color: #eef1f7;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.9);
+  transform: translateX(-50%);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  animation: acc-toast-in 0.2s ease-out;
+}
+
+.acc-toast.is-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+}
+
+body[data-os-theme="light"] .acc-toast {
+  background: #fff;
+  color: #1b2130;
+  border-color: rgba(24, 30, 42, 0.12);
+}
+
+@keyframes acc-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .gauth,
+  .gacct {
+    padding: 14px;
+    align-items: center;
+  }
+
+  .gauth-card {
+    padding: 26px 20px 20px;
+    border-radius: 22px;
+  }
+
+  .gacct-card {
+    padding: 22px 18px 18px;
+    border-radius: 22px;
+    max-height: 88vh;
+  }
+
+  .gacct-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gacct-grid .wide {
+    grid-column: auto;
+  }
+
+  .gacct-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .gauth-card h1 {
+    font-size: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gauth-card,
+  .gacct-card,
+  .mb-account-menu {
+    animation: none;
+  }
+}
