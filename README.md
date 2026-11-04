@@ -161,7 +161,11 @@ anon key 会出现在前端代码里，这是设计如此——**密钥公开不
   "services": { "d1": "connected", "r2": "available" },
   "details": {
     "d1": { "latencyMs": 3 },
-    "r2": { "capabilities": { "put": true, "get": true, "head": true, "delete": true } }
+    "r2": {
+      "latencyMs": 54,
+      "capabilities": { "put": true, "get": true, "head": true, "delete": true },
+      "probe": "not_found"
+    }
   },
   "checkedAt": "2026-11-04T05:15:05.979Z",
   "durationMs": 30
@@ -169,7 +173,8 @@ anon key 会出现在前端代码里，这是设计如此——**密钥公开不
 ```
 
 - D1：真实执行只读的 `SELECT 1 AS ok`，2 秒超时；
-- R2：只检查 `put/get/head/delete` 四个方法是否存在，**不做任何读写**，也不返回 Binding 对象；
+- R2：确认 `put/get/head/delete` 存在后，对固定 key `__healthcheck__/probe` 做一次只读
+  `head`（返回 `null` 即桶可达），**不创建、不覆盖、不删除任何对象**；
 - 任一服务异常时返回 HTTP 503、`status: "degraded"`，并把对应服务标成
   `unconfigured`（没绑定）或 `error`（查询失败）；静态页面不受影响；
 - 错误统一为 `{ "success": false, "error": { "code", "message" } }`，

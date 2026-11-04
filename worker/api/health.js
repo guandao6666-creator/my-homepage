@@ -3,7 +3,8 @@
  *
  * 只做连通性探测，不读写业务数据：
  * - D1：执行只读的 `SELECT 1 AS ok`；
- * - R2：仅检查 put/get/head/delete 四个方法是否存在，不执行任何 I/O。
+ * - R2：先确认 put/get/head/delete 存在，再对固定 key 做一次只读 head 探测，
+ *       不创建、不覆盖、不删除任何对象。
  *
  * 安全约束：
  * - 不返回 Binding 对象本身，也不返回其可枚举属性；
@@ -14,7 +15,10 @@
 import { json } from "./http.js";
 
 const D1_TIMEOUT_MS = 2000;
+const R2_TIMEOUT_MS = 2000;
 const R2_REQUIRED_METHODS = ["put", "get", "head", "delete"];
+/** 固定探测 key，正常情况下不存在；head 返回 null 即视为桶可达。 */
+const R2_PROBE_KEY = "__healthcheck__/probe";
 
 /**
  * @param {{ DB?: D1Database, FILES?: R2Bucket }} env
@@ -73,7 +77,7 @@ async function checkD1(env) {
   }
 }
 
-function checkR2(env) {
+async function checkR2(env) {
   const bucket = env?.FILES;
 
   if (!bucket) {
@@ -95,7 +99,30 @@ function checkR2(env) {
     return { status: "error", details: { capabilities, missing } };
   }
 
-  return { status: "available", details: { capabilities } };
+  // 真实可达性探测：对一个固定 key 做 head，不存在时返回 null，属正常结果。
+  // 只读操作，不创建、不覆盖、不删除任何对象。
+  const startedAt = Date.now();
+  try {
+    const object = await withTimeout(bucket.head(R2_PROBE_KEY), R2_TIMEOUT_MS);
+    return {
+      status: "available",
+      details: {
+        latencyMs: Date.now() - startedAt,
+        capabilities,
+        probe: object === null ? "not_found" : "ok",
+      },
+    };
+  } catch (error) {
+    console.error("[api/health] r2 head probe failed:", describe(error));
+    return {
+      status: "error",
+      details: {
+        latencyMs: Date.now() - startedAt,
+        capabilities,
+        reason: error?.name === "TimeoutError" ? "timeout" : "head_failed",
+      },
+    };
+  }
 }
 
 function withTimeout(promise, ms) {
