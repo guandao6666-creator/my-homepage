@@ -7,7 +7,11 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    // 关键：/api/* 与 /sb/* 必须先进入 Worker，不能被静态资源层的 404 缓存截胡。
+    // 之前部署前的 404 被边缘记住后，部分节点（如 EWR）直接返回缓存 404，
+    // 请求根本没到 Worker 路由。
+    "run_worker_first": ["/api/*", "/sb/*"]
   },
   // R2：bucket 名不是账号私有信息，直接写进配置，保证任何一次 deploy 都带上绑定。
   "r2_buckets": [
