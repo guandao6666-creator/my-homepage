@@ -3,6 +3,7 @@
  *
  * 只读 `data.posts` / `data.site`，无 init、无持久化、无定时器。
  */
+import { safeUrl } from "../../html";
 import type { LegacyAppModule } from "../types";
 
 export const articlesApp: LegacyAppModule = {
@@ -15,7 +16,7 @@ export const articlesApp: LegacyAppModule = {
     const rows = data.posts
       .map(
         (post, index) => `
-              <a class="file-row" href="${post.href}">
+              <a class="file-row" href="${safeUrl(post.href)}">
                 <span class="file-icon"></span>
                 <span class="file-main">
                   <span class="file-name">${escapeHtml(post.title)}</span>

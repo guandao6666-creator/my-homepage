@@ -5,6 +5,7 @@
  * tests/e2e/html-security.spec.ts 在真实浏览器里验证（项目没有 jsdom 依赖，
  * 而 Playwright 本来就是这个项目既有的浏览器测试环境）。
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { escapeAttr, escapeHtml, isSafeUrl, safeUrl } from "../../src/lib/html";
 
@@ -175,5 +176,104 @@ describe("safeUrl · 协议白名单", () => {
   it("拒绝返回空串，而不是抛错", () => {
     expect(() => safeUrl({ evil: true })).not.toThrow();
     expect(safeUrl({ evil: true })).toBe("");
+  });
+});
+
+describe("safeUrl · 2.3.1 补充用例", () => {
+  it("SVG data URI 默认拒绝（未做专门安全评估）", () => {
+    const svg = "data:image/svg+xml,<svg onload=alert(1)></svg>";
+    expect(isSafeUrl(svg)).toBe(false);
+    // 即使显式放行 data:，也只用于 <img>，不会进 href
+    expect(isSafeUrl(svg, { allowData: true })).toBe(true);
+  });
+
+  it("data:text/html 无论 allowData 与否都不该出现在 href 场景", () => {
+    const html = "data:text/html,<script>alert(1)</script>";
+    expect(isSafeUrl(html)).toBe(false);
+  });
+
+  it("全大写协议同样被识别", () => {
+    expect(isSafeUrl("JAVASCRIPT:alert(1)")).toBe(false);
+    expect(isSafeUrl("HTTPS://guandao.xin/")).toBe(true);
+  });
+
+  it("前导空白不会绕过检查", () => {
+    expect(isSafeUrl("   javascript:alert(1)")).toBe(false);
+    expect(isSafeUrl("\tjavascript:alert(1)")).toBe(false);
+  });
+
+  it("URL 编码后的协议不会被误判为安全协议白名单之外的东西", () => {
+    // %6a%61vascript: 没有真实协议，浏览器按相对路径处理，不会执行
+    expect(isSafeUrl("javascript%3Aalert(1)")).toBe(true);
+    // 但解码后仍是危险协议的字符串，交给调用方决定；这里记录当前行为
+    expect(safeUrl("javascript%3Aalert(1)")).toBe("javascript%3Aalert(1)");
+  });
+});
+
+/**
+ * blog/index.astro 里的内联转义副本必须与统一实现保持一致。
+ *
+ * 它不能 import（<script is:inline>），所以只能在测试里把它抽出来跑一遍，
+ * 保证两边规则漂移会被 CI 抓出来。
+ */
+describe("blog/index.astro 内联副本一致性", () => {
+  /** 从 .astro 里抽出内联的 escapeHtml 函数并求值 */
+  function loadInlineEscape(): (value: unknown) => string {
+    const source = readFileSync("src/pages/blog/index.astro", "utf8");
+    const start = source.indexOf("const escapeHtml");
+    expect(start, "blog/index.astro 里应当有内联 escapeHtml").toBeGreaterThan(-1);
+
+    // 找到函数体结束的平衡大括号
+    const braceStart = source.indexOf("{", source.indexOf("=>", start));
+    let depth = 0;
+    let end = -1;
+    for (let i = braceStart; i < source.length; i += 1) {
+      if (source[i] === "{") depth += 1;
+      else if (source[i] === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    expect(end, "应当能找到函数体结束位置").toBeGreaterThan(braceStart);
+
+    const fnSource = source.slice(start, end + 1);
+    // 内联脚本是纯 JS（无类型标注），可直接求值
+    // eslint-disable-next-line no-new-func
+    return new Function(`${fnSource}; return escapeHtml;`)() as (value: unknown) => string;
+  }
+
+  const SAMPLES: unknown[] = [
+    "<script>alert(1)</script>",
+    "<img src=x onerror=alert(1)>",
+    "&", "<", ">", '"', "'",
+    "&<>\"'",
+    "&lt;script&gt;",
+    "管道的首页",
+    "骑车 🚴‍♀️ 100km",
+    "café",
+    "",
+    null,
+    undefined,
+    0,
+    -1.5,
+    true,
+    false,
+  ];
+
+  it("对相同输入与 src/lib/html.ts 输出一致", () => {
+    const inline = loadInlineEscape();
+    for (const sample of SAMPLES) {
+      expect(inline(sample), `输入 ${JSON.stringify(sample)}`).toBe(escapeHtml(sample));
+    }
+  });
+
+  it("五个特殊字符逐一一致", () => {
+    const inline = loadInlineEscape();
+    for (const ch of ["&", "<", ">", '"', "'"]) {
+      expect(inline(ch)).toBe(escapeHtml(ch));
+    }
   });
 });

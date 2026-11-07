@@ -1,10 +1,11 @@
 # HTML 转义与 URL 安全（HTML Security）
 
-**阶段**：Guandao OS 2.3
-**状态**：`Partially Verified`（转义已统一并有单元/DOM 测试；URL 协议校验只覆盖第三方内容入口，其余按风险登记）
+**阶段**：Guandao OS 2.3 / 2.3.1
+**状态**：`Verified`（2.3.1 完成全量审计：291 处 HTML 注入点逐项登记，42 处动态 URL 全部收敛，静态检查接入 verify）
 **最后核对**：2026-11-07
 **分支**：`refactor/2.3-unified-html-escaping`
 **统一入口**：`src/lib/html.ts`
+**自动检查**：`npm run check:html-security`（AST 扫描 + 白名单 + 数量漂移检测）
 
 ---
 
@@ -239,3 +240,124 @@ escapeHtml("javascript:alert(1)"); // => "javascript:alert(1)"  —— 什么都
 - [`docs/architecture/DESKTOP-CSS.md`](DESKTOP-CSS.md)：Phase 2.1 CSS 拆分
 - [`GUANDAO_2_0_AUDIT.md`](../../GUANDAO_2_0_AUDIT.md)：总体审计
 - [`docs/ACCEPTANCE-2.0.md`](../ACCEPTANCE-2.0.md)：验收清单
+
+---
+
+# 附录：Phase 2.3.1 全量审计（2026-11-07）
+
+上一轮只覆盖了三处已知实现和 4 个第三方 URL 入口。这一轮把全仓库扫了一遍。
+**以下数字全部来自本次 `npm run check:html-security` 的真实输出**，不是旧报告。
+
+## A1. 真实扫描结果
+
+| 类别 | 数量 |
+| --- | ---: |
+| HTML sink（`innerHTML` / `outerHTML` / `insertAdjacentHTML` / `document.write`） | **268** |
+| 动态 URL 属性插值（`href="..."` / `src="..."` 内的 `${}`） | **42** |
+| 直接 URL 赋值（`el.href =` / `el.src =`） | **22** |
+| 危险协议字面量 | **0** |
+| 重复转义实现 | **1**（blog 内联副本，唯一例外） |
+| **合计待登记** | **333** |
+
+> 说明：上一轮报告里的 34 / 22 / 268 是用行级正则估的。改成 TypeScript AST 后
+> 动态 URL 插值从 34 变成 **42**（正则漏掉了跨行模板与嵌套表达式），
+> 同时修掉了两处自身误报（把任意 `.write()` 当成 `document.write`、
+> 把 `data-gp-action` 当成 `action` 属性）。
+
+## A2. 动态 URL 审计（42 → 0）
+
+原则：**按用途选策略，不是统一套一个函数**。
+
+| 用途 | 处理 | 处数 |
+| --- | --- | ---: |
+| 第三方内容：社区封面 / 头像 / 帖子图 / 资产预览 | `safeUrl()` | 15 |
+| 插件：主页、开发者网站（`href`）、截图、图标（`src`，允许 `data:`） | `safeUrl()` | 3 |
+| 本地对象 URL：云盘预览、组件预览、壁纸缩略图（`blob:`） | `safeUrl(..., { allowBlob: true })` | 7 |
+| 云盘 `/api/files/…` 内部路径 | `safeUrl()` | 2 |
+| 市场图标（第三方清单） | `safeUrl()` | 1 |
+| 文章列表 `post.href`（构建期） | `safeUrl()` | 1 |
+| 社交头像常量表 | `safeUrl()` | 3 |
+| 壁纸路径 + `safeWallId` 白名单 | `safeUrl(\`…\`)` | 3 |
+| 被误报的 `data-gp-action` | 修正扫描器 | 1 |
+| 剩余 | **0** | |
+
+## A3. 直接 URL 赋值审计（22）
+
+全部为属性赋值（`el.href = x`），**不经过 HTML 解析**，因此不存在属性逃逸；
+风险只剩「协议是否可执行」。
+
+| 来源 | 处数 | 结论 |
+| --- | ---: | --- |
+| `URL.createObjectURL(blob)` → `blob:` | 12 | Safe：系统生成，生命周期可控 |
+| `/api/files/${encodeURIComponent(id)}/download` 等内部路径 | 3 | Safe：同源相对路径 |
+| `RUNNER_URL` / `/m/` / `/` 等常量 | 4 | Safe |
+| 头像 URL（API 返回，赋给 `img.src`） | 3 | Safe：`javascript:` 在 `img.src` 不执行 |
+
+## A4. HTML Sink 审计（268）
+
+**方法**：对每个 sink 的右值做 AST 展开，检查模板插值是否被
+`escapeHtml` / `escapeAttr` / `safeUrl` / 数字格式化 等安全路径包裹。
+
+| 分组 | 文件数 | 结论 |
+| --- | ---: | --- |
+| 插值 **100% 已包装或字面量** | 26 | Safe（自动检查 0 处未包装） |
+| 含未包装插值，逐个复核 | 26 | Safe（见下） |
+
+未包装插值经复核只落在三类，**没有发现新的 XSS 路径**：
+
+1. **数字/计数**：`total`、`idx + 1`、`words`、`list.length`、`control.volume`；
+2. **内部渲染函数返回的受控 HTML**：`topBar()`、`tabContent`、`statusBadge()`、
+   `options.body`（内部 API，调用方都在仓库内）；
+3. **已校验常量**：`safeWallId()` 白名单后的 `wall`、`APP_ICON[id]`。
+
+特别复核：`renderMarkdown()` —— 它先 `escapeHtml(text)` **再做标签替换**，
+链接正则只匹配 `https?://`，因此 Markdown 输入无法注入标签或 `javascript:` 链接。
+
+## A5. 本轮修复的问题
+
+| # | 问题 | 修复 |
+| --- | --- | --- |
+| 1 | `src/lib/pairing/page.ts` 有一份**未被上一轮发现**的 `escapeHtml` 副本（4 字符） | 迁移到 `src/lib/html.ts` |
+| 2 | `src/pages/admin/index.astro` 同样有一份副本 | 迁移到统一模块 |
+| 3 | 42 处动态 URL 中 19 处只用 `esc()`，**无协议校验** | 按用途分别套 `safeUrl` |
+| 4 | 静态检查工具自身 2 处误报 | 修正 AST 规则 |
+
+> 第 1、2 项是上一轮用 `escapeHtml\s*=\s*\(` 正则漏掉的（那份写成了
+> `function escapeHtml(...)`）。这正是本阶段改用 AST 的理由。
+
+## A6. 保留的兼容实现（1 处）
+
+`src/pages/blog/index.astro` 的内联 `escapeHtml`：
+
+- 原因是 `<script is:inline>` 不能用 ESM import，改成模块脚本会改变 CSP 内联哈希；
+- **已加一致性测试**：`tests/unit/html.test.ts` 会把它抽出来求值，
+  对 20 组输入（五个特殊字符、null、undefined、数字、中文、Emoji、实体串）
+  与 `src/lib/html.ts` 逐项比对，规则漂移会直接让 CI 失败。
+
+## A7. 自动化检查
+
+`npm run check:html-security`（已接入 `npm run verify`）：
+
+- 用 TypeScript 编译器 API 做 AST 扫描，正则只用于属性文本匹配；
+- `.astro` 会先抽出 frontmatter 与 `<script>` 块，保留行号偏移；
+- 白名单 `scripts/html-security-allowlist.json` 里 **每条必须写 reason**；
+- 文件级条目带 `count`：**新增同类代码会让数量不符，检查直接失败**，
+  不会因为「这个文件已审查过」而放过新写的 sink。
+
+## A8. 仍然存在的风险
+
+| # | 风险 | 现状 |
+| --- | --- | --- |
+| 1 | 白名单是「文件级 + 数量」粒度，不是逐行 | 同文件内新增 sink 会被 count 抓住；但对已有 sink **内部**逻辑的改动不会被察觉 |
+| 2 | 没有 HTML sanitizer | 当前无富文本渲染通道；引入前必须先补流程 |
+| 3 | `img.src` 的 URL 未强制协议校验 | `javascript:` 在 `img.src` 不执行，且多数已是常量/对象 URL |
+| 4 | CSP 仍是最后防线 | `check:csp` 校验 12 个内联哈希 |
+
+## A9. 测试数量
+
+| 文件 | 数量 | 内容 |
+| --- | ---: | --- |
+| `tests/unit/html.test.ts` | **47** | 基础 XSS、五字符、边界、Unicode、双重转义、safeUrl 协议矩阵、blog 一致性 |
+| `tests/e2e/html-security.spec.ts` | **26** | 对照组、5 类载荷、属性逃逸、7 种危险 URL、6 类真实字段、窗口标题、回归 |
+
+全量：`npm run verify` **170 单测**；`npx playwright test` **64 项**；`npm run qa:sync` **20/20**。

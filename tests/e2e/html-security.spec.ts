@@ -157,3 +157,86 @@ test.describe("Phase 2.3 · DOM 安全", () => {
     expect(result.text).toContain("<b>加粗</b>");
   });
 });
+
+/** 危险 URL 的统一断言：进 href/src 后不能保留危险协议 */
+const DANGEROUS_URLS = [
+  "javascript:alert(1)",
+  "JaVaScRiPt:alert(1)",
+  "java\nscript:alert(1)",
+  "vbscript:alert(1)",
+  "file:///C:/Windows/win.ini",
+  "data:text/html,<script>alert(1)</script>",
+  "data:image/svg+xml,<svg onload=alert(1)></svg>",
+];
+
+test.describe("Phase 2.3.1 · 真实字段场景", () => {
+  const FIELDS = [
+    { name: "用户昵称", payload: '<img src=x onerror=alert(1)>" onmouseover="alert(2)' },
+    { name: "社区帖子标题", payload: "<script>alert('post')</script>" },
+    { name: "社区帖子正文", payload: '<svg onload=alert(1)>正常文字</svg>' },
+    { name: "评论内容", payload: '<iframe src="javascript:alert(1)"></iframe>' },
+    { name: "插件名称", payload: "<details open ontoggle=alert(1)>插件" },
+    { name: "市场资源名", payload: '<a href="javascript:alert(1)">点我</a>' },
+  ];
+
+  for (const field of FIELDS) {
+    test(`${field.name}：转义后不产生节点、不执行`, async ({ page }) => {
+      await freshPage(page);
+      const result = await insert(page, `<div class="field">${escapeHtml(field.payload)}</div>`);
+      expect(result.scripts).toBe(0);
+      expect(result.imgs).toBe(0);
+      expect(result.svgs).toBe(0);
+      expect(result.iframes).toBe(0);
+      expect(result.alerted).toBe(false);
+      expect(result.text).toContain(field.payload);
+    });
+  }
+
+  test("窗口标题：属性中的引号无法逃逸", async ({ page }) => {
+    await freshPage(page);
+    const title = '标题" onmouseover="alert(1)" x="';
+    await page.evaluate((t) => {
+      const host = document.createElement("div");
+      host.innerHTML = `<div id="win" title="${t}">内容</div>`;
+      document.body.appendChild(host);
+    }, escapeAttr(title));
+
+    const info = await page.evaluate(() => {
+      const el = document.querySelector("#win") as HTMLElement;
+      return { attrs: el.attributes.length, hasHandler: el.hasAttribute("onmouseover"), title: el.getAttribute("title") };
+    });
+    expect(info.attrs).toBe(2);
+    expect(info.hasHandler).toBe(false);
+    expect(info.title).toBe(title);
+  });
+
+  for (const url of DANGEROUS_URLS) {
+    test(`危险 URL 进入 href 被清空：${url.slice(0, 26)}`, async ({ page }) => {
+      await freshPage(page);
+      const href = safeUrl(url);
+      await page.evaluate((value) => {
+        const host = document.createElement("div");
+        host.innerHTML = `<a id="x" href="${value}">x</a><img id="y" src="${value}" alt=""/>`;
+        document.body.appendChild(host);
+      }, href);
+
+      const info = await page.evaluate(() => ({
+        href: document.querySelector("#x")?.getAttribute("href"),
+        src: document.querySelector("#y")?.getAttribute("src"),
+      }));
+      expect(info.href).toBe("");
+      expect(info.src).toBe("");
+    });
+  }
+
+  test("合法相对路径与 https 图片仍然可用（回归）", async ({ page }) => {
+    await freshPage(page);
+    const rel = safeUrl("/wallpapers/thumbs/aurora.webp");
+    const abs = safeUrl("https://cdn.example.test/a.png");
+    expect(rel).toBe("/wallpapers/thumbs/aurora.webp");
+    expect(abs).toBe("https://cdn.example.test/a.png");
+
+    const result = await insert(page, `<img src="${rel}" alt=""/><img src="${abs}" alt=""/>`);
+    expect(result.imgs).toBe(2);
+  });
+});

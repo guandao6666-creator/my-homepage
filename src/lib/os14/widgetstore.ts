@@ -6,6 +6,7 @@
  * 组件被移除后自动不再更新，不会留下后台任务。
  */
 
+import { safeUrl } from "../html";
 import {
   $$,
   bindTabs,
@@ -179,7 +180,7 @@ const renderPhotoInto = async (root: HTMLElement) => {
     stage.innerHTML = `<div class="w14p-empty"><span>!</span><p>图片数据丢失</p></div>`;
     return;
   }
-  stage.innerHTML = `<img src="${url}" alt="${escapeHtml(item.caption)}" draggable="false" />`;
+  stage.innerHTML = `<img src="${safeUrl(url, { allowBlob: true })}" alt="${escapeHtml(item.caption)}" draggable="false" />`;
   if (cap) cap.textContent = `${item.caption} · ${st.idx + 1}/${st.items.length}`;
 };
 
@@ -798,17 +799,6 @@ export const initWidgetRuntime = (ctx: Ctx) => {
     ctx.widgets.render("clock");
     ctx.toast(cur === "digital" ? "已切换为指针时钟" : "已切换为数字时钟");
   });
-  // 互动时钟：点时钟组件本体，在数字与指针之间切换
-  document.addEventListener("click", (e) => {
-    const body = (e.target as HTMLElement).closest<HTMLElement>('.widget[data-widget="clock"] .widget-body');
-    if (!body) return;
-    const all = ls.get<Record<string, Record<string, unknown>>>(WIDGET_STATE_KEY, {});
-    const cur = String(all.clock?.style ?? "digital");
-    all.clock = { ...all.clock, style: cur === "digital" ? "analog" : "digital" };
-    ls.set(WIDGET_STATE_KEY, all);
-    ctx.widgets.render("clock");
-    ctx.toast(cur === "digital" ? "已切换为指针时钟" : "已切换为数字时钟");
-  });
   if (ticker == null) {
     ticker = window.setInterval(tick, 1000);
   }
@@ -1105,6 +1095,378 @@ export const initWidgetGallery = (win: HTMLElement): (() => void) => {
   return () => undefined;
 };
 
+/* ============================================================
+   Guandao OS 1.6 · 社区组件（声明式）
+   —— 只注册系统内置的组件类型，配置来自服务端校验过的 JSON。
+   —— 不执行任何社区脚本，不允许 HTML / URL / 动态 import。
+   ============================================================ */
+
+const COMMUNITY_WIDGET_KEY = "guandao.community.widgets.v1";
+const COMMUNITY_FOCUS_KEY = "guandao.community.focus.v1";
+
+export type CommunityWidgetConfig = {
+  id: string;
+  type: string;
+  title: string;
+  version: string;
+  postId: string;
+  props: Record<string, string | number | boolean>;
+  permissions: string[];
+  dependencies: string[];
+};
+
+type CommunityFocusState = { running: boolean; remaining: number; endsAt: number };
+
+const readCommunityWidgets = (): Record<string, CommunityWidgetConfig> =>
+  ls.get<Record<string, CommunityWidgetConfig>>(COMMUNITY_WIDGET_KEY, {});
+
+const writeCommunityWidgets = (all: Record<string, CommunityWidgetConfig>) =>
+  ls.set(COMMUNITY_WIDGET_KEY, all);
+
+export const communityWidgetConfigs = (): CommunityWidgetConfig[] => Object.values(readCommunityWidgets());
+
+const readFocusState = (): Record<string, CommunityFocusState> =>
+  ls.get<Record<string, CommunityFocusState>>(COMMUNITY_FOCUS_KEY, {});
+
+const writeFocusState = (all: Record<string, CommunityFocusState>) => ls.set(COMMUNITY_FOCUS_KEY, all);
+
+const comEscape = (value: unknown) => escapeHtml(String(value ?? ""));
+
+const comAccent = (props: Record<string, unknown>) => {
+  const raw = String(props.accent ?? "#6f8cff");
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw : "#6f8cff";
+};
+
+const comLabel = (props: Record<string, unknown>, fallback: string) =>
+  String(props.label ?? "").slice(0, 24) || fallback;
+
+const WEATHER_CITIES: Record<string, [number, number]> = {
+  大连: [38.914, 121.615],
+  北京: [39.904, 116.407],
+  上海: [31.23, 121.474],
+  广州: [23.129, 113.264],
+  深圳: [22.543, 114.058],
+  杭州: [30.274, 120.155],
+  成都: [30.572, 104.066],
+  武汉: [30.592, 114.305],
+  西安: [34.341, 108.94],
+  南京: [32.06, 118.796],
+  天津: [39.084, 117.201],
+  重庆: [29.563, 106.551],
+  青岛: [36.067, 120.383],
+  厦门: [24.479, 118.089],
+  长沙: [28.228, 112.939],
+  苏州: [31.299, 120.585],
+};
+
+const WEATHER_GLYPH: Record<number, string> = {
+  0: "☀", 1: "☀", 2: "⛅", 3: "☁", 45: "🌫", 48: "🌫",
+  51: "🌦", 53: "🌦", 55: "🌦", 61: "🌧", 63: "🌧", 65: "🌧",
+  71: "🌨", 73: "🌨", 75: "❄", 80: "🌦", 81: "🌧", 82: "⛈",
+  95: "⛈", 96: "⛈", 99: "⛈",
+};
+
+const clockText = (showSeconds: boolean) => {
+  const now = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return showSeconds ? `${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}` : `${p(now.getHours())}:${p(now.getMinutes())}`;
+};
+
+const communityWidgetBody = (config: CommunityWidgetConfig): string => {
+  const props = config.props ?? {};
+  const accent = comAccent(props);
+  const label = comLabel(props, config.title);
+  const wrap = (inner: string, extra = "") =>
+    `<div class="cw cw-${comEscape(config.type)} ${extra}" data-cw-id="${comEscape(config.id)}" style="--cw-accent:${accent}">${inner}</div>`;
+
+  switch (config.type) {
+    case "clock": {
+      const analog = props.style === "analog";
+      const showSeconds = props.showSeconds !== false;
+      const text = clockText(showSeconds);
+      if (analog) {
+        return wrap(
+          `<span class="cw-label">${comEscape(label)}</span>
+           <div class="cw-dial" data-cw-dial>
+             <i class="cw-hand is-h" data-cw-hand-h></i>
+             <i class="cw-hand is-m" data-cw-hand-m></i>
+             ${showSeconds ? `<i class="cw-hand is-s" data-cw-hand-s></i>` : ""}
+             <b class="cw-dot"></b>
+           </div>
+           <span class="cw-sub" data-cw-date>${new Date().toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" })}</span>`,
+          "is-analog",
+        );
+      }
+      return wrap(
+        `<span class="cw-label">${comEscape(label)}</span>
+         <b class="cw-time" data-cw-clock>${text}</b>
+         <span class="cw-sub" data-cw-date>${new Date().toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" })}</span>`,
+      );
+    }
+    case "calendar": {
+      const now = new Date();
+      return wrap(
+        `<span class="cw-label">${comEscape(label)}</span>
+         <b class="cw-day">${now.getDate()}</b>
+         <span class="cw-sub">${now.getFullYear()} 年 ${now.getMonth() + 1} 月 · ${now.toLocaleDateString("zh-CN", { weekday: "long" })}</span>`,
+      );
+    }
+    case "weather": {
+      const city = String(props.city ?? "大连").slice(0, 24);
+      return wrap(
+        `<span class="cw-label">${comEscape(label)}</span>
+         <div class="cw-weather-main"><span class="cw-weather-ico" data-cw-weather-ico>☀</span><b data-cw-weather>--°</b></div>
+         <span class="cw-sub" data-cw-weather-sub>${comEscape(city)} · 正在获取</span>`,
+      );
+    }
+    case "focus": {
+      const minutes = Math.max(5, Math.min(120, Number(props.minutes) || 25));
+      const state = readFocusState()[config.id];
+      const remaining = state ? Math.max(0, Math.ceil(state.remaining)) : minutes * 60;
+      const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+      const ss = String(remaining % 60).padStart(2, "0");
+      return wrap(
+        `<span class="cw-label">${comEscape(label)}</span>
+         <b class="cw-time" data-cw-focus>${mm}:${ss}</b>
+         <div class="cw-focus-acts">
+           <button type="button" data-cw-act="toggle">${state?.running ? "暂停" : "开始"}</button>
+           <button type="button" data-cw-act="reset">重置</button>
+         </div>
+         <span class="cw-sub">专注 ${minutes} 分钟</span>`,
+      );
+    }
+    case "quote": {
+      const text = String(props.text ?? "把桌面收拾干净，思绪也会跟着清晰。").slice(0, 120);
+      const author = String(props.author ?? "Guandao Community").slice(0, 32);
+      return wrap(
+        `<span class="cw-quote-mark">“</span>
+         <p class="cw-quote">${comEscape(text)}</p>
+         <span class="cw-sub">— ${comEscape(author)}</span>`,
+      );
+    }
+    case "photo": {
+      const caption = String(props.caption ?? "一张属于你的照片").slice(0, 60);
+      const fit = props.fit === "contain" ? "contain" : "cover";
+      return wrap(
+        `<div class="cw-photo" style="object-fit:${fit}"><span>▧</span></div>
+         <span class="cw-sub">${comEscape(caption)}</span>`,
+      );
+    }
+    case "music": {
+      return wrap(
+        `<span class="cw-label">${comEscape(label)}</span>
+         <div class="cw-music">
+           <span class="cw-music-cover" data-cw-music-cover>♫</span>
+           <div><b data-cw-music-title>还没有曲目</b><span data-cw-music-artist>在 Guandao Music 中导入音频</span></div>
+         </div>
+         <div class="cw-music-acts">
+           <button type="button" data-cw-music="prev">⏮</button>
+           <button type="button" data-cw-music="toggle">▶</button>
+           <button type="button" data-cw-music="next">⏭</button>
+         </div>`,
+      );
+    }
+    case "system": {
+      return wrap(
+        `<span class="cw-label">${comEscape(label)}</span>
+         <div class="cw-sys"><span>内存</span><i><b style="width:46%"></b></i><em>—</em></div>
+         <div class="cw-sys"><span>网络</span><i><b style="width:${navigator.onLine ? 82 : 3}%"></b></i><em>${navigator.onLine ? "在线" : "离线"}</em></div>
+         <span class="cw-sub">系统状态组件 · 不读取隐私数据</span>`,
+      );
+    }
+    case "productivity": {
+      return wrap(
+        `<span class="cw-label">${comEscape(label)}</span>
+         <ul class="cw-todo"><li>整理今天的三件事</li><li>专注 25 分钟</li><li>记录一条灵感</li></ul>
+         <span class="cw-sub">在任务应用中管理真实待办</span>`,
+      );
+    }
+    case "decorative": {
+      const pattern = ["grid", "dots", "lines"].includes(String(props.pattern)) ? String(props.pattern) : "grid";
+      const opacity = Math.max(0.1, Math.min(1, Number(props.opacity) || 0.5));
+      return wrap(
+        `<div class="cw-deco is-${pattern}" style="opacity:${opacity}"></div>
+         <span class="cw-label">${comEscape(label)}</span>`,
+      );
+    }
+    default:
+      return wrap(`<span class="cw-label">${comEscape(config.title)}</span><span class="cw-sub">未知组件类型</span>`);
+  }
+};
+
+const communityWidgetInit = (config: CommunityWidgetConfig, el: HTMLElement) => {
+  if (config.type === "focus") {
+    const state = () => readFocusState()[config.id] ?? {
+      running: false,
+      remaining: Math.max(5, Math.min(120, Number(config.props.minutes) || 25)) * 60,
+      endsAt: 0,
+    };
+    el.addEventListener("click", (event) => {
+      const btn = (event.target as HTMLElement).closest<HTMLElement>("[data-cw-act]");
+      if (!btn) return;
+      event.stopPropagation();
+      const all = readFocusState();
+      const cur = { ...state() };
+      if (btn.dataset.cwAct === "reset") {
+        cur.running = false;
+        cur.remaining = Math.max(5, Math.min(120, Number(config.props.minutes) || 25)) * 60;
+        cur.endsAt = 0;
+      } else if (cur.running) {
+        cur.remaining = Math.max(0, Math.ceil((cur.endsAt - Date.now()) / 1000));
+        cur.running = false;
+        cur.endsAt = 0;
+      } else {
+        cur.running = true;
+        cur.endsAt = Date.now() + Math.max(1, cur.remaining) * 1000;
+      }
+      all[config.id] = cur;
+      writeFocusState(all);
+      const label = el.querySelector<HTMLElement>("[data-cw-act='toggle']");
+      if (label) label.textContent = cur.running ? "暂停" : "开始";
+    });
+  }
+
+  if (config.type === "weather" && (config.permissions.includes("weather") || config.permissions.includes("none"))) {
+    const city = String(config.props.city ?? "大连").slice(0, 24);
+    const coord = WEATHER_CITIES[city];
+    if (!coord) {
+      const sub = el.querySelector<HTMLElement>("[data-cw-weather-sub]");
+      if (sub) sub.textContent = `${city} · 该城市暂未收录`;
+      return;
+    }
+    const controller = new AbortController();
+    fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${coord[0]}&longitude=${coord[1]}&current=temperature_2m,weather_code&timezone=auto`,
+      { signal: controller.signal, credentials: "omit" },
+    )
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!el.isConnected) return;
+        const temp = data?.current?.temperature_2m;
+        const code = Number(data?.current?.weather_code);
+        const value = el.querySelector<HTMLElement>("[data-cw-weather]");
+        const sub = el.querySelector<HTMLElement>("[data-cw-weather-sub]");
+        const ico = el.querySelector<HTMLElement>("[data-cw-weather-ico]");
+        if (value && Number.isFinite(temp)) value.textContent = `${Math.round(temp)}°`;
+        if (ico) ico.textContent = WEATHER_GLYPH[code] ?? "☀";
+        if (sub) sub.textContent = `${city} · 数据来自 open-meteo`;
+      })
+      .catch(() => {
+        const sub = el.querySelector<HTMLElement>("[data-cw-weather-sub]");
+        if (sub) sub.textContent = `${city} · 暂时无法获取`;
+      });
+    el.addEventListener("guandao:before-close", () => controller.abort(), { once: true });
+  }
+
+  if (config.type === "music" && config.permissions.includes("music")) {
+    let unsubscribe: (() => void) | null = null;
+    const paint = (snapshot: PlayerSnapshot) => {
+      if (!el.isConnected) {
+        unsubscribe?.();
+        return;
+      }
+      const title = el.querySelector<HTMLElement>("[data-cw-music-title]");
+      const artist = el.querySelector<HTMLElement>("[data-cw-music-artist]");
+      const cover = el.querySelector<HTMLElement>("[data-cw-music-cover]");
+      const toggle = el.querySelector<HTMLElement>("[data-cw-music='toggle']");
+      if (title) title.textContent = snapshot.track?.title ?? "还没有曲目";
+      if (artist) artist.textContent = snapshot.track?.artist ?? "在 Guandao Music 中导入音频";
+      if (cover && snapshot.track) cover.style.background = coverGradient(snapshot.track.title);
+      if (toggle) toggle.textContent = snapshot.playing ? "❚❚" : "▶";
+    };
+    unsubscribe = music.subscribe(paint);
+    el.addEventListener("click", (event) => {
+      const btn = (event.target as HTMLElement).closest<HTMLElement>("[data-cw-music]");
+      if (!btn) return;
+      event.stopPropagation();
+      if (btn.dataset.cwMusic === "toggle") music.toggle();
+      if (btn.dataset.cwMusic === "next") void music.next();
+      if (btn.dataset.cwMusic === "prev") void music.prev();
+    });
+  }
+};
+
+let communityTicker = 0;
+const startCommunityTicker = () => {
+  if (communityTicker) return;
+  communityTicker = window.setInterval(() => {
+    const configs = readCommunityWidgets();
+    document.querySelectorAll<HTMLElement>("[data-cw-id]").forEach((el) => {
+      const id = el.dataset.cwId ?? "";
+      const config = configs[id];
+      if (!config) return;
+      if (config.type === "clock") {
+        const showSeconds = config.props.showSeconds !== false;
+        const text = clockText(showSeconds);
+        const node = el.querySelector<HTMLElement>("[data-cw-clock]");
+        if (node) node.textContent = text;
+        const now = new Date();
+        const h = el.querySelector<HTMLElement>("[data-cw-hand-h]");
+        const m = el.querySelector<HTMLElement>("[data-cw-hand-m]");
+        const s = el.querySelector<HTMLElement>("[data-cw-hand-s]");
+        if (h) h.style.transform = `rotate(${(now.getHours() % 12) * 30 + now.getMinutes() * 0.5}deg)`;
+        if (m) m.style.transform = `rotate(${now.getMinutes() * 6 + now.getSeconds() * 0.1}deg)`;
+        if (s) s.style.transform = `rotate(${now.getSeconds() * 6}deg)`;
+        const date = el.querySelector<HTMLElement>("[data-cw-date]");
+        if (date) date.textContent = now.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" });
+      }
+      if (config.type === "focus") {
+        const state = readFocusState()[id];
+        const node = el.querySelector<HTMLElement>("[data-cw-focus]");
+        const toggle = el.querySelector<HTMLElement>("[data-cw-act='toggle']");
+        if (state) {
+          let remaining = Math.max(0, Math.ceil(state.remaining));
+          if (state.running && state.endsAt) remaining = Math.max(0, Math.ceil((state.endsAt - Date.now()) / 1000));
+          if (node) {
+            node.textContent = `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
+          }
+          if (toggle) toggle.textContent = state.running ? "暂停" : "开始";
+          if (state.running && remaining === 0) {
+            const all = readFocusState();
+            all[id] = { running: false, remaining: Math.max(5, Math.min(120, Number(config.props.minutes) || 25)) * 60, endsAt: 0 };
+            writeFocusState(all);
+            ctxRef?.toast("专注时间到，休息一下");
+          }
+        }
+      }
+    });
+  }, 1000);
+};
+
+const communityWidgetSpec = (config: CommunityWidgetConfig): WidgetSpec => ({
+  id: config.id,
+  title: config.title.slice(0, 40),
+  desc: `社区组件 · ${config.type} · v${config.version}`,
+  category: "community",
+  body: () => communityWidgetBody(readCommunityWidgets()[config.id] ?? config),
+  init: (el) => communityWidgetInit(readCommunityWidgets()[config.id] ?? config, el),
+});
+
+export const installCommunityWidgetInstance = (config: CommunityWidgetConfig, ctx: Ctx): boolean => {
+  if (!/^com-[a-z0-9-]{1,72}$/.test(config.id)) return false;
+  const all = readCommunityWidgets();
+  all[config.id] = config;
+  writeCommunityWidgets(all);
+  startCommunityTicker();
+  if (!ctx.widgets.ids.includes(config.id)) ctx.widgets.register(communityWidgetSpec(config));
+  else ctx.widgets.render(config.id);
+  ctx.widgets.setEnabled(config.id, true);
+  ctx.widgets.stack();
+  return true;
+};
+
+export const uninstallCommunityWidgetInstance = (id: string, ctx: Ctx): void => {
+  const all = readCommunityWidgets();
+  delete all[id];
+  writeCommunityWidgets(all);
+  ctx.widgets.setEnabled(id, false);
+};
+
+export const setCommunityWidgetEnabled = (id: string, on: boolean, ctx: Ctx): void => {
+  if (!readCommunityWidgets()[id]) return;
+  ctx.widgets.setEnabled(id, on);
+};
+
 /** 注册 8 个新组件；由 index 在启动时调用一次 */
 export const registerNewWidgets = (ctx: Ctx) => {
   ctxRef = ctx;
@@ -1120,6 +1482,11 @@ export const registerNewWidgets = (ctx: Ctx) => {
   ];
   for (const spec of specs) ctx.widgets.register(spec);
   currentWidgets = specs;
+  // 已安装的社区组件在每次启动时重新注册；配置来自本地缓存，渲染仍是声明式的
+  for (const config of communityWidgetConfigs()) {
+    if (!ctx.widgets.ids.includes(config.id)) ctx.widgets.register(communityWidgetSpec(config));
+  }
+  startCommunityTicker();
   initWidgetRuntime(ctx);
 };
 

@@ -5,6 +5,7 @@
  * 支持相册、收藏、搜索与幻灯片。所有操作都在浏览器本地完成。
  */
 
+import { safeUrl } from "../../html";
 import {
   compressImage,
   escapeHtml,
@@ -161,7 +162,7 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
       const el = grid.querySelector<HTMLElement>(`[data-thumb="${CSS.escape(p.blobKey)}"]`);
       if (!el) continue;
       const url = await urlOf(p.blobKey);
-      if (url) el.innerHTML = `<img src="${url}" alt="${escapeHtml(p.name)}" loading="lazy" draggable="false" />`;
+      if (url) el.innerHTML = `<img src="${safeUrl(url)}" alt="${escapeHtml(p.name)}" loading="lazy" draggable="false" />`;
     }
   };
 
@@ -189,7 +190,7 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
           <button type="button" data-lb-close>✕</button>
         </div>
       </div>
-      <div class="ga14-lb-stage"><img src="${url ?? ""}" alt="${escapeHtml(p.name)}"/></div>
+      <div class="ga14-lb-stage"><img src="${safeUrl(url ?? "")}" alt="${escapeHtml(p.name)}"/></div>
       <div class="ga14-lb-foot">
         <button type="button" data-lb-prev>‹ 上一张</button>
         <span>${fmtBytes(p.size)} · ${albumName(st, p.album)}</span>

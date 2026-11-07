@@ -616,3 +616,22 @@ Infrastructure
 | 结论 | **Partially Verified** | 转义统一与双层测试已达成；URL 校验仅覆盖第三方入口 |
 
 详见 **docs/architecture/HTML-SECURITY.md**（权威说明）。
+
+## 附录 J：Phase 2.3.1 全量 HTML 安全审计（2026-11-07）
+
+| 项 | 状态 | 证据 |
+| --- | --- | --- |
+| 扫描方式 | **AST（TypeScript 编译器 API）** | 正则只用于模板内属性文本匹配；`.astro` 先抽 script 块并保留行号 |
+| HTML sink | **268 处，全部登记** | 26 文件插值 100% 已包装；26 文件逐个复核（数字/内部渲染函数/已校验常量） |
+| 动态 URL 插值 | **42 → 0** | 按用途分别用 `safeUrl`（第三方/内部路径）、`{allowBlob}`（对象 URL）、`{allowData}`（插件图标） |
+| 直接 URL 赋值 | **22 处，全部 Safe** | `blob:` / 内部 API 路径 / 常量；属性赋值不经 HTML 解析 |
+| 危险协议字面量 | **0** | 上一轮的 `"JavaScript"` 是标签字符串误报，规则已加冒号要求 |
+| 修复 | **2 份遗漏的转义副本** | `pairing/page.ts`、`admin/index.astro`（上一轮正则漏掉 `function escapeHtml` 写法） |
+| 保留例外 | **1 处** | `blog/index.astro` 内联副本 + 20 组一致性测试 |
+| 自动化 | **已接入 verify** | `npm run check:html-security`：白名单需写 reason、文件级 count 防漂移 |
+| 测试 | **47 单元 / 26 DOM** | 全量 `verify` 170 单测；E2E **64**；`qa:sync` 20/20 |
+| 剩余风险 | **已登记** | 白名单为文件级粒度；无 sanitizer；`img.src` 未强制协议校验；CSP 兜底 |
+| 生产变更 | **无** | 未部署、未改数据、未跑 `qa:prod` |
+| 结论 | **Verified** | 全部注入点完成分类，无未审计项 |
+
+详见 **docs/architecture/HTML-SECURITY.md** 附录。

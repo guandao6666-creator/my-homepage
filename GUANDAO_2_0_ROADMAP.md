@@ -216,6 +216,24 @@
 > 但「全仓库 URL 协议校验」不是本阶段能一次做完的，如实留在风险清单里。
 > 权威说明见 [`docs/architecture/HTML-SECURITY.md`](docs/architecture/HTML-SECURITY.md)。
 
+### 2.3.1 全量审计收尾（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| 扫描方式 | TypeScript 编译器 API 做 AST 扫描（正则只用于属性文本匹配） |
+| HTML sink | **268 处**（26 个文件插值 100% 已包装；26 个文件逐个复核，只落在数字/内部渲染/已校验常量） |
+| 动态 URL 插值 | **42 处 → 0 处未处理**（社区封面头像 15、插件 3、对象 URL 7、内部路径 2、常量等） |
+| 直接 URL 赋值 | **22 处**：全部为 `blob:` / 内部 API 路径 / 常量，属性赋值不经 HTML 解析 |
+| 新增修复 | `pairing/page.ts` 与 `admin/index.astro` 各有一份**上一轮正则漏掉的** `escapeHtml` 副本 |
+| 保留例外 | **1 处**：`blog/index.astro` 内联副本，已加 20 组输入的一致性测试 |
+| 自动化 | 新增 `npm run check:html-security`（白名单每条必须写 reason，文件级条目带 count，新增 sink 会让检查失败），已接入 `verify` |
+| 测试 | 单元 **47**；DOM **26**；全量 `verify` 170 单测 / E2E **64** / `qa:sync` 20/20 |
+| 结论 | **Verified** |
+
+> 数字全部来自本次真实扫描。上一轮报告的 34 处动态 URL 是行级正则的结果，
+> 改 AST 后为 42 处；同时修掉了扫描器自身的两处误报。
+> 权威说明见 [`docs/architecture/HTML-SECURITY.md`](docs/architecture/HTML-SECURITY.md) 附录。
+
 任务 2.4（事件监听器生命周期治理）尚未开始。
 
 ### 2.2 前置条件

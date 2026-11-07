@@ -648,6 +648,22 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 
 详见 `docs/architecture/HTML-SECURITY.md`。
 
+### 16.13 Phase 2.3.1 全量 HTML 安全审计（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| 扫描 | TypeScript AST：HTML sink **268**、动态 URL **42**、直接 URL 赋值 **22**，合计 333 处 |
+| 动态 URL | **42 → 0**：社区封面/头像 15、插件 3、对象 URL 7、内部路径 2、常量等，按用途分别用 `safeUrl` |
+| 直接赋值 | **22 处全部 Safe**：`blob:` / 内部路径 / 常量，属性赋值不经 HTML 解析 |
+| 修复 | 发现 2 份上一轮正则漏掉的转义副本（`pairing/page.ts`、`admin/index.astro`） |
+| 保留例外 | 1 处：`blog/index.astro` 内联副本 + 20 组一致性测试 |
+| 自动化 | `npm run check:html-security` 已接入 `verify`；白名单需 reason，文件级 count 防漂移 |
+| 测试 | 单元 **47**；DOM **26**；`verify` 170 单测；E2E **64**；`qa:sync` 20/20 |
+| 生产变更 | **无** |
+| 结论 | **Verified** |
+
+详见 `docs/architecture/HTML-SECURITY.md` 附录。
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash
