@@ -1,0 +1,184 @@
+# Guandao OS 2.0 · 正式发布验收清单
+
+> 对照任务书 §21。图例：
+> **✅ 已验证**（有可重复执行的自动化证据，或已在生产环境实际验证）
+> **🟡 已实现，未端到端验证**（需要真实 GitHub OAuth / 双设备 / 真实上传等）
+> **⚠️ 部分实现**
+> **⛔ 未执行**（本次发布窗口内未做）
+
+**发布状态**：已于 2026-11-05 部署到 Cloudflare 生产（https://guandao.xin，版本 `8866fe13`）。
+
+| 结论 | 数量 |
+| --- | --- |
+| ✅ 已验证 | 39 |
+| 🟡 已实现，未端到端 | 15 |
+| ⚠️ 部分实现 | 0 |
+| ⛔ 未执行 | 0 |
+
+> 生产端到端（`npm run qa:prod`）覆盖：会话/账号、云盘上传下载、同步推送与冲突、备份创建/校验/下载/恢复、隐私与安全事件、社区与插件公开接口、登录态内核启动与同步下拉、System Center 真实配额、PWA 离线刷新，共 35 项。
+
+---
+
+## Core
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| 系统启动正常 | ✅ | `tests/e2e/os20.spec.ts:48` 断言 11 个阶段都有耗时；`platform.test.ts` 拓扑/超时 |
+| 核心模块职责清楚 | ✅ | `docs/ARCHITECTURE-2.0.md` §3，18 个模块一一对应文件 |
+| 生命周期管理正常 | ✅ | `core.test.ts` initialize/start/activate/suspend/dispose + 逆序销毁 |
+| 应用注册中心正常 | ✅ | `core.test.ts` 状态机；`os20.spec.ts:138` 窗口 ↔ 状态映射 |
+| 事件系统正常 | ✅ | `core.test.ts` 通配/once/waitFor/错误隔离 |
+| 错误隔离正常 | ✅ | `bus.ts` 单订阅者抛错不打断；`service.ts` 环依赖整环标记失败 |
+
+## Desktop
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| 桌面正常 | ✅ | `desktop.spec.ts` 菜单栏 / 图标 / Dock |
+| 窗口管理正常 | ✅ | 拖动、关闭、最大化、程序坞同步（`desktop.spec.ts`） |
+| Dock 正常 | ✅ | `desktop.spec.ts:78` |
+| 菜单栏正常 | ✅ | `desktop.spec.ts:44` |
+| 虚拟桌面正常 | 🟡 | 1.x 实现（`index.astro` 虚拟桌面），2.0 未新增自动化用例，人工验证通过 |
+| Widget 正常 | 🟡 | 1.x 组件系统 + System Center 开关；无专门 E2E |
+| 主题正常 | ✅ | `desktop.spec.ts:119` 深浅切换；System Center 主题卡片 |
+
+## Applications
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| 应用安装正常 | ✅ | 1.4 应用中心 + 市场预检（`os20.spec.ts:204`） |
+| 应用启动正常 | ✅ | `desktop.spec.ts` 便签 / 文章 / 性能实验室 |
+| 应用关闭正常 | ✅ | `desktop.spec.ts:78` 关闭后 Dock 状态复位 |
+| 应用更新正常 | 🟡 | `sys.update` 与插件更新路径已实现；插件更新需真实市场包，未端到端 |
+| 应用卸载正常 | ✅ | 系统应用禁止卸载（`system.ts`）；`platform.test.ts` 断言 |
+| 生命周期统一 | ✅ | `registry.ts` 迁移表 + `runtime.ts`；窗口 observed |
+
+## Cloud
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| 登录正常 | 🟡 | 用生产临时 Session 验证了会话识别、账号读取、同步与云端状态；GitHub OAuth 交互登录本身未执行 |
+| 数据同步正常 | ✅ | `sync-qa.mjs` 20/20（HTTP/D1）、`sync-client-qa.mjs` 8/8（双设备）；生产 `prod-e2e` 推送/索引/冲突/客户端拉取全通过 |
+| 文件上传正常 | ✅ | 生产 `POST /api/files/upload?name=…` → 201，内容原样读回（56 字节） |
+| 文件下载正常 | ✅ | 生产 `/content` 与 `/download` 均 200，下载带 attachment 头 |
+| 多设备正常 | 🟡 | 配对/接力后端真实（6 位码 + SHA-256 + TTL）；双设备 QA 脚本未在本环境运行 |
+| 备份正常 | ✅ | 生产创建保护性 + 手动备份、`run`、`verify`、JSON 下载含 SHA-256 均通过 |
+| 恢复正常 | ✅ | 删除文件并清空回收站后恢复，`filesRestored=1`，文件重新出现且内容一致 |
+
+## Ecosystem
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| 社区正常 | 🟡 | D1 + R2 + 审核实现；`community-qa.mjs` 需要真实登录，未运行 |
+| 主题分享正常 | 🟡 | 社区主题上传/安装链实现；同上 |
+| 组件分享正常 | 🟡 | 同上 |
+| 插件市场正常 | 🟡 | 市场/审核/安装实现；真实发布流程未跑 |
+| 插件沙箱安全 | ✅ | `sandbox.spec.ts` 3 项：nonce、MOUNT、`allow-scripts` 无 `allow-same-origin` |
+| SDK 文档正常 | ✅ | `docs/SDK-1.md` + `public/sandbox/sdk.d.ts` |
+| 开发者工具正常 | ✅ | CLI `create/dev/validate/test/build/package/preview/publish`；`test` 6 项自检实测通过 |
+
+## Security
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| Session 管理正常 | ✅ | 代码审查 + `/api/sync/*` 未登录 401 实测；撤销路径 5 条 |
+| 权限系统正常 | ✅ | `os20.spec.ts:187` 默认拒绝写入审计；`platform.test.ts` 防提权/拉黑 |
+| 用户数据隔离正常 | ✅ | `sync-qa.mjs` 第二个账号索引为空 |
+| 插件权限正常 | ✅ | `METHOD_PERMISSION` + 高敏感权限逐项确认；换设备恢复需重新授权 |
+| 文件权限正常 | ✅ | 所有文件查询带 `user_id`；IDOR 复核（审计 §5 排除项） |
+| 数据导出正常 | 🟡 | `/api/privacy/export*` 实现；需要登录态，未端到端 |
+| 数据删除正常 | 🟡 | 删除任务 + R2 重试实现；需要真实账号，未端到端 |
+
+## Multi-device
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| Desktop Mode 正常 | ✅ | `desktop.spec.ts` 1440×900 |
+| Tablet Mode 正常 | 🟡 | `adaptive.ts` 密度/尺寸规则；无 2.0 专门用例 |
+| Mobile Mode 正常 | ✅ | `mobile.spec.ts` 3 项 |
+| 设备配对正常 | 🟡 | 后端实现；双设备未跑 |
+| 跨设备接力正常 | 🟡 | 后端实现；`continuity-qa.mjs` 未跑 |
+| PWA 正常 | ✅ | 生产实测：SW 激活并接管页面，断网刷新仍能打开桌面 |
+| 离线模式正常 | ✅ | 生产 `setOffline(true)` 后刷新成功渲染桌面（标题正常） |
+
+## Migration & Stability
+
+| 验收项 | 结论 | 证据 |
+| --- | --- | --- |
+| 旧版本数据迁移正常 | ✅ | `platform.test.ts` 迁移引擎；浏览器实测 `pre-2.0-*` 快照与旧键保留 |
+| 不存在已知数据丢失问题 | ✅ | 迁移只新增键；失败不提升版本；删除留墓碑 |
+| 原有核心功能无回归 | ✅ | 21 项 E2E 全绿（含 1.9 桌面/移动/沙箱） |
+| 自动化测试正常 | ✅ | 115 单测 + 21 E2E + 20 同步 API + 8 双设备 = 164 |
+| 构建正常 | ✅ | 29 页 / 2.4s / CSP 12 哈希一致 |
+| 部署正常 | ✅ | 2026-11-05 部署到 https://guandao.xin；`/api/health` 200 + 2.0.0 + D1/R2 正常；首页内核 11 阶段、0 CSP 违规、0 控制台错误（见 `docs/RELEASE-2.0.md` §16） |
+| 回滚方案经过验证 | 🟡 | 上一版本 `fecd8355`（1.9）仍在部署历史中，`wrangler rollback` 可用；D1 只增索引与新表，无需回滚数据库。**未实际执行回滚演练** |
+
+---
+
+## 与任务书的差异说明
+
+1. **§18 技术栈口径**：任务书写 Cloudflare Pages + Pages Functions；项目实际是
+   **Worker + Static Assets**（`wrangler.jsonc`）。2.0 保持现有 Worker 形态，未改成 Pages。
+2. **§9.4 同步范围**：实现 Notes / Tasks / Calendar 三个域；Workspace、User Preferences、
+   Device Information 的同步未接入（设备信息由独立的 devices API 管理）。
+3. **§10 Tutorials**：社区支持主题/组件/工作区/插件/应用/壁纸，**教程（Tutorials）未单独建模型**。
+4. **§17 开发团队页面**：只写「Guandao Studio」与版本信息，**没有编造具体成员**。
+5. **§13 更新中心**：静态站点语义，只做「检查 + 重新加载 + 迁移」，**不伪装内核热更新**。
+
+---
+
+## 未执行的验证（及原因）
+
+| 项 | 原因 |
+| --- | --- |
+| GitHub OAuth 交互登录 | 需要真实 GitHub 账号在本机浏览器完成授权；本轮用生产临时 Session 验证了 Session 之后的所有链路 |
+| 双设备配对 / 接力 | 需要两台设备与同一账号 |
+| 社区发布 / 主题上传 | 需要真实创作者操作与人工审核；本轮验证了公开列表与登录态读取 |
+| 线上回滚演练 | 发布过程未出现需要回滚的故障，未主动制造故障演练 |
+
+这些项目在 `docs/RELEASE-2.0.md` 第 15–17 节同样标注为未执行，不会被写成「已验证」。
+
+**已执行的部署验证**（详见 `docs/RELEASE-2.0.md` §16）：D1 逻辑备份、0013/0014 迁移、
+Worker + 静态资源部署、`/api/health`、`/api/auth/status`、未登录 401、首页/移动端/Service Worker、
+浏览器内核启动、CSP 与控制台零错误、数据完整性复核。
+
+---
+
+## Phase 1 · 安全与数据基线（2026-11-06）
+
+| 项 | 状态 | 证据 |
+| --- | --- | --- |
+| Supabase 凭据审查 | Verified | 只检查变量名；`SUPABASE_DB_PASSWORD` 零引用且未进 dist，已从本地 `.env` 移除 |
+| Supabase 真实依赖 | Verified | 仍在使用（前端 23 + 8 处引用）；`/sb` 代理存活；未删除代理与 SQL |
+| anon key 轮换 | **Verified（owner-confirmed）** | publishable key 已部署验证（`/sb` 200、dist 无旧 JWT/secret）；legacy keys 已由 owner 在控制台停用（2026-11-06 17:44） |
+| Guards 统一 | Verified | `worker/api/guards.js`；auth/files/devices/backups/privacy/community/plugins/sync 已迁移 |
+| 未登录 / 跨源 / 超大 body | Verified | 401 / 403 / 413；chunked 10KB 也返回 413；合法同源到达业务 |
+| R2 只读巡检 | Verified | 管理员接口 + CLI；生产实跑：0 引用、12 对象、0 缺失、12 孤儿候选 |
+| 依赖清理 | Verified | `@astrojs/markdown-remark` 实测为 Astro 7 配置必需，保留；`check:unused` 通过 |
+| Astro 模板类型检查 | Verified | `astro check` 246 文件，0 errors / 0 warnings / 137 hints |
+| ESLint | Verified | Worker/scripts/CLI 安全规则，0 problems |
+| 单元测试 | Verified | 115 passed |
+| QA 清理护栏测试 | Verified | 11/11（隔离 SQLite） |
+| E2E | Verified | 24 passed |
+| 同步 QA | Verified | 20/20 |
+| 生产 QA | Verified | 35/35（本任务未重跑；按调查约束不执行） |
+| 部署 | Verified | `a05bedf8-a5ff-4839-a9eb-03ab090b943f`（publishable key）；`/api/health` 200 |
+| 生产数据事件 | **Mitigated / Pending Investigation** | `users=0` 后经 D1 Time Travel 恢复 1/3/3；应用内删除路径已加固；根因未确认，详见 [`docs/INCIDENT-2026-11-06-ACCOUNT-DELETION.md`](INCIDENT-2026-11-06-ACCOUNT-DELETION.md) |
+| D1 整库备份工具 | Verified（本地） | backup/verify/restore-check；8/8；生产自动备份未启用 |
+| 数据异常监控 | Implemented / 本地验证 | 0015 迁移 + Cron + 管理员接口；本地 scheduled 1 快照/0 告警；未部署 |
+| 安全事件日志 | Implemented / 本地验证 | 49 项安全测试通过；生产未部署 |
+| Cloudflare Audit Logs | **Pending Manual Action** | 当前 OAuth 403；见 `docs/SECURITY-AUDIT-ACCESS.md` |
+| Phase 2.1 CSS 拆分 | **Partially Verified（本地）/ 已上线** | 18 文件合计 270,945 B，与拆分前字节完全相同；构建 `index.B_TNKWp7.css` 273,238 B hash 未变；19/21 逐像素完全一致 + 1 动态红点 + 1 单像素 Δ3；147/147 布局框；已随 `6928916f` 上线 |
+| Phase 2.1 生产 UI 复测 | **通过** | 生产 10 个 CSS 资产与本机构建同名同字节（含 `index.B_TNKWp7.css` 273,238 B）；渲染检查 9/9；只读，未登录未写数据 |
+| Phase 2.1 首屏 CSS | **未达标** | 476,749 B，仍超 200 KB；仅桌面样式包本身即 273,238 B，纯搬迁结构性不可达 |
+| Phase 2.1 取证缺口 | **已关闭** | `1440x900-dialog` 已恢复复采且 diff=0；截图脚本已入库 `a712d96` |
+| Phase 1.6 D1 备份 Workflow | **生产真实执行成功** | 5 steps complete；SQL 100,976 B |
+| Phase 1.6 每日调度 | **已启用（Worker Cron）** | `0 19 * * *`；版本 `6928916f` |
+| Phase 1.6 独立 R2 / Token | **已配置且可用** | D1 GET/export 成功；Bucket 已创建 |
+| Phase 1.6 隔离恢复 | **生产备份隔离验证通过** | 63 表 / 16 迁移；`productionTouched:false` |
+| Phase 1.6 备份监控 | **已部署** | 26h stale / failed / unknown |
+| Phase 1.6 生产备份 | **成功** | R2 100,992 B；SHA match；隔离恢复 63 表 |
+| Phase 1.6 告警真实送达 | **本地已验证（真实外部 HTTPS）** | `npm run qa:alerts` 16/16：webhook.site 真实收到 `guandao.backup.alert` 与 `guandao.data.alert`，payload 无敏感字段 |
+| Phase 1.6 生产告警配置 | **Pending Manual Action** | Cloudflare 上仍未设置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`；需所有者提供渠道并部署 |
+
+Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 重写。
