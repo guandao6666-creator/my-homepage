@@ -1,10 +1,10 @@
 # 旧版应用迁移（Legacy Applications）
 
 **阶段**：Guandao OS 2.2
-**状态**：`Partially Verified`（5 个低耦合应用已迁移并有回归证据；高耦合应用需前置的 Core 能力）
+**状态**：`Partially Verified`（5 个低耦合应用已迁移并有回归证据；12 个高耦合应用需前置的 Core 能力）
 **最后核对**：2026-11-07
 **分支**：`refactor/2.2-legacy-app-extraction`
-**范围**：只把 `src/pages/index.astro` 里的旧版应用搬到 `src/lib/legacy-apps/`；
+**范围**：把 `src/pages/index.astro` 里的旧版应用搬到 `src/lib/legacy-apps/`，并清理已被 os14 覆盖的死代码；
 未改窗口系统、App Registry、App Runtime、Core 启动流程、Dock、菜单栏、Worker、D1/R2、同步、PWA。
 
 ---
@@ -15,15 +15,15 @@
 | --- | --- |
 | 迁移方式 | 复用 `registerApp`，应用通过显式 `LegacyAppContext` 取依赖 |
 | 已迁移 | **5 个**：`posts` / `about` / `rank` / `calc` / `viewer` |
-| `index.astro` 行数 | 7,765 → **7,439**（−326；字节 331,283 → 317,430） |
+| 死代码清理 | **删除 831 行**：`notes` / `calendar` / `files` / `music` 旧实现（已被 os14 同名应用覆盖） |
+| `index.astro` 行数 | 7,765 → **6,605**（−1,160；字节 331,283 → 283,007） |
 | 新增模块 | 8 个文件 / 470 行（含类型与共享上报） |
 | 重复实现 | 消除了排行榜上报的第二份可能副本（外壳与窗口共用 `report.ts`） |
-| 回归证据 | E2E **31/31**（新增 7 项）；单测 **123/123**（新增 8 项）；`verify` 绿；`qa:sync` 20/20 |
+| 回归证据 | E2E **36/36**（新增 12 项）；单测 **123/123**（新增 8 项）；`verify` 绿；`qa:sync` 20/20 |
 | 未迁移 | 12 个仍在 `index.astro`，原因见 §6 |
-| 额外发现 | **约 893 行旧应用已被 os14 同名应用覆盖，实际不会执行**（§7） |
 
-> **为什么是 Partially Verified**：本次把「低耦合应用」这一类完整迁完并验证了；
-> 但 `terminal` / `settings` / `social` / `treehole` / `council` 这些高耦合应用
+> **为什么是 Partially Verified**：本次把「低耦合应用」这一类完整迁完并验证了，并顺手清掉了
+> 已被覆盖的 831 行死代码；但 `terminal` / `settings` / `social` / `treehole` / `council` 这些高耦合应用
 > 需要 Core 先提供「窗口级作用域 + 认证会话」能力，否则迁移只是在模块里重建闭包，
 > 属于假解耦。这部分如实留给 Phase 2.3 之后。
 
@@ -224,14 +224,14 @@ export function createRankReporter(supabase, fetchWithTimeout) { … }
 | 设置 `settings` | 12 项：数据导入导出、Dock 增删、壁纸、小组件联动 | 外壳能力接口化（`setDockFilter` 那类已有，但不成体系） |
 | 树洞 / 议会 / 社会网络 | 共享 `authFormHtml` + `readAuth` + `ensureFreshToken` 认证链路 | 把登录表单与 token 刷新下沉到可注入的 `AuthPort` |
 | 水族箱 / 访客墙 / 新闻 / 监视器 | 游戏循环、`pet` 元素、全局窗口集合 | 生命周期与「桌面设施」接口 |
-| 便签 / 日历 / 文件 / 音乐 | **已被 os14 同名应用覆盖** | 不是迁移，是删除（见 §7） |
+| 便签 / 日历 / 文件 / 音乐 | 旧实现已被 os14 同名应用覆盖 | **已删除**，不再需要迁移（见 §7） |
 
 > 判断标准：如果一个应用迁出去需要在模块里重建 10 个以上外壳调用，
 > 那不是解耦，只是把耦合搬了个地方。本阶段不为了凑数量硬迁。
 
 ---
 
-## 7. 重要发现：约 893 行旧应用实际不执行
+## 7. 死代码清理（2026-11-07 已完成）
 
 `src/lib/os14/index.ts` 的注册循环里有明确注释：
 
@@ -242,22 +242,55 @@ ctx.registerApp(spec);
 
 `os14` 注册了与旧版**同名**的 `notes` / `calendar` / `files` / `music`，
 而 `initOs14()` 在 `index.astro` 中于 `APPS` 初始化之后才执行，
-因此这四个旧实现被整体覆盖：
+因此这四个旧实现被整体覆盖，**永远不会执行**。
 
-| 旧实现 | 位置 | 行数 | 现状 |
-| --- | --- | ---: | --- |
-| `renderNotes` / `initNotes` | L3488–3608 | 121 | 被 `os14/apps/notes.ts` 覆盖 |
-| `renderCalendar` / `initCalendar` | L3686–3813 | 128 | 被 `os14/apps/calendar.ts` 覆盖 |
-| `renderFiles` / `initFiles` | L3975–4289 | 315 | 被 `os14/files.ts` 覆盖 |
-| `renderMusic` / `initMusic` | L5413–5665 | 253 | 被 `os14/music-core.ts` 覆盖 |
-| 合计 | — | **约 817–893 行** | 不可达 |
+### 7.1 删除前的可达性论证
 
-**本次没有删除它们**：Phase 2.2 的授权是「迁移」，不是「清理死代码」。
-删除需要单独确认（尤其要确认没有插件或深链在启动早期依赖这些符号），
-建议作为 Phase 2.3 的独立小任务，届时可再减约 800 行。
+只凭上面那条注释还不够，删之前逐条确认：
+
+| 检查 | 结果 |
+| --- | --- |
+| os14 是否无条件注册这 4 个 id | 是；`optional: true` 只有 `gallery` / `reader` |
+| `initOs14` 是否在静态 `APPS` 之后执行 | 是（`ctx14` 构造完毕后才 `initOs14(ctx14)`） |
+| `legacyInit` 回退是否可能命中 | 否；`mountApp` 的 `runInit` 先查 `APP_INIT`，os14 的 `load()` 会写入 `APP_INIT[id]` |
+| 这些符号是否通过 `ctx14` 暴露给外部 | 否，只暴露了 `escapeHtml` 等通用能力 |
+| 是否有插件/深链直接引用 | 无；仓库内没有 `#notes` / `#calendar` / `#files` / `#music` 链接 |
+| 删除后编译是否通过 | `tsc` 0 error、`astro check` 0 error |
+
+> 过程中我写过一个「传递式死代码分析」脚本，它把 `boot14`、`openFromHash`、`launchpad`
+> 等活代码也判成死代码——因为该脚本用「下一个顶层声明」界定函数体，边界严重失真。
+> **该结论被丢弃**，改用「明确区块边界 + 边界断言 + 编译/引用/回归三重验证」。
+
+### 7.2 实际删除内容
+
+| 删除对象 | 行数 |
+| --- | ---: |
+| `renderNotes` + `initNotes` + `NOTES_KEY` / `NOTE_COLORS` / `NoteItem` / `readNotes` / `writeNotes` | 121 |
+| `renderCalendar` + `initCalendar` + `EVENTS_KEY` / `CalEvent` / `readEvents` / `writeEvents` / `pad2` / `dayKey` | 128 |
+| `renderFiles` + `initFiles` + `FS_KEY` / `FsNode` / `readFs` / `writeFs` / `seedFs` | 313 |
+| `renderMusic` + `initMusic` | 16 + 253 |
+| `APPS` 4 条静态条目 + `legacyInit` 4 条分支 | 8 |
+| **合计** | **839** |
+
+（文档口径取整为 **831 行实现 + 8 行登记项**。）
+
+### 7.3 一处行为差异及其补偿
+
+删除后 `notes` / `calendar` / `files` / `music` 在 `APPS` 里只由 os14 注册。
+但开机时的 `openFromHash()` 早于 `initOs14()`，所以 `#notes` 这类直达链接会失效。
+
+补偿：在 `initOs14()` 之后补一次 `openFromHash()`。
+
+```ts
+boot14 = initOs14(ctx14 as never);
+...
+openFromHash();   // 注册表此刻才完整；对已开窗口是聚焦，幂等
+```
+
+副作用是正向的：`#drive`、`#devices` 这类 os14 应用的直达链接**以前也是坏的**，现在一并修好。
 
 > 这也解释了为什么 `index.astro` 的「应用」比实际运行的少：
-> `APPS` 里有 21 个条目，真正走旧实现的只有 12 个。
+> `APPS` 静态表原有 21 个条目，真正走旧实现的只有 12 个。
 
 ---
 
@@ -265,7 +298,7 @@ ctx.registerApp(spec);
 
 ### 8.1 E2E
 
-`npx playwright test` → **31 passed**（原 24 + 新增 7）。
+`npx playwright test` → **36 passed**（原 24 + 新增 12）。
 
 新增 `tests/e2e/legacy-apps.spec.ts`：
 
@@ -278,6 +311,8 @@ ctx.registerApp(spec);
 | 5 | 排行榜 | 状态区不再是「正在加载…」（本地无后端也要有明确文案） |
 | 6 | 重复打开 | 连续 `openApp("calc")` 三次，窗口只有 1 个 |
 | 7 | 关闭再打开 | 输入 9 → 关闭 → 重开，显示回到 `0`（init 重新执行，无状态残留） |
+| 8–11 | 清理回归 ×4 | `notes` / `calendar` / `files` / `music` 仍能打开、内容非空、**不是崩溃卡片**、控制台无错 |
+| 12 | 注册表完整性 | 这 4 个 id 仍在 `ctx.APPS` 里（图标可点） |
 
 ### 8.2 单测
 
@@ -297,7 +332,7 @@ ctx.registerApp(spec);
 | 命令 | 结果 |
 | --- | --- |
 | `npm run verify` | 通过：123 单测 + 49 安全测试；`astro check` 0 error；`lint` 0 problem；build 29 页；CSP 12 哈希 |
-| `npx playwright test` | **31 passed** |
+| `npx playwright test` | **36 passed** |
 | `npm run qa:sync` | **20 / 20 通过** |
 | `npm run qa:prod` | **未运行**（按要求） |
 
@@ -308,17 +343,17 @@ ctx.registerApp(spec);
 
 ## 9. 代码规模
 
-| 指标 | 迁移前 | 迁移后 | 变化 |
-| --- | ---: | ---: | ---: |
-| `index.astro` 行数 | 7,765 | **7,439** | −326 |
-| `index.astro` 字节 | 331,283 | **317,430** | −13,853 |
-| `src/lib/legacy-apps/` | 0 | **8 文件 / 470 行** | +470 |
-| 旧应用实现段 | 21 段 | 16 段 | −5 |
-| `legacyInit` 分支 | 18 | 15 | −3 |
+| 指标 | 迁移前 | 迁移后 | 清理后 | 总变化 |
+| --- | ---: | ---: | ---: | ---: |
+| `index.astro` 行数 | 7,765 | 7,439 | **6,605** | −1,160 |
+| `index.astro` 字节 | 331,283 | 317,430 | **283,007** | −48,276 |
+| `src/lib/legacy-apps/` | 0 | 8 文件 / 470 行 | 8 文件 / 470 行 | +470 |
+| `APPS` 静态条目 | 21 | 16 | **12** | −9 |
+| `legacyInit` 分支 | 18 | 15 | **11** | −7 |
 
 行数不是本阶段的目标（`index.astro` 早已低于路线图 12,000 行），
-**目标是让迁移出去的 5 个应用不再依赖闭包**。模块总量大于删除量是正常的：
-它包含类型定义、依赖注入接线和一份被消除重复的共享上报实现。
+**目标是让迁移出去的 5 个应用不再依赖闭包 + 移除不可达代码**。
+模块总量大于删除量是正常的：它包含类型定义、依赖注入接线和一份被消除重复的共享上报实现。
 
 ---
 
@@ -326,11 +361,20 @@ ctx.registerApp(spec);
 
 | # | 债 | 影响 | 建议阶段 |
 | --- | --- | --- | --- |
-| 1 | 约 817–893 行死代码（`notes`/`calendar`/`files`/`music` 旧实现） | 增加阅读与 grep 噪音，易误判依赖 | Phase 2.3 前单独清理 |
-| 2 | 12 个应用仍读闭包 | 无法独立测试，改动易牵连 | Phase 2.3+，需先做外壳能力接口化 |
-| 3 | `initRank` 的 `void load()` 未随窗口关闭取消 | 关窗后仍会写已脱离文档的节点（不抛错、不泄漏处理器） | Phase 2.4（事件/作用域审计） |
-| 4 | `LegacyAppContext` 只有 4 个能力 | 迁移终端/设置时会需要扩容 | 扩容前先确认每个新能力的归属 |
-| 5 | 没有「应用级」单测脚手架（依赖真实 DOM） | init 只能靠 E2E 验证 | 可选：引入 jsdom 环境 |
+| 1 | 12 个应用仍读闭包 | 无法独立测试，改动易牵连 | Phase 2.3+，需先做外壳能力接口化 |
+| 2 | `initRank` 的 `void load()` 未随窗口关闭取消 | 关窗后仍会写已脱离文档的节点（不抛错、不泄漏处理器） | Phase 2.4（事件/作用域审计） |
+| 3 | `LegacyAppContext` 只有 4 个能力 | 迁移终端/设置时会需要扩容 | 扩容前先确认每个新能力的归属 |
+| 4 | 没有「应用级」单测脚手架（依赖真实 DOM） | init 只能靠 E2E 验证 | 可选：引入 jsdom 环境 |
+
+已关闭：
+
+- ~~约 831 行死代码（`notes`/`calendar`/`files`/`music` 旧实现）~~ → 2026-11-07 已删除，见 §7。
+
+### 10.1 对 Phase 2.3 的输入
+
+清理后 `index.astro` 里 `escapeHtml` 仍有 **37 处引用**，分布在通知中心、虚拟桌面、
+访客墙、社会网络等区块，加上 `src/lib/os14/core.ts`、`src/lib/mobile/ui.ts` 的副本。
+死代码清完后，这 37 处全部位于活代码路径，2.3 收敛时不需要在死代码里甄别。
 
 ---
 

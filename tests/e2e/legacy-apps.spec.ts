@@ -135,3 +135,44 @@ test.describe("Phase 2.2 · 已迁移应用", () => {
     await expect(win.locator("#calc-display")).toHaveText("0");
   });
 });
+
+test.describe("Phase 2.2 · 清理被 os14 覆盖的旧实现后仍可用", () => {
+  /**
+   * notes / calendar / files / music 的旧实现已被删除。
+   * 它们现在完全由 os14 注册；这里确认删除没有把应用一起删掉。
+   */
+  for (const { id, label, contentSelector } of [
+    { id: "notes", label: "便签", contentSelector: ".win-body *" },
+    { id: "calendar", label: "日历", contentSelector: ".win-body *" },
+    { id: "files", label: "文件管理器", contentSelector: ".win-body *" },
+    { id: "music", label: "音乐", contentSelector: ".win-body *" },
+  ]) {
+    test(`${label}（${id}）仍能打开且不是崩溃卡片`, async ({ page }) => {
+      const errors = watchErrors(page);
+      await bootDesktop(page);
+      await openApp(page, id);
+
+      const win = page.locator(`.window[data-app="${id}"]`);
+      await expect(win).toBeVisible();
+
+      // 有真实内容，没有落到「加载失败 / 初始化失败」的崩溃卡片
+      await expect(win.locator(".win-body").first()).not.toBeEmpty();
+      await expect(win.locator("[data-g19-retry]")).toHaveCount(0);
+      const bodyText = (await win.locator(".win-body").first().innerText()) ?? "";
+      expect(bodyText).not.toContain("初始化时出错");
+      expect(bodyText).not.toContain("应用加载失败");
+
+      await expect(win.locator(contentSelector).first()).toBeVisible();
+      expect(errors, `控制台报错：${errors.join("\n")}`).toEqual([]);
+    });
+  }
+
+  test("四个应用都还在注册表里（图标可点）", async ({ page }) => {
+    await bootDesktop(page);
+    const present = await page.evaluate(() => {
+      const apps = (window as unknown as { GOS14: { ctx: { APPS: Record<string, unknown> } } }).GOS14.ctx.APPS;
+      return ["notes", "calendar", "files", "music"].filter((id) => Boolean(apps[id]));
+    });
+    expect(present.sort()).toEqual(["calendar", "files", "music", "notes"]);
+  });
+});
