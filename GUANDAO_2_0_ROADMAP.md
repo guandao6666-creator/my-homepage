@@ -178,7 +178,25 @@
 > 取证脚本与架构文档已提交 `a712d96`。
 > 权威说明见 [`docs/architecture/DESKTOP-CSS.md`](docs/architecture/DESKTOP-CSS.md)。
 
-任务 2.2（JS 拆分）仍未开始；2.1 只完成 CSS 部分。
+### 2.2 执行结果（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| 已迁移应用 | **5 个**：`posts`（文章）/ `about`（关于）/ `rank`（排行榜）/ `calc`（计算器）/ `viewer`（图片查看器） |
+| 新模块 | `src/lib/legacy-apps/`：8 文件 / 470 行（含 `types.ts` 与共享上报 `leaderboard/report.ts`） |
+| 接入方式 | 复用 `registerApp`；能力经 `LegacyAppContext` 显式注入，注册点位于 `renderDock()` 之前 |
+| `index.astro` | 7,765 → **7,439 行**（331,283 → 317,430 B） |
+| 重复实现 | 排行榜上报由外壳与窗口共用一份（`RANK_NAME_KEY` 键名保持不变） |
+| 回归 | E2E **31/31**（新增 7）；单测 **123/123**（新增 8）；`verify` 绿；`qa:sync` 20/20 |
+| 未迁移 | 12 个应用仍读闭包：终端/设置为 10–12 项外壳依赖，树洞/议会/社会网络共享认证链路 |
+| 额外发现 | 约 **817–893 行**旧应用（`notes`/`calendar`/`files`/`music`）已被 os14 同名实现覆盖，实际不执行 |
+| 结论 | **Partially Verified**：低耦合应用一类已完整迁移并验证；高耦合应用需先做外壳能力接口化 |
+
+> 行数不是本阶段目标（`index.astro` 早已低于 12,000 行）。
+> 判断标准是「迁出的应用不再依赖闭包」，而不是删掉多少行。
+> 权威说明见 [`docs/architecture/LEGACY-APPLICATIONS.md`](docs/architecture/LEGACY-APPLICATIONS.md)。
+
+任务 2.3（统一模板转义）尚未开始；2.2 只完成低耦合旧版应用的迁移。
 
 ### 2.2 前置条件
 

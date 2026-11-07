@@ -577,3 +577,23 @@ Infrastructure
 > 告警**代码链路**已用真实外部 HTTPS 验通（不是 Mock），但 Cloudflare 上仍未配置接收端，
 > 因此整体维持 `Implemented / Partially Verified`：不能声称"生产告警已在真实故障中送达"。
 > 验证脚本与口径见 `docs/architecture/DESKTOP-CSS.md` §10 与 `scripts/alert-delivery-check.mjs`。
+
+## 附录 H：Phase 2.2 旧版应用迁移（2026-11-07）
+
+| 项 | 状态 | 证据 |
+| --- | --- | --- |
+| 迁移方式 | **复用现有注册机制** | `registerApp` + `LegacyAppContext` 显式注入；未新建注册中心 |
+| 已迁移 | **5 个** | `posts` / `about` / `rank` / `calc` / `viewer` |
+| 新模块 | `src/lib/legacy-apps/` | 8 文件 / 470 行，含 `types.ts` 与共享上报 `leaderboard/report.ts` |
+| 注册时机 | **保持正确顺序** | 注册点在 `renderDock()` 之前，程序坞不会漏图标 |
+| `index.astro` | **7,765 → 7,439 行** | 字节 331,283 → 317,430 |
+| 重复实现 | **已消除** | 排行榜上报由外壳 60s 计时器与窗口共用一份实现 |
+| E2E | **31/31 通过** | 新增 `tests/e2e/legacy-apps.spec.ts` 7 项，覆盖 5 个应用的开/关/重开/去重 |
+| 单测 | **123/123 通过** | 新增 8 项：模块形状、注入契约、上报适配器 |
+| 全量门禁 | **通过** | `verify` 0 error / 0 lint problem；build 29 页；CSP 12 哈希；`qa:sync` 20/20 |
+| 未迁移 | **12 个仍读闭包** | 终端/设置 10–12 项外壳依赖；树洞·议会·社会网络共享认证链路 |
+| 死代码 | **已定位，未清理** | `notes`/`calendar`/`files`/`music` 旧实现约 817–893 行被 os14 覆盖 |
+| 生产变更 | **无** | 未部署、未改数据、未跑 `qa:prod` |
+| 结论 | **Partially Verified** | 低耦合一类已完整迁移并验证；高耦合需先做外壳能力接口化 |
+
+详见 **docs/architecture/LEGACY-APPLICATIONS.md**（权威说明）。

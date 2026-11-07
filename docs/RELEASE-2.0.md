@@ -615,6 +615,23 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 文档：`docs/operations/D1-BACKUP.md`、`D1-RECOVERY.md`、`D1-MONITORING.md`。
 生产备份已成功；因真实告警通知渠道未配置，状态保持 **Implemented / Partially Verified**。
 
+### 16.11 Phase 2.2 旧版应用迁移（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| 已迁移 | **5 个**：`posts`（文章）/ `about`（关于）/ `rank`（排行榜）/ `calc`（计算器）/ `viewer`（图片查看器） |
+| 结构 | 新增 `src/lib/legacy-apps/`：8 文件 / 470 行，含类型契约与共享上报 |
+| 接入 | 复用 `registerApp` + `LegacyAppContext` 显式注入；注册点位于 `renderDock()` 之前 |
+| `index.astro` | 7,765 → **7,439 行**（331,283 → 317,430 B） |
+| 重复实现 | 排行榜上报由外壳 60s 计时器与排行榜窗口共用一份 |
+| 回归 | E2E **31/31**（新增 7）；单测 **123/123**（新增 8）；`verify` 绿；`qa:sync` 20/20 |
+| 未迁移 | 12 个应用仍读闭包（终端/设置 10–12 项外壳依赖；树洞·议会·社会网络共享认证） |
+| 死代码 | 发现 `notes`/`calendar`/`files`/`music` 旧实现约 817–893 行被 os14 覆盖，本次未删 |
+| 生产变更 | **无**（未部署、未改数据、未跑 `qa:prod`） |
+| 结论 | **Partially Verified** |
+
+详见 `docs/architecture/LEGACY-APPLICATIONS.md`。
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash
