@@ -177,6 +177,10 @@ Worker + 静态资源部署、`/api/health`、`/api/auth/status`、未登录 401
 | Phase 2.2 回归证据 | **通过** | E2E 36/36（新增 12 项）；单测 123/123（新增 8 项）；`verify` 绿；`qa:sync` 20/20 |
 | Phase 2.2 未迁移应用 | **12 个仍读闭包** | 终端 10 项 / 设置 12 项外壳依赖；树洞·议会·社会网络共享认证链路；需先做外壳能力接口化 |
 | Phase 2.2 死代码清理 | **已完成（831 行）** | `notes`/`calendar`/`files`/`music` 旧实现被 os14 覆盖，已删除；含可达性论证与 `openFromHash()` 深链补偿 |
+| Phase 2.3 统一转义 | **Partially Verified** | 新建 `src/lib/html.ts`；6 处重复实现已迁移，`blog/index.astro` 因内联脚本例外保留并说明 |
+| Phase 2.3 安全测试 | **通过** | 单元 40/40（`tests/unit/html.test.ts`）；DOM 11/11（`tests/e2e/html-security.spec.ts`，含对照组） |
+| Phase 2.3 URL 校验 | **部分覆盖** | 新增 `safeUrl`，用于 4 处第三方入口；34 处动态 URL 插值、22 处直接赋值仍按风险登记未改 |
+| Phase 2.2 生命周期 | **通过** | 连续开关 20 次：监听 5→5、timeout 1→1、interval 1→1、资源域 7→7，零增长 |
 | Phase 1.6 D1 备份 Workflow | **生产真实执行成功** | 5 steps complete；SQL 100,976 B |
 | Phase 1.6 每日调度 | **已启用（Worker Cron）** | `0 19 * * *`；版本 `6928916f` |
 | Phase 1.6 独立 R2 / Token | **已配置且可用** | D1 GET/export 成功；Bucket 已创建 |

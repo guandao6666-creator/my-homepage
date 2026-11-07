@@ -597,3 +597,22 @@ Infrastructure
 | 结论 | **Partially Verified** | 低耦合一类已完整迁移并验证；高耦合需先做外壳能力接口化 |
 
 详见 **docs/architecture/LEGACY-APPLICATIONS.md**（权威说明）。
+
+## 附录 I：Phase 2.3 统一 HTML 转义与 URL 校验（2026-11-07）
+
+| 项 | 状态 | 证据 |
+| --- | --- | --- |
+| 统一模块 | **已建立** | `src/lib/html.ts`：`escapeHtml` / `escapeAttr` / `safeUrl` / `isSafeUrl` |
+| 重复实现迁移 | **6 处已迁移** | `os14/core.ts`、`mobile/ui.ts`、`quality/errors.ts`、`index.astro`、`home.astro`、`notes.astro` |
+| 保留例外 | **1 处（已说明）** | `blog/index.astro`：`<script is:inline>` 不能 import，改模块脚本会改变 CSP 哈希 |
+| 别名 | **已归一** | `esc`（421 处调用）改为 `escapeHtml` 别名，不是第二份实现 |
+| URL 协议校验 | **新增能力** | 此前全仓库无任何协议校验；`safeUrl` 拦截 `javascript:`/`vbscript:`/控制字符拆解 |
+| URL 覆盖范围 | **4 处第三方入口** | 插件主页、开发者网站、插件截图、插件图标 |
+| 单元测试 | **40/40** | `tests/unit/html.test.ts`；含 `safeUrl({}) → ""` 反向用例（该用例一开始失败，暴露并修复了实参类型漏洞） |
+| DOM 测试 | **11/11** | `tests/e2e/html-security.spec.ts`；含对照组证明检测有效 |
+| 全量门禁 | **通过** | `verify` 163 单测 + 49 安全；E2E 49/49；`qa:sync` 20/20 |
+| 剩余风险 | **已登记，未修复** | 34 处动态 URL 插值 / 22 处直接赋值未做协议校验；268 处 `innerHTML` 未逐一审计 |
+| 生产变更 | **无** | 未部署、未改数据、未跑 `qa:prod` |
+| 结论 | **Partially Verified** | 转义统一与双层测试已达成；URL 校验仅覆盖第三方入口 |
+
+详见 **docs/architecture/HTML-SECURITY.md**（权威说明）。

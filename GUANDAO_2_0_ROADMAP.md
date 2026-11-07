@@ -196,7 +196,27 @@
 > 判断标准是「迁出的应用不再依赖闭包」，而不是删掉多少行。
 > 权威说明见 [`docs/architecture/LEGACY-APPLICATIONS.md`](docs/architecture/LEGACY-APPLICATIONS.md)。
 
-任务 2.3（统一模板转义）尚未开始；2.2 只完成低耦合旧版应用的迁移。
+### 2.3 执行结果（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| 统一模块 | **`src/lib/html.ts`**：`escapeHtml` / `escapeAttr` / `safeUrl` / `isSafeUrl` |
+| 迁移的重复实现 | **6 处**：`os14/core.ts`、`mobile/ui.ts`（escapeAttr）、`quality/errors.ts`（escapeAttr）、`index.astro`、`home.astro`、`notes.astro`（原审计只列了 3 处） |
+| 保留例外 | **1 处**：`blog/index.astro`——`<script is:inline>` 不能用 ESM import，改模块脚本会改 CSP 哈希 |
+| 别名处理 | `esc`（421 处调用）统一为 `escapeHtml` 的别名，不构成第二份实现 |
+| 新能力 | **`safeUrl`**：协议白名单，拦截 `javascript:` / `vbscript:` / 控制字符拆解；此前全仓库**没有任何 URL 协议校验** |
+| URL 应用范围 | 4 处第三方内容入口（插件主页、开发者网站、插件截图、插件图标） |
+| 单元测试 | `tests/unit/html.test.ts` **40 项** |
+| DOM 测试 | `tests/e2e/html-security.spec.ts` **11 项**（含「未转义会真的生成节点」的对照组） |
+| 全量门禁 | `verify` 通过（163 单测 + 49 安全）；E2E **49/49**；`qa:sync` 20/20 |
+| 未解决 | `href`/`src` 仍有 34 处动态插值、22 处直接赋值未做协议校验；268 处 `innerHTML` 未逐一审计 |
+| 结论 | **Partially Verified**：转义已统一且双层测试通过；URL 校验只覆盖第三方入口，其余按风险登记 |
+
+> 判断标准：转义统一 + 单元/DOM 双层测试是硬要求，已达成；
+> 但「全仓库 URL 协议校验」不是本阶段能一次做完的，如实留在风险清单里。
+> 权威说明见 [`docs/architecture/HTML-SECURITY.md`](docs/architecture/HTML-SECURITY.md)。
+
+任务 2.4（事件监听器生命周期治理）尚未开始。
 
 ### 2.2 前置条件
 

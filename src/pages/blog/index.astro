@@ -123,11 +123,23 @@ const jsonLd = {
     const baseOrder = new Map(items.map((el, i) => [el, i]));
     const normalize = (value) => (value || "").toLowerCase();
     const termsOf = (value) => normalize(value).split(/\s+/).filter(Boolean);
-    const escapeHtml = (text) =>
-      String(text).replace(
-        /[&<>"]/g,
-        (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch],
-      );
+    /**
+     * 2.3：与 src/lib/html.ts 的 escapeHtml **保持同一语义**（5 字符 + null 安全）。
+     *
+     * 为什么这里必须保留本地副本：本页用的是 <script is:inline>，
+     * 内联脚本不能使用 ESM import；改成模块脚本又会改变 CSP 内联哈希。
+     * 改转义规则时两边必须同步，见 docs/architecture/HTML-SECURITY.md §6。
+     */
+    const escapeHtml = (text) => {
+      if (text === null || text === undefined) return "";
+      return String(text).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[ch]);
+    };
     const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     /** 标题 > 标签 > 摘要 > 正文；多个关键词之间取「并且」 */

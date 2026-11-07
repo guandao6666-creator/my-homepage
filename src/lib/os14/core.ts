@@ -10,6 +10,11 @@
  * 约定：1.4 的键名统一走 `guandao.os14.*`，不改动 1.0–1.3 已有键。
  */
 
+/* 2.3：HTML 转义统一到 src/lib/html.ts。
+   这里 import 进来是因为本文件内部有 14 处调用，再 export 出去是为了
+   保持「从 os14/core 引 escapeHtml」的历史调用点不动。 */
+import { escapeHtml } from "../html";
+
 /* ============================================================
    类型
    ============================================================ */
@@ -20,6 +25,11 @@ export type RadiusStyle = "soft" | "round" | "sharp";
 export type FontTone = "sans" | "serif" | "mono";
 export type DockPos = "bottom" | "left" | "right";
 
+export type LazyAppModule = {
+  body: () => string;
+  init?: (win: HTMLElement) => void | (() => void);
+};
+
 export type AppSpec = {
   id: string;
   title: string;
@@ -29,6 +39,11 @@ export type AppSpec = {
   body: () => string;
   /** 返回清理函数：窗口关闭时调用，游戏循环 / 定时器必须在这里停掉 */
   init?: (win: HTMLElement) => void | (() => void);
+  /**
+   * 1.9：按需加载。提供 load 时，窗口先显示骨架，
+   * 模块下载完成后再渲染真实内容；同一会话内不重复下载。
+   */
+  load?: () => Promise<LazyAppModule>;
 };
 
 export type WidgetSpec = {
@@ -103,6 +118,16 @@ export type Ctx = {
   /** 工作空间切场景用：先关窗，再按快照重开 */
   restoreWindows: (map: Record<string, WinStateLike>, ids: string[]) => Promise<void>;
   closeAllWindows: () => void;
+  /**
+   * 2.0：桌面外壳暴露的窗口级操作。
+   * Core 的 WindowManager 通过它复用 1.x 的窗口实现，不重复写拖动 / 缩放。
+   */
+  shellOps?: {
+    minimize: (win: HTMLElement) => void;
+    restore: (win: HTMLElement) => void;
+    maximize: (win: HTMLElement) => void;
+    moveToSpace: (win: HTMLElement, space: number) => void;
+  };
 };
 
 /* ============================================================
@@ -332,13 +357,13 @@ export const el = <K extends keyof HTMLElementTagNameMap>(
   return node;
 };
 
-export const escapeHtml = (value: unknown): string =>
-  String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+/**
+ * 2.3：实现已统一到 `src/lib/html.ts`，这里只做转出。
+ *
+ * 行为变化（相对 1.x 本文件旧实现）：无。旧实现就是 5 字符转义 + null 安全，
+ * 与统一模块完全一致。差异出现在四个 Astro 页面（原本只转 4 个字符）。
+ */
+export { escapeHtml };
 
 export const on = <K extends keyof HTMLElementEventMap>(
   node: EventTarget | null,

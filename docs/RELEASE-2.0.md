@@ -632,6 +632,22 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 
 详见 `docs/architecture/LEGACY-APPLICATIONS.md`。
 
+### 16.12 Phase 2.3 统一 HTML 转义与 URL 校验（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| 统一模块 | 新建 `src/lib/html.ts`：`escapeHtml` / `escapeAttr` / `safeUrl` / `isSafeUrl` |
+| 迁移重复实现 | **6 处**：`os14/core.ts`、`mobile/ui.ts`、`quality/errors.ts`、`index.astro`、`home.astro`、`notes.astro` |
+| 保留例外 | `blog/index.astro`（`<script is:inline>` 不能 import，改模块会改 CSP 哈希） |
+| 新能力 | `safeUrl` 协议白名单——此前全仓库**没有任何 URL 协议校验** |
+| URL 应用 | 4 处第三方入口（插件主页、开发者网站、截图、图标） |
+| 测试 | 单元 **40/40**；DOM **11/11**（含对照组）；`verify` 163 单测；E2E **49/49**；`qa:sync` 20/20 |
+| 未解决 | 34 处动态 URL 插值 / 22 处直接赋值未做协议校验；268 处 `innerHTML` 未逐一审计 |
+| 生产变更 | **无** |
+| 结论 | **Partially Verified** |
+
+详见 `docs/architecture/HTML-SECURITY.md`。
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash
