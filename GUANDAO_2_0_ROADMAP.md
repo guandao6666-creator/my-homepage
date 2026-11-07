@@ -234,7 +234,58 @@
 > 改 AST 后为 42 处；同时修掉了扫描器自身的两处误报。
 > 权威说明见 [`docs/architecture/HTML-SECURITY.md`](docs/architecture/HTML-SECURITY.md) 附录。
 
-任务 2.4（事件监听器生命周期治理）尚未开始。
+### 2.4 执行结果（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| Scope | **复用** `src/lib/quality/resources.ts`，未新建第二套资源管理器；接口未改 |
+| 修复缺陷 | **1 个**：`once: true` 监听器触发后计数与登记不回收（`on()` 包一层回收） |
+| 新增测试 | Scope 契约 **19 项**（`tests/unit/resources.test.ts`） |
+| 生命周期 E2E | 从 5 项计数扩展到 **7 项**（新增 observers / objectUrls），并加功能回归 |
+| 20 次开关 | listeners 5→5、timeouts 1→1、intervals 1→1、rafs 0→0、scopes 7→7、observers 4→4、objectUrls 0→0 |
+| 模块迁移 | **0 个**：审计显示基线干净，按「不为覆盖而强行迁移」原则不动现有归属 |
+| `installRootDisposal` | **评估后不启用**：`pagehide` 与 BFCache 冲突，卸载时浏览器本就会回收 |
+| 未交付 AST 门禁 | 不新增 `check-resource-lifecycle`：生命周期归属无法可靠静态判定，避免误报门禁 |
+| 全量门禁 | `verify` **189 单测**；E2E **64**；`qa:sync` 20/20 |
+| 结论 | **Verified**（监控盲区已在文档 §10 如实列出） |
+
+> 权威说明见 [`docs/architecture/EVENT-LIFECYCLE.md`](docs/architecture/EVENT-LIFECYCLE.md)。
+
+### 2.5 批次 1 执行结果（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| 原始规模 | `community.ts` **3,350 行 / 171,279 字节** |
+| 公开导出 | **只有 2 个**：`renderCommunity`、`initCommunity` |
+| 已拆出 | `community/{types,constants,ui}.ts`，合计 **252 行**（类型 / 常量 / 纯渲染工具） |
+| `community.ts` 现在 | **3,163 行**（-187），作为兼容入口，导出面不变 |
+| 兼容性 | 有测试锁定导出面 = `["initCommunity","renderCommunity"]` |
+| 未完成 | `initCommunity` 内 **73 个函数**仍共享同一闭包（批次 2–4） |
+| 全量门禁 | `verify` **195 单测**；E2E **64**；`qa:sync` 20/20 |
+| 结论 | **Partially Verified** |
+
+> 说明：本轮只完成零风险的纯逻辑层。剩余 73 个函数需要先抽 context 对象，
+> 与 Phase 2.2 的 5 应用迁移同量级，留给专门批次。
+> 详见 [`docs/architecture/COMMUNITY-ARCHITECTURE.md`](docs/architecture/COMMUNITY-ARCHITECTURE.md)。
+
+### Phase 2 阶段判断（2026-11-07）
+
+| 阶段 | 状态 |
+| --- | --- |
+| 2.1 Desktop CSS | Verified |
+| 2.2 Legacy Applications | Partially Verified |
+| 2.3 / 2.3.1 HTML Security | Verified |
+| 2.4 Event Lifecycle | Verified |
+| 2.5 Community | **Partially Verified**（批次 1/4） |
+
+**Phase 2 整体：`Partially Verified`** —— 2.5 未完成，按验收标准不能标记 Verified，
+因此**不进入 Phase 3**。
+
+架构现状：`index.astro` 6,603 行；`community.ts` 3,163 行；CSS 已独立；
+旧应用已迁出 `src/lib/legacy-apps/`；HTML 安全统一（291 处注入点全部登记）；
+资源生命周期有 19 项契约测试 + 7 项计数基线。
+
+任务 2.5 批次 2（列表/搜索迁移）尚未开始。
 
 ### 2.2 前置条件
 

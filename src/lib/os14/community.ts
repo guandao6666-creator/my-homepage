@@ -65,229 +65,44 @@ import {
   type WorkspaceConfig,
 } from "../community/manifest";
 
-type Post = api.CommunityPost;
-type Role = api.CommunityRole;
-
-type ViewState =
-  | { kind: "tab"; tab: string }
-  | { kind: "detail"; id: string }
-  | { kind: "creator"; id: string }
-  | { kind: "search"; q: string }
-  | { kind: "publish"; editId?: string; versionOf?: string };
-
-type AssetRef = { id: string; thumbId?: string | null };
-
-type PublishState = {
-  mode: "create" | "edit" | "version";
-  type: PostType;
-  postId?: string;
-  manifest: Manifest | null;
-  manifestError: string;
-  cover: AssetRef | null;
-  previews: AssetRef[];
-  wallpapers: AssetRef[];
-  previewsChanged: boolean;
-  wallpapersChanged: boolean;
-  coverChanged: boolean;
-};
-
-const TYPE_LABEL: Record<string, string> = {
-  theme: "主题",
-  widget: "组件",
-  workspace: "工作空间",
-  wallpaper: "壁纸",
-  tutorial: "教程",
-};
-
-const TYPE_GLYPH: Record<string, string> = {
-  theme: "◑",
-  widget: "▦",
-  workspace: "▤",
-  wallpaper: "▧",
-  tutorial: "✎",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  draft: "草稿",
-  pending_review: "待审核",
-  published: "已发布",
-  hidden: "已隐藏",
-  rejected: "未通过",
-  deleted: "已删除",
-};
-
-const ROLE_LABEL: Record<string, string> = {
-  admin: "管理员",
-  moderator: "审核员",
-  member: "创作者",
-  visitor: "访客",
-};
-
-const REASON_LABEL: Record<string, string> = {
-  copyright: "侵权内容",
-  malicious: "恶意资源",
-  inappropriate: "不适当内容",
-  spam: "垃圾广告",
-  impersonation: "冒充他人",
-  harassment: "恶意评论 / 骚扰",
-  other: "其他违规",
-};
-
-const SEARCH_SORTS = [
-  ["latest", "最新发布"],
-  ["popular", "最受欢迎"],
-  ["downloads", "安装最多"],
-  ["favorites", "收藏最多"],
-  ["updated", "最近更新"],
-];
-
-const LAYOUT_KEY = "guandao.community.layout.v1";
-const VIEW_KEY = "guandao.community.seen.v1";
-
-const esc = (value: unknown) => escapeHtml(String(value ?? ""));
-
-const clampText = (value: string, max: number) => String(value ?? "").trim().slice(0, max);
-
-const safeWallId = (value: unknown) => {
-  const id = String(value ?? "");
-  return /^[a-z0-9-]{2,32}$/.test(id) ? id : "aurora";
-};
-
-const safeHex = (value: unknown) => {
-  const hex = String(value ?? "");
-  return /^#[0-9a-f]{6}$/i.test(hex) ? hex : "#6f8cff";
-};
-
-const timeAgo = (value: number | null | undefined) => (value ? fmtAgo(value) : "—");
-
-const bytesText = (bytes: number) => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-};
-
-const roleBadge = (role: Role | string | undefined) => {
-  if (role === "admin") return `<span class="cx-role is-admin">管理员</span>`;
-  if (role === "moderator") return `<span class="cx-role is-mod">审核员</span>`;
-  return "";
-};
-
-const avatarHtml = (person: { displayName?: string; avatarUrl?: string | null } | null, size = "m") => {
-  if (!person) return `<span class="cx-avatar is-${size}"><i>?</i></span>`;
-  const initial = esc((person.displayName || "?").slice(0, 1));
-  return person.avatarUrl
-    ? `<span class="cx-avatar is-${size}"><img src="${safeUrl(person.avatarUrl)}" alt="" loading="lazy"/></span>`
-    : `<span class="cx-avatar is-${size}"><i>${initial}</i></span>`;
-};
-
-const coverHtml = (post: Post, className = "cx-cover", options: { full?: boolean } = {}) => {
-  const src = options.full ? post.coverUrl || post.coverThumbUrl : post.coverThumbUrl || post.coverUrl;
-  return `<div class="${className}">
-    ${src ? `<img src="${safeUrl(src)}" alt="${esc(post.title)}" loading="lazy"/>` : `<span class="cx-cover-fallback">${TYPE_GLYPH[post.type] ?? "◇"}</span>`}
-    <span class="cx-cover-veil"></span>
-    <span class="cx-type-chip">${TYPE_GLYPH[post.type] ?? "◇"} ${TYPE_LABEL[post.type] ?? post.type}</span>
-    ${post.featured ? `<span class="cx-featured-chip">编辑精选</span>` : ""}
-    ${post.status !== "published" ? `<span class="cx-status-chip is-${esc(post.status)}">${STATUS_LABEL[post.status] ?? post.status}</span>` : ""}
-  </div>`;
-};
-
-const postCard = (post: Post, options: { row?: boolean; showStatus?: boolean } = {}) => `
-  <article class="cx-card ${options.row ? "is-row" : ""}" data-post="${esc(post.id)}" tabindex="0" role="link" aria-label="${esc(post.title)}">
-    ${coverHtml(post)}
-    <div class="cx-card-body">
-      <div class="cx-card-head">
-        <h3>${esc(post.title)}</h3>
-        <span class="cx-version">v${esc(post.version)}</span>
-      </div>
-      <p class="cx-card-desc">${esc(post.description || "创作者还没有填写简介。")}</p>
-      <div class="cx-card-tags">${post.tags.slice(0, 3).map((tag) => `<span>#${esc(tag)}</span>`).join("")}</div>
-      <div class="cx-card-foot">
-        <button class="cx-author" type="button" data-creator="${esc(post.author.id)}">
-          ${avatarHtml(post.author, "xs")}
-          <span>${esc(post.author.displayName)}</span>
-          ${roleBadge(post.author.role)}
-        </button>
-        <span class="cx-time">${timeAgo(post.publishedAt || post.createdAt)}</span>
-      </div>
-      <div class="cx-metrics">
-        <button type="button" class="cx-metric cx-like ${post.viewer.liked ? "is-on" : ""}" data-like="${esc(post.id)}" aria-label="点赞">
-          <span>♥</span><b data-like-count="${esc(post.id)}">${post.likeCount}</b>
-        </button>
-        <button type="button" class="cx-metric cx-fav ${post.viewer.favorited ? "is-on" : ""}" data-fav="${esc(post.id)}" aria-label="收藏">
-          <span>★</span><b data-fav-count="${esc(post.id)}">${post.favoriteCount}</b>
-        </button>
-        <span class="cx-metric">💬 <b>${post.commentCount}</b></span>
-        <span class="cx-metric">⤓ <b>${post.downloadCount}</b></span>
-      </div>
-      ${options.showStatus && post.moderationNote ? `<p class="cx-modnote">审核备注：${esc(post.moderationNote)}</p>` : ""}
-    </div>
-  </article>`;
-
-const pageNav = (page: number, hasMore: boolean, total: number, label = "作品") => `
-  <div class="cx-pager">
-    <button type="button" class="cx-btn is-ghost" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>上一页</button>
-    <span>第 ${page} 页 · 共 ${total} 个${label}</span>
-    <button type="button" class="cx-btn is-ghost" data-page="${page + 1}" ${!hasMore ? "disabled" : ""}>下一页</button>
-  </div>`;
-
-const skeleton = (label = "正在从社区读取真实数据…") => `
-  <div class="cx-loading">
-    <span class="cx-spinner"></span>
-    <p>${esc(label)}</p>
-    <div class="cx-skel-grid">${"<i></i>".repeat(3)}</div>
-  </div>`;
-
-const loginGate = (message = "登录 Guandao Account 后即可使用社区功能。") => `
-  <div class="cx-gate">
-    <span class="cx-gate-art">◇</span>
-    <h2>需要登录</h2>
-    <p>${esc(message)}</p>
-    <div class="cx-gate-actions">
-      <button type="button" class="cx-btn is-primary" data-action="login">登录 Guandao Account</button>
-      <button type="button" class="cx-btn" data-action="join">加入社区</button>
-    </div>
-    <p class="cx-hint">社区只读取你在 GitHub 的公开资料；不会访问仓库、Session 或私人文件。</p>
-  </div>`;
-
-const errorPanel = (message: string) => `
-  <div class="cx-error-panel">
-    <span>!</span>
-    <h2>没能读取社区数据</h2>
-    <p>${esc(message)}</p>
-    <button type="button" class="cx-btn is-primary" data-action="retry">重试</button>
-  </div>`;
-
-const progressBar = (used: number, limit: number) => {
-  const percent = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  return `<div class="cx-usage"><i style="width:${percent}%"></i><b>${percent}%</b></div>`;
-};
-
-const typeChips = (selected: string, onSelect: string, includeAll = true) => {
-  const entries: Array<[string, string]> = (
-    includeAll ? ([["", "全部"]] as Array<[string, string]>) : []
-  ).concat(Object.entries(TYPE_LABEL) as Array<[string, string]>);
-  return entries
-    .map(
-      ([id, label]) =>
-        `<button type="button" class="cx-chip ${selected === id ? "is-active" : ""}" data-${onSelect}="${esc(id)}">${esc(label)}</button>`,
-    )
-    .join("");
-};
-
-const categoryChips = (type: string, selected: string, onSelect: string) => {
-  const categories = type ? CATEGORY_LABEL[type] || {} : {};
-  if (!type) return "";
-  return Object.entries(categories)
-    .map(
-      ([id, label]) =>
-        `<button type="button" class="cx-chip is-small ${selected === id ? "is-active" : ""}" data-${onSelect}="${esc(id)}">${esc(label)}</button>`,
-    )
-    .join("");
-};
-
-const detailPermissionText = (permissions: string[]) =>
-  permissions.map((permission) => `${permission}：${(window as unknown as { __CX_PERMS?: Record<string, string> }).__CX_PERMS?.[permission] || permission}`).join("；");
+/* ---------------- 2.5 拆分后的内部依赖 ----------------
+   类型 / 常量 / 纯渲染工具已移到 ./community/*。
+   这里 import 回来，initCommunity 内部的 73 个函数继续用同样的名字，
+   行为与拆分前完全一致。 */
+import type { AssetRef, Post, PublishState, Role, ViewState } from "./community/types";
+import {
+  LAYOUT_KEY,
+  REASON_LABEL,
+  ROLE_LABEL,
+  SEARCH_SORTS,
+  STATUS_LABEL,
+  TYPE_GLYPH,
+  TYPE_LABEL,
+  VIEW_KEY,
+} from "./community/constants";
+import {
+  avatarHtml,
+  bytesText,
+  categoryChips,
+  clampText,
+  coverHtml,
+  detailPermissionText,
+  errorPanel,
+  esc,
+  loginGate,
+  pageNav,
+  postCard,
+  progressBar,
+  roleBadge,
+  safeHex,
+  safeWallId,
+  skeleton,
+  timeAgo,
+  typeChips,
+} from "./community/ui";
+import { loadFollowingTab, loadMyFavorites } from "./community/loaders";
+import type { CommunityContext } from "./community/context";
+import { notificationBody, notificationTitle } from "./community/notifications";
 
 /* ============================================================
    应用入口
@@ -803,52 +618,33 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
     }
   };
 
-  const loadFollowing = async () => {
-    setActiveNav("following");
-    if (needLogin()) return;
-    const token = ++loadToken;
-    setBody(skeleton("正在读取你关注的创作者动态…"));
-    try {
-      await ensureMeta();
-      const result = await api.getFollowingFeed(1);
-      if (token !== loadToken) return;
-      setBody(`
-        <section class="cx-page-head">
-          <div><p class="cx-eyebrow">Following</p><h1>关注动态</h1><p>你关注的创作者发布的新作品会出现在这里。</p></div>
-          <button class="cx-btn" type="button" data-tab="creators">发现创作者</button>
-        </section>
-        ${result.items.length ? `<div class="cx-grid is-${layout}">${result.items.map((post) => postCard(post, { row: layout === "list" })).join("")}</div>` : emptyState("还没有关注动态", "去创作者页关注几位创作者，或者发布你自己的第一个作品。", "⇢")}
-      `);
-    } catch (error) {
-      if (token === loadToken) showError(error);
-    }
+  const communityCtx: CommunityContext = {
+    setActiveNav,
+    needLogin,
+    setBody,
+    showError,
+    ensureMeta,
+    emptyState,
+    nextToken: () => ++loadToken,
+    isStale: (token: number) => token !== loadToken,
+    get layout() {
+      return layout;
+    },
+    get favoritesCollection() {
+      return favoritesCollection;
+    },
   };
+
+  const loadFollowing = () => loadFollowingTab(communityCtx);
+
+  const loadFavorites = () => loadMyFavorites(communityCtx);
+;
 
   /* ============================================================
      收藏 / 通知
      ============================================================ */
 
-  const loadFavorites = async () => {
-    setActiveNav("favorites");
-    if (needLogin()) return;
-    const token = ++loadToken;
-    setBody(skeleton("正在读取收藏…"));
-    try {
-      await ensureMeta();
-      const result = await api.getMyFavorites({ collection: favoritesCollection || undefined, page: 1 });
-      if (token !== loadToken) return;
-      setBody(`
-        <section class="cx-page-head"><div><p class="cx-eyebrow">Favorites</p><h1>我的收藏</h1><p>收藏是私人数据，只有你自己能看到。收藏夹分类也保存在服务端。</p></div><span class="cx-count">${result.total} 个作品</span></section>
-        <div class="cx-chip-row">
-          <button type="button" class="cx-chip ${favoritesCollection === "" ? "is-active" : ""}" data-fav-collection="">全部</button>
-          ${result.collections.map((collection) => `<button type="button" class="cx-chip ${favoritesCollection === collection.name ? "is-active" : ""}" data-fav-collection="${esc(collection.name)}">${esc(collection.name)} <em>${collection.count}</em></button>`).join("")}
-        </div>
-        ${result.items.length ? `<div class="cx-grid is-${layout}">${result.items.map((post) => postCard(post, { row: layout === "list" })).join("")}</div>` : emptyState("这个收藏夹还是空的", "在作品详情页点星标即可收藏。", "★")}
-      `);
-    } catch (error) {
-      if (token === loadToken) showError(error);
-    }
-  };
+  ;
 
   const loadNotifications = async (page = notificationsPage) => {
     setActiveNav("notifications");
@@ -890,25 +686,8 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
     }
   };
 
-  const notificationTitle = (item: api.NotificationItem) => {
-    switch (item.type) {
-      case "comment": return "收到新评论";
-      case "reply": return "收到回复";
-      case "post_review": return "作品审核结果";
-      case "post_update": return "关注的作品更新";
-      case "follow": return "有新的关注者";
-      case "moderation": return "社区管理通知";
-      default: return "社区通知";
-    }
-  };
-  const notificationBody = (item: api.NotificationItem) => {
-    const payload = item.payload || {};
-    if (typeof payload.message === "string") return payload.message;
-    if (typeof payload.excerpt === "string") return `${item.actor?.displayName || "社区成员"}：${payload.excerpt}`;
-    if (typeof payload.title === "string") return payload.title;
-    if (item.type === "follow") return `${item.actor?.displayName || "一位创作者"} 关注了你`;
-    return "查看详情";
-  };
+  
+  
 
   /* ============================================================
      我的作品 / 资料 / 已安装

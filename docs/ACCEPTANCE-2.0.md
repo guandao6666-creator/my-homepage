@@ -181,6 +181,13 @@ Worker + 静态资源部署、`/api/health`、`/api/auth/status`、未登录 401
 | Phase 2.3 安全测试 | **通过** | 单元 **47/47**；DOM **26/26**（含对照组与 7 种危险 URL） |
 | Phase 2.3.1 全量审计 | **Verified** | HTML sink **268**、动态 URL **42**、直接赋值 **22** 全部登记；`check:html-security` 接入 verify，291 处命中 0 未审查 |
 | Phase 2.3.1 补漏 | **已修复** | 发现并迁移 2 份上一轮正则漏掉的转义副本（`pairing/page.ts`、`admin/index.astro`） |
+| Phase 2.4 资源生命周期 | **Verified** | 复用既有 `ResourceScope`；修复 `once: true` 计数不回收缺陷；新增 Scope 单测 **19 项** |
+| Phase 2.4 开关测试 | **通过** | 20 次开关 7 项计数全部零净增长（监听 5→5 / 定时器 1→1 / 观察器 4→4 / 资源域 7→7 等）+ 4 项功能回归 |
+| Phase 2.4 模块迁移 | **0 个（不需要）** | 审计显示现有 Root/Application/Window/Component 归属正确，按「不为覆盖而强行迁移」处理 |
+| Phase 2.4 Root Disposal | **评估后不启用** | `installRootDisposal` 用 `pagehide`，与 BFCache 冲突；理由见 EVENT-LIFECYCLE.md §6 |
+| Phase 2.5 社区拆分 | **Partially Verified** | 批次 1/4：拆出 `community/{types,constants,ui}.ts`（252 行），`community.ts` 3,350 → 3,163 行，导出面不变 |
+| Phase 2.5 未完成 | **73 个闭包函数** | 仍共享 `initCommunity` 闭包；需先抽 context 对象，留给批次 2–4 |
+| Phase 2 整体 | **Partially Verified** | 2.1/2.3/2.3.1/2.4 Verified；2.2 与 2.5 Partially Verified → **不进入 Phase 3** |
 | Phase 2.2 生命周期 | **通过** | 连续开关 20 次：监听 5→5、timeout 1→1、interval 1→1、资源域 7→7，零增长 |
 | Phase 1.6 D1 备份 Workflow | **生产真实执行成功** | 5 steps complete；SQL 100,976 B |
 | Phase 1.6 每日调度 | **已启用（Worker Cron）** | `0 19 * * *`；版本 `6928916f` |

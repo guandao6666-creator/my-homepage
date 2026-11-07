@@ -58,6 +58,8 @@ interface Snapshot {
   timeouts: number;
   rafs: number;
   scopes: number;
+  observers: number;
+  objectUrls: number;
 }
 
 async function sample(page: Page): Promise<Snapshot> {
@@ -72,9 +74,11 @@ async function sample(page: Page): Promise<Snapshot> {
   const [timeouts, intervals] = timers.split("/").map((part) => Number.parseInt(part.trim(), 10));
   const rafs = Number.parseInt(await readCounter(page, "动画帧回调"), 10);
   const scopes = Number.parseInt(await readCounter(page, "存活资源域"), 10);
+  const observers = Number.parseInt(await readCounter(page, "观察器"), 10);
+  const objectUrls = Number.parseInt(await readCounter(page, "未释放 Object URL"), 10);
 
   await closeApp(page, "perflab");
-  return { listeners, intervals, timeouts, rafs, scopes };
+  return { listeners, intervals, timeouts, rafs, scopes, observers, objectUrls };
 }
 
 test.describe("Phase 2.2 · 生命周期", () => {
@@ -101,7 +105,9 @@ test.describe("Phase 2.2 · 生命周期", () => {
       `[lifecycle] listeners ${before.listeners} → ${after.listeners}；` +
         `timeouts ${before.timeouts} → ${after.timeouts}；` +
         `intervals ${before.intervals} → ${after.intervals}；` +
-        `rafs ${before.rafs} → ${after.rafs}；scopes ${before.scopes} → ${after.scopes}`,
+        `rafs ${before.rafs} → ${after.rafs}；scopes ${before.scopes} → ${after.scopes}；` +
+        `observers ${before.observers} → ${after.observers}；` +
+        `objectUrls ${before.objectUrls} → ${after.objectUrls}`,
     );
 
     // 20 次开关不允许留下监听器或定时器
@@ -110,10 +116,32 @@ test.describe("Phase 2.2 · 生命周期", () => {
     expect(after.intervals - before.intervals, "interval 增长").toBeLessThanOrEqual(1);
     expect(after.rafs - before.rafs, "动画帧回调增长").toBeLessThanOrEqual(2);
     expect(after.scopes - before.scopes, "存活资源域增长").toBeLessThanOrEqual(1);
+    expect(after.observers - before.observers, "观察器增长").toBeLessThanOrEqual(1);
+    expect(after.objectUrls - before.objectUrls, "未释放 Object URL 增长").toBeLessThanOrEqual(1);
 
     // DOM 不残留：回到开机时的窗口数，且没有 calc 窗口
     await expect(page.locator(".window")).toHaveCount(baselineWindows);
     await expect(page.locator('.window[data-app="calc"]')).toHaveCount(0);
+
+    /* 功能回归：20 次开关之后，桌面交互仍然正常（不是「没报错」就算过） */
+    // 1) 从桌面图标打开（事件委托仍然有效）
+    await page.locator('.desk-icon[data-app="calc"]').first().click();
+    await expect(page.locator('.window[data-app="calc"]')).toBeVisible();
+    // 2) 计算器交互仍然绑定
+    const calcWin = page.locator('.window[data-app="calc"]');
+    await calcWin.locator('.calc-key[data-k="4"]').click();
+    await expect(calcWin.locator("#calc-display")).toHaveText("4");
+    await closeApp(page, "calc");
+    // 3) 程序坞仍然可点
+    await page.locator('.dock-item[data-app="posts"]').click();
+    await expect(page.locator('.window[data-app="posts"]')).toBeVisible();
+    await closeApp(page, "posts");
+    // 4) 全局快捷键仍然有效（Spotlight）
+    await page.keyboard.press("Control+k");
+    await expect(page.locator("#spotlight")).toBeVisible({ timeout: 5_000 });
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#spotlight")).toBeHidden({ timeout: 5_000 });
+
     expect(errors, `控制台报错：${errors.join("\n")}`).toEqual([]);
   });
 

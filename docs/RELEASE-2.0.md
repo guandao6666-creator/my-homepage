@@ -664,6 +664,38 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 
 详见 `docs/architecture/HTML-SECURITY.md` 附录。
 
+### 16.14 Phase 2.4 事件与资源生命周期治理（2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| Scope | 复用 `src/lib/quality/resources.ts`，未新建第二套资源管理器 |
+| 修复 | **1 个真实缺陷**：`once: true` 监听器触发后计数与登记不回收 |
+| 测试 | Scope 契约 **19 项**；生命周期 E2E 扩展到 **7 项计数** + 4 项功能回归 |
+| 20 次开关 | listeners 5→5、timeouts 1→1、intervals 1→1、rafs 0→0、scopes 7→7、observers 4→4、objectUrls 0→0 |
+| 模块迁移 | **0 个**：审计未发现泄漏，不为覆盖率强行改写现有归属 |
+| Root Disposal | **不启用**：`pagehide` 与 BFCache 冲突（已论证并记录） |
+| 监控盲区 | 已如实列出（Scope 内计数、无 subscription/WebSocket 独立计数） |
+| 全量门禁 | `verify` 189 单测；E2E **64**；`qa:sync` 20/20 |
+| 生产变更 | **无** |
+| 结论 | **Verified** |
+
+详见 `docs/architecture/EVENT-LIFECYCLE.md`。
+
+### 16.15 Phase 2.5 社区模块拆分（批次 1，2026-11-07）
+
+| 项 | 结果 |
+| --- | --- |
+| 原始规模 | `community.ts` 3,350 行 / 171,279 字节，公开导出仅 2 个 |
+| 已拆出 | `community/{types,constants,ui}.ts` = **252 行**（类型 / 常量 / 纯渲染工具） |
+| 入口 | `community.ts` 3,163 行，导出面 `["initCommunity","renderCommunity"]` 有测试锁定 |
+| 循环依赖 | 无；共享状态未复制 |
+| 测试 | 新增 **6 项**；`verify` 195 单测；E2E **64**；`qa:sync` 20/20 |
+| 未完成 | `initCommunity` 内 73 个闭包函数（批次 2–4） |
+| 生产变更 | **无** |
+| 结论 | **Partially Verified** |
+
+详见 `docs/architecture/COMMUNITY-ARCHITECTURE.md`。
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash

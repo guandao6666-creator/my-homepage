@@ -635,3 +635,40 @@ Infrastructure
 | 结论 | **Verified** | 全部注入点完成分类，无未审计项 |
 
 详见 **docs/architecture/HTML-SECURITY.md** 附录。
+
+## 附录 K：Phase 2.4 事件与资源生命周期治理（2026-11-07）
+
+| 项 | 状态 | 证据 |
+| --- | --- | --- |
+| Scope | **复用现有实现** | `src/lib/quality/resources.ts`；未新建资源管理器，接口未变 |
+| 确认缺陷 | **1 个，已修复** | `once: true` 监听器触发后计数与 disposer 登记不回收，导致 `resourceStats()` 永久偏高 |
+| 新增单测 | **19 项** | `tests/unit/resources.test.ts`：dispose 幂等/重复执行/异常隔离/逆序/子域级联/监听手动与自动释放/timeout 完成与取消/interval/observer/abort/scopes 对称 |
+| 生命周期 E2E | **7 项计数** | 新增 observers、objectUrls；另加 4 项功能回归（图标、按键、程序坞、Ctrl+K） |
+| 20 次开关 | **全部零净增长** | 5→5 / 1→1 / 1→1 / 0→0 / 7→7 / 4→4 / 0→0 |
+| 模块迁移 | **0 个** | 审计未发现泄漏模块；现有 Root/Application/Window/Component 归属正确 |
+| Root Disposal | **不启用（已论证）** | `installRootDisposal` 用 `pagehide`，与 BFCache 冲突；卸载时浏览器自会回收 |
+| 静态门禁 | **不新增** | 生命周期归属无法可靠 AST 判定，避免高误报门禁；改用运行时计数证据 |
+| 监控盲区 | **已记录** | 计数只覆盖 Scope 内资源；subscription / WebSocket / BroadcastChannel 无独立计数器 |
+| 全量门禁 | **通过** | `verify` 189 单测；E2E 64；`qa:sync` 20/20 |
+| 生产变更 | **无** | 未部署、未改数据、未跑 `qa:prod` |
+| 结论 | **Verified** | 缺陷已修、回归有据、盲区如实列出 |
+
+详见 **docs/architecture/EVENT-LIFECYCLE.md**。
+
+## 附录 L：Phase 2.5 社区模块拆分（批次 1，2026-11-07）
+
+| 项 | 状态 | 证据 |
+| --- | --- | --- |
+| 原始规模 | **3,350 行 / 171,279 字节** | 本次重新统计，与历史审计一致 |
+| 公开导出 | **2 个** | `renderCommunity`、`initCommunity` |
+| 已拆出 | **3 模块 / 252 行** | `community/types.ts`、`constants.ts`、`ui.ts` |
+| 入口兼容 | **保持** | `community.ts` 仍导出原 2 个函数；导出面有测试锁定 |
+| 循环依赖 | **无** | `community/*` 只依赖 `../../html`、`../core`、`../../community/*` |
+| 共享状态 | **未复制** | 闭包状态仍只在 `initCommunity` 内 |
+| 测试 | **6 项** | `tests/unit/community.test.ts` |
+| 全量门禁 | **通过** | `verify` 195 单测；E2E 64；`qa:sync` 20/20 |
+| 未完成 | **73 个闭包函数** | 需先抽 context 对象，留给批次 2–4 |
+| 生产变更 | **无** | 未部署、未改数据、未跑 `qa:prod` |
+| 结论 | **Partially Verified** | 纯层已拆且验证通过；业务闭包尚未拆分 |
+
+详见 **docs/architecture/COMMUNITY-ARCHITECTURE.md**。
