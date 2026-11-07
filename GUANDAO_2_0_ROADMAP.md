@@ -115,9 +115,13 @@
 | 隔离恢复 | **生产备份隔离验证通过** | 63 表 / 16 迁移；`productionTouched:false` |
 | 备份监控 | **已部署** | 26h stale / failed / unknown |
 | 生产状态 | **备份成功** | 版本 `6928916f`；R2 对象 100,992 B；SHA match |
+| 告警真实送达 | **已验证（真实外部 HTTPS）** | `npm run qa:alerts` 16/16；webhook.site 实收两种 payload，非 Mock |
+| 生产告警配置 | **未配置** | Cloudflare 仍未设置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK` |
 
-**当前状态**：生产备份已成功，R2 回读与隔离恢复通过；但真实告警通知渠道未配置，
-因此仍保持 `Implemented / Partially Verified`，不能写成“告警已验证”。
+**当前状态**：生产备份已成功，R2 回读与隔离恢复通过，告警**代码链路**已用真实外部 HTTPS 验通；
+但 Cloudflare 上仍未配置接收端，生产故障不会真正外发，
+因此整体保持 `Implemented / Partially Verified`，不能写成「生产告警已验证」。
+剩余动作只需所有者提供一个渠道地址并授权部署，详见 `docs/architecture/DESKTOP-CSS.md` §10。
 
 ---
 
@@ -130,7 +134,7 @@
 
 | # | 任务 | 涉及文件 | 验收 |
 | --- | --- | --- | --- |
-| 2.1 | 抽出全局样式：把 `<style is:global>` 中的桌面样式迁移到 `src/styles/desktop.css`，按「基础 → 组件 → 应用」分文件；保持加载顺序 | `src/pages/index.astro`、新增 `src/styles/desktop/*.css` | 视觉回归：生产截图对比无差异；CSS 体积拆分后首屏 CSS ≤ 200 KB |
+| 2.1 | 抽出全局样式：把 `<style is:global>` 中的桌面样式迁移到 `src/styles/desktop.css`，按「基础 → 组件 → 应用」分文件；保持加载顺序 | `src/pages/index.astro`、新增 `src/styles/desktop/*.css` | **结构**：迁入 `src/styles/desktop/` 且加载顺序不变；**语义**：规则顺序/媒体查询/动画不重排；**视觉**：生产截图与基线对比无差异。~~首屏 CSS ≤ 200 KB~~ → 移交 Phase 6.2（2026-11-07 所有者修订，见 2.1 验收口径修订） |
 | 2.2 | 抽出独立应用脚本：把 1.x 内联的应用（终端/文章/关于/排行榜等）逐个迁到 `src/lib/legacy-apps/*.ts`，由 `registerApp` 注入 | `src/pages/index.astro`、新增 `legacy-apps/` | 每迁一个应用跑一次 `desktop.spec.ts`；最终 `index.astro` ≤ 12k 行 |
 | 2.3 | 统一模板转义：把分散的 `escapeHtml` 收敛到 `src/lib/html.ts`，替换 3 份副本 | 新增 `html.ts`；`index.astro`、`os14/core.ts`、`mobile/ui.ts` | 单测覆盖 `<script>`、引号、`&`；生产控制台 0 错误 |
 | 2.4 | 事件监听审计：为长生命周期监听加统一 `Scope`（已有 `quality/resources.ts`），接入未使用的 `installRootDisposal` 或在启动/销毁时调用 | `quality/resources.ts`、`os20/bridge.ts`、`index.astro` | 连续开关 20 次窗口，监听数不增长（Playwright 断言） |
@@ -147,9 +151,28 @@
 | 视觉回归 | 19/21 逐像素完全一致；1 张通知红点（动态）；1 张单像素 Δ=3/255；147/147 boundingBox 一致；`dialog` 状态已恢复复采（diff=0） |
 | 生产 UI 复测 | 通过：生产 10 个 CSS 资产与本机构建同名同字节；渲染检查 9/9（只读） |
 | 自动化 | `verify` / 24 E2E / `qa:sync` 20/20 / `check:astro` / `lint` / `check:csp` 全部通过（2026-11-07 实跑） |
-| 首屏 CSS | **476,749 B，仍超 200 KB**；仅桌面样式包本身 273,238 B，纯搬迁结构性不可达 |
+| 首屏 CSS | **476,749 B，仍超 200 KB**；仅桌面样式包本身 273,238 B，纯搬迁结构性不可达 → 该指标移交 **Phase 6.2** |
 | 生产 | 已随 6928916f 上线；本阶段未部署、未改数据 |
-| 结论 | **Partially Verified**：结构与视觉已证，只差 200 KB 这一条；需所有者决定豁免或推迟到 Phase 6 |
+| 结论 | **Verified**（结构 / 语义 / 视觉口径，见下方口径修订） |
+
+### 2.1 验收口径修订（2026-11-07 · 所有者决定）
+
+**背景**：原验收同时要求「视觉无差异」与「首屏 CSS ≤ 200 KB」。实测首屏 476,749 B；
+仅桌面样式包本身就 273,238 B，**即使把其余 9 个页面级样式全部延迟加载仍超 200 KB**。
+在「只搬不改」的约束下该指标结构性不可达，混在 2.1 会让阶段永远无法收口。
+
+**决定（方案 A）**：把 2.1 的验收口径收敛为「结构 + 语义 + 视觉」，**200 KB 移交 Phase 6.2**。
+显式记录，避免未达标数字被静默忽略：
+
+| 项 | 修订前 | 修订后 |
+| --- | --- | --- |
+| 2.1 验收 | 视觉无差异 **且** 首屏 ≤ 200 KB | 结构 / 语义 / 视觉三项 |
+| 首屏 ≤ 200 KB | Phase 2.1 | **Phase 6.2「CSS 拆分与按需加载」** |
+| 当前实测 | — | 476,749 B（作为 Phase 6 的起点基线保留） |
+
+> 这不是「把失败改成成功」：476,749 B 的事实、以及它未达标的原因与后续责任，
+> 都写进了 `docs/architecture/DESKTOP-CSS.md` §9 与 Phase 6 的验收。
+> 2.1 现在判 `Verified`，仅代表**这次 CSS 搬迁本身**达到它应有的标准。
 
 > 本次复核**未修改任何产品代码**，只做验证、取证工具与文档；分支 `refactor/2.1-desktop-css-extraction`，
 > 取证脚本与架构文档已提交 `a712d96`。
@@ -173,7 +196,8 @@
 
 ### 2.4 验收标准
 
-- `index.astro` ≤ 12,000 行（当前 7,766 行，CSS 部分已达标），CSS ≤ 200 KB 首屏（**未达标，476,749 B**）。
+- `index.astro` ≤ 12,000 行（当前 7,766 行，CSS 部分已达标）。
+- ~~CSS ≤ 200 KB 首屏~~ → **移交 Phase 6.2**（2026-11-07 所有者修订；当前实测 476,749 B 作为 Phase 6 起点基线）。
 - 21 项 E2E + 生产 `qa:prod` 全绿。
 - 构建 chunk 警告消失或降到 1 条以下（入口 ≤ 450 KB）。
 - 新增 `npm run check:listeners`（可选）或单测覆盖 Scope。
@@ -295,7 +319,7 @@
 | # | 任务 | 涉及文件 | 验收 |
 | --- | --- | --- | --- |
 | 6.1 | 入口拆包：把 19 个旧应用从入口 chunk 拆出（动态 import + `registerApp` 时加载） | `index.astro`、`os14/index.ts` | 入口 chunk ≤ 450 KB；首屏可用；应用按需加载 |
-| 6.2 | CSS 拆分与按需加载 | `src/styles/desktop/*.css` | 首屏 CSS ≤ 200 KB |
+| 6.2 | CSS 拆分与按需加载 | `src/styles/desktop/*.css` | 首屏 CSS ≤ 200 KB（起点基线 **476,749 B**，2026-11-07 由 Phase 2.1 移交；桌面样式包本身 273,238 B，必须先做「非首屏样式延迟加载」才能逼近） |
 | 6.3 | 诊断中心接入 LCP/CLS/INP（`PerformanceObserver`，仅本地采集） | `quality/diagnostics.ts`、`os20/apps/systemcenter.ts` | 显示真实数值；无数据时显示「未采集」 |
 | 6.4 | 生产性能基线进入发布报告 | `scripts/prod-e2e.mjs`、`docs/RELEASE-2.0.md` | 每次发布记录 DCL/load/资源体积 |
 

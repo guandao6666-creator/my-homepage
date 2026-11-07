@@ -168,9 +168,10 @@ Worker + 静态资源部署、`/api/health`、`/api/auth/status`、未登录 401
 | 数据异常监控 | Implemented / 本地验证 | 0015 迁移 + Cron + 管理员接口；本地 scheduled 1 快照/0 告警；未部署 |
 | 安全事件日志 | Implemented / 本地验证 | 49 项安全测试通过；生产未部署 |
 | Cloudflare Audit Logs | **Pending Manual Action** | 当前 OAuth 403；见 `docs/SECURITY-AUDIT-ACCESS.md` |
-| Phase 2.1 CSS 拆分 | **Partially Verified（本地）/ 已上线** | 18 文件合计 270,945 B，与拆分前字节完全相同；构建 `index.B_TNKWp7.css` 273,238 B hash 未变；19/21 逐像素完全一致 + 1 动态红点 + 1 单像素 Δ3；147/147 布局框；已随 `6928916f` 上线 |
+| Phase 2.1 CSS 拆分 | **Verified / 已上线** | 18 文件合计 270,945 B，与拆分前字节完全相同；构建 `index.B_TNKWp7.css` 273,238 B hash 未变；19/21 逐像素完全一致 + 1 动态红点 + 1 单像素 Δ3；147/147 布局框；已随 `6928916f` 上线 |
 | Phase 2.1 生产 UI 复测 | **通过** | 生产 10 个 CSS 资产与本机构建同名同字节（含 `index.B_TNKWp7.css` 273,238 B）；渲染检查 9/9；只读，未登录未写数据 |
-| Phase 2.1 首屏 CSS | **未达标** | 476,749 B，仍超 200 KB；仅桌面样式包本身即 273,238 B，纯搬迁结构性不可达 |
+| Phase 2.1 验收口径 | **已修订（2026-11-07 所有者决定）** | 2.1 收敛为「结构 / 语义 / 视觉」；首屏 ≤ 200 KB 移交 Phase 6.2，起点基线 476,749 B |
+| Phase 6.2 首屏 CSS | **未达标（待 Phase 6 处理）** | 当前 476,749 B；仅桌面样式包本身 273,238 B，需先做非首屏样式延迟加载 |
 | Phase 2.1 取证缺口 | **已关闭** | `1440x900-dialog` 已恢复复采且 diff=0；截图脚本已入库 `a712d96` |
 | Phase 1.6 D1 备份 Workflow | **生产真实执行成功** | 5 steps complete；SQL 100,976 B |
 | Phase 1.6 每日调度 | **已启用（Worker Cron）** | `0 19 * * *`；版本 `6928916f` |

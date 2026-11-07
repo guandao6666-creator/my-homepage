@@ -587,9 +587,13 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 | 生产 UI | **已只读复测**：生产 10 个 CSS 资产与本机构建同名同字节；渲染检查 9/9 |
 | 取证缺口 | 已关闭：`1440x900-dialog` 恢复复采（diff=0）；截图脚本入库 `a712d96` |
 | 测试 | `verify`、24 E2E、`qa:sync` 20/20、`check:astro`、`lint`、`check:csp` 通过（2026-11-07 实跑） |
-| 首屏 CSS | **476,749 B，仍超 200 KB**；仅桌面样式包本身 273,238 B，未删样式凑数 |
+| 首屏 CSS | **476,749 B，超 200 KB → 移交 Phase 6.2**；2.1 验收口径已修订，未删样式凑数 |
 | 生产 | **已随 6928916f 上线**；本阶段未部署、未改数据 |
-| 结论 | **Partially Verified**；分支 `refactor/2.1-desktop-css-extraction` |
+| 结论 | **Verified**（结构 / 语义 / 视觉口径）；分支 `refactor/2.1-desktop-css-extraction` |
+
+> **验收口径修订（2026-11-07 所有者决定）**：首屏 ≤ 200 KB 结构性不可达（仅桌面样式包即 273,238 B），
+> 已移交 Phase 6.2「CSS 拆分与按需加载」，当前 476,749 B 作为 6.2 起点基线。
+> 2.1 判 `Verified` 只针对本次搬迁，不代表性能目标达成。
 
 详见 `docs/architecture/DESKTOP-CSS.md`（权威说明）、`docs/PHASE-2.1-CSS-AUDIT.md`、`docs/PHASE-2.1-CSS-REFACTOR.md`。
 
