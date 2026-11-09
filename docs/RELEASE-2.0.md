@@ -755,7 +755,7 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 | `npm run qa:devices` | **31/31**（自包含运行器：本地 seed + `wrangler dev --local` 8794；设备总览/心跳/CSRF/跨账号/会话撤销/设备撤销） |
 | `npm run qa:prod` | **禁止执行**（Phase 1.6 门禁） |
 
-> CI：`.github/workflows/quality.yml` 的 E2E job 已加 `npx playwright install --with-deps firefox webkit`，四个 project（chromium / worker / firefox-worker / webkit-worker）会全部在 CI 执行；worker project 的 e2e-server 自行迁移本地 D1 并生成夹具。**本阶段未 push，GitHub Actions 实跑未验证**，CI 结论只代表配置已就绪。
+> CI：`.github/workflows/quality.yml` 的 E2E job 已加 `npx playwright install --with-deps firefox webkit`，四个 project（chromium / worker / firefox-worker / webkit-worker）会全部在 CI 执行；worker project 的 e2e-server 自行迁移本地 D1 并生成夹具。2026-11-09 已推送到独立分支 `ci/phase3-verify` 并通过 PR #1 触发 quality workflow（run `42564445648`）：verify / API smoke / E2E 三个 job 全部 success，E2E 实跑 **147 passed (3.8m)**，与本地一致。首次实跑暴露两个全新 checkout 问题（`backups/` 忽略规则误伤源码目录、typecheck 前缺 `astro sync`），已在 `559adf5` 修复并复跑通过；未合并、未部署。
 
 **6. 顺带修复的真实缺陷**
 

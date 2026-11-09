@@ -786,6 +786,6 @@ Infrastructure
 | 配对 TTL 真实时间 | `scripts/pairing-ttl-check.mjs`（`npm run qa:pairing-ttl`：真实等待 10 分钟） |
 | QA 自包含运行 | `scripts/seed-qa-local.mjs`、`scripts/qa-local-run.mjs`（`npm run qa:plugins` 70/70、`npm run qa:continuity` 45/45、`npm run qa:devices` 31/31） |
 | 文档 | `docs/security/PLUGIN-SIGNING.md`、`PLUGIN-SANDBOX.md`、`docs/architecture/DEVICE-PAIRING.md`、`docs/testing/OAUTH-TESTING.md` |
-| CI | `.github/workflows/quality.yml`：E2E 安装 Firefox / WebKit 并跑四个 project；本阶段未 push，GitHub Actions 实跑未验证 |
+| CI | `.github/workflows/quality.yml`：E2E 安装 Firefox / WebKit 并跑四个 project；2026-11-09 已由 PR #1 触发 quality run `42564445648`：verify / API smoke / E2E 全 success，E2E 147 passed；首次实跑修复 `backups/` 忽略误伤源码与 typecheck 缺 `astro sync`（`559adf5`） |
 
 **结论：`Partially Verified`** —— 本地 / 隔离环境全绿且有真实执行证据；生产验证与部署按门禁未执行。

@@ -372,7 +372,7 @@
   `qa:continuity` 45/45，只连 loopback。
 - 任务书提到的 `qa:devices` 已补齐：新增 `scripts/devices-api-qa.mjs`（31 项：设备总览/当前设备/详情/会话/活动/心跳/CSRF/未登录/跨账号/会话撤销/设备撤销），由 `scripts/qa-local-run.mjs` 自包含驱动，实测 **31/31 通过**；`scripts/devices-qa.mjs` 仍是需要人工 `GDV_TOKEN` 的旧浏览器冒烟脚本。
   真实双设备覆盖由 worker project 的 `device.spec.ts`（12 项，Chrome + Firefox + WebKit）承担。
-- CI 门禁已同步：`.github/workflows/quality.yml` 的 E2E job 增加 `npx playwright install --with-deps firefox webkit`，四个 project 全部在 CI 执行；e2e-server 自行迁移本地 D1 并生成夹具。本阶段未 push，**GitHub Actions 实跑未验证**。
+- CI 门禁已同步：`.github/workflows/quality.yml` 的 E2E job 增加 `npx playwright install --with-deps firefox webkit`，四个 project 全部在 CI 执行；e2e-server 自行迁移本地 D1 并生成夹具。2026-11-09 已推送 `ci/phase3-verify` 并通过 PR 触发 quality workflow（run `42564445648`）：三 job 全 success，E2E **147 passed**（四 project 与本地一致）；首次实跑修复了 `backups/` 误忽略源码与 typecheck 缺 `astro sync` 两个问题（`559adf5`）。
 
 ### Phase 3 阶段判断（2026-11-07）
 
