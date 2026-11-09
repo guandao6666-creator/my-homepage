@@ -776,8 +776,9 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 - 独立 Sandbox Origin：已有本地真实两源隔离实测（`tests/e2e/sandbox-origin.spec.ts`）；但生产域名/证书/Worker route **未创建**，且实测发现 Cookie 作用域是 host（换端口不隔离），落地必须使用独立 host。
 - 真实 10 分钟配对 TTL 已由 `npm run qa:pairing-ttl` 覆盖；两台物理设备的人工冒烟未做。
 - 导航逃逸只能事后惩罚；D1 是安装完整性信任根（安装接口不读 R2 原文）。
+- Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。
 
-**结论：`Partially Verified`**（本地 / 隔离环境全部通过；生产侧按门禁未执行）。
+**结论：`Accepted (Local/CI)`；生产层 `Blocked`。** 本地 / 隔离环境与 GitHub Actions 全部通过（quality 三 job 全绿、E2E 147 passed）；生产部署、生产验证、物理设备与真机项按 Phase 1.6 门禁未执行，不写成「已验证」。PR #1 仅用于触发 CI，验证后已关闭、未合并 `main`，分支 `ci/phase3-verify` 保留。
 
 ### 16.4 回滚预案（已确认可用，未实际执行）
 

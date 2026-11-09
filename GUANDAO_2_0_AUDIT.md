@@ -788,4 +788,4 @@ Infrastructure
 | 文档 | `docs/security/PLUGIN-SIGNING.md`、`PLUGIN-SANDBOX.md`、`docs/architecture/DEVICE-PAIRING.md`、`docs/testing/OAUTH-TESTING.md` |
 | CI | `.github/workflows/quality.yml`：E2E 安装 Firefox / WebKit 并跑四个 project；2026-11-09 已由 PR #1 触发 quality run `42564445648`：verify / API smoke / E2E 全 success，E2E 147 passed；首次实跑修复 `backups/` 忽略误伤源码与 typecheck 缺 `astro sync`（`559adf5`） |
 
-**结论：`Partially Verified`** —— 本地 / 隔离环境全绿且有真实执行证据；生产验证与部署按门禁未执行。
+**结论：`Accepted (Local/CI)`；生产层 `Blocked`。** —— 本地 / 隔离环境与 GitHub Actions 全绿且有真实执行证据；生产验证与部署按门禁未执行，不写成「已验证」。PR #1 仅用于触发 CI，已关闭未合并；Phase 2 的 2.2 / 2.5 作为独立遗留项跟踪。

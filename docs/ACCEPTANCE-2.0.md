@@ -219,7 +219,7 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | Broker 权限继续有效 | **通过（本地）** | 未授权 SDK 调用 `PERMISSION_DENIED`；撤销后实例销毁 |
 | 未授权访问被阻止 | **通过（本地）** | 插件 frame 内 `localStorage` / `document.cookie` / `fetch` 真实抛错或被 CSP 拒绝 |
 | 撤销后运行实例被销毁 | **通过（本地）** | 权限撤销、禁用、卸载、跨标签页撤销均销毁实例 |
-| 独立 Origin 隔离效果 | **未实施（方案已给）** | 本阶段只做同域隔离加固；独立 Origin 方案 A/B 对比见 `docs/security/PLUGIN-SANDBOX.md`，需新 DNS / Worker 资源 → 未创建 |
+| 独立 Origin 隔离效果 | **本地两源已验证 / 生产未实施** | `tests/e2e/sandbox-origin.spec.ts` 1 passed（宿主 8788 + 沙箱源 4399；实测 Cookie 作用域是 host、换端口不隔离）；生产域名 / 证书 / Worker route 未创建 |
 | 两个独立 Browser Context | **通过（本地）** | `tests/e2e/device.spec.ts` 12 项，六个独立 `browser.newContext()`（A / A2 / B / C / outsider / crowded），连续两轮全绿 |
 | 配对完整 / 批准完整 | **通过（本地）** | create → claim → confirm → 轮询领取独立 Session |
 | 接力完整 | **通过（本地）** | `pending → delivered → opened → completed` 与取消 / 过期 / 越权 |
@@ -231,7 +231,11 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | 质量门禁 | **通过** | `verify` 12 文件 / 251 单测 + lint + build + CSP；Playwright 整包 `npx playwright test` **147 passed**（chromium 67 + worker 56 + firefox 12 + webkit 12；worker 56 = 签名 19 / 沙箱（真实 Worker 10 + 独立 Origin 两源 1）11 / 设备 12 / OAuth 14）；`qa:sync` 20/20；`qa:plugins` 70/70；`qa:continuity` 45/45；`qa:devices` **31/31**；`qa:pairing-ttl` 真实等待 10 分钟 **12/12 通过**（elapsedMs=605004） |
 | 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、事故未 Closed → 禁止生产写入与部署 |
 
-**Phase 3 整体：`Partially Verified`。**
+**Phase 3 整体：`Accepted (Local/CI)`；生产层 `Blocked`。**
+
+> 判定口径（所有者 2026-11-09 确认）：本地 / 隔离环境与 GitHub Actions 的自动化证据全部通过，视为本阶段**代码层验收通过**；生产部署、生产验证、物理设备与真机项仍标记 `Blocked`，不写成「已验证」。因此 Phase 3 不标记为「全部通过」，进入 Phase 4 需所有者另行决定。
+>
+> 处置记录：PR #1（`ci/phase3-verify` → `main`）仅用于触发 CI，验证后已关闭、**未合并**；分支保留。GitHub Actions quality 三 job 全绿，E2E 147 passed。
 
 未完成 / 未验证项：
 
@@ -240,4 +244,5 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 3. 真实等待 10 分钟配对 TTL 已由 `npm run qa:pairing-ttl` 覆盖并通过 **12/12**（真实 `sleep`，实测 `elapsedMs=605004`；过期轮询/确认 410、重领 404、设备快照不变）；两台物理设备的人工冒烟仍未做。
 4. 非 Chrome：Firefox 157 与 WebKit 27.2（Safari 家族引擎）均已安装，设备 12 项分别在 `--project=firefox-worker` / `--project=webkit-worker` 通过；真机 Safari / iOS、真实域名下的 CSP 与 Cookie `Secure` 行为仍未验证。
 5. `qa:plugins` 70/70、`qa:continuity` 45/45、`qa:devices` **31/31** 已由自包含运行器跑通；旧的 `scripts/devices-qa.mjs` 仍需人工 `GDV_TOKEN`，仅作历史浏览器冒烟脚本。
+6. Phase 2 的 2.2 Legacy 与 2.5 Community 仍为 `Partially Verified`，作为**独立遗留项**跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。
 6. 原两项已知缺陷已处理：`PAIRING_ATTEMPTS_EXCEEDED` 不可达分支已删除；撤销后 401 错误码已由 `guards.sessionFailure` / `requireActiveSession` 统一。

@@ -374,18 +374,22 @@
   真实双设备覆盖由 worker project 的 `device.spec.ts`（12 项，Chrome + Firefox + WebKit）承担。
 - CI 门禁已同步：`.github/workflows/quality.yml` 的 E2E job 增加 `npx playwright install --with-deps firefox webkit`，四个 project 全部在 CI 执行；e2e-server 自行迁移本地 D1 并生成夹具。2026-11-09 已推送 `ci/phase3-verify` 并通过 PR 触发 quality workflow（run `42564445648`）：三 job 全 success，E2E **147 passed**（四 project 与本地一致）；首次实跑修复了 `backups/` 误忽略源码与 typecheck 缺 `astro sync` 两个问题（`559adf5`）。
 
-### Phase 3 阶段判断（2026-11-07）
+### Phase 3 阶段判断（2026-11-09 所有者确认分层口径）
 
 | 阶段 | 状态 |
 | --- | --- |
-| 3.1 插件发布者签名 | Verified（本地） |
-| 3.2 沙箱隔离 | Verified（本地） |
-| 3.3 双浏览器设备 | Verified（本地） |
-| 3.4 OAuth 可测化 | Verified（本地） |
+| 3.1 插件发布者签名 | Verified（本地 / CI） |
+| 3.2 沙箱隔离 | Verified（本地 / CI）；独立 Origin 生产部署 Blocked（资源未创建） |
+| 3.3 双浏览器设备 | Verified（本地 / CI，Chrome + Firefox + WebKit） |
+| 3.4 OAuth 可测化 | Verified（本地 / CI）；生产环境实跑未执行 |
 
-**Phase 3 整体：`Partially Verified`** —— 全部验收项在本地 / 隔离环境有真实执行证据，
-但生产部署与生产验证按 Phase 1.6 门禁未执行（备份告警仍未配置、2026-11-06 事故仍为
-`Mitigated / Pending Investigation`），因此不满足「建议进入 Phase 4」的条件。
+**Phase 3：`Accepted (Local/CI)`，生产层 `Blocked`。** 全部自动化验收项在本地 / 隔离环境
+与 GitHub Actions 有真实执行证据，视为代码层验收通过；生产部署与生产验证仍按 Phase 1.6
+门禁未执行（备份告警未配置、2026-11-06 事故为 `Mitigated / Pending Investigation`），
+物理设备冒烟与真机 Safari/iOS 未做。**不标记「全部通过」；Phase 4 是否启动由所有者另行决定。**
+
+处置记录：PR #1（`ci/phase3-verify` → `main`）仅用于触发 CI，验证后已关闭、未合并；
+`main` 仍为 `e8603f7`。Phase 2 的 2.2 / 2.5 遗留作为独立项跟踪，不阻塞 Phase 4。
 
 ---
 
@@ -393,6 +397,9 @@
 
 **周期估算**：1 周
 **目标**：把 Workspace/Preferences 接入同步；把「服务端优先」变成用户可理解的冲突策略。
+
+> 状态：**尚未启动**。Phase 3 已按分层口径判 `Accepted (Local/CI)`（生产层 `Blocked`），
+> Phase 4 本地开发的前置（设备测试基建）已就绪，但启动仍需所有者明确决定。
 
 ### 4.1 任务清单
 
