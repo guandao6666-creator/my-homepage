@@ -17,6 +17,8 @@ import {
   uid,
   type Ctx,
 } from "../core";
+import { sendToDevice } from "../../continuity/ui";
+import { recordTombstone } from "../../sync/tombstones";
 
 export type NoteDoc = {
   id: string;
@@ -253,6 +255,7 @@ export const initNotes = (win: HTMLElement, ctx: Ctx): (() => void) => {
             <button type="button" data-n-mode="preview" class="${state.ui.mode === "preview" ? "is-active" : ""}">预览</button>
           </div>
           <button type="button" class="n14-icon" data-n-pin title="置顶">${note.pinned ? "★" : "☆"}</button>
+          <button type="button" class="n14-icon" data-n-send title="发送到设备">⇥</button>
           <button type="button" class="n14-icon" data-n-export title="导出 Markdown">↓</button>
           <button type="button" class="n14-icon is-danger" data-n-delete title="删除">🗑</button>
         </div>
@@ -422,6 +425,25 @@ export const initNotes = (win: HTMLElement, ctx: Ctx): (() => void) => {
       return;
     }
 
+    if (t.closest("[data-n-send]")) {
+      const note = current();
+      if (!note) return;
+      save();
+      void sendToDevice(ctx, {
+        itemType: "note",
+        title: note.title || "未命名笔记",
+        resourceId: note.id,
+        payload: {
+          title: note.title,
+          body: note.body,
+          folder: note.folder,
+          tags: note.tags,
+          pinned: note.pinned,
+          updatedAt: note.updatedAt,
+        },
+      });
+      return;
+    }
     if (t.closest("[data-n-pin]")) {
       const note = current();
       if (!note) return;
@@ -523,9 +545,134 @@ export const initNotes = (win: HTMLElement, ctx: Ctx): (() => void) => {
     }
   });
 
+  // 2.0：云同步把远端变更写进同一个 KEY 后会发这个事件，
+  // 已打开的编辑窗口立刻重读并重绘，不需要用户手动刷新。
+  const onSync = () => {
+    state = read();
+    paintAll();
+  };
+  window.addEventListener("guandao:notes-sync", onSync);
+
   // 关窗前把未落盘的改动写掉
   win.addEventListener("guandao:before-close", () => save());
 
   paintAll();
-  return () => save();
+  return () => {
+    window.removeEventListener("guandao:notes-sync", onSync);
+    save();
+  };
+};
+
+/* ---------------------------------------------------------------------------
+   1.8：给移动端 / 接力使用的稳定数据接口。
+   与桌面 Notes 共用同一个 localStorage 键，不产生第二套笔记模型。
+--------------------------------------------------------------------------- */
+
+export const notesStore = {
+  list: (): NoteDoc[] => sortNotes(read().notes.slice()),
+  get: (id: string): NoteDoc | null => read().notes.find((note) => note.id === id) ?? null,
+  folders: () => read().folders.slice(),
+  select: (id: string): boolean => {
+    const st = read();
+    if (!st.notes.some((note) => note.id === id)) return false;
+    st.ui.noteId = id;
+    write(st);
+    return true;
+  },
+  create: (patch: Partial<NoteDoc> = {}): NoteDoc => {
+    const st = read();
+    const now = Date.now();
+    const note: NoteDoc = {
+      id: uid(),
+      title: String(patch.title ?? "").slice(0, 80),
+      body: String(patch.body ?? "").slice(0, 200_000),
+      folder: patch.folder || "inbox",
+      tags: Array.isArray(patch.tags) ? patch.tags.slice(0, 8) : [],
+      pinned: Boolean(patch.pinned),
+      createdAt: now,
+      updatedAt: now,
+    };
+    st.notes.push(note);
+    st.ui.noteId = note.id;
+    write(st);
+    return note;
+  },
+  update: (id: string, patch: Partial<NoteDoc>): NoteDoc | null => {
+    const st = read();
+    const note = st.notes.find((item) => item.id === id);
+    if (!note) return null;
+    if (patch.title !== undefined) note.title = String(patch.title).slice(0, 80);
+    if (patch.body !== undefined) note.body = String(patch.body).slice(0, 200_000);
+    if (patch.folder !== undefined) note.folder = patch.folder;
+    if (patch.tags !== undefined) note.tags = patch.tags.slice(0, 8);
+    if (patch.pinned !== undefined) note.pinned = Boolean(patch.pinned);
+    note.updatedAt = Date.now();
+    write(st);
+    return note;
+  },
+  remove: (id: string): boolean => {
+    const st = read();
+    const before = st.notes.length;
+    st.notes = st.notes.filter((note) => note.id !== id);
+    if (st.notes.length === before) return false;
+    if (st.ui.noteId === id) st.ui.noteId = st.notes[0]?.id ?? "";
+    write(st);
+    // 2.0：删除留墓碑，云同步才能把删除传播到其他设备
+    recordTombstone("notes", id);
+    return true;
+  },
+
+  /* ---------------- 2.0 云同步接口 ---------------- */
+
+  /** 同步引擎读取的本地快照（含墓碑由 provider 负责拼接） */
+  syncItems: (): Array<{ id: string; updatedAt: number; payload: NoteDoc }> =>
+    read().notes.map((note) => ({ id: note.id, updatedAt: note.updatedAt || note.createdAt, payload: note })),
+
+  /**
+   * 应用远端变更：按 id upsert，墓碑则移除。
+   * 走模块自己的 write()，保证本标签页后续读取立刻看到新数据。
+   */
+  applySync: (
+    items: Array<{ id: string; updatedAt: number; deleted: boolean; payload?: NoteDoc | null }>,
+  ): { applied: number; removed: number } => {
+    const st = read();
+    let applied = 0;
+    let removed = 0;
+    for (const item of items) {
+      if (item.deleted) {
+        const before = st.notes.length;
+        st.notes = st.notes.filter((note) => note.id !== item.id);
+        if (st.notes.length !== before) removed += 1;
+        continue;
+      }
+      const incoming = item.payload;
+      if (!incoming || typeof incoming !== "object") continue;
+      const index = st.notes.findIndex((note) => note.id === item.id);
+      const merged: NoteDoc = {
+        id: item.id,
+        title: String(incoming.title ?? "").slice(0, 80),
+        body: String(incoming.body ?? "").slice(0, 200_000),
+        folder: String(incoming.folder ?? "inbox"),
+        tags: Array.isArray(incoming.tags) ? incoming.tags.slice(0, 8) : [],
+        pinned: Boolean(incoming.pinned),
+        createdAt: Number(incoming.createdAt) || item.updatedAt,
+        updatedAt: Number(incoming.updatedAt) || item.updatedAt,
+      };
+      if (index >= 0) st.notes[index] = merged;
+      else st.notes.push(merged);
+      applied += 1;
+    }
+    if (st.ui.noteId && !st.notes.some((note) => note.id === st.ui.noteId)) {
+      st.ui.noteId = st.notes[0]?.id ?? "";
+    }
+    write(st);
+    if (applied || removed) {
+      try {
+        window.dispatchEvent(new CustomEvent("guandao:notes-sync"));
+      } catch {
+        /* 忽略 */
+      }
+    }
+    return { applied, removed };
+  },
 };

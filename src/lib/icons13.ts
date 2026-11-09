@@ -187,6 +187,30 @@ export const ICON_SVG: Record<string, string> = {
     ${A("M11 15.2c4.2-1.8 8.6-1.5 13 1.2v20.4c-4.4-2.7-8.8-3-13-1.2V15.2Z")}
     ${A("M37 15.2c-4.2-1.8-8.6-1.5-13 1.2v20.4c4.4-2.7 8.8-3 13-1.2V15.2Z", 0.72)}
     <path d="M24 16.4v20.4" stroke="#0b1020" stroke-opacity=".3" stroke-width="1.8"/>`,
+
+  community: `
+    ${A("M24 9.8a5.4 5.4 0 1 1 0 10.8 5.4 5.4 0 0 1 0-10.8Z")}
+    ${A("M12.6 25.4a4.2 4.2 0 1 1 0 8.4 4.2 4.2 0 0 1 0-8.4Z", 0.72)}
+    ${A("M35.4 25.4a4.2 4.2 0 1 1 0 8.4 4.2 4.2 0 0 1 0-8.4Z", 0.72)}
+    <path d="M24 21.4v8.2M24 26.2l-7.2 3.4M24 26.2l7.2 3.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity=".8"/>`,
+
+  /* 2.0：更新中心 */
+  fresh: `
+    <path d="M34.6 24a10.6 10.6 0 1 1-3.4-7.7" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <path d="M34.8 12.4v6.2h-6.2" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    ${A("M24 18.6a5.4 5.4 0 1 1 0 10.8 5.4 5.4 0 0 1 0-10.8Z", 0.3)}`,
+
+  /* 2.0：应用与资源市场 */
+  store: `
+    ${A("M12.4 20.6h23.2l-1.8 12.2a3.2 3.2 0 0 1-3.2 2.8H17.4a3.2 3.2 0 0 1-3.2-2.8L12.4 20.6Z")}
+    <path d="M18.4 20.6v-2.4a5.6 5.6 0 0 1 11.2 0v2.4" stroke="currentColor" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+    <path d="M19 26.4h10" stroke="#0b1020" stroke-opacity=".28" stroke-width="2.2" stroke-linecap="round"/>`,
+
+  /* 2.0：首次启动引导 */
+  spark: `
+    ${A("M24 10.6c1.1 5.6 3.4 8 9 9-5.6 1.1-7.9 3.4-9 9-1.1-5.6-3.4-7.9-9-9 5.6-1 7.9-3.4 9-9Z")}
+    ${A("M33.4 28.4c.6 3 1.8 4.2 4.8 4.8-3 .6-4.2 1.8-4.8 4.8-.6-3-1.8-4.2-4.8-4.8 3-.6 4.2-1.8 4.8-4.8Z", 0.62)}
+    ${A("M14.2 27.2c.4 2.2 1.4 3.1 3.6 3.6-2.2.4-3.1 1.4-3.6 3.6-.4-2.2-1.4-3.1-3.6-3.6 2.2-.4 3.1-1.4 3.6-3.6Z", 0.45)}`,
 };
 
 const CLASS_MAP: Record<string, string> = {
@@ -222,6 +246,11 @@ const CLASS_MAP: Record<string, string> = {
   "di-data": "data",
   "di-gallery": "gallery",
   "di-reader": "reader",
+  "di-community": "community",
+  // 2.0
+  "di-fresh": "fresh",
+  "di-store": "store",
+  "di-spark": "spark",
 };
 
 const paint = (glyph: HTMLElement) => {
@@ -239,13 +268,31 @@ export function installIcons() {
   let raf = 0;
   const run = () => {
     raf = 0;
-    document.querySelectorAll<HTMLElement>(".di-glyph").forEach(paint);
+    // 1.9：只处理还没画过的图标。旧实现在任何 DOM 变化时都会全量重扫并重绘，
+    // 游戏 / 组件的 innerHTML 更新会把它变成每帧一次的全文档查询。
+    const pending = document.querySelectorAll<HTMLElement>(".di-glyph:not(.has-svg)");
+    for (const glyph of pending) paint(glyph);
   };
   run();
   const mo = new MutationObserver(() => {
+    // 页面不可见时不处理：恢复可见后由下一次变更或 visibilitychange 补上
+    if (document.hidden) return;
     if (raf) return;
     raf = requestAnimationFrame(run);
   });
   mo.observe(document.body, { childList: true, subtree: true });
-  return () => mo.disconnect();
+
+  // 从后台切回前台时补一次，避免后台新增的图标一直空着
+  const onVisible = () => {
+    if (document.hidden || raf) return;
+    raf = requestAnimationFrame(run);
+  };
+  document.addEventListener("visibilitychange", onVisible);
+
+  return () => {
+    mo.disconnect();
+    document.removeEventListener("visibilitychange", onVisible);
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+  };
 }

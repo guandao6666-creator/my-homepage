@@ -1,0 +1,93 @@
+---
+import "../styles/mobile.css";
+import "../styles/pwa.css";
+---
+
+<!doctype html>
+<html lang="zh-CN" data-page="mobile" data-shell="mobile">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover"
+    />
+    <title>Guandao OS · 手机伴侣</title>
+    <meta name="description" content="Guandao OS 移动伴侣：笔记、任务、日程、云端文件与跨设备接力。" />
+    <meta name="theme-color" content="#070a11" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Guandao" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <script is:inline>
+      // 2.0：手机访问站点 URL 默认进入手机伴侣。
+      // - 显式 ?desktop=1：记入本次会话并回桌面；
+      // - 手机尺寸：即使 localStorage 里还留着旧的 desktop 偏好，也留在 /m/；
+      // - 桌面/平板尺寸：auto 回桌面，只有手动选过「手机布局」才留在 /m/。
+      (function () {
+        try {
+          var params = null;
+          try {
+            params = new URLSearchParams(location.search);
+          } catch (e) {
+            params = null;
+          }
+          if (params && params.get("desktop") === "1") {
+            try {
+              sessionStorage.setItem("guandao.shell.desktop-session", "1");
+            } catch (e) {}
+            location.replace("/" + location.search);
+            return;
+          }
+
+          var w = window.innerWidth || 1024;
+          var h = window.innerHeight || 768;
+          var coarse = false;
+          try {
+            coarse = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+          } catch (err) {}
+          var screenShort = Math.min(
+            (window.screen && window.screen.width) || w,
+            (window.screen && window.screen.height) || h,
+          );
+          var phone = w < 640 || (coarse && screenShort < 500);
+
+          if (phone) {
+            // 直接打开 /m/ = 明确要手机布局：清掉上一次会话的桌面标记
+            try {
+              sessionStorage.removeItem("guandao.shell.desktop-session");
+            } catch (e) {}
+            return;
+          }
+
+          var pref = localStorage.getItem("guandao.os18.shell.v1") || "auto";
+          if (pref !== "mobile") {
+            // 带 desktop=1 回桌面：绕过服务端的「手机 UA → /m/」重定向。
+            // 桌面宽度但 UA/客户端提示像手机（平板、触屏笔记本）不会陷入 / ↔ /m/ 循环。
+            var next = "/?desktop=1";
+            if (location.search) next += "&" + location.search.slice(1);
+            location.replace(next);
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="m-app" id="mobile-root">
+      <header class="m-top">
+        <span class="m-avatar">管</span>
+        <div class="m-top-text"><b>Guandao OS</b><span>正在加载手机伴侣…</span></div>
+      </header>
+      <main class="m-scroll">
+        <div class="m-empty" style="padding-top: 60px"><b>正在准备你的数字世界</b>笔记与任务会从本机读取。</div>
+      </main>
+    </div>
+    <input id="m-file" type="file" multiple hidden accept="image/*,text/*,application/pdf,audio/*,video/*" />
+    <div id="m-sheet-layer" class="m-sheet-layer" hidden></div>
+
+    <script>
+      import "../lib/mobile/app";
+    </script>
+  </body>
+</html>

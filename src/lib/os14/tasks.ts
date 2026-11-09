@@ -21,6 +21,7 @@ import {
 } from "./core";
 import { PRIORITY, TASK_CATEGORIES, taskStore, type Task } from "./tasks-store";
 import { patchPrefs, readPrefs } from "./prefs";
+import { sendToDevice } from "../continuity/ui";
 
 const NOTIF_KEY = "guandao.os.notif.v1";
 
@@ -65,6 +66,7 @@ const taskRow = (t: Task) => `
       </div>
     </div>
     <div class="tk14-acts">
+      <button class="g14-btn is-ghost" type="button" data-task-send="${escapeHtml(t.id)}">发送</button>
       <button class="g14-btn is-ghost" type="button" data-task-edit="${escapeHtml(t.id)}">编辑</button>
       <button class="g14-btn is-ghost" type="button" data-task-del="${escapeHtml(t.id)}">删除</button>
     </div>
@@ -215,6 +217,10 @@ export const initTasks = (win: HTMLElement, ctx: Ctx): (() => void) => {
     if (host) host.innerHTML = view();
   };
 
+  // 2.0：云同步写入同一个 KEY 后立即重绘
+  const onSync = () => paint();
+  window.addEventListener("guandao:tasks-sync", onSync);
+
   const editor = (task?: Task) => {
     void modal(win, {
       title: task ? "编辑任务" : "新建任务",
@@ -261,6 +267,26 @@ export const initTasks = (win: HTMLElement, ctx: Ctx): (() => void) => {
     const t = e.target as HTMLElement;
     if (t.closest("[data-task-new]")) {
       editor();
+      return;
+    }
+    const send = t.closest<HTMLElement>("[data-task-send]");
+    if (send) {
+      const task = taskStore.list().find((item) => item.id === send.dataset.taskSend);
+      if (task && ctxRef) {
+        void sendToDevice(ctxRef, {
+          itemType: "task",
+          title: task.title,
+          resourceId: task.id,
+          payload: {
+            title: task.title,
+            note: task.note,
+            priority: task.priority,
+            due: task.due,
+            category: task.category,
+            done: task.done,
+          },
+        });
+      }
       return;
     }
     const tg = t.closest<HTMLElement>("[data-task-toggle]");
@@ -344,7 +370,9 @@ export const initTasks = (win: HTMLElement, ctx: Ctx): (() => void) => {
   });
 
   paint();
-  return () => undefined;
+  return () => {
+    window.removeEventListener("guandao:tasks-sync", onSync);
+  };
 };
 
 export const notifStore = { read: readNotifs, write: writeNotifs };

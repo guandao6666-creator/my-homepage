@@ -346,6 +346,47 @@
 - OAuth 回调测试在 CI 中可重复运行。
 - 生产 `qa:prod` 扩展到覆盖配对/接力。
 
+### 3.5 执行结果（2026-11-08 收尾更新）
+
+> 前置状态说明：Phase 2 整体仍为 `Partially Verified`（2.2 Legacy、2.5 Community 未完成），
+> 本路线图此前的结论是「不进入 Phase 3」。本次是**所有者直接指派 Phase 3**；
+> Phase 2 的状态不因本阶段工作而变化，也没有在本阶段里顺手修改 Phase 2 的代码。
+
+| 项 | 结果 |
+| --- | --- |
+| 3.1 发布者签名 | **Verified（本地层）**。`shared/plugin-signature.js` 519 行：签名信封 + 规范载荷（信封去 `sig` 后 `canonicalJson` 的 UTF-8 字节；字段缺失即非法；v1 只允许字符串 / 非负整数 / 布尔），Ed25519 走 WebCrypto（**未新增任何依赖**）。迁移 `0017_plugin_signatures.sql`（`publisher_keys` + `plugin_versions` 4 列）。服务端 `resolveSignature` 在**落库前**拦截非法签名（422），`pluginPackage` 每次下载动态复验；客户端 `verifyPackageSignature` 接入 4 条下载路径；CLI `keygen` / `sign` / `keys register`；市场列表与详情页信任徽标 |
+| 3.2 沙箱隔离 | **Verified（本地层）**。未改 `host.ts` / `runner.html` / `worker/index.js`，**未新增任何 `allow-*`**；新增 `tests/e2e/sandbox-worker.spec.ts` 10 项（真实 Worker + 真实 CSP 响应头）、`tests/e2e/sandbox-origin.spec.ts` 1 项（本地真实两源隔离实测：8788 宿主 + 4399 沙箱源，证明 `window.origin`、localStorage、DOM、CORS、postMessage 的隔离语义；同时实测发现 Cookie 作用域是 host，换端口不隔离，落地需独立 host），`tests/e2e/sandbox.spec.ts` 3 → 6 项 |
+| 3.3 双浏览器设备 | **Verified（本地层）**。`tests/e2e/device.spec.ts` **12 项**：A / A2 / B / C / outsider / crowded **六个独立 `browser.newContext()`**，覆盖配对、批准（含 `WRONG_DEVICE`、`DEVICE_LIMIT`）、完整领取 Session、**真实过去时间戳的过期拒绝**、claim 同源校验与 `INVALID_TOKEN`、接力 `pending → delivered → opened → completed`、错误码、剪贴板隔离、撤销（五路径统一 `SESSION_REVOKED` / `DEVICE_REVOKED`）；连续两轮全绿且中间不重启服务；同一 spec 另在 **Firefox 157** 与 **WebKit 27.2** 各通过 12 项 |
+| 3.4 OAuth 可测化 | **Verified（本地层）**。`AUTH_TEST_MODE=1` 为三条件 AND（env + 请求 origin loopback + 配置 origin loopback）；测试身份只来自固定 `qa-*` 档案；state / PKCE 校验零改动；`tests/e2e/oauth.spec.ts` 14 项 |
+| 全量门禁 | `npm run verify` 通过（**12 文件 / 251 单测**，含 `check:html-security`、`check:csp` 12 哈希 / 30 HTML）；`npx playwright test` 整包一次运行 **147 passed**（chromium 67 + worker 56 + firefox 12 + webkit 12；worker = 签名 19 / 沙箱 11 / 设备 12 / OAuth 14）；`npm run qa:sync` **20/20**；`npm run qa:plugins` **70/70**、`npm run qa:continuity` **45/45**、`npm run qa:devices` **31/31**（自包含 seed + 本地 Worker）、`npm run qa:pairing-ttl` 真实等待 10 分钟 **12/12**（`elapsedMs=605004`） |
+| 修掉的真实缺陷 | ① `POST /api/pairing/claim` 缺同源校验（第三方页面可替用户提交 claim）② `POST /api/continuity/:id/open` 的 `openedAt` 恒为 null ③ `mapSignatureTrust` 从错误模块导入导致 Worker 构建失败（`tsc` 不检查 `.js`，只有真实构建能发现）④ CLI `sign` 产物写到 CWD 而非项目根、且未回填 `filesDigest` ⑤ `ApiError` 无法携带结构化原因（新增第 4 参数 `details`）⑥ 插件管理器「已安装」标签页有本地记录时不渲染列表（`listView()` 缺分支），已补分支并显示签名信任 ⑦ `continuity/handlers.js` 剪贴板分支调用未导入的 `requireSession`（运行时 ReferenceError）⑧ 撤销后 401 错误码不一致（新增 `guards.sessionFailure` / `requireActiveSession` 统一）⑨ `PAIRING_ATTEMPTS_EXCEEDED` 不可达分支（attempts 永不累加）已删除假保护 ⑩ E2E 就绪竞态：Playwright 就绪探针改到 8789 `GET /__e2e/ready`，避免测试与夹具写入抢本地 D1 |
+| 已知未修 | 无新增。原两项（ATTEMPTS、401 错误码）已在本轮处理 |
+| 未验证 | 生产环境与真实域名、真机 Safari/iOS（WebKit 引擎已本地通过，≠ 真机）、两台物理设备人工冒烟、独立 Sandbox Origin 的生产部署（本地已两源实测，但域名/证书/Worker route 未创建）、`network.fetch` 之外的服务端 Broker 复核、资源滥用（死循环 / postMessage 洪泛） |
+| 生产变更 | **无**。未部署、未改生产数据、未跑 `qa:prod` |
+| 结论 | **Partially Verified**（本地 / 隔离环境全部通过；生产验证按 Phase 1.6 门禁未执行） |
+
+补充两点，避免把「脚本存在」当成「已验证」：
+
+- `qa:plugins` / `qa:continuity` 已改为**自包含**：`scripts/seed-qa-local.mjs` 写本地 D1 的固定 QA 账号/设备/Session，
+  `scripts/qa-local-run.mjs` 起本地 Worker（8794）后运行脚本并自动关进程。实测 `qa:plugins` 70/70、
+  `qa:continuity` 45/45，只连 loopback。
+- 任务书提到的 `qa:devices` 已补齐：新增 `scripts/devices-api-qa.mjs`（31 项：设备总览/当前设备/详情/会话/活动/心跳/CSRF/未登录/跨账号/会话撤销/设备撤销），由 `scripts/qa-local-run.mjs` 自包含驱动，实测 **31/31 通过**；`scripts/devices-qa.mjs` 仍是需要人工 `GDV_TOKEN` 的旧浏览器冒烟脚本。
+  真实双设备覆盖由 worker project 的 `device.spec.ts`（12 项，Chrome + Firefox + WebKit）承担。
+- CI 门禁已同步：`.github/workflows/quality.yml` 的 E2E job 增加 `npx playwright install --with-deps firefox webkit`，四个 project 全部在 CI 执行；e2e-server 自行迁移本地 D1 并生成夹具。本阶段未 push，**GitHub Actions 实跑未验证**。
+
+### Phase 3 阶段判断（2026-11-07）
+
+| 阶段 | 状态 |
+| --- | --- |
+| 3.1 插件发布者签名 | Verified（本地） |
+| 3.2 沙箱隔离 | Verified（本地） |
+| 3.3 双浏览器设备 | Verified（本地） |
+| 3.4 OAuth 可测化 | Verified（本地） |
+
+**Phase 3 整体：`Partially Verified`** —— 全部验收项在本地 / 隔离环境有真实执行证据，
+但生产部署与生产验证按 Phase 1.6 门禁未执行（备份告警仍未配置、2026-11-06 事故仍为
+`Mitigated / Pending Investigation`），因此不满足「建议进入 Phase 4」的条件。
+
 ---
 
 ## Phase 4 · 同步范围扩展与冲突策略（P3）

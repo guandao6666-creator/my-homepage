@@ -20,6 +20,7 @@ import {
   uid,
   type Ctx,
 } from "./core";
+import { EXPORT_FORMAT } from "../version";
 
 let ctxRef: Ctx | null = null;
 let tab = "overview";
@@ -233,7 +234,7 @@ export const createBackup = async (): Promise<Backup | null> => {
   const payload: Backup = {
     id: `bk-${uid().slice(0, 8)}`,
     at: Date.now(),
-    version: "guandao-os/1.4",
+    version: EXPORT_FORMAT,
     size: 0,
     data,
   };
@@ -295,7 +296,7 @@ export const initDataCenter = (win: HTMLElement, ctx: Ctx): (() => void) => {
       const data = collect();
       download(
         `guandao-os-backup-${new Date().toISOString().slice(0, 10)}.json`,
-        JSON.stringify({ kind: "guandao-os-backup", version: "guandao-os/1.4", exportedAt: new Date().toISOString(), count: Object.keys(data).length, data }, null, 2),
+        JSON.stringify({ kind: "guandao-os-backup", version: EXPORT_FORMAT, exportedAt: new Date().toISOString(), count: Object.keys(data).length, data }, null, 2),
       );
       ctx.pushNotif({ icon: "↓", title: "数据已导出", body: `备份文件已下载，共 ${Object.keys(data).length} 个键。` });
       ctx.pushNotif({ icon: "↓", title: "数据已导出", body: `备份文件已下载，共 ${Object.keys(data).length} 个键。` });
@@ -413,11 +414,15 @@ export const initDataCenter = (win: HTMLElement, ctx: Ctx): (() => void) => {
       const data = parsed.data as Record<string, unknown> | undefined;
       if (!data || typeof data !== "object") throw new Error("no-data");
       if (parsed.kind && parsed.kind !== "guandao-os-backup") throw new Error("bad-kind");
+      // 1.9：真的校验版本号（旧代码只检查了 kind，注释却写着会校验版本）。
+      // 格式形如 guandao-os/1.4；只接受 1.x，跨大版本的数据结构无法保证兼容。
+      const format = String(parsed.version ?? "");
+      if (format && !/^guandao-os\/1(\.\d+)?$/.test(format)) throw new Error("bad-version");
       const entries = Object.entries(data).filter(([k]) => k.startsWith("guandao."));
       if (!entries.length) throw new Error("empty");
       const ok = await modal(win, {
         title: "导入这份备份？",
-        body: `<p class="g14-modal-text">文件包含 ${entries.length} 个键，导出时间 ${escapeHtml(String(parsed.exportedAt ?? "未知"))}。导入会覆盖同名数据，然后刷新页面。</p>`,
+        body: `<p class="g14-modal-text">文件包含 ${entries.length} 个键，格式版本 ${escapeHtml(format || "未标注")}，导出时间 ${escapeHtml(String(parsed.exportedAt ?? "未知"))}。导入会覆盖同名数据，然后刷新页面。</p>`,
         actions: [
           { label: "取消", value: "" },
           { label: "导入并刷新", value: "ok", primary: true },

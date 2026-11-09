@@ -10,7 +10,16 @@ migrations/
   0001_init.sql          基础表结构（users / devices / notes / files / sync_changes / backups）
   0002_account.sql       GitHub 身份字段、sessions、oauth_states、setup_tickets
   0003_cloud_drive.sql   files 扩展、folders、multipart_uploads、file_events
-  0004_xxx.sql           下一次变更
+  0004_devices.sql       设备字段扩展、session revoked_at、device_activity、device_sync_state
+  0005_device_names.sql  旧自动设备名归一化为 My Desktop / Laptop / Tablet / Phone
+  0006_backups.sql       备份扩展、backup_jobs / backup_items / backup_settings / backup_restores
+  0007_privacy_security.sql  安全事件、隐私设置、导出、删除任务、注销票据与审计
+  0008_rate_limit.sql        固定窗口限流计数（rate_limits）
+  0009_community.sql         社区资料、作品、内容包版本、互动、举报、审核、通知、设置与邀请
+  0010_plugins.sql           插件元数据、版本、安装、权限、评价、举报、审计、开发者与下载事件
+  0011_continuity.sql        设备配对、接力内容、设备上下文与跨设备剪贴板
+  0012_indexes.sql           1.9 热点查询索引
+  0013_index_fixes.sql       2.0 索引名冲突修正 + 备份分页索引
 ```
 
 - 文件名必须符合 `^[0-9]{4}_[a-z0-9_]+\.sql$`，Wrangler 按编号顺序执行；
@@ -65,11 +74,11 @@ Time Travel 是整库回滚，会连同期间写入的业务数据一起回退�
 npx wrangler d1 export guandao-db --remote --output=backup-$(date +%Y%m%d).sql
 ```
 
-## 安全边界（本阶段）
+## 安全边界（2.0 更新）
 
-- 表已建好，但**没有任何对外数据接口**。在身份认证完成之前，任何读写路由都无法
-  可靠判断 `user_id` 归属，开放即等于越权。
-- 所有业务表都有 `user_id` 字段和 `(user_id, ...)` 复合索引；后续接口必须从会话
-  解析用户身份，禁止接受客户端传入的 `user_id`。
+- 所有业务接口都从 Session 解析 `user_id`，禁止接受客户端传入的 `user_id`；
+  所有用户数据查询都带 `user_id`（2.0 审计抽样复核过约 200 处 `DB.prepare`）。
 - 迁移脚本中不得写入真实用户数据、密钥或令牌。
 - D1 绑定名固定为 `DB`，R2 绑定名固定为 `FILES`，不要在代码里写死资源 ID。
+- 2.0 起迁移必须通过 `npm run check:migrations`：编号连续、索引带 `IF NOT EXISTS`、
+  不允许同名索引定义冲突、禁止 `DROP TABLE` / `DROP COLUMN`。

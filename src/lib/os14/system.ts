@@ -269,8 +269,9 @@ export const createSystem = (ctx: Ctx) => {
 
   const desktopShortcutIds = () =>
     Array.from(document.querySelectorAll<HTMLElement>(".desk-icons .desk-icon[data-app]"))
-      .map((n) => n.dataset.app ?? "")
-      .filter((id) => id && isDesktopLink(n));
+      .filter((node) => isDesktopLink(node))
+      .map((node) => node.dataset.app ?? "")
+      .filter(Boolean);
 
   return {
     registerSpec,

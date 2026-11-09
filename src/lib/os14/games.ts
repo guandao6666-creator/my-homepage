@@ -378,8 +378,8 @@ const mineGame: GameDef = {
     } as const;
     type LevelKey = keyof typeof levels;
     let level: LevelKey = "easy";
-    let n = levels[level].n;
-    let mines = levels[level].mines;
+    let n: number = levels[level].n;
+    let mines: number = levels[level].mines;
     let cells: Array<{ mine: boolean; open: boolean; flag: boolean; near: number }> = [];
     let started = false;
     let dead = false;

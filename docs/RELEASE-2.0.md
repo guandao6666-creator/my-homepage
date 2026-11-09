@@ -696,6 +696,89 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 
 详见 `docs/architecture/COMMUNITY-ARCHITECTURE.md`。
 
+### 16.16 Phase 3 插件供应链安全与多设备验证（2026-11-07）
+
+**本阶段未部署生产**，以下结果全部来自本地 / 隔离环境（`wrangler dev --local` + 本地 D1/R2）。
+
+**1. 插件发布者签名（Ed25519）**
+
+- 新增 `shared/plugin-signature.js`（519 行）与 `.d.ts`：签名信封 + 规范化载荷。
+  载荷 = 信封去 `sig` 后 `canonicalJson` 的 UTF-8 字节；v1 只允许字符串 / 非负整数 / 布尔，
+  字段缺失即非法——从设计上排除了 JSON 键序、Unicode 归一化与数值格式差异。
+- 新增迁移 `0017_plugin_signatures.sql`：`publisher_keys`（只存公钥，唯一约束）+ `plugin_versions` 的
+  `signature_json / signature_status / signature_key_id / signed_at` 四列。只增不删。
+- 服务端：上传期 `resolveSignature` 校验，非法签名 **422 且不写版本行**；下载期每次重新验签
+  （`SIGNATURE_INVALID` 409）；安装期拒绝已撤销密钥与身份不匹配。
+- 客户端：`src/lib/plugins/signature.ts` 独立验签，公钥只从服务端 `publisherKeys` 取；
+  `registry.ts` 四条下载路径（云端恢复 / 市场安装 / 更新 / 回滚）全部接入。
+- CLI：`keygen`（本地生成，私钥写 `mode 0o600` 文件）、`sign`、`keys register`；`publish --key` 自动签名。
+- 市场与插件管理器：市场列表卡片、市场详情页、插件管理器「已安装」列表与详情都显示「已签名 / 未签名 / 签名无效」，
+  管理器详情额外显示签署时间；同时修复了管理器 `listView()` 在「已安装」标签有记录时不渲染列表的缺陷。
+- 兼容策略：阶段 A（可选签名）——无签名旧包仍可安装但标记 `unsigned`；签名无效一律拒绝，不静默降级。
+
+**2. 沙箱隔离（实测）**
+
+- 未改 `host.ts` / `runner.html` / `worker/index.js`，**未新增任何 `allow-*`**，双层 iframe 保持
+  `sandbox="allow-scripts"`（opaque origin）。
+- 新增 `tests/e2e/sandbox-worker.spec.ts`（10 项，真实 Worker + 真实 CSP）：消息通信、伪造来源、
+  恶意 postMessage、未授权 Broker、读宿主存储、读 Cookie、导航逃逸销毁、权限撤销销毁、跨标签页撤销。
+- `tests/e2e/sandbox.spec.ts` 由 3 项扩到 6 项（静态层契约断言 + opaque origin 行为验证）。
+
+**3. 双浏览器设备配对 / 接力 / 剪贴板**
+
+- 新增 `tests/e2e/device.spec.ts`（**12 项**，连续两轮全绿且中间不重启服务、不清库）与
+  `tests/e2e/support/device-flow.ts`：A / A2 / B / C / outsider / crowded **六个独立 `browser.newContext()`**，
+  不共享 Cookie / localStorage / IndexedDB。
+- 覆盖：配对创建契约、批准语义（含同账号其他设备 `WRONG_DEVICE`）、错误码与取消、完整配对并领取独立 Session、
+  **真实过去时间戳的过期拒绝**、**设备上限 `DEVICE_LIMIT`**、claim 同源校验与 `INVALID_TOKEN`、
+  接力四态、接力错误码、剪贴板隔离与 4000 字符上限、撤销后全部 401。
+
+**4. OAuth 可重复测试**
+
+- `AUTH_TEST_MODE` 为三条件 AND：`env.AUTH_TEST_MODE === "1"` **且** 请求 origin **且** 配置 origin
+  都是 loopback；查询参数无法开启；测试身份只来自固定 `qa-*` 档案；state / PKCE / Cookie 属性零改动。
+- `tests/e2e/oauth.spec.ts` 14 项：回调 → Session → `/api/auth/me` → 退出，以及 state 缺失 / 不匹配 /
+  过期、非法测试角色、生产 origin 拒绝。
+
+**5. 质量门禁（本机实跑）**
+
+| 门禁 | 结果 |
+| --- | --- |
+| `npm run verify` | 通过（typecheck、**12 文件 / 251 单测**、`check:html-security`、lint、build、`check:csp` 12 哈希 / 30 HTML） |
+| `npx playwright test`（整包，四 project 一次运行） | **147 passed**（chromium 67 + worker 56 + firefox 12 + webkit 12，3.0m） |
+| 其中 worker project | **56 passed**（真实 Worker 8788：签名 19 / 沙箱 11（含独立 Origin 两源 1）/ 设备 12 / OAuth 14） |
+| 其中 firefox-worker project | **12 passed**（Firefox 157，设备配对/接力/剪贴板） |
+| 其中 webkit-worker project | **12 passed**（WebKit 27.2，Safari 家族引擎，设备配对/接力/剪贴板；≠ 真机 Safari/iOS） |
+| `npm run qa:sync` | **20/20** |
+| `npm run qa:plugins` / `qa:continuity` | **70/70** / **45/45**（自包含运行器：本地迁移 + QA seed + `wrangler dev --local` 8794） |
+| `npm run qa:pairing-ttl` | **12/12**（真实等待 10 分钟，`elapsedMs=605004`）：TTL 契约、过期轮询/确认 410、重领 404、设备快照不变 |
+| `npm run qa:devices` | **31/31**（自包含运行器：本地 seed + `wrangler dev --local` 8794；设备总览/心跳/CSRF/跨账号/会话撤销/设备撤销） |
+| `npm run qa:prod` | **禁止执行**（Phase 1.6 门禁） |
+
+> CI：`.github/workflows/quality.yml` 的 E2E job 已加 `npx playwright install --with-deps firefox webkit`，四个 project（chromium / worker / firefox-worker / webkit-worker）会全部在 CI 执行；worker project 的 e2e-server 自行迁移本地 D1 并生成夹具。**本阶段未 push，GitHub Actions 实跑未验证**，CI 结论只代表配置已就绪。
+
+**6. 顺带修复的真实缺陷**
+
+1. `POST /api/pairing/claim` 缺 `assertSameOrigin` —— 任意第三方页面可替用户提交 claim。
+2. `POST /api/continuity/:id/open` 响应的 `openedAt` 恒为 `null`。
+3. `mapSignatureTrust` 从错误模块导入 → Worker 构建失败（`tsc` 不检查 `.js`，只有真实构建能发现）。
+4. CLI `sign` 产物写到 CWD；`signBundleObject` 未回填 `filesDigest`。
+5. `ApiError` 新增 `details` 参数，客户端可区分具体签名失败原因。
+6. 插件管理器「已安装」标签页存在本地记录时不渲染列表（`listView()` 缺分支）——已修复。
+7. `worker/api/continuity/handlers.js` 的剪贴板分支调用未导入的 `requireSession`（重构漏改，运行时 ReferenceError）——改为统一 `requireActiveSession`。
+8. 撤销后 401 错误码不一致——新增 `guards.sessionFailure()` / `requireActiveSession()`，devices / continuity / clipboard / pairing 统一返回 `SESSION_REVOKED` / `DEVICE_REVOKED`。
+9. `PAIRING_ATTEMPTS_EXCEEDED` 分支不可达（配对只有 pending 能被认领、认领后即置 claimed，attempts 永不累加）——删除假保护，真实防线（10 分钟 TTL + 10 次/10 分钟/IP + 源设备确认）写入注释。
+10. E2E 就绪竞态：Playwright 以 `/api/health` 判定 e2e-server 就绪时，Worker 已健康但 `buildFixtures()` 仍在写本地 D1，测试与夹具写入抢锁曾致夹具生成失败、服务退出（`ECONNRESET`）。已把就绪探针改为夹具管理端口 `GET /__e2e/ready`（该端口只在夹具全部生成后监听）。
+
+**7. 未完成 / 风险**
+
+- 生产部署、生产验证、真实域名均未做；非 Chrome 引擎已用 Firefox 157 + WebKit 27.2 覆盖，但真机 Safari / iOS 未验证。
+- 独立 Sandbox Origin：已有本地真实两源隔离实测（`tests/e2e/sandbox-origin.spec.ts`）；但生产域名/证书/Worker route **未创建**，且实测发现 Cookie 作用域是 host（换端口不隔离），落地必须使用独立 host。
+- 真实 10 分钟配对 TTL 已由 `npm run qa:pairing-ttl` 覆盖；两台物理设备的人工冒烟未做。
+- 导航逃逸只能事后惩罚；D1 是安装完整性信任根（安装接口不读 R2 原文）。
+
+**结论：`Partially Verified`**（本地 / 隔离环境全部通过；生产侧按门禁未执行）。
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash

@@ -1,0 +1,864 @@
+      /* ---------------- Finder ---------------- */
+
+      .finder {
+        display: grid;
+        grid-template-columns: 148px minmax(0, 1fr);
+        height: 100%;
+      }
+
+      .finder-side {
+        padding: 14px 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border-right: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .side-title {
+        margin: 12px 0 6px;
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.36);
+      }
+
+      .side-title:first-child {
+        margin-top: 0;
+      }
+
+      .side-item {
+        display: block;
+        padding: 6px 9px;
+        border-radius: 7px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.62);
+      }
+
+      .side-item.is-active {
+        background: rgba(111, 140, 255, 0.24);
+        color: #fff;
+      }
+
+      .finder-files {
+        padding: 8px;
+        overflow: auto;
+      }
+
+      .file-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 9px;
+        color: inherit;
+        text-decoration: none;
+        transition: background-color 0.16s ease;
+      }
+
+      .file-row:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .file-icon {
+        width: 26px;
+        height: 30px;
+        flex: none;
+        border-radius: 3px;
+        background: linear-gradient(180deg, #ffffff 0%, #d9dfea 100%);
+        position: relative;
+      }
+
+      .file-icon::after {
+        content: "";
+        position: absolute;
+        left: 5px;
+        right: 5px;
+        top: 9px;
+        height: 2px;
+        background: rgba(70, 84, 110, 0.45);
+        box-shadow: 0 5px 0 rgba(70, 84, 110, 0.3), 0 10px 0 rgba(70, 84, 110, 0.2);
+      }
+
+      .file-main {
+        min-width: 0;
+        display: grid;
+        gap: 3px;
+      }
+
+      .file-name {
+        font-size: 13px;
+        color: #f2f5fa;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .file-meta {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.42);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .file-index {
+        margin-left: auto;
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.28);
+      }
+
+      .finder-empty {
+        padding: 24px 12px;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      /* ---------------- 关于 ---------------- */
+
+      .about {
+        padding: 24px 26px;
+        font-size: 13px;
+        line-height: 1.85;
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .about-kicker {
+        margin: 0 0 4px;
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.38);
+      }
+
+      .about h2 {
+        margin: 0 0 12px;
+        font-size: 22px;
+        color: #fff;
+      }
+
+      .about p {
+        margin: 0 0 10px;
+      }
+
+      .about-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .about-links a {
+        font-size: 12.5px;
+        color: #9fb4ff;
+        text-decoration: none;
+      }
+
+      .about-links a:hover {
+        text-decoration: underline;
+      }
+
+      /* ---------------- 终端 ---------------- */
+
+      .term {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: rgba(8, 10, 16, 0.82);
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 12.5px;
+      }
+
+      .term-out {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 14px 16px 6px;
+        line-height: 1.7;
+      }
+
+      .term-line {
+        margin: 0 0 2px;
+        color: rgba(232, 240, 255, 0.82);
+        white-space: pre-wrap;
+      }
+
+      .term-muted {
+        color: rgba(232, 240, 255, 0.42);
+      }
+
+      .term-echo {
+        color: #7ef0b0;
+      }
+
+      .term-error {
+        color: #ff8f8f;
+      }
+
+      .term-input-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 16px 14px;
+      }
+
+      .term-prompt {
+        color: #7ef0b0;
+      }
+
+      .term-input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: none;
+        color: #eef1f7;
+        font: inherit;
+        outline: none;
+        caret-color: #7ef0b0;
+      }
+
+      /* ---------------- 设置 ---------------- */
+
+      .settings {
+        padding: 20px 22px;
+      }
+
+      .wall-picks {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .dock-picker {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px 12px;
+        margin-bottom: 8px;
+      }
+
+      .dock-opt {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.72);
+        cursor: pointer;
+      }
+
+      .dock-opt:hover {
+        color: #fff;
+      }
+
+      .dock-opt input {
+        width: 13px;
+        height: 13px;
+        accent-color: #6f8cff;
+        cursor: pointer;
+      }
+
+      .settings-tip {
+        margin: 0 0 18px;
+        font-size: 10.5px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.34);
+      }
+
+      .wall-pick {
+        flex: 1;
+        padding: 9px 0;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(255, 255, 255, 0.72);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .wall-pick:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .wall-pick.is-active {
+        border-color: var(--os-accent);
+        background: rgba(111, 140, 255, 0.22);
+        color: #fff;
+      }
+
+      .settings-note {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.8;
+        color: rgba(255, 255, 255, 0.46);
+      }
+
+      /* 设置：外观主题 */
+      .theme-picks {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .theme-pick {
+        flex: 1;
+        padding: 9px 0;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(255, 255, 255, 0.72);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .theme-pick:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .theme-pick.is-active {
+        border-color: var(--os-accent);
+        background: rgba(111, 140, 255, 0.22);
+        color: #fff;
+      }
+
+      /* 设置：开关行 */
+      .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 9px 12px;
+        margin-bottom: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.78);
+        cursor: pointer;
+      }
+
+      .settings-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .settings-row input {
+        width: 15px;
+        height: 15px;
+        accent-color: #6f8cff;
+        cursor: pointer;
+      }
+
+      /* 设置：数据管理 */
+      .data-actions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .data-btn {
+        flex: 1;
+        padding: 8px 0;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.72);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .data-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+      }
+
+      .data-btn.is-danger {
+        border-color: rgba(255, 95, 87, 0.4);
+        color: #ff9b95;
+      }
+
+      .data-btn.is-danger:hover {
+        background: rgba(255, 95, 87, 0.16);
+      }
+
+      /* 设置：系统信息 */
+      .sys-info {
+        display: grid;
+        gap: 2px;
+        margin-bottom: 8px;
+        padding: 4px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .sys-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 7px 0;
+        font-size: 12px;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+      }
+
+      .sys-row:last-child {
+        border-bottom: 0;
+      }
+
+      .sys-row span {
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .sys-row b {
+        font-weight: 550;
+        color: rgba(255, 255, 255, 0.82);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---------------- 音乐 ---------------- */
+
+      .music {
+        display: grid;
+        gap: 12px;
+        padding: 18px 20px 20px;
+      }
+
+      .music-cover {
+        position: relative;
+        height: 88px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: linear-gradient(135deg, #6f8cff 0%, #b06eff 100%);
+      }
+
+      .cover-disc {
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        width: 62px;
+        height: 62px;
+        margin-top: -31px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #161922 0 16%, #262b38 16% 42%, #161922 42% 100%);
+        animation: discSpin 9s linear infinite;
+      }
+
+      .music-title {
+        margin: 0;
+        font-size: 15px;
+        color: #fff;
+      }
+
+      .music-sub {
+        margin: 2px 0 0;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .music-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .music-play {
+        flex: none;
+        width: 36px;
+        height: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 50%;
+        background: rgba(111, 140, 255, 0.26);
+        color: #fff;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .music-play:hover {
+        background: rgba(111, 140, 255, 0.44);
+      }
+
+      .music-wave {
+        flex: 1;
+        min-width: 0;
+        height: 42px;
+      }
+
+      .music-note {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .music-step {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border: 0;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.66);
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        transition: background-color 0.18s ease, color 0.18s ease;
+      }
+
+      .music-step:hover {
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+      }
+
+      .music-list {
+        max-height: 152px;
+        margin: 14px 0 0;
+        padding: 0;
+        overflow: auto;
+        list-style: none;
+        display: grid;
+        gap: 2px;
+      }
+
+      .music-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 9px;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+      }
+
+      .music-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .music-row.is-current {
+        background: rgba(111, 140, 255, 0.16);
+      }
+
+      .music-row-no {
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .music-row.is-playing .music-row-no {
+        color: #8fa6ff;
+      }
+
+      .music-row-name {
+        flex: 1;
+        overflow: hidden;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.78);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .music-row.is-current .music-row-name {
+        color: #fff;
+      }
+
+      @keyframes discSpin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ---------------- 成就 ---------------- */
+
+      .ach-wrap {
+        padding: 18px 20px 20px;
+      }
+
+      .ach-head {
+        margin: 0 0 14px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .ach-head b {
+        font-size: 15px;
+        color: #ffd479;
+      }
+
+      .ach-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .ach {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .ach.is-got {
+        border-color: rgba(255, 212, 121, 0.32);
+        background: rgba(255, 212, 121, 0.08);
+      }
+
+      .ach-mark {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        flex: none;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.07);
+        font-family: var(--font-serif);
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .ach.is-got .ach-mark {
+        background: linear-gradient(150deg, #ffd479, #d1902a);
+        color: #3a2606;
+      }
+
+      .ach-body {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .ach-name {
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .ach.is-got .ach-name {
+        color: #fff;
+      }
+
+      .ach-desc {
+        overflow: hidden;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.3);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ---------------- 成就提示 ---------------- */
+
+      .toast-stack {
+        position: fixed;
+        right: 18px;
+        bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        z-index: 500;
+        display: grid;
+        gap: 8px;
+        pointer-events: none;
+      }
+
+      .toast {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 196px;
+        padding: 10px 14px 10px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(26, 29, 38, 0.94);
+        box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(18px);
+        opacity: 0;
+        transform: translateX(24px) scale(0.96);
+        transition: opacity 0.3s ease, transform 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+      }
+
+      .toast.is-in {
+        opacity: 1;
+        transform: none;
+      }
+
+      .toast-mark {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        flex: none;
+        border-radius: 9px;
+        background: linear-gradient(150deg, #ffd479, #d1902a);
+        font-family: var(--font-serif);
+        font-size: 15px;
+        color: #3a2606;
+      }
+
+      .toast-body {
+        display: grid;
+        gap: 2px;
+      }
+
+      .toast-kicker {
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .toast-name {
+        font-size: 13px;
+        color: #fff;
+      }
+
+      /* ---------------- 通知中心 ---------------- */
+
+      .notif-center {
+        position: fixed;
+        top: 46px;
+        right: 12px;
+        z-index: 600;
+        width: 320px;
+        max-width: calc(100vw - 24px);
+        max-height: min(72vh, 520px);
+        display: flex;
+        flex-direction: column;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.96);
+        box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(24px) saturate(1.5);
+        overflow: hidden;
+        animation: notifIn 0.22s var(--os-ease);
+      }
+
+      .notif-center[hidden] {
+        display: none;
+      }
+
+      @keyframes notifIn {
+        from {
+          opacity: 0;
+          transform: translateY(-8px) translateX(12px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .notif-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .notif-head-title {
+        font-size: 13px;
+        font-weight: 650;
+        color: #fff;
+      }
+
+      .notif-clear {
+        padding: 4px 10px;
+        border: 0;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.6);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease;
+      }
+
+      .notif-clear:hover {
+        background: rgba(255, 255, 255, 0.14);
+        color: #fff;
+      }
+
+      .notif-list {
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 8px;
+        display: grid;
+        gap: 4px;
+      }
+
+      .notif-empty {
+        margin: 0;
+        padding: 32px 16px;
+        text-align: center;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .notif-empty[hidden] {
+        display: none;
+      }
+
+      .notif-item {
+        position: relative;
+        display: flex;
+        gap: 11px;
+        padding: 11px 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid transparent;
+      }
+
+      .notif-item.is-new {
+        background: rgba(111, 140, 255, 0.09);
+        border-color: rgba(111, 140, 255, 0.16);
+      }
+
+      .notif-icon {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.07);
+        font-family: var(--font-serif);
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .notif-item.is-new .notif-icon {
+        background: linear-gradient(150deg, #6f8cff, #b06eff);
+        color: #fff;
+      }
+
+      .notif-body {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+
+      .notif-title {
+        margin: 0;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .notif-text {
+        margin: 0;
+        font-size: 11.5px;
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.55);
+        overflow-wrap: break-word;
+      }
+
+      .notif-time {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.32);
+        margin-top: 3px;
+      }
+

@@ -1,0 +1,637 @@
+/* ============================================================
+   Guandao OS 1.9 · 质量层样式
+   性能实验室 / 系统诊断中心 / 崩溃占位 / 在线状态
+   —— 全部复用 1.4 的 --g-* 与 1.1 的 --os-* 设计 Token，不另起一套颜色
+   ============================================================ */
+
+/* ---------------- 指标卡片 ---------------- */
+
+.g19-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.g19-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 14px;
+  border-radius: var(--os-r-md);
+  border: 1px solid var(--g-line);
+  background: var(--g-card);
+  min-width: 0;
+}
+
+.g19-card-k {
+  font-size: 11.5px;
+  color: var(--g-dim);
+  letter-spacing: 0.02em;
+}
+
+.g19-card-v {
+  font-size: 20px;
+  font-weight: 650;
+  color: var(--g-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g19-card-s {
+  font-size: 11.5px;
+  color: var(--g-faint);
+  line-height: 1.45;
+}
+
+/* ---------------- 面板 / 列表 ---------------- */
+
+.g19-panel {
+  border: 1px solid var(--g-line);
+  border-radius: var(--os-r-md);
+  background: var(--g-surface-2);
+  padding: 13px 14px;
+  margin-bottom: 14px;
+}
+
+.g19-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.g19-panel-head h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 620;
+  color: var(--g-text);
+}
+
+.g19-muted {
+  font-size: 11.5px;
+  color: var(--g-faint);
+}
+
+.g19-note {
+  margin: 10px 0 0;
+  font-size: 11.8px;
+  line-height: 1.65;
+  color: var(--g-dim);
+}
+
+.g19-note code,
+.g19-panel code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--g-surface-3);
+  color: var(--g-text);
+}
+
+.g19-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.g19-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.g19-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--g-dim);
+}
+
+.g19-list li:nth-child(odd) {
+  background: var(--g-surface-2);
+}
+
+.g19-list li code {
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  padding: 0;
+  color: var(--g-text);
+}
+
+.g19-list li span {
+  font-variant-numeric: tabular-nums;
+  color: var(--g-faint);
+  flex: none;
+}
+
+.g19-list li button {
+  min-height: 26px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+/* ---------------- 键值表 ---------------- */
+
+.g19-kv {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.g19-kv li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 12px;
+  padding: 4px 2px;
+  border-bottom: 1px dashed var(--g-line);
+}
+
+.g19-kv li:last-child {
+  border-bottom: 0;
+}
+
+.g19-kv li span {
+  color: var(--g-dim);
+}
+
+.g19-kv li b {
+  color: var(--g-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  word-break: break-word;
+}
+
+/* ---------------- 表格 ---------------- */
+
+.g19-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+
+.g19-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--g-faint);
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--g-line-2);
+}
+
+.g19-table td {
+  padding: 9px;
+  border-bottom: 1px solid var(--g-line);
+  color: var(--g-text);
+  vertical-align: top;
+}
+
+.g19-table tr.is-empty td {
+  color: var(--g-faint);
+}
+
+.g19-table td.is-good {
+  color: var(--os-success);
+}
+
+.g19-table td.is-bad {
+  color: var(--os-warning);
+}
+
+.g19-td-note {
+  color: var(--g-dim);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* ---------------- 健康检查行 ---------------- */
+
+.g19-health {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.g19-health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--g-line);
+  border-radius: var(--os-r-sm);
+  background: var(--g-card);
+}
+
+.g19-health-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.g19-health-name b {
+  font-size: 12.5px;
+  color: var(--g-text);
+  font-weight: 600;
+}
+
+.g19-health-name span {
+  font-size: 11.5px;
+  color: var(--g-faint);
+  line-height: 1.5;
+}
+
+.g19-health-state {
+  flex: none;
+}
+
+/* ---------------- 自检 ---------------- */
+
+.g19-check {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.g19-check li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--os-r-sm);
+  background: var(--g-surface-2);
+}
+
+.g19-check-ico {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.g19-check-ico.is-ok {
+  background: color-mix(in srgb, var(--os-success) 20%, transparent);
+  color: var(--os-success);
+}
+
+.g19-check-ico.is-warn {
+  background: color-mix(in srgb, var(--os-warning) 20%, transparent);
+  color: var(--os-warning);
+}
+
+.g19-check-ico.is-danger {
+  background: color-mix(in srgb, var(--os-danger) 20%, transparent);
+  color: var(--os-danger);
+}
+
+.g19-check-ico.is-mute {
+  background: var(--g-surface-3);
+  color: var(--g-faint);
+}
+
+.g19-check-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.g19-check-body b {
+  font-size: 12.5px;
+  color: var(--g-text);
+  font-weight: 600;
+}
+
+.g19-check-body span {
+  font-size: 11.5px;
+  color: var(--g-dim);
+  line-height: 1.55;
+}
+
+.g19-check-ms {
+  flex: none;
+  font-size: 11px;
+  color: var(--g-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 诊断记录 ---------------- */
+
+.g19-diag-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.g19-diag-item {
+  padding: 9px 11px;
+  border-radius: var(--os-r-sm);
+  background: var(--g-surface-2);
+  border-left: 2px solid var(--g-line-2);
+}
+
+.g19-diag-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--g-dim);
+}
+
+.g19-diag-top b {
+  color: var(--g-text);
+  font-weight: 600;
+}
+
+.g19-diag-time {
+  margin-left: auto;
+  color: var(--g-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.g19-diag-msg {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--g-text);
+  word-break: break-word;
+}
+
+.g19-diag-meta {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--g-faint);
+}
+
+.g19-diag-stack {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: var(--g-surface-3);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--g-dim);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.g19-bullets {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--g-dim);
+  line-height: 1.6;
+}
+
+/* ---------------- 崩溃占位 ---------------- */
+
+.g19-crash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  height: 100%;
+  min-height: 220px;
+  padding: 26px 22px;
+}
+
+.g19-crash-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--os-danger) 18%, transparent);
+  color: var(--os-danger);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.g19-crash-title {
+  margin: 4px 0 0;
+  font-size: 14.5px;
+  font-weight: 620;
+  color: var(--g-text);
+}
+
+.g19-crash-msg {
+  margin: 0;
+  max-width: 420px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--g-dim);
+}
+
+.g19-crash-hint,
+.g19-crash-code {
+  margin: 0;
+  font-size: 11px;
+  color: var(--g-faint);
+}
+
+.g19-crash-code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.g19-crash-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.g19-crash-foot {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--g-faint);
+}
+
+/* ---------------- 应用加载骨架 ---------------- */
+
+.g19-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px;
+}
+
+.g19-loading-bar {
+  height: 9px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--g-surface-2) 0%, var(--g-surface-3) 50%, var(--g-surface-2) 100%);
+  background-size: 200% 100%;
+  animation: g19-shimmer 1.1s linear infinite;
+}
+
+.g19-loading-bar.is-short {
+  width: 42%;
+}
+
+.g19-loading-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--g-faint);
+}
+
+@keyframes g19-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------------- 在线状态徽标 ---------------- */
+
+.g19-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--g-dim);
+}
+
+.g19-conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--os-success);
+}
+
+.g19-conn[data-state="offline"] .g19-conn-dot {
+  background: var(--os-warning);
+}
+
+.g19-conn[data-state="reconnecting"] .g19-conn-dot {
+  background: var(--os-accent);
+  animation: g19-pulse 1.4s ease-in-out infinite;
+}
+
+.g19-conn[data-state="failed"] .g19-conn-dot {
+  background: var(--os-danger);
+}
+
+@keyframes g19-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ---------------- 可访问性修复（1.9） ---------------- */
+
+/*
+ * 1.0–1.8 有 14 处 input/slider 写了 outline: none，且 global.css 的 :focus-visible
+ * 先于内联样式加载，同优先级下被覆盖——键盘用户看不到焦点在哪。
+ * 这里用 !important 把焦点框强制要回来，只影响键盘焦点（:focus-visible）。
+ */
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--os-accent) !important;
+  outline-offset: 2px !important;
+  border-radius: 6px;
+}
+
+/* 桌面为了拖拽禁用了文本选择，但笔记、终端、文章正文必须能选中复制 */
+.os .win-body,
+.os .win-body *,
+.g19-crash-msg,
+.g19-diag-stack {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 移动端底部安全区内的可点区域不被手势条挡住 */
+@media (max-width: 720px) {
+  .g19-crash-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+}
+
+/* ---------------- 浅色模式 ---------------- */
+
+[data-os-theme="light"] .g19-card,
+[data-os-theme="light"] .g19-health-row {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+[data-os-theme="light"] .g19-panel {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+[data-os-theme="light"] .g19-list li:nth-child(odd),
+[data-os-theme="light"] .g19-check li,
+[data-os-theme="light"] .g19-diag-item {
+  background: rgba(24, 30, 42, 0.04);
+}
+
+[data-os-theme="light"] .g19-diag-stack {
+  background: rgba(24, 30, 42, 0.06);
+}
+
+/* ---------------- 减少动效 ---------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .g19-loading-bar,
+  .g19-conn-dot {
+    animation: none !important;
+  }
+}
+
+[data-reduce-motion="1"] .g19-loading-bar,
+[data-reduce-motion="1"] .g19-conn-dot {
+  animation: none !important;
+}

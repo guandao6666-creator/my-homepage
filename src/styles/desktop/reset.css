@@ -1,0 +1,35 @@
+      /* 移动端地址栏会伸缩，这里把滚动彻底锁死：
+         html 定高、body 固定定位，容器用 dvh 跟着可视区走 */
+      html {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+
+      body {
+        position: fixed;
+        inset: 0;
+        margin: 0;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: #0b0d14;
+        color: var(--os-fg);
+        font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .os {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      .os.is-off {
+        /* Dock 的 backdrop-filter 会生成独立合成层，visibility 盖不住它 */
+        display: none;
+      }
+

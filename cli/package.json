@@ -1,0 +1,13 @@
+{
+  "name": "guandao-plugin-cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "guandao": "./guandao.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "description": "Guandao OS 1.7 plugin CLI: create / validate / package / preview / publish"
+}

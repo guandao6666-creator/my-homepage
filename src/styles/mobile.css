@@ -1,0 +1,1183 @@
+/* ============================================================
+   Guandao OS 1.8 · Mobile Companion (/m/)
+   独立移动端视觉与布局：不是桌面缩略图，也不加载窗口系统
+   ============================================================ */
+
+:root {
+  --m-bg: #070a11;
+  --m-bg-2: #0d1220;
+  --m-panel: rgba(21, 26, 39, 0.72);
+  --m-panel-solid: #121725;
+  --m-panel-2: rgba(30, 36, 52, 0.86);
+  --m-line: rgba(255, 255, 255, 0.1);
+  --m-line-2: rgba(255, 255, 255, 0.18);
+  --m-text: #eef1f7;
+  --m-dim: rgba(238, 241, 247, 0.6);
+  --m-faint: rgba(238, 241, 247, 0.38);
+  --m-accent: #7c9cff;
+  --m-accent-2: #c084fc;
+  --m-ok: #5ecf9a;
+  --m-warn: #ffd479;
+  --m-danger: #ff8f8f;
+  --m-radius: 20px;
+  --m-radius-sm: 13px;
+  --m-tabbar: 66px;
+  --m-safe-top: env(safe-area-inset-top, 0px);
+  --m-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --m-font: "Inter", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+}
+
+html[data-m-theme="light"] {
+  --m-bg: #eef1f7;
+  --m-bg-2: #e4e9f3;
+  --m-panel: rgba(255, 255, 255, 0.78);
+  --m-panel-solid: #ffffff;
+  --m-panel-2: rgba(255, 255, 255, 0.94);
+  --m-line: rgba(24, 30, 42, 0.1);
+  --m-line-2: rgba(24, 30, 42, 0.18);
+  --m-text: #1b2130;
+  --m-dim: rgba(27, 33, 48, 0.62);
+  --m-faint: rgba(27, 33, 48, 0.42);
+  --m-accent: #4a63d8;
+  --m-accent-2: #8b4fd8;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--m-bg);
+  color: var(--m-text);
+  font-family: var(--m-font);
+  font-size: 15px;
+  line-height: 1.5;
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100dvh;
+  background:
+    radial-gradient(120% 60% at 8% -10%, color-mix(in srgb, var(--m-accent) 26%, transparent), transparent 62%),
+    radial-gradient(100% 50% at 100% 0%, color-mix(in srgb, var(--m-accent-2) 18%, transparent), transparent 58%),
+    linear-gradient(180deg, var(--m-bg-2), var(--m-bg) 46%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--m-wall, none);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.32;
+  filter: saturate(0.9);
+  pointer-events: none;
+}
+
+html[data-m-theme="light"] body::before {
+  opacity: 0.18;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 0;
+  background: none;
+}
+
+.m-app {
+  min-height: 100dvh;
+  padding-top: var(--m-safe-top);
+  padding-bottom: calc(var(--m-tabbar) + var(--m-safe-bottom) + 10px);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* ------------------------------ 顶栏 ------------------------------ */
+
+.m-top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--m-bg) 72%, transparent);
+  border-bottom: 1px solid transparent;
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.m-top.is-scrolled {
+  border-bottom-color: var(--m-line);
+}
+
+.m-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--m-accent), var(--m-accent-2));
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.m-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.m-top-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.m-top-text b {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-top-text span {
+  display: block;
+  font-size: 10.5px;
+  color: var(--m-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--m-dim);
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--m-line);
+  background: var(--m-panel);
+  white-space: nowrap;
+}
+
+.m-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--m-ok);
+  box-shadow: 0 0 8px var(--m-ok);
+}
+
+.m-status.is-offline i {
+  background: var(--m-warn);
+  box-shadow: none;
+}
+
+.m-status.is-guest i {
+  background: var(--m-faint);
+  box-shadow: none;
+}
+
+/* ------------------------------ 内容 ------------------------------ */
+
+.m-scroll {
+  padding: 4px 16px 24px;
+}
+
+.m-greet {
+  padding: 14px 2px 16px;
+}
+
+.m-greet p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--m-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.m-greet h1 {
+  margin: 6px 0 2px;
+  font-size: 26px;
+  line-height: 1.24;
+  letter-spacing: -0.02em;
+}
+
+.m-greet h1 em {
+  font-style: normal;
+  background: linear-gradient(100deg, var(--m-accent), var(--m-accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.m-greet small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--m-faint);
+}
+
+.m-section {
+  margin-top: 20px;
+}
+
+.m-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+  padding: 0 2px;
+}
+
+.m-sec-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.m-sec-head button,
+.m-sec-head a {
+  font-size: 11px;
+  color: var(--m-dim);
+  padding: 4px 2px;
+}
+
+.m-card {
+  border: 1px solid var(--m-line);
+  border-radius: var(--m-radius);
+  background: var(--m-panel);
+  box-shadow: 0 20px 44px -32px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+}
+
+.m-card-pad {
+  padding: 14px;
+}
+
+.m-hero {
+  position: relative;
+  padding: 18px 16px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--m-line-2);
+  background:
+    radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--m-accent-2) 30%, transparent), transparent 60%),
+    linear-gradient(140deg, color-mix(in srgb, var(--m-accent) 22%, transparent), transparent 62%),
+    var(--m-panel);
+}
+
+.m-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.m-hero h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.m-hero p {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--m-dim);
+  max-width: 30ch;
+}
+
+.m-hero-stats {
+  display: flex;
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.m-hero-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.m-hero-stats b {
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-hero-stats span {
+  font-size: 10px;
+  color: var(--m-faint);
+}
+
+.m-quick {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.m-quick button,
+.m-quick a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  min-height: 74px;
+  padding: 11px 4px;
+  border-radius: 16px;
+  border: 1px solid var(--m-line);
+  background: var(--m-panel);
+  font-size: 10.5px;
+  color: var(--m-dim);
+  text-align: center;
+}
+
+.m-quick button:active,
+.m-quick a:active {
+  transform: scale(0.97);
+  background: var(--m-panel-2);
+}
+
+.m-quick .m-ico {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--m-accent) 20%, transparent);
+  color: var(--m-accent);
+}
+
+.m-quick .m-ico svg {
+  width: 17px;
+  height: 17px;
+}
+
+.m-row-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.m-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 11px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--m-line);
+}
+
+.m-row:last-child {
+  border-bottom: 0;
+}
+
+.m-row:active {
+  background: color-mix(in srgb, var(--m-text) 5%, transparent);
+}
+
+/* 2.0：手机伴侣底栏的「桌面」出口见 .m-tab-desktop。
+   移动端默认落在 /m/，底栏入口负责回到博客、全部应用与窗口系统。 */
+a.m-row {
+  text-decoration: none;
+  color: inherit;
+}
+
+.m-row-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.m-row-main b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-row-main span {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--m-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-row-side {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--m-faint);
+  text-align: right;
+}
+
+.m-check {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  border: 1.5px solid var(--m-line-2);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: transparent;
+}
+
+.m-check.is-on {
+  background: var(--m-ok);
+  border-color: var(--m-ok);
+  color: #062018;
+}
+
+.m-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  background: color-mix(in srgb, var(--m-accent) 16%, transparent);
+  color: var(--m-accent);
+  border: 1px solid color-mix(in srgb, var(--m-accent) 26%, transparent);
+}
+
+.m-pill.warn {
+  background: color-mix(in srgb, var(--m-warn) 16%, transparent);
+  color: var(--m-warn);
+  border-color: color-mix(in srgb, var(--m-warn) 28%, transparent);
+}
+
+.m-pill.ok {
+  background: color-mix(in srgb, var(--m-ok) 16%, transparent);
+  color: var(--m-ok);
+  border-color: color-mix(in srgb, var(--m-ok) 28%, transparent);
+}
+
+.m-empty {
+  padding: 26px 16px;
+  text-align: center;
+  color: var(--m-faint);
+  font-size: 12px;
+}
+
+.m-empty b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: var(--m-dim);
+}
+
+.m-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--m-line-2);
+  background: var(--m-panel);
+  font-size: 12.5px;
+  font-weight: 560;
+}
+
+.m-btn.primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--m-accent), var(--m-accent-2));
+  color: #fff;
+}
+
+.m-btn.ghost {
+  background: transparent;
+  border-color: var(--m-line);
+  color: var(--m-dim);
+}
+
+.m-btn.danger {
+  color: var(--m-danger);
+  border-color: color-mix(in srgb, var(--m-danger) 30%, transparent);
+}
+
+.m-btn:active {
+  transform: scale(0.98);
+}
+
+.m-btn.block {
+  width: 100%;
+}
+
+.m-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--m-line-2);
+  background: color-mix(in srgb, var(--m-bg) 50%, transparent);
+  font-size: 13px;
+  outline: none;
+}
+
+.m-input:focus {
+  border-color: color-mix(in srgb, var(--m-accent) 70%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-accent) 16%, transparent);
+}
+
+textarea.m-input {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.m-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 42px;
+  border-radius: 13px;
+  border: 1px solid var(--m-line);
+  background: var(--m-panel);
+}
+
+.m-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+}
+
+.m-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 8px;
+  scrollbar-width: none;
+}
+
+.m-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.m-chip {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--m-line);
+  background: var(--m-panel);
+  font-size: 11px;
+  color: var(--m-dim);
+}
+
+.m-chip.is-on {
+  background: color-mix(in srgb, var(--m-accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--m-accent) 45%, transparent);
+  color: var(--m-text);
+}
+
+/* ------------------------------ 笔记编辑 ------------------------------ */
+
+.m-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: calc(100dvh - var(--m-tabbar) - var(--m-safe-bottom) - 150px);
+}
+
+.m-editor input.m-title {
+  border: 0;
+  background: transparent;
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  padding: 8px 2px;
+  outline: none;
+}
+
+.m-editor textarea {
+  flex: 1;
+  min-height: 45dvh;
+  border: 0;
+  background: transparent;
+  outline: none;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--m-text);
+  padding: 4px 2px;
+}
+
+.m-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0 2px;
+  flex-wrap: nowrap;
+}
+
+.m-editor-bar .m-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 0 10px;
+  font-size: 11.5px;
+}
+
+.m-editor-bar .m-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.m-editor-bar .m-saved {
+  margin-left: auto;
+  font-size: 9.5px;
+  color: var(--m-faint);
+  white-space: nowrap;
+}
+
+/* ------------------------------ 日历 ------------------------------ */
+
+.m-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.m-cal-head {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.m-cal-head span {
+  text-align: center;
+  font-size: 9.5px;
+  color: var(--m-faint);
+  padding: 3px 0;
+}
+
+.m-cal button {
+  position: relative;
+  aspect-ratio: 1 / 1.05;
+  border-radius: 11px;
+  font-size: 12px;
+  color: var(--m-dim);
+}
+
+.m-cal button.is-out {
+  color: var(--m-faint);
+  opacity: 0.5;
+}
+
+.m-cal button.is-today {
+  color: var(--m-accent);
+  font-weight: 700;
+}
+
+.m-cal button.is-sel {
+  background: linear-gradient(135deg, var(--m-accent), var(--m-accent-2));
+  color: #fff;
+}
+
+.m-cal button i {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--m-accent);
+}
+
+.m-cal button.is-sel i {
+  background: #fff;
+}
+
+.m-cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.m-cal-nav b {
+  font-size: 14px;
+}
+
+.m-cal-nav button {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--m-line);
+  display: grid;
+  place-items: center;
+}
+
+.m-cal-nav .m-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-width: 56px;
+  padding: 0 10px;
+}
+
+/* ------------------------------ 底部导航 ------------------------------ */
+
+.m-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  height: calc(var(--m-tabbar) + var(--m-safe-bottom));
+  padding: 6px 8px var(--m-safe-bottom);
+  background: color-mix(in srgb, var(--m-bg) 78%, transparent);
+  border-top: 1px solid var(--m-line);
+  backdrop-filter: blur(20px) saturate(1.3);
+}
+
+.m-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 14px;
+  font-size: 9.5px;
+  color: var(--m-faint);
+  min-height: 52px;
+}
+
+.m-tab svg {
+  width: 20px;
+  height: 20px;
+}
+
+.m-tab.is-on {
+  color: var(--m-accent);
+}
+
+.m-tab.is-on svg {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--m-accent) 55%, transparent));
+}
+
+/* 2.0：底栏的「桌面」出口（链接，不是路由 tab） */
+.m-tab-desktop {
+  text-decoration: none;
+  color: var(--m-faint);
+}
+
+.m-tab-desktop:active {
+  color: var(--m-accent);
+}
+
+.m-tab:active {
+  background: color-mix(in srgb, var(--m-text) 6%, transparent);
+}
+
+.m-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--m-tabbar) + var(--m-safe-bottom) + 14px);
+  z-index: 35;
+  width: 50px;
+  height: 50px;
+  border-radius: 17px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--m-accent), var(--m-accent-2));
+  box-shadow: 0 16px 30px -12px color-mix(in srgb, var(--m-accent) 65%, transparent);
+  font-size: 24px;
+}
+
+/* ------------------------------ 底部抽屉 ------------------------------ */
+
+.m-sheet-layer[hidden] {
+  display: none !important;
+}
+
+.m-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.m-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 5, 10, 0.56);
+  backdrop-filter: blur(3px);
+  animation: m-fade 0.18s ease both;
+}
+
+.m-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: min(90dvh, 780px);
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px calc(16px + var(--m-safe-bottom));
+  border-radius: 24px 24px 0 0;
+  border: 1px solid var(--m-line-2);
+  border-bottom: 0;
+  background: var(--m-panel-solid);
+  color: var(--m-text);
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.4);
+  animation: m-sheet-up 0.26s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.m-sheet-grip {
+  width: 38px;
+  height: 4px;
+  margin: 2px auto 10px;
+  border-radius: 99px;
+  background: var(--m-line-2);
+}
+
+.m-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.m-sheet-head h3 {
+  margin: 0;
+  font-size: 15px;
+  flex: 1;
+}
+
+.m-sheet-head button {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--m-dim);
+  font-size: 18px;
+}
+
+.m-sheet-body {
+  overflow: auto;
+  min-height: 0;
+  padding-bottom: 4px;
+}
+
+.m-sheet-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.m-sheet-actions .m-btn {
+  flex: 1;
+}
+
+@keyframes m-sheet-up {
+  from {
+    transform: translateY(28px);
+    opacity: 0.6;
+  }
+}
+
+@keyframes m-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------ 提示 ------------------------------ */
+
+.m-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--m-tabbar) + var(--m-safe-bottom) + 22px);
+  transform: translateX(-50%) translateY(12px);
+  z-index: 120;
+  max-width: calc(100vw - 40px);
+  padding: 10px 15px;
+  border-radius: 12px;
+  background: rgba(16, 20, 30, 0.94);
+  color: #eef1f7;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.m-toast.is-on {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.m-toast.is-danger {
+  border-color: rgba(255, 143, 143, 0.4);
+  color: #ffd0d0;
+}
+
+/* ------------------------------ 登录 / 空态 ------------------------------ */
+
+.m-login {
+  padding: 22px 16px;
+  text-align: center;
+}
+
+.m-login .m-logo {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--m-accent), var(--m-accent-2));
+}
+
+.m-login h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.m-login p {
+  margin: 0 auto 14px;
+  max-width: 32ch;
+  font-size: 11.5px;
+  color: var(--m-dim);
+}
+
+.m-offline {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--m-warn) 30%, transparent);
+  background: color-mix(in srgb, var(--m-warn) 10%, transparent);
+  color: var(--m-warn);
+  font-size: 11px;
+}
+
+.m-device-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--m-line);
+}
+
+.m-device-row:last-child {
+  border-bottom: 0;
+}
+
+.m-device-ico {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--m-accent) 14%, transparent);
+  color: var(--m-accent);
+  flex: 0 0 auto;
+}
+
+.m-device-ico svg {
+  width: 19px;
+  height: 19px;
+}
+
+.m-code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 30px;
+  letter-spacing: 0.24em;
+  text-align: center;
+  padding: 14px 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-qr {
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff;
+  width: 176px;
+  margin: 10px auto;
+}
+
+.m-qr svg {
+  width: 156px;
+  height: 156px;
+  display: block;
+}
+
+.m-clip-item {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--m-line);
+}
+
+.m-clip-item:last-child {
+  border-bottom: 0;
+}
+
+.m-clip-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12.5px;
+  line-height: 1.55;
+  max-height: 8.5em;
+  overflow: hidden;
+}
+
+.m-clip-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 9.5px;
+  color: var(--m-faint);
+}
+
+.m-clip-meta button {
+  margin-left: auto;
+  color: var(--m-accent);
+  font-size: 11px;
+}
+
+.m-note-item {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--m-line);
+}
+
+.m-note-item:last-child {
+  border-bottom: 0;
+}
+
+.m-note-item b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 620;
+}
+
+.m-note-item p {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: var(--m-faint);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.m-note-item span {
+  display: block;
+  margin-top: 5px;
+  font-size: 9.5px;
+  color: var(--m-faint);
+}
+
+.m-fade-in {
+  animation: m-rise 0.24s ease both;
+}
+
+@keyframes m-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ------------------------------ 大屏适配（强制移动版） ------------------------------ */
+
+@media (min-width: 700px) {
+  .m-app {
+    border-left: 1px solid var(--m-line);
+    border-right: 1px solid var(--m-line);
+    background: color-mix(in srgb, var(--m-bg) 42%, transparent);
+  }
+
+  .m-tabbar {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    max-width: 720px;
+    border-left: 1px solid var(--m-line);
+    border-right: 1px solid var(--m-line);
+    border-radius: 22px 22px 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-sheet,
+  .m-sheet-backdrop,
+  .m-fade-in,
+  .m-toast {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* 横屏：压低顶部留白，日历与编辑区优先 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .m-greet {
+    padding: 6px 2px 10px;
+  }
+
+  .m-greet h1 {
+    font-size: 21px;
+  }
+
+  .m-hero {
+    padding: 14px;
+  }
+
+  .m-tabbar {
+    --m-tabbar: 58px;
+  }
+
+  .m-tab {
+    min-height: 44px;
+  }
+}

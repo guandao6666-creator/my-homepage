@@ -9,6 +9,7 @@ export const SESSION_COOKIE = "gauth_sid";
 export const DEVICE_COOKIE = "gauth_did";
 export const STATE_COOKIE = "gauth_state";
 export const SETUP_COOKIE = "gauth_setup";
+export const REAUTH_COOKIE = "gauth_reauth";
 
 const AUTH_PATH = "/api/auth";
 
@@ -98,6 +99,23 @@ export function clearSetupCookie(origin) {
   return serializeCookie(SETUP_COOKIE, "", {
     maxAge: 0,
     path: AUTH_PATH,
+    secure: origin.startsWith("https://"),
+  });
+}
+
+/** 注销前的重新验证：10 分钟、仅 /api 路径。 */
+export function reauthCookie(token, origin) {
+  return serializeCookie(REAUTH_COOKIE, token, {
+    maxAge: 600,
+    path: "/api",
+    secure: origin.startsWith("https://"),
+  });
+}
+
+export function clearReauthCookie(origin) {
+  return serializeCookie(REAUTH_COOKIE, "", {
+    maxAge: 0,
+    path: "/api",
     secure: origin.startsWith("https://"),
   });
 }

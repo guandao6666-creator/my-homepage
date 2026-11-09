@@ -5,6 +5,8 @@
  * 每个游戏的循环都由自己的 destroy 负责收尾，关窗即停。
  */
 
+// 1.9：应用样式跟着应用代码一起按需加载，不再压进首屏 CSS
+import "../../styles/os14-games.css";
 import { badge, emptyState, escapeHtml, fmtAgo, ls, shell, type Ctx } from "./core";
 import { GAMES, gameById, gameCover, type GameHandle } from "./games";
 import {

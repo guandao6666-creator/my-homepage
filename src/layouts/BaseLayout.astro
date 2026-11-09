@@ -160,12 +160,13 @@ const fullJsonLd = jsonLd
         const key = root.dataset.sbKey || "";
         if (!url || !key) return;
 
-        const fill = (counts, els, attr, suffix) => {
+        const fill = (counts: Map<string, number>, els: Iterable<Element>, attr: string, suffix: string) => {
           for (const el of els) {
-            const n = counts.get(el.dataset[attr] ?? "") ?? 0;
+            const node = el as HTMLElement;
+            const n = counts.get(node.dataset[attr] ?? "") ?? 0;
             if (!n) continue;
-            el.textContent = `${n} ${suffix}`;
-            el.hidden = false;
+            node.textContent = `${n} ${suffix}`;
+            node.hidden = false;
           }
         };
 

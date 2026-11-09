@@ -18,6 +18,8 @@ import {
   type Ctx,
 } from "../core";
 import { TASK_CATEGORIES, taskStore } from "../tasks-store";
+import { sendToDevice } from "../../continuity/ui";
+import { recordTombstone } from "../../sync/tombstones";
 
 export type Repeat = "none" | "daily" | "weekly" | "monthly";
 
@@ -31,6 +33,8 @@ export type CalEvent = {
   remind: number;
   note: string;
   createdAt: number;
+  /** 2.0：最后一次修改时间（云同步用） */
+  updatedAt?: number;
   notified?: string[];
 };
 
@@ -204,6 +208,7 @@ const renderBody = (win: HTMLElement) => {
                             <span class="c14-lbar" style="background:${COLORS[ev.category] ?? COLORS.other}"></span>
                             <span class="c14-ltitle">${escapeHtml(ev.title)}</span>
                             <span class="c14-ltag">${escapeHtml(CAT_LABEL[ev.category] ?? ev.category)}</span>
+                            <button class="c14-send" type="button" data-c14-send="${escapeHtml(ev.id)}" title="发送到设备">⇥</button>
                           </div>`,
                         )
                         .join("")
@@ -250,6 +255,10 @@ export const initCalendar = (win: HTMLElement, ctx: Ctx): (() => void) => {
   const paint = () => {
     host.innerHTML = renderBody(win);
   };
+
+  // 2.0：云同步写入同一个 KEY 后立即重绘（用户不需要重开窗口）
+  const onSync = () => paint();
+  window.addEventListener("guandao:calendar-sync", onSync);
 
   const openEditor = (date?: string, id?: string) => {
     const st = read();
@@ -383,6 +392,28 @@ export const initCalendar = (win: HTMLElement, ctx: Ctx): (() => void) => {
       openEditor(st.ui.day);
       return;
     }
+    const send = t.closest<HTMLElement>("[data-c14-send]");
+    if (send) {
+      e.stopPropagation();
+      const ev = st.events.find((item) => item.id === send.dataset.c14Send);
+      if (ev) {
+        void sendToDevice(ctx, {
+          itemType: "event",
+          title: ev.title,
+          resourceId: ev.id,
+          payload: {
+            title: ev.title,
+            date: ev.date,
+            time: ev.time,
+            category: ev.category,
+            repeat: ev.repeat,
+            remind: ev.remind,
+            note: ev.note,
+          },
+        });
+      }
+      return;
+    }
     const open = t.closest<HTMLElement>("[data-c14-open]");
     if (open) {
       openEditor(undefined, open.dataset.c14Open ?? "");
@@ -438,8 +469,113 @@ export const initCalendar = (win: HTMLElement, ctx: Ctx): (() => void) => {
   }, 30000);
 
   paint();
-  return () => window.clearInterval(timer);
+  return () => {
+    window.removeEventListener("guandao:calendar-sync", onSync);
+    window.clearInterval(timer);
+  };
 };
 
 export const calendarColors = COLORS;
 export { CAT_LABEL as calendarCategories, clamp };
+
+/* ---------------------------------------------------------------------------
+   1.8：移动端 / 接力共用的日历接口（同一个 KEY，不复制数据模型）。
+--------------------------------------------------------------------------- */
+
+export const calendarStore = {
+  list: (): CalEvent[] => read().events.slice().sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || ""))),
+  get: (id: string): CalEvent | null => read().events.find((event) => event.id === id) ?? null,
+  add: (patch: Partial<CalEvent>): CalEvent => {
+    const st = read();
+    const now = Date.now();
+    const event: CalEvent = {
+      id: uid(),
+      title: String(patch.title ?? "").slice(0, 80) || "未命名日程",
+      date: patch.date || todayKey(),
+      time: patch.time ?? "",
+      category: patch.category || "other",
+      repeat: (patch.repeat as Repeat) || "none",
+      remind: Number(patch.remind) || 0,
+      note: String(patch.note ?? "").slice(0, 300),
+      createdAt: now,
+      // 2.0：云同步需要最后修改时间
+      updatedAt: now,
+    };
+    st.events.push(event);
+    st.ui.day = event.date;
+    write(st);
+    return event;
+  },
+  update: (id: string, patch: Partial<CalEvent>): CalEvent | null => {
+    const st = read();
+    const event = st.events.find((item) => item.id === id);
+    if (!event) return null;
+    Object.assign(event, patch, { id: event.id, createdAt: event.createdAt, updatedAt: Date.now() });
+    write(st);
+    return event;
+  },
+  remove: (id: string): boolean => {
+    const st = read();
+    const before = st.events.length;
+    st.events = st.events.filter((event) => event.id !== id);
+    if (st.events.length === before) return false;
+    write(st);
+    // 2.0：删除留墓碑，云同步才能传播删除
+    recordTombstone("calendar", id);
+    return true;
+  },
+  onDay: (date: Date): CalEvent[] => read().events.filter((event) => occursOn(event, date)),
+
+  /* ---------------- 2.0 云同步接口 ---------------- */
+
+  syncItems: (): Array<{ id: string; updatedAt: number; payload: CalEvent }> =>
+    read().events.map((event) => ({
+      id: event.id,
+      updatedAt: event.updatedAt || event.createdAt,
+      payload: event,
+    })),
+
+  applySync: (
+    items: Array<{ id: string; updatedAt: number; deleted: boolean; payload?: CalEvent | null }>,
+  ): { applied: number; removed: number } => {
+    const st = read();
+    let applied = 0;
+    let removed = 0;
+    for (const item of items) {
+      if (item.deleted) {
+        const before = st.events.length;
+        st.events = st.events.filter((event) => event.id !== item.id);
+        if (st.events.length !== before) removed += 1;
+        continue;
+      }
+      const incoming = item.payload;
+      if (!incoming || typeof incoming !== "object") continue;
+      const merged: CalEvent = {
+        id: item.id,
+        title: String(incoming.title ?? "").slice(0, 80) || "未命名日程",
+        date: String(incoming.date ?? todayKey()),
+        time: String(incoming.time ?? ""),
+        category: String(incoming.category ?? "other"),
+        repeat: (incoming.repeat as Repeat) || "none",
+        remind: Number(incoming.remind) || 0,
+        note: String(incoming.note ?? "").slice(0, 300),
+        createdAt: Number(incoming.createdAt) || item.updatedAt,
+        updatedAt: Number(incoming.updatedAt) || item.updatedAt,
+        ...(Array.isArray(incoming.notified) ? { notified: incoming.notified.slice(0, 30) } : {}),
+      };
+      const index = st.events.findIndex((event) => event.id === item.id);
+      if (index >= 0) st.events[index] = merged;
+      else st.events.push(merged);
+      applied += 1;
+    }
+    write(st);
+    if (applied || removed) {
+      try {
+        window.dispatchEvent(new CustomEvent("guandao:calendar-sync"));
+      } catch {
+        /* 忽略 */
+      }
+    }
+    return { applied, removed };
+  },
+};

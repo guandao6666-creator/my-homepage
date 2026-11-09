@@ -859,3 +859,73 @@ body[data-os-theme="light"] .acc-toast {
     animation: none;
   }
 }
+
+/* Guandao OS 1.6 · 社区注册入口 */
+.gauth-community {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+}
+.gauth-community-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gauth-community-head span {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.gauth-community-head b {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(255, 138, 92, 0.14);
+  color: #ffb491;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+.gauth-community-desc {
+  margin: 7px 0 10px;
+  color: rgba(238, 241, 247, 0.5);
+  font-size: 10.5px;
+  line-height: 1.65;
+}
+.gauth-invite {
+  width: 100%;
+  height: 38px;
+  margin-bottom: 8px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #eef1f7;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  box-sizing: border-box;
+  outline: none;
+}
+.gauth-invite:focus {
+  border-color: rgba(255, 138, 92, 0.5);
+}
+.gauth-join {
+  width: 100%;
+  height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #ff8a5c, #ff6f91 55%, #8b7bff);
+  color: #1d1117;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gauth-join:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.gauth-join:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

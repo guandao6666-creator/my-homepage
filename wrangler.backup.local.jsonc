@@ -1,0 +1,46 @@
+{
+  // 本地隔离测试配置：不部署、不创建 Cloudflare 资源。
+  // 使用 Miniflare 本地 R2 / D1；D1 REST API 由 scripts/mock-d1-export-server.mjs 模拟。
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "my-homepage-backup-local",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": true
+  },
+  "vars": {
+    "ACCOUNT_ID": "local-account",
+    "DATABASE_ID": "9c89b111-bd89-47a6-8615-2c838993ede5",
+    "DATABASE_NAME": "guandao-db",
+    "D1_API_BASE": "http://127.0.0.1:8799",
+    "D1_BACKUP_ALLOW_HTTP": "1"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "guandao-db",
+      "database_id": "9c89b111-bd89-47a6-8615-2c838993ede5",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "guandao-files-local"
+    },
+    {
+      "binding": "DB_BACKUPS",
+      "bucket_name": "guandao-db-backups-local"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "guandao-d1-backup-local",
+      "binding": "BACKUP_WORKFLOW",
+      "class_name": "D1BackupWorkflow"
+    }
+  ]
+}

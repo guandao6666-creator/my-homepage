@@ -199,3 +199,45 @@ Worker + 静态资源部署、`/api/health`、`/api/auth/status`、未登录 401
 | Phase 1.6 生产告警配置 | **Pending Manual Action** | Cloudflare 上仍未设置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`；需所有者提供渠道并部署 |
 
 Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 重写。
+
+---
+
+## Phase 3 · 插件供应链与多设备验证（2026-11-07）
+
+> 前置说明：Phase 2 整体仍为 `Partially Verified`（见上表 2.2 / 2.5），本阶段由所有者**直接指派**，
+> 不改变 Phase 2 的结论，也未在本阶段修改 Phase 2 的代码。
+
+| 验收项 | 状态 | 证据 |
+| --- | --- | --- |
+| 插件 Ed25519 签名成功 | **通过（本地）** | `tests/unit/plugin-signature.test.ts` 40 项、E2E 19 项；CLI 真实签名产物 `dist/<id>-<version>.gplug` |
+| 客户端正确验签 | **通过（本地）** | `src/lib/plugins/signature.ts` 接入 4 条下载路径；公钥只取服务端 `publisherKeys` |
+| 篡改包被拒绝 | **通过（本地）** | `SIG_DIGEST_MISMATCH` / `PACKAGE_INTEGRITY_ERROR` / `SIG_IDENTITY_MISMATCH` 均有 E2E 夹具 |
+| 已撤销密钥被拒绝 | **通过（本地）** | 下载 `SIG_KEY_REVOKED`、安装 `SIGNATURE_KEY_REVOKED`（旧包撤销后也不可再装） |
+| 旧插件兼容策略 | **通过（本地）** | `com.qa.unsigned` 可安装，信任状态为 `unsigned` 且界面标注；签名无效与缺少签名严格区分 |
+| 私钥保护方案 | **已审计，仍需人工确认** | 私钥只在本机文件（`mode 0o600`）与 CLI 内存中；服务端只存公钥；迁移无任何私钥字段 |
+| 沙箱安全边界明确 | **通过（本地）** | `docs/security/PLUGIN-SANDBOX.md` 列出「能保证 8 条 / 不能保证 8 条」 |
+| Broker 权限继续有效 | **通过（本地）** | 未授权 SDK 调用 `PERMISSION_DENIED`；撤销后实例销毁 |
+| 未授权访问被阻止 | **通过（本地）** | 插件 frame 内 `localStorage` / `document.cookie` / `fetch` 真实抛错或被 CSP 拒绝 |
+| 撤销后运行实例被销毁 | **通过（本地）** | 权限撤销、禁用、卸载、跨标签页撤销均销毁实例 |
+| 独立 Origin 隔离效果 | **未实施（方案已给）** | 本阶段只做同域隔离加固；独立 Origin 方案 A/B 对比见 `docs/security/PLUGIN-SANDBOX.md`，需新 DNS / Worker 资源 → 未创建 |
+| 两个独立 Browser Context | **通过（本地）** | `tests/e2e/device.spec.ts` 12 项，六个独立 `browser.newContext()`（A / A2 / B / C / outsider / crowded），连续两轮全绿 |
+| 配对完整 / 批准完整 | **通过（本地）** | create → claim → confirm → 轮询领取独立 Session |
+| 接力完整 | **通过（本地）** | `pending → delivered → opened → completed` 与取消 / 过期 / 越权 |
+| 剪贴板隔离有效 | **通过（本地）** | 定向投递、账号隔离、4000 字符上限、外来设备不可读 |
+| 撤销 / 过期有效 | **通过（本地）** | 撤销后 B 请求全部 401；真实过去时间戳的过期配对覆盖 claim→404、轮询与 confirm→410（不 sleep 10 分钟，时钟未伪造） |
+| OAuth 本地测试模式正常 | **通过（本地）** | `tests/e2e/oauth.spec.ts` 14 项：回调 → Session → `/me` → 退出 |
+| 生产拒绝测试模式 | **通过（本地模拟）** | 伪造 `Host: guandao.xin` + `?test_login=` → 302 `not_configured`、无 Set-Cookie；`wrangler.jsonc` 无 `AUTH_TEST_MODE` |
+| 回调与 Session 可重复测试 | **通过（本地）** | 同一脚本连续运行，无需真实 GitHub App |
+| 质量门禁 | **通过** | `verify` 12 文件 / 251 单测 + lint + build + CSP；Playwright 整包 `npx playwright test` **147 passed**（chromium 67 + worker 56 + firefox 12 + webkit 12；worker 56 = 签名 19 / 沙箱（真实 Worker 10 + 独立 Origin 两源 1）11 / 设备 12 / OAuth 14）；`qa:sync` 20/20；`qa:plugins` 70/70；`qa:continuity` 45/45；`qa:devices` **31/31**；`qa:pairing-ttl` 真实等待 10 分钟 **12/12 通过**（elapsedMs=605004） |
+| 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、事故未 Closed → 禁止生产写入与部署 |
+
+**Phase 3 整体：`Partially Verified`。**
+
+未完成 / 未验证项：
+
+1. 生产部署与生产验证（本阶段明确不部署）。
+2. 独立 Sandbox Origin：已有**真实浏览器两源隔离实测**（`tests/e2e/sandbox-origin.spec.ts`，宿主 8788 + 沙箱源 4399，1 passed）；同时实测发现 Cookie 的作用域是 host（换端口不隔离 Cookie），落地必须使用独立 host。生产域名/证书/Worker route **未创建**，生产隔离未验证。
+3. 真实等待 10 分钟配对 TTL 已由 `npm run qa:pairing-ttl` 覆盖并通过 **12/12**（真实 `sleep`，实测 `elapsedMs=605004`；过期轮询/确认 410、重领 404、设备快照不变）；两台物理设备的人工冒烟仍未做。
+4. 非 Chrome：Firefox 157 与 WebKit 27.2（Safari 家族引擎）均已安装，设备 12 项分别在 `--project=firefox-worker` / `--project=webkit-worker` 通过；真机 Safari / iOS、真实域名下的 CSP 与 Cookie `Secure` 行为仍未验证。
+5. `qa:plugins` 70/70、`qa:continuity` 45/45、`qa:devices` **31/31** 已由自包含运行器跑通；旧的 `scripts/devices-qa.mjs` 仍需人工 `GDV_TOKEN`，仅作历史浏览器冒烟脚本。
+6. 原两项已知缺陷已处理：`PAIRING_ATTEMPTS_EXCEEDED` 不可达分支已删除；撤销后 401 错误码已由 `guards.sessionFailure` / `requireActiveSession` 统一。

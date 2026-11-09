@@ -6,6 +6,7 @@
  */
 
 import { emit, ls, uid } from "./core";
+import { recordTombstone } from "../sync/tombstones";
 
 export type Priority = "low" | "normal" | "high";
 
@@ -19,6 +20,8 @@ export type Task = {
   category: string;
   done: boolean;
   createdAt: number;
+  /** 2.0：最后一次修改时间（云同步用） */
+  updatedAt?: number;
   doneAt?: number;
   /** 已经提醒过的日期，避免同一天重复弹 */
   notified?: string;
@@ -97,6 +100,7 @@ export const taskStore = {
   }),
   add: (patch: Partial<Task>): Task => {
     const st = read();
+    const now = Date.now();
     const task: Task = {
       id: uid(),
       title: String(patch.title ?? "").slice(0, 120) || "未命名任务",
@@ -105,7 +109,9 @@ export const taskStore = {
       due: patch.due ?? "",
       category: patch.category ?? "other",
       done: false,
-      createdAt: Date.now(),
+      createdAt: now,
+      // 2.0：同步需要「最后一次修改时间」，否则改标题不会被识别为变更
+      updatedAt: now,
     };
     st.tasks.unshift(task);
     write(st);
@@ -115,7 +121,7 @@ export const taskStore = {
     const st = read();
     const t = st.tasks.find((x) => x.id === id);
     if (!t) return;
-    Object.assign(t, patch);
+    Object.assign(t, patch, { id: t.id, createdAt: t.createdAt, updatedAt: Date.now() });
     write(st);
   },
   toggle: (id: string) => {
@@ -124,6 +130,7 @@ export const taskStore = {
     if (!t) return;
     t.done = !t.done;
     t.doneAt = t.done ? Date.now() : undefined;
+    t.updatedAt = Date.now();
     write(st);
     if (t.done) emit("task-done", { id, title: t.title });
   },
@@ -131,11 +138,16 @@ export const taskStore = {
     const st = read();
     st.tasks = st.tasks.filter((x) => x.id !== id);
     write(st);
+    // 2.0：删除留墓碑，云同步才能传播删除
+    recordTombstone("tasks", id);
   },
   clearDone: () => {
     const st = read();
+    const removed = st.tasks.filter((x) => x.done);
     st.tasks = st.tasks.filter((x) => !x.done);
     write(st);
+    // 2.0：批量删除也要留墓碑
+    for (const task of removed) recordTombstone("tasks", task.id);
   },
   stats: () => {
     const tasks = read().tasks;
@@ -150,5 +162,57 @@ export const taskStore = {
     const today = new Date();
     const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     return read().tasks.filter((t) => !t.done && t.due === key);
+  },
+
+  /* ---------------- 2.0 云同步接口 ---------------- */
+
+  syncItems: (): Array<{ id: string; updatedAt: number; payload: Task }> =>
+    read().tasks.map((task) => ({
+      id: task.id,
+      updatedAt: task.updatedAt || task.doneAt || task.createdAt,
+      payload: task,
+    })),
+
+  applySync: (
+    items: Array<{ id: string; updatedAt: number; deleted: boolean; payload?: Task | null }>,
+  ): { applied: number; removed: number } => {
+    const st = read();
+    let applied = 0;
+    let removed = 0;
+    for (const item of items) {
+      if (item.deleted) {
+        const before = st.tasks.length;
+        st.tasks = st.tasks.filter((task) => task.id !== item.id);
+        if (st.tasks.length !== before) removed += 1;
+        continue;
+      }
+      const incoming = item.payload;
+      if (!incoming || typeof incoming !== "object") continue;
+      const merged: Task = {
+        id: item.id,
+        title: String(incoming.title ?? "").slice(0, 120) || "未命名任务",
+        note: String(incoming.note ?? "").slice(0, 600),
+        priority: (incoming.priority as Priority) ?? "normal",
+        due: String(incoming.due ?? ""),
+        category: String(incoming.category ?? "other"),
+        done: Boolean(incoming.done),
+        createdAt: Number(incoming.createdAt) || item.updatedAt,
+        updatedAt: Number(incoming.updatedAt) || item.updatedAt,
+        ...(incoming.doneAt ? { doneAt: Number(incoming.doneAt) } : {}),
+      };
+      const index = st.tasks.findIndex((task) => task.id === item.id);
+      if (index >= 0) st.tasks[index] = merged;
+      else st.tasks.unshift(merged);
+      applied += 1;
+    }
+    write(st);
+    if (applied || removed) {
+      try {
+        window.dispatchEvent(new CustomEvent("guandao:tasks-sync"));
+      } catch {
+        /* 忽略 */
+      }
+    }
+    return { applied, removed };
   },
 };

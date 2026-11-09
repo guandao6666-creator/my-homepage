@@ -1,0 +1,83 @@
+      /* ---------------- 壁纸 ---------------- */
+
+      .wallpaper {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(1100px 760px at 18% 12%, rgba(122, 86, 190, 0.55), transparent 62%),
+          radial-gradient(900px 700px at 84% 82%, rgba(48, 96, 190, 0.45), transparent 58%),
+          linear-gradient(158deg, #14111f 0%, #1a1730 46%, #0c101c 100%);
+        transition: background 0.6s ease;
+      }
+
+      .os[data-wall="dusk"] .wallpaper {
+        background:
+          radial-gradient(1000px 700px at 22% 16%, rgba(220, 128, 96, 0.45), transparent 60%),
+          radial-gradient(880px 660px at 82% 78%, rgba(122, 66, 140, 0.42), transparent 58%),
+          linear-gradient(160deg, #1d1620 0%, #2a1b28 48%, #140d18 100%);
+      }
+
+      .os[data-wall="deep"] .wallpaper {
+        background:
+          radial-gradient(1000px 720px at 24% 14%, rgba(34, 120, 150, 0.5), transparent 60%),
+          radial-gradient(900px 700px at 80% 80%, rgba(22, 78, 120, 0.45), transparent 58%),
+          linear-gradient(160deg, #08131c 0%, #0c2230 46%, #060e16 100%);
+      }
+
+      /* 环境光斑：极慢漂移，让壁纸有细微的呼吸感 */
+      .wallpaper::before {
+        content: "";
+        position: absolute;
+        inset: -20%;
+        background:
+          radial-gradient(42% 38% at 70% 20%, rgba(140, 170, 255, 0.18), transparent 70%),
+          radial-gradient(34% 30% at 24% 72%, rgba(190, 140, 255, 0.14), transparent 70%);
+        animation: wallDrift 60s ease-in-out infinite alternate;
+        pointer-events: none;
+      }
+
+      @keyframes wallDrift {
+        from {
+          transform: translate3d(-2%, -1%, 0) scale(1);
+        }
+        to {
+          transform: translate3d(2%, 1.5%, 0) scale(1.06);
+        }
+      }
+
+      /* 时段光影：自动壁纸开启时由 data-wall-phase 驱动，平滑交叉淡入 */
+      .wallpaper::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transition: opacity 1.6s ease;
+        pointer-events: none;
+      }
+
+      .os[data-wall-phase="dawn"] .wallpaper::after {
+        opacity: 1;
+        background:
+          radial-gradient(900px 600px at 20% 8%, rgba(255, 196, 140, 0.35), transparent 60%),
+          radial-gradient(700px 500px at 90% 90%, rgba(120, 160, 255, 0.16), transparent 60%);
+      }
+
+      .os[data-wall-phase="day"] .wallpaper::after {
+        opacity: 1;
+        background:
+          radial-gradient(1000px 700px at 50% 0%, rgba(255, 255, 255, 0.2), transparent 55%),
+          radial-gradient(800px 600px at 80% 20%, rgba(150, 200, 255, 0.14), transparent 60%);
+      }
+
+      .os[data-wall-phase="dusk"] .wallpaper::after {
+        opacity: 1;
+        background:
+          radial-gradient(900px 640px at 82% 86%, rgba(255, 140, 90, 0.3), transparent 58%),
+          radial-gradient(800px 600px at 16% 10%, rgba(150, 110, 220, 0.2), transparent 60%);
+      }
+
+      .os[data-wall-phase="night"] .wallpaper::after {
+        opacity: 1;
+        background: linear-gradient(180deg, rgba(6, 10, 24, 0.5), rgba(4, 6, 16, 0.7));
+      }
+

@@ -672,3 +672,120 @@ Infrastructure
 | 结论 | **Partially Verified** | 纯层已拆且验证通过；业务闭包尚未拆分 |
 
 详见 **docs/architecture/COMMUNITY-ARCHITECTURE.md**。
+
+---
+
+## 附录 M：Phase 3 插件供应链安全与多设备验证（2026-11-07）
+
+**边界**：未重写 Core / Window Manager / App Registry / Plugin Runtime；未删除任何未签名插件数据；
+未强制旧插件签名；私钥未写入数据库普通字段、源码、构建日志或客户端包；生产未部署、未写入、未跑 `qa:prod`。
+
+### M.1 改造前的真实供应链（不是文档推测）
+
+1. **生成包**：CLI `makeBundle(manifest, files)` → `{format:"guandao-plugin", formatVersion:1, manifest, files, filesDigest}`，
+   `filesDigest = sha256(canonicalFilesJson(files))`。
+2. **上传**：`POST /api/developer/plugins/:id/versions`（body `bundle` 必须是**字符串**）→
+   `inspectBundle()` = `validateBundle` + 重算 `filesDigest` / `packageDigest=sha256(raw)` 并与声明比对 →
+   写 R2 `plugins/<id>/<version>/package.json` + `plugin_versions` 行（`status='pending'`）。
+3. **存储**：R2 `FILES` 存整包原文；D1 `plugin_versions.package_sha256` 存摘要、`package_key` 存对象键。
+4. **发布者身份**：`plugins.developer_id` → `users.id`（GitHub 账号），**没有任何密钥概念**。
+5. **市场返回**：`listPlugins` / `pluginDetail` 由 `mapPluginCard` / `mapVersion` 出卡片与版本列表。
+6. **客户端下载**：`GET /api/plugins/:id/package` → 服务端重算 `sha256(text)` 与 `package_sha256` 比对 →
+   返回 `{packageJson, checksum, manifest}`。
+7. **安装 / 更新**：`POST /api/plugins/install`（比对客户端声明的 `packageHash` 与 DB 摘要）→
+   客户端 `verifyBundle()` 再算一次双摘要 → 写入 IndexedDB 安装记录。
+8. **回滚**：`updateInstallation` / `rollbackInstallation` 重放先前的 `packageHash`，同样没有签名环节。
+
+**结论**：改造前 D1 + R2 是唯一信任根。谁能让 D1 与 R2 同时被改（或谁能冒充开发者账号上传），
+谁就能让所有客户端装上任意内容——这正是本阶段要补的洞。
+
+### M.2 签名架构（已落地）
+
+- **被签内容**：`SIG_FIELDS = spec / alg / keyId / publisherId / pluginId / version / format / formatVersion / filesDigest / manifestDigest / signedAt`，
+  载荷 = 信封去掉 `sig` 后的 `canonicalJson` 的 UTF-8 字节。**不签原始包文本**：包是格式化 JSON，
+  逐字节跨端不可保证，且签名内嵌进包会造成循环。
+- **规范化**：复用 `shared/plugin-spec.js` 的 `canonicalJson`（对象键排序、数组保序）与 `canonicalFilesJson`（按 path 排序）；
+  v1 只允许字符串 / 非负整数 / 布尔，禁止浮点、null、数组、嵌套与自由文本 → 不存在 Unicode 归一化与数值格式歧义；
+  **字段必须全部存在，缺字段即非法，不做默认值填充**。
+- **keyId**：`ggk_` + `sha256(publicKey raw)` 前 16 hex，公钥与 keyId 一一对应，`publisher_keys` 上另有唯一索引兜底。
+- **密钥生命周期**：`keygen`（客户端本地生成，私钥只写 `mode 0o600` 文件并提示保存责任）→
+  `keys register`（用私钥对 `registerProofPayloadText` 签名，服务端验证持有证明后只存公钥）→
+  轮换 = 新密钥对 + 重新登记（旧密钥可保留 active 用于验旧包）→ 撤销 = `POST /api/developer/keys/:keyId/revoke` →
+  丢失 = 重新生成并登记，旧密钥撤销，已发版本需重新签名后重发。
+- **判定顺序（服务端 `resolveSignature`）**：无签名 → `unsigned`；结构非法 → `invalid`；
+  keyId 未登记 → `SIG_KEY_UNKNOWN`；`publisher_keys.user_id !== plugins.developer_id` → `SIG_IDENTITY_MISMATCH`；
+  已撤销 → `SIG_KEY_REVOKED`；再验 Ed25519 与摘要/版本/插件 ID 一致性。
+- **客户端二次验签**：`src/lib/plugins/signature.ts` 独立实现，公钥**只从服务端 `publisherKeys` 取**，
+  绝不接受签名自带的公钥；包摘要 → filesDigest → 信任状态 → keyId 查找 → 撤销状态 → Ed25519 → 插件 ID/版本一致性。
+- **阶段 A（本阶段）**：签名缺失 = `unsigned`，**允许安装但界面必须标注**；签名存在但任何一步失败 = `invalid`，
+  拒绝安装 / 更新，**绝不静默降级为无签名安装**；上传期即拒绝（422），不写版本行。
+- **保留 SHA-256**：哈希与签名承担不同责任。哈希防篡改（传输/存储损坏），签名防伪造（发布者身份）。
+
+### M.3 沙箱隔离现状与实测
+
+- 双层 `sandbox="allow-scripts"`（宿主 iframe + 插件 iframe），**全仓无 `allow-same-origin`**，两帧都是 opaque origin。
+- 每次挂载独立 `MessageChannel` + nonce 握手；全仓不做 `event.origin` 比较，依赖 WindowProxy 相等 + 一次性 port + nonce。
+- Broker（`METHOD_PERMISSION` 白名单 + payload 上限 + 权限 + 限速 + 超时）门控全部 SDK 能力；
+  `network.fetch` 另有服务端复核（域名白名单、私网 IP 拦截、禁重定向、256 KB 上限）。
+- 实测（`tests/e2e/sandbox-worker.spec.ts` 10 项，真实 Worker）：插件 frame 内 `localStorage` / `document.cookie` /
+  `fetch` 真实抛错或被 CSP 拒绝；导航逃逸后 `record.blocked=true`、iframe 销毁、重开直接禁用；
+  权限撤销与跨标签页撤销都会销毁运行实例；伪造 HELLO/RPC 消息可达宿主但不影响真实会话。
+- 独立 Origin 本地实测（`tests/e2e/sandbox-origin.spec.ts`，宿主 8788 + 沙箱源 4399）：sandbox 帧 `window.origin` 为 `null`、
+  `localStorage` / `document.cookie` 读取抛 `SecurityError`、父 DOM 与宿主 API 不可达；**未加 sandbox 的独立源帧**仍被
+  Origin / CORS / 父文档同源策略隔离；同时实测发现 **Cookie 作用域是 host（端口不隔离）**，方案 B 落地必须使用独立 host。
+  该实测只证明隔离语义，生产域名/证书/Worker route 未创建。
+- 残余风险：**导航逃逸只能事后惩罚**（越权的 URL 请求已经发出）；撤销依赖调用点而非运行期回读 store；
+  服务端只对 `network.fetch` 复核。独立 Sandbox Origin 方案 A/B 对比与迁移步骤见 `docs/security/PLUGIN-SANDBOX.md`。
+
+### M.4 多设备与 OAuth
+
+- 配对：6 位数字码（约 20 bit）+ 32 字符 token，10 分钟 TTL，`max_attempts 5`，服务端只存 SHA-256；
+  A 批准才插设备并下发独立 Session（`x-pairing-cookie`）。
+- 接力：`pending → delivered → opened → completed`，另有 `cancelled / expired`；载荷 32 KB 上限。
+- 剪贴板：4000 字符上限、24h TTL、目标设备或广播、软删。
+- 实测：`tests/e2e/device.spec.ts` **12 项**，六个独立 `browser.newContext()`（A / A2 / B / C / outsider / crowded），不共享 Cookie / localStorage / IndexedDB；
+  连续两轮全绿且中间不重启服务、不清库（12 passed 4.3s / 4.2s），覆盖真实过期判定、`WRONG_DEVICE`、`DEVICE_LIMIT`、`INVALID_TOKEN` 与 claim 同源校验；
+  同一 spec 另在 **Firefox 157**（`--project=firefox-worker`）与 **WebKit 27.2**（`--project=webkit-worker`）各通过 12 项。撤销后 401 错误码已统一为 `SESSION_REVOKED` / `DEVICE_REVOKED`。
+- 真实 TTL：`npm run qa:pairing-ttl`（`scripts/pairing-ttl-check.mjs`）真实等待 10 分钟（不修改时间戳），
+  断言 `elapsedMs ≥ 600000`、过期轮询/确认 410、同码重领 404、设备快照不变；**实跑 12/12 通过，`elapsedMs=605004`**。
+- OAuth：本阶段新增的测试模式开关为三条件 AND，且**只在 loopback origin 成立**；测试身份只来自固定 `qa-*`；
+  state / PKCE / Cookie 属性一律不改。生产侧用伪造 `Host: guandao.xin` 实测被拒（302 `not_configured`，无 Set-Cookie）。
+
+### M.5 本阶段发现并修复的缺陷
+
+1. `POST /api/pairing/claim` 缺 `assertSameOrigin` —— 第三方页面可替用户提交 claim。
+2. `POST /api/continuity/:id/open` 响应的 `openedAt` 恒为 `null`（用更新前行映射）。
+3. `worker/api/plugins/handlers.js` 从 `./signature.js` 导入 `mapSignatureTrust`（实际在 `./store.js`）→ Worker 构建失败；
+   `tsc` 不检查 `.js`，只有真实 `wrangler dev` 能发现。
+4. CLI `sign` 产物写到 CWD 而非项目根；`signBundleObject` 未回填 `filesDigest`（会被服务端判 `FILES_DIGEST_MISSING`）。
+5. `ApiError` 无法携带结构化原因 → 新增第 4 参数 `details`，客户端可区分 `SIG_DIGEST_MISMATCH` / `SIG_KEY_REVOKED` 等。
+6. 插件管理器 `listView()` 缺 `tab === "installed"` 分支：存在本地安装记录时「已安装」标签页会穿透到 policy 视图，
+   列表不渲染；已补分支，并在列表/详情显示签名信任 chip 与签署时间。
+7. `worker/api/continuity/handlers.js` 的剪贴板分支调用未导入的 `requireSession`（重构漏改，运行时 ReferenceError）；
+   已改为统一的 `requireActiveSession`。
+8. 撤销后 401 错误码在 devices 与 continuity/clipboard/pairing 之间不一致；已抽出
+   `guards.sessionFailure()` / `requireActiveSession()` 统一（`SESSION_REVOKED` / `DEVICE_REVOKED` / `SESSION_EXPIRED`）。
+9. E2E 就绪竞态：Playwright 以 `/api/health` 判定 e2e-server 就绪时，Worker 已健康但 `buildFixtures()` 仍在写本地 D1，测试与夹具写入抢锁曾致夹具生成失败、服务退出（`ECONNRESET`）。
+   已把就绪探针改为夹具管理端口 `GET /__e2e/ready`（只在夹具全部生成后监听），并在 `playwright.config.ts` 写明原因。
+
+**本轮继续处理（原「只报告未修」）**：`PAIRING_ATTEMPTS_EXCEEDED` 分支经核实不可达
+（`findByIdentity` 只匹配 `pending`、`markClaimed` 会置 `claimed`，attempts 永不累加），已删除假保护分支并写明真实防线
+（10 分钟 TTL + `pairing-claim` 10 次/10 分钟/IP 限流 + 源设备 confirm）；撤销后 401 错误码已如上统一。
+
+### M.6 证据索引
+
+| 证据 | 位置 |
+| --- | --- |
+| 签名规范与共享实现 | `shared/plugin-signature.js`、`shared/plugin-signature.d.ts` |
+| 服务端验签 | `worker/api/plugins/signature.js`、`developer.js`、`handlers.js`、`store.js` |
+| 客户端验签 | `src/lib/plugins/signature.ts`、`registry.ts`、`market.ts` |
+| CLI | `cli/guandao.mjs`（`keygen` / `sign` / `keys register`） |
+| 迁移 | `migrations/0017_plugin_signatures.sql` |
+| 单测 | `tests/unit/plugin-signature.test.ts`（40）、`plugin-signature-server.test.ts`（11） |
+| E2E | `tests/e2e/plugin-signature.spec.ts`（19）、`sandbox-worker.spec.ts`（10）、`sandbox-origin.spec.ts`（1）、`sandbox.spec.ts`（6）、`device.spec.ts`（12，Chrome + Firefox + WebKit）、`oauth.spec.ts`（14） |
+| 配对 TTL 真实时间 | `scripts/pairing-ttl-check.mjs`（`npm run qa:pairing-ttl`：真实等待 10 分钟） |
+| QA 自包含运行 | `scripts/seed-qa-local.mjs`、`scripts/qa-local-run.mjs`（`npm run qa:plugins` 70/70、`npm run qa:continuity` 45/45、`npm run qa:devices` 31/31） |
+| 文档 | `docs/security/PLUGIN-SIGNING.md`、`PLUGIN-SANDBOX.md`、`docs/architecture/DEVICE-PAIRING.md`、`docs/testing/OAUTH-TESTING.md` |
+| CI | `.github/workflows/quality.yml`：E2E 安装 Firefox / WebKit 并跑四个 project；本阶段未 push，GitHub Actions 实跑未验证 |
+
+**结论：`Partially Verified`** —— 本地 / 隔离环境全绿且有真实执行证据；生产验证与部署按门禁未执行。

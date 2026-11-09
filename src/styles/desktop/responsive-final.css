@@ -1,0 +1,109 @@
+      /* ---------- 12. 减少动态效果 ---------- */
+      .os13-reduce .wp-layer.is-on,
+      .os13-reduce .widget,
+      .os13-reduce .window {
+        animation: none !important;
+      }
+      .os13-reduce .wp13 .wp-layer {
+        transition-duration: 0.2s;
+      }
+      .os13-reduce .dock-item {
+        transition: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .wp-layer.is-on {
+          animation: none !important;
+        }
+        .wp13 .wp-layer {
+          transition-duration: 0.15s;
+        }
+      }
+
+      /* ---------- 13. 移动端 ---------- */
+      @media (max-width: 720px) {
+        /* 小屏强制网格：自由摆放只对宽屏有意义，手机上会互相压住 */
+        .desk-icons.is-free {
+          display: grid;
+          right: 10px;
+          bottom: auto;
+        }
+        .desk-icons.is-free .desk-icon {
+          position: relative;
+          left: auto !important;
+          top: auto !important;
+        }
+        .menubar {
+          height: 34px;
+          padding: 0 10px;
+        }
+        .mb-brand-text,
+        .mb-version {
+          display: none;
+        }
+        .dock {
+          --dock-size: 44px !important;
+          --dock-pad: 7px;
+          border-radius: 18px;
+        }
+        .desk-icon {
+          width: 74px;
+        }
+        .widget {
+          width: min(42vw, 176px) !important;
+        }
+        .widget[data-size="l"] {
+          width: min(56vw, 240px) !important;
+        }
+        .control-center {
+          right: 8px;
+          left: 8px;
+          width: auto;
+          top: 42px;
+        }
+        .settings13 {
+          grid-template-columns: 1fr;
+        }
+        .s13-side {
+          flex-direction: row;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 10px;
+          border-right: 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+          overflow: auto;
+        }
+        .s13-id {
+          display: none;
+        }
+        .s13-tabs {
+          display: flex;
+          gap: 2px;
+        }
+        .s13-tabs button {
+          white-space: nowrap;
+          height: 28px;
+        }
+        .s13-tabs button span {
+          display: none;
+        }
+        .s13-foot {
+          display: none;
+        }
+        .s13-main {
+          padding: 14px 14px 22px;
+        }
+        .s-row input[type="range"] {
+          width: 110px;
+        }
+        .wall-grid {
+          grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+        }
+        .preset-grid {
+          grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+        }
+        .ctxmenu {
+          min-width: 186px;
+        }
+      }
+

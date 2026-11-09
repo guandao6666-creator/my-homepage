@@ -4,20 +4,48 @@
   "main": "worker/index.js",
   "compatibility_date": "2026-10-23",
   "compatibility_flags": ["global_fetch_strictly_public"],
+  // Cron Trigger：
+  // - 每 15 分钟：续跑无人轮询的删除 / 注销任务、清理过期导出与限流窗口；
+  // - 自动备份按 backup_settings 的 daily/weekly 到期判断，多触发不会重复备份。
+  "triggers": {
+    "crons": ["*/15 * * * *", "0 19 * * *"]
+  },
+  "vars": {
+    "BACKUP_CRON_ENABLED": "true",
+    // 留空 = 不做公网探测，安全中心如实显示 Unknown。
+    // 如果 R2 绑定了自定义域名（例如 https://files.example.com），填进来才会真正校验私有性。
+    "R2_PUBLIC_BASE_URL": "",
+    // Phase 1.6：D1 备份 Workflow 的非敏感配置
+    "ACCOUNT_ID": "e40e3f33f13aabaae2c6da6c36b38749",
+    "DATABASE_ID": "9c89b111-bd89-47a6-8615-2c838993ede5",
+    "DATABASE_NAME": "guandao-db"
+  },
+  // Phase 1.6：每日 UTC 19:00（北京时间次日 03:00）独立 R2 SQL 备份。
+  // D1_REST_API_TOKEN / BACKUP_ENCRYPTION_KEY 是 Secret，不写在这里。
+  "workflows": [
+    {
+      "name": "guandao-d1-backup",
+      "binding": "BACKUP_WORKFLOW",
+      "class_name": "D1BackupWorkflow"
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    // 关键：/api/* 与 /sb/* 必须先进入 Worker，不能被静态资源层的 404 缓存截胡。
-    // 之前部署前的 404 被边缘记住后，部分节点（如 EWR）直接返回缓存 404，
-    // 请求根本没到 Worker 路由。
-    "run_worker_first": ["/api/*", "/sb/*"]
+    // 所有请求先经过 Worker：这样才能给静态 HTML 也加上 CSP/HSTS 等安全头。
+    // Worker 内部再调用 env.ASSETS.fetch，不会递归。
+    "run_worker_first": true
   },
   // R2：bucket 名不是账号私有信息，直接写进配置，保证任何一次 deploy 都带上绑定。
   "r2_buckets": [
     {
       "binding": "FILES",
       "bucket_name": "guandao-files"
+    },
+    {
+      "binding": "DB_BACKUPS",
+      "bucket_name": "guandao-db-backups"
     }
   ],
   // D1：database_id 由 `npm run cf:link` 从账号读取后写入（资源标识，不是密钥）。

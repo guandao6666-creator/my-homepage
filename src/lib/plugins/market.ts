@@ -9,6 +9,7 @@
  */
 
 import { safeUrl } from "../html";
+import { trustDetail, trustLabel } from "./signature";
 import { escapeHtml, shell, type Ctx } from "../os14/core";
 import * as api from "./api";
 import * as registry from "./registry";
@@ -51,6 +52,15 @@ const CATEGORY_OF: Record<string, string> = {
 };
 
 const INSTALL_STEPS = ["下载插件包", "校验清单与摘要", "写入本地存储", "登记安装记录", "注册到桌面"];
+
+/** 发布者签名徽标：已签名 / 未签名 / 签名无效，与安全审核徽标并列展示。 */
+function signatureChip(trust: { status?: string; keyId?: string | null } | undefined): string {
+  const status = trust?.status;
+  const label = trustLabel(status as "verified" | "unsigned" | "invalid" | undefined);
+  const hint = trustDetail(status as "verified" | "unsigned" | "invalid" | undefined, trust?.keyId ?? null);
+  const tone = status === "verified" ? " is-ok" : status === "invalid" ? " is-warn" : "";
+  return `<span class="gp-chip${tone}" title="${esc(hint)}">${esc(label)}</span>`;
+}
 
 export const renderPluginMarket = () =>
   shell(
@@ -315,6 +325,7 @@ export const initPluginMarket = (win: HTMLElement, ctx: Ctx): (() => void) => {
       </div>
       <footer>
         <span class="gp-chip ${item.security.audited ? "is-ok" : "is-warn"}">${item.security.audited ? "已审核" : "未审核"}</span>
+        ${signatureChip(item.security.signature)}
         ${
           item.installed
             ? `<button type="button" class="gp-btn" data-act="open" data-id="${esc(item.id)}">${item.enabled ? "打开" : "已禁用"}</button>`
@@ -420,6 +431,7 @@ export const initPluginMarket = (win: HTMLElement, ctx: Ctx): (() => void) => {
             <h2>${esc(plugin.name)}</h2>
             <span class="gp-chip">${esc(typeLabel(plugin.type))}</span>
             <span class="gp-chip ${plugin.security.audited ? "is-ok" : "is-warn"}">${plugin.security.audited ? "已通过安全审核" : "尚未审核"}</span>
+            ${signatureChip(plugin.security.signature)}
             ${plugin.featured ? '<span class="gp-chip is-accent">推荐</span>' : ""}
           </div>
           <p class="gp-market-byline">
@@ -441,7 +453,7 @@ export const initPluginMarket = (win: HTMLElement, ctx: Ctx): (() => void) => {
                  <p class="gp-buy-note">已安装 v${esc(record.version)}${update ? ` · 可更新到 v${update.version}` : ""}</p>
                  ${update ? `<button type="button" class="gp-btn is-warn" data-act="update" data-id="${esc(plugin.id)}">更新</button>` : ""}`
               : `<button type="button" class="gp-btn is-primary" data-act="install" data-id="${esc(plugin.id)}" ${plugin.security.audited ? "" : "disabled"}>安装</button>
-                 <p class="gp-buy-note">${plugin.security.audited ? "安装前会逐项展示权限" : "该版本尚未通过审核，暂不可安装"}</p>`
+                 <p class="gp-buy-note">${plugin.security.audited ? `安装前会逐项展示权限 · ${trustDetail(plugin.security.signature?.status, plugin.security.signature?.keyId ?? null)}` : "该版本尚未通过审核，暂不可安装"}</p>`
           }
           <button type="button" class="gp-btn" data-act="report" data-id="${esc(plugin.id)}">举报</button>
         </div>

@@ -181,11 +181,44 @@ import { avatarHtml, esc, ... } from "./community/ui";
 | 3 | 发布 / 上传 | `newPublishState`、`loadPublish`、`paintPublishForm` |
 | 4 | 审核 / 预览 | `themePreviewPanel`、`widgetPreviewPanel`、`workspacePreviewPanel`、`licenseName`、`licenseSummary` |
 
-**为什么没做完**：这些函数共享同一个闭包。要拆开必须先引入 context 对象
-（`state / meta / api / render / handlers`）并改写每个调用点 —— 73 个函数一次性改完，
-风险与 Phase 2.2 的 5 个应用迁移相当，但规模更大。
+### 7.1 符号级依赖分析（TypeScript 编译器 API）
 
-本轮选择**先完成零风险的纯层**，把剩余部分留给专门的批次，避免交付半拆状态的模块。
+用 AST 算出每个 loader 的**真实自由变量**（引用到、且不是自己声明的、且属于 `initCommunity` 闭包的）：
+
+| loader | 自由变量数 | 其中 `CommunityContext` 还没有的 |
+| --- | ---: | --- |
+| `loadCreators` | 6 | `creatorsSort` |
+| `loadExplore` | 7 | `explore` |
+| `loadHome` | 7 | `meta`、`viewer` |
+| `loadCreator` | 8 | `creatorPostSort`、`creatorPostType`、`view` |
+| `loadNotifications` | 9 | `applyViewerChrome`、`meta`、`notificationsPage` |
+| `loadSearch` | 9 | `loadHome`、`searchState`、`view` |
+| `loadCreations` | 12 | `creationsStatus`、`creationsTab`、`creationsType`、`installedCache`、`meta` |
+
+**结论：剩余 7 个 loader 没有一个能直接用当前 ctx 搬走。** 它们都需要先扩大接口，
+而且其中多数是**可变状态**（`creatorsSort`、`explore`、`searchState`、`view`、`meta` 等会被写入），
+ctx 必须同时提供 getter 和 setter，不能只读。
+
+### 7.2 为什么批次 2 停在 2/9
+
+前两次批量迁移失败的原因已经查清，都是「靠正则猜依赖」导致的：
+
+| 失败 | 真实原因 |
+| --- | --- |
+| `creatorsSort is not defined` | 正则扫描没抓到它（声明形式不匹配我的模式）；AST 分析一跑就暴露了 |
+| `loadExplore` 语法错误 | 带对象参数 `options: {...} = {}` 的函数，`bodyOf()` 从第一个 `{` 切，切进了参数解构 |
+| `safeUrl` / `avatarHtml` 缺失 | 被搬走的部分引用了模块级 import，没有一起搬 |
+| wrapper 参数不匹配 | 生成的包装函数丢了原参数表 |
+
+AST 分析现在把这四类问题都变成了可预知的数据（见 §7.1 的表）。
+
+### 7.3 下一步的正确做法
+
+1. 按 §7.1 的表扩大 `CommunityContext`（可变项用 getter + setter）；
+2. 每次只搬 **1 个** loader，搬完立刻 `tsc` + `verify`；
+3. 用 AST 复核自由变量集合是否为空，而不是靠人工阅读。
+
+**不要一次搬 4 个**——这正是本轮失败的原因。
 
 ---
 

@@ -1,0 +1,429 @@
+      /* ---------------- 菜单栏 ---------------- */
+
+      .menubar {
+        position: relative;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        height: 36px;
+        padding: 0 14px;
+        background: rgba(12, 14, 22, 0.55);
+        backdrop-filter: blur(20px) saturate(1.4);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 12px;
+      }
+
+      .mb-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        flex: none;
+      }
+
+      .mb-logo {
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        background: linear-gradient(150deg, #6f8cff, #b06eff);
+        font-family: var(--font-serif);
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .mb-brand-text {
+        font-weight: 650;
+      }
+
+      .mb-version {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.34);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .mb-menu {
+        display: flex;
+        gap: 2px;
+        color: var(--os-dim);
+      }
+
+      .mb-menu-item {
+        position: relative;
+      }
+
+      .mb-menu-btn {
+        padding: 4px 10px;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: var(--os-dim);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: color 0.15s ease, background-color 0.15s ease;
+      }
+
+      .mb-menu-btn:hover,
+      .mb-menu-btn.is-open {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .mb-dropdown {
+        position: absolute;
+        top: 30px;
+        left: 0;
+        z-index: 90;
+        display: grid;
+        min-width: 168px;
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.97);
+        box-shadow: 0 20px 48px -18px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(24px);
+        animation: menuIn 0.16s var(--os-ease);
+      }
+
+      .mb-dropdown[hidden] {
+        display: none;
+      }
+
+      @keyframes menuIn {
+        from {
+          opacity: 0;
+          transform: translateY(-6px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .mb-dropdown button,
+      .mb-dropdown a {
+        display: block;
+        padding: 7px 10px;
+        border: 0;
+        border-radius: 7px;
+        background: none;
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .mb-dropdown button:hover,
+      .mb-dropdown a:hover {
+        background: rgba(111, 140, 255, 0.24);
+      }
+
+      .mb-sep {
+        height: 1px;
+        margin: 5px 4px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      /* 虚拟桌面指示器（菜单栏内） */
+      .spaces {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 7px;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .space-dot {
+        width: 8px;
+        height: 8px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.24);
+        cursor: pointer;
+        transition: width 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .space-dot:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .space-dot.is-active {
+        width: 16px;
+        border-radius: 4px;
+        background: var(--os-accent);
+        box-shadow: 0 0 8px rgba(111, 140, 255, 0.6);
+      }
+
+      .mb-sep-v {
+        width: 1px;
+        height: 16px;
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .mb-status {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--os-dim);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .mb-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #6ee7a8;
+        box-shadow: 0 0 8px rgba(110, 231, 168, 0.8);
+      }
+
+      .mb-time-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: var(--os-dim);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease;
+      }
+
+      .mb-time-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+      }
+
+      .clock-panel {
+        position: absolute;
+        top: 32px;
+        right: 8px;
+        z-index: 90;
+        display: grid;
+        justify-items: center;
+        gap: 4px;
+        min-width: 190px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.97);
+        box-shadow: 0 20px 48px -18px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(24px);
+        animation: menuIn 0.16s var(--os-ease);
+      }
+
+      .clock-panel[hidden] {
+        display: none;
+      }
+
+      .clock-date {
+        margin: 0;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .clock-time {
+        margin: 0;
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 22px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: 0.02em;
+      }
+
+      .clock-msg {
+        margin: 2px 0 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .mb-bell {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        transition: color 0.2s ease, background-color 0.2s ease;
+      }
+
+      .mb-bell:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .mb-bell svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .mb-bell-dot {
+        position: absolute;
+        top: 4px;
+        right: 5px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ff5f57;
+        box-shadow: 0 0 6px rgba(255, 95, 87, 0.9);
+      }
+
+      .mb-power {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: rgba(255, 255, 255, 0.6);
+        cursor: pointer;
+        transition: color 0.2s ease, background-color 0.2s ease;
+      }
+
+      .mb-power:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .mb-power svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .power-menu {
+        position: absolute;
+        top: 32px;
+        right: 8px;
+        z-index: 90;
+        display: grid;
+        min-width: 138px;
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.97);
+        box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(20px);
+        animation: menuIn 0.16s var(--os-ease);
+      }
+
+      .power-menu button {
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .power-menu button:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      /* ---- 手机端专属控件：桌面模式切换 / 汉堡菜单 ---- */
+      .mb-desktop-toggle,
+      .mb-mobile-menu {
+        display: none; /* 桌面端默认隐藏，仅手机端显示 */
+        align-items: center;
+        gap: 5px;
+        height: 26px;
+        padding: 0 9px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--os-dim);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+      }
+      .mb-desktop-toggle:hover,
+      .mb-mobile-menu:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+      }
+      .mb-desktop-toggle .mbdt-icon,
+      .mb-mobile-menu svg {
+        width: 15px;
+        height: 15px;
+        display: block;
+      }
+      .mb-desktop-toggle[aria-pressed="true"] {
+        color: #fff;
+        border-color: rgba(143, 166, 255, 0.7);
+        background: rgba(143, 166, 255, 0.18);
+      }
+      .mb-mobile-menu {
+        padding: 0;
+        width: 30px;
+        justify-content: center;
+      }
+
+      .mb-mobile-panel {
+        position: absolute;
+        top: 32px;
+        right: 8px;
+        z-index: 90;
+        display: grid;
+        align-content: start;
+        gap: 2px;
+        width: 224px;
+        max-height: calc(100dvh - 48px);
+        overflow-y: auto;
+        padding: 8px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(26, 29, 38, 0.98);
+        box-shadow: 0 20px 48px -16px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(24px);
+        animation: menuIn 0.16s var(--os-ease);
+      }
+      .mb-mobile-panel[hidden] {
+        display: none;
+      }
+      .mb-mp-cat {
+        margin: 9px 2px 2px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.35);
+      }
+      .mb-mp-cat:first-child {
+        margin-top: 2px;
+      }
+      .mb-mobile-panel button {
+        padding: 9px 10px;
+        border: 0;
+        border-radius: 8px;
+        background: none;
+        color: #eef1f7;
+        font: inherit;
+        font-size: 13px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .mb-mobile-panel button:hover,
+      .mb-mobile-panel button:active {
+        background: rgba(255, 255, 255, 0.1);
+      }
+

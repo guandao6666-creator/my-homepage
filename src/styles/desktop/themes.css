@@ -1,0 +1,1060 @@
+      /* ============================================================
+         浅色主题
+         ============================================================ */
+      body[data-os-theme="light"] {
+        background: #dce1ee;
+      }
+
+      [data-os-theme="light"] .wallpaper {
+        background:
+          radial-gradient(1100px 760px at 18% 12%, rgba(168, 184, 255, 0.55), transparent 62%),
+          radial-gradient(900px 700px at 84% 82%, rgba(120, 200, 255, 0.42), transparent 58%),
+          linear-gradient(158deg, #e9ecf6 0%, #dde2f0 46%, #eef1f8 100%);
+      }
+
+      [data-os-theme="light"] .os[data-wall="dusk"] .wallpaper {
+        background:
+          radial-gradient(1000px 700px at 22% 16%, rgba(255, 196, 150, 0.5), transparent 60%),
+          radial-gradient(880px 660px at 82% 78%, rgba(210, 150, 230, 0.4), transparent 58%),
+          linear-gradient(160deg, #f2e4e0 0%, #e8d8e2 48%, #efe6ec 100%);
+      }
+
+      [data-os-theme="light"] .os[data-wall="deep"] .wallpaper {
+        background:
+          radial-gradient(1000px 720px at 24% 14%, rgba(140, 210, 235, 0.55), transparent 60%),
+          radial-gradient(900px 700px at 80% 80%, rgba(120, 170, 220, 0.45), transparent 58%),
+          linear-gradient(160deg, #dcecf2 0%, #cfe2ec 46%, #e2eef4 100%);
+      }
+
+      [data-os-theme="light"] .os[data-wall-phase="night"] .wallpaper::after {
+        background: linear-gradient(180deg, rgba(30, 40, 70, 0.26), rgba(20, 28, 50, 0.4));
+      }
+
+      /* 菜单栏 / Dock */
+      [data-os-theme="light"] .menubar {
+        background: rgba(250, 251, 255, 0.72);
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+
+      [data-os-theme="light"] .mb-brand-text,
+      [data-os-theme="light"] .mb-menu-btn,
+      [data-os-theme="light"] .mb-time-btn,
+      [data-os-theme="light"] .mb-bell,
+      [data-os-theme="light"] .mb-power {
+        color: rgba(20, 24, 40, 0.62);
+      }
+
+      [data-os-theme="light"] .mb-menu-btn:hover,
+      [data-os-theme="light"] .mb-menu-btn.is-open,
+      [data-os-theme="light"] .mb-time-btn:hover,
+      [data-os-theme="light"] .mb-bell:hover,
+      [data-os-theme="light"] .mb-power:hover {
+        color: #1c2030;
+        background: rgba(20, 24, 40, 0.08);
+      }
+
+      [data-os-theme="light"] .mb-version {
+        color: rgba(20, 24, 40, 0.35);
+      }
+
+      [data-os-theme="light"] .mb-dropdown,
+      [data-os-theme="light"] .clock-panel,
+      [data-os-theme="light"] .power-menu {
+        background: rgba(252, 253, 255, 0.96);
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 20px 48px -18px rgba(30, 40, 70, 0.4);
+      }
+
+      [data-os-theme="light"] .mb-dropdown button,
+      [data-os-theme="light"] .mb-dropdown a,
+      [data-os-theme="light"] .power-menu button {
+        color: #1c2030;
+      }
+
+      [data-os-theme="light"] .mb-dropdown button:hover,
+      [data-os-theme="light"] .mb-dropdown a:hover {
+        background: rgba(111, 140, 255, 0.18);
+      }
+
+      [data-os-theme="light"] .power-menu button:hover {
+        background: rgba(20, 24, 40, 0.08);
+      }
+
+      [data-os-theme="light"] .mb-sep {
+        background: rgba(20, 24, 40, 0.1);
+      }
+
+      [data-os-theme="light"] .mb-sep-v {
+        background: rgba(20, 24, 40, 0.12);
+      }
+      [data-os-theme="light"] .spaces {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .space-dot {
+        background: rgba(20, 24, 40, 0.24);
+      }
+      [data-os-theme="light"] .space-dot:hover {
+        background: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .space-dot.is-active {
+        background: #6f8cff;
+        box-shadow: 0 0 8px rgba(111, 140, 255, 0.5);
+      }
+
+      [data-os-theme="light"] .clock-date {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .clock-time {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .clock-msg {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* Dock 玻璃 */
+      [data-os-theme="light"] .dock {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(240, 242, 250, 0.78));
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 18px 44px -18px rgba(30, 40, 70, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      }
+
+      /* 浅色主题下白色点阵几乎看不见，换成深色点 + 淡底 */
+      [data-os-theme="light"] .di-grid {
+        background:
+          radial-gradient(circle at 33% 33%, #3c4763 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 67% 33%, #3c4763 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 33% 67%, #3c4763 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 67% 67%, #3c4763 0 2.4px, transparent 2.6px),
+          rgba(40, 48, 70, 0.08);
+      }
+
+      [data-os-theme="light"] .dock-item.has-open::after {
+        background: rgba(20, 24, 40, 0.45);
+      }
+
+      /* 桌面 */
+      [data-os-theme="light"] .di-label {
+        color: rgba(20, 24, 40, 0.82);
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+      }
+
+      [data-os-theme="light"] .desk-icon:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+
+      [data-os-theme="light"] .desk-hint {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* 窗口 */
+      [data-os-theme="light"] .window {
+        background: rgba(252, 253, 255, 0.9);
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 24px 60px -24px rgba(30, 40, 70, 0.42);
+      }
+
+      [data-os-theme="light"] .window:not(.is-front) {
+        border-color: rgba(20, 24, 40, 0.06);
+        box-shadow: 0 14px 34px -16px rgba(30, 40, 70, 0.3);
+      }
+
+      [data-os-theme="light"] .titlebar {
+        background: rgba(20, 24, 40, 0.04);
+        border-bottom-color: rgba(20, 24, 40, 0.06);
+      }
+
+      [data-os-theme="light"] .win-title {
+        color: rgba(20, 24, 40, 0.62);
+      }
+
+      [data-os-theme="light"] .resize-handle {
+        background:
+          linear-gradient(135deg, transparent 55%, rgba(20, 24, 40, 0.35) 55%) 6px 10px / 6px 6px no-repeat,
+          linear-gradient(135deg, transparent 55%, rgba(20, 24, 40, 0.35) 55%) 2px 6px / 6px 6px no-repeat;
+      }
+
+      /* Finder（文章） */
+      [data-os-theme="light"] .finder-side {
+        background: rgba(20, 24, 40, 0.03);
+        border-right-color: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .side-title {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .side-item {
+        color: rgba(20, 24, 40, 0.62);
+      }
+      [data-os-theme="light"] .side-item.is-active {
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .file-row:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .file-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .file-meta {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .file-index {
+        color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .file-icon {
+        border: 1px solid rgba(20, 24, 40, 0.1);
+      }
+      [data-os-theme="light"] .finder-empty {
+        color: rgba(20, 24, 40, 0.45);
+      }
+
+      /* 关于 */
+      [data-os-theme="light"] .about {
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .about-kicker {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .about h2 {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .about-links {
+        border-top-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .about-links a {
+        color: #3f5bd6;
+      }
+
+      /* 设置 */
+      [data-os-theme="light"] .wall-pick,
+      [data-os-theme="light"] .theme-pick {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.04);
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .wall-pick:hover,
+      [data-os-theme="light"] .theme-pick:hover {
+        background: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .wall-pick.is-active,
+      [data-os-theme="light"] .theme-pick.is-active {
+        border-color: #6f8cff;
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .dock-opt {
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .dock-opt:hover {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .settings-tip {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .settings-note {
+        color: rgba(20, 24, 40, 0.46);
+      }
+      [data-os-theme="light"] .settings-row {
+        border-color: rgba(20, 24, 40, 0.08);
+        background: rgba(20, 24, 40, 0.03);
+        color: rgba(20, 24, 40, 0.78);
+      }
+      [data-os-theme="light"] .settings-row:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .sys-info {
+        border-color: rgba(20, 24, 40, 0.08);
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .sys-row {
+        border-bottom-color: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .sys-row span {
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .sys-row b {
+        color: rgba(20, 24, 40, 0.82);
+      }
+      [data-os-theme="light"] .data-btn {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.05);
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .data-btn:hover {
+        background: rgba(20, 24, 40, 0.1);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .data-btn.is-danger {
+        border-color: rgba(200, 60, 55, 0.4);
+        color: #b03028;
+      }
+
+      /* 音乐 */
+      [data-os-theme="light"] .music-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .music-sub {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .music-play {
+        border-color: rgba(20, 24, 40, 0.18);
+        background: rgba(111, 140, 255, 0.22);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .music-play:hover {
+        background: rgba(111, 140, 255, 0.34);
+      }
+      [data-os-theme="light"] .music-step {
+        background: rgba(20, 24, 40, 0.08);
+        color: rgba(20, 24, 40, 0.66);
+      }
+      [data-os-theme="light"] .music-step:hover {
+        background: rgba(20, 24, 40, 0.14);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .music-row:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .music-row.is-current {
+        background: rgba(111, 140, 255, 0.16);
+      }
+      [data-os-theme="light"] .music-row-no {
+        color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .music-row.is-playing .music-row-no {
+        color: #3f5bd6;
+      }
+      [data-os-theme="light"] .music-row-name {
+        color: rgba(20, 24, 40, 0.78);
+      }
+      [data-os-theme="light"] .music-row.is-current .music-row-name {
+        color: #1c2030;
+      }
+
+      /* 成就 */
+      [data-os-theme="light"] .ach-head {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .ach {
+        border-color: rgba(20, 24, 40, 0.07);
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .ach-mark {
+        background: rgba(20, 24, 40, 0.07);
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .ach-name {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .ach.is-got .ach-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .ach-desc {
+        color: rgba(20, 24, 40, 0.3);
+      }
+
+      /* 访客墙 */
+      [data-os-theme="light"] .wall-count {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .wall-add {
+        border-color: rgba(20, 24, 40, 0.16);
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .wall-add:hover {
+        background: rgba(111, 140, 255, 0.32);
+      }
+      [data-os-theme="light"] .wall-item:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .wall-item img {
+        box-shadow: 0 0 0 2px rgba(20, 24, 40, 0.12);
+      }
+      [data-os-theme="light"] .wall-item span {
+        color: rgba(20, 24, 40, 0.62);
+      }
+      [data-os-theme="light"] .wall-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .wall-name {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.05);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .wall-pick {
+        border-color: rgba(20, 24, 40, 0.2);
+        color: rgba(20, 24, 40, 0.66);
+      }
+      [data-os-theme="light"] .wall-pick:hover {
+        border-color: #6f8cff;
+        color: #1c2030;
+      }
+
+      /* 排行榜 */
+      [data-os-theme="light"] .rank-status {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .rank-join {
+        border-color: rgba(20, 24, 40, 0.16);
+        background: rgba(46, 154, 94, 0.16);
+        color: #1f5c39;
+      }
+      [data-os-theme="light"] .rank-row.is-top {
+        background: rgba(255, 190, 60, 0.14);
+      }
+      [data-os-theme="light"] .rank-no {
+        color: rgba(20, 24, 40, 0.32);
+      }
+      [data-os-theme="light"] .rank-row.is-top .rank-no {
+        color: #a06a00;
+      }
+      [data-os-theme="light"] .rank-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .rank-time {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .rank-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .rank-note {
+        color: rgba(20, 24, 40, 0.32);
+      }
+
+      /* 每日抽奖 */
+      [data-os-theme="light"] .draw-mark {
+        color: rgba(20, 24, 40, 0.85);
+      }
+      [data-os-theme="light"] .draw-text {
+        color: rgba(20, 24, 40, 0.78);
+      }
+
+      /* 议会 */
+      [data-os-theme="light"] .council-status {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .council-tip {
+        color: rgba(20, 24, 40, 0.32);
+      }
+      [data-os-theme="light"] .council-retry {
+        border-color: rgba(109, 40, 217, 0.4);
+        background: rgba(167, 139, 250, 0.18);
+        color: #5b3fa0;
+      }
+      [data-os-theme="light"] .council-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .council-opt {
+        border-color: rgba(20, 24, 40, 0.1);
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .council-opt:not(:disabled):hover {
+        border-color: rgba(167, 139, 250, 0.5);
+        background: rgba(167, 139, 250, 0.1);
+      }
+      [data-os-theme="light"] .council-label {
+        color: rgba(20, 24, 40, 0.85);
+      }
+      [data-os-theme="light"] .council-num {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .council-meta {
+        color: rgba(20, 24, 40, 0.34);
+      }
+      [data-os-theme="light"] .council-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* 树洞 */
+      [data-os-theme="light"] .hole-topic-label {
+        color: rgba(20, 24, 40, 0.32);
+      }
+      [data-os-theme="light"] .hole-topic {
+        color: #a06a00;
+      }
+      [data-os-theme="light"] .hole-input {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .hole-count {
+        color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .hole-item {
+        border-color: rgba(20, 24, 40, 0.06);
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .hole-text {
+        color: rgba(20, 24, 40, 0.86);
+      }
+      [data-os-theme="light"] .hole-meta {
+        color: rgba(20, 24, 40, 0.34);
+      }
+      [data-os-theme="light"] .hole-nick {
+        color: #4a5d2e;
+      }
+      [data-os-theme="light"] .hole-reply-toggle {
+        border-color: rgba(20, 24, 40, 0.1);
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .hole-reply-toggle:hover {
+        border-color: rgba(20, 24, 40, 0.25);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .hole-replies {
+        border-top-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .hole-reply {
+        color: rgba(20, 24, 40, 0.7);
+      }
+      [data-os-theme="light"] .hole-reply-nick {
+        color: #4a5d2e;
+      }
+      [data-os-theme="light"] .hole-reply-empty {
+        color: rgba(20, 24, 40, 0.28);
+      }
+      [data-os-theme="light"] .hole-reply-input {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .hole-reply-form button {
+        background: rgba(168, 191, 133, 0.35);
+        color: #3c4a26;
+      }
+      [data-os-theme="light"] .hole-empty {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .hole-status {
+        color: rgba(20, 24, 40, 0.32);
+      }
+
+      /* 新闻联播 */
+      [data-os-theme="light"] .news-head {
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .news-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .news-date {
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .news-tag {
+        background: rgba(20, 24, 40, 0.08);
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .news-text {
+        color: rgba(20, 24, 40, 0.82);
+      }
+      [data-os-theme="light"] .news-foot {
+        border-top-color: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.28);
+      }
+
+      /* 社会网络 */
+      [data-os-theme="light"] .social-card {
+        border-color: rgba(126, 34, 206, 0.2);
+        background: linear-gradient(150deg, rgba(240, 171, 252, 0.18), rgba(126, 34, 206, 0.08));
+      }
+      [data-os-theme="light"] .social-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .social-bio {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .social-meta {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .social-role {
+        background: rgba(20, 24, 40, 0.1);
+        color: rgba(20, 24, 40, 0.62);
+      }
+      [data-os-theme="light"] .social-edit {
+        border-color: rgba(20, 24, 40, 0.16);
+        color: rgba(20, 24, 40, 0.7);
+      }
+      [data-os-theme="light"] .social-edit:hover {
+        border-color: rgba(240, 171, 252, 0.6);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .social-edit.is-quiet {
+        border-color: transparent;
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .auth-form {
+        border-color: rgba(126, 34, 206, 0.22);
+        background: rgba(126, 34, 206, 0.06);
+      }
+      [data-os-theme="light"] .auth-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .auth-note {
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .auth-btn.is-ghost {
+        background: rgba(20, 24, 40, 0.08);
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .social-head {
+        color: rgba(20, 24, 40, 0.42);
+      }
+      [data-os-theme="light"] .social-tip {
+        color: rgba(20, 24, 40, 0.28);
+      }
+      [data-os-theme="light"] .social-row {
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .social-row-name {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .social-row-bio {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .social-row-role {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .social-follow {
+        border-color: rgba(126, 34, 206, 0.4);
+        background: rgba(240, 171, 252, 0.18);
+        color: #6d3a9e;
+      }
+      [data-os-theme="light"] .social-follow.is-on {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: transparent;
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .social-form {
+        border-color: rgba(20, 24, 40, 0.1);
+        background: rgba(20, 24, 40, 0.04);
+      }
+      [data-os-theme="light"] .social-pick {
+        border-color: transparent;
+        background: rgba(20, 24, 40, 0.04);
+      }
+      [data-os-theme="light"] .social-pick.is-on {
+        border-color: rgba(240, 171, 252, 0.7);
+        background: rgba(240, 171, 252, 0.18);
+      }
+      [data-os-theme="light"] .social-input {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .social-cancel {
+        background: rgba(20, 24, 40, 0.07);
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .social-empty {
+        color: rgba(20, 24, 40, 0.35);
+      }
+
+      /* 通知中心：浅色 */
+      [data-os-theme="light"] .notif-center {
+        background: rgba(252, 253, 255, 0.96);
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 24px 60px -20px rgba(30, 40, 70, 0.4);
+      }
+      [data-os-theme="light"] .notif-head {
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .notif-head-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .notif-clear {
+        background: rgba(20, 24, 40, 0.08);
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .notif-clear:hover {
+        background: rgba(20, 24, 40, 0.14);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .notif-item {
+        background: rgba(20, 24, 40, 0.03);
+      }
+      [data-os-theme="light"] .notif-item.is-new {
+        background: rgba(111, 140, 255, 0.1);
+        border-color: rgba(111, 140, 255, 0.2);
+      }
+      [data-os-theme="light"] .notif-icon {
+        background: rgba(20, 24, 40, 0.07);
+        color: rgba(20, 24, 40, 0.82);
+      }
+      [data-os-theme="light"] .notif-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .notif-text {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .notif-time {
+        color: rgba(20, 24, 40, 0.32);
+      }
+      [data-os-theme="light"] .notif-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* Spotlight：浅色 */
+      [data-os-theme="light"] .spotlight {
+        background: rgba(20, 28, 50, 0.28);
+      }
+      [data-os-theme="light"] .spotlight-box {
+        background: rgba(252, 253, 255, 0.94);
+        border-color: rgba(20, 24, 40, 0.1);
+        box-shadow: 0 32px 80px -24px rgba(30, 40, 70, 0.4);
+      }
+      [data-os-theme="light"] .spotlight-input-row {
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .spotlight-icon {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] #spotlight-input {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .spotlight-kbd,
+      [data-os-theme="light"] .spotlight-foot kbd {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .spot-item {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .spot-item.is-active {
+        background: rgba(111, 140, 255, 0.2);
+      }
+      [data-os-theme="light"] .spot-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .spot-sub,
+      [data-os-theme="light"] .spot-kind,
+      [data-os-theme="light"] .spot-enter {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .spotlight-foot {
+        border-top-color: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .spot-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* Mission Control：浅色 */
+      [data-os-theme="light"] .mission {
+        background: rgba(20, 28, 50, 0.4);
+      }
+      [data-os-theme="light"] .mission-title,
+      [data-os-theme="light"] .mc-desk,
+      [data-os-theme="light"] .mc-card-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .mc-desk {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(252, 253, 255, 0.7);
+      }
+      [data-os-theme="light"] .mc-desk.is-active {
+        border-color: rgba(111, 140, 255, 0.7);
+        background: rgba(111, 140, 255, 0.2);
+      }
+      [data-os-theme="light"] .mc-desk-count {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .mission-close {
+        background: rgba(252, 253, 255, 0.7);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .mc-card {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(252, 253, 255, 0.92);
+      }
+      [data-os-theme="light"] .mc-card-bar {
+        background: rgba(20, 24, 40, 0.04);
+        border-bottom-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .mc-card-close {
+        background: rgba(20, 24, 40, 0.1);
+        color: rgba(20, 24, 40, 0.7);
+      }
+      [data-os-theme="light"] .mc-card-close:hover {
+        background: #ff5f57;
+        color: #fff;
+      }
+      [data-os-theme="light"] .mc-dots i {
+        background: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .mc-card-body {
+        background: rgba(20, 24, 40, 0.02);
+      }
+      [data-os-theme="light"] .mc-card-space {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .mc-empty {
+        color: rgba(20, 24, 40, 0.45);
+      }
+
+      /* 小组件：浅色 */
+      [data-os-theme="light"] .widget {
+        background: rgba(252, 253, 255, 0.82);
+        border-color: rgba(20, 24, 40, 0.12);
+        box-shadow: 0 12px 32px -14px rgba(30, 40, 70, 0.3);
+      }
+      [data-os-theme="light"] .widget-title {
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .widget-grip {
+        color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .w-time,
+      [data-os-theme="light"] .w-wx-temp,
+      [data-os-theme="light"] .w-sys-row b {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .w-date,
+      [data-os-theme="light"] .w-wx-desc,
+      [data-os-theme="light"] .w-cal-title {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .w-cal-h {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .w-cal-grid span {
+        color: rgba(20, 24, 40, 0.72);
+      }
+      [data-os-theme="light"] .w-cal-grid span.is-today {
+        color: #fff;
+      }
+      [data-os-theme="light"] .w-todo-input {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .w-todo-item {
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .w-todo-check {
+        border-color: rgba(20, 24, 40, 0.3);
+      }
+      [data-os-theme="light"] .w-sys-row {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .w-loading,
+      [data-os-theme="light"] .w-wx-sub,
+      [data-os-theme="light"] .w-todo-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+
+      /* 1.2 新应用：浅色 */
+      [data-os-theme="light"] .calc-display,
+      [data-os-theme="light"] .mon-val {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .calc-key {
+        background: rgba(20, 24, 40, 0.06);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .calc-key:hover {
+        background: rgba(20, 24, 40, 0.12);
+      }
+      [data-os-theme="light"] .calc-key.is-op {
+        background: rgba(111, 140, 255, 0.24);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .calc-h-item {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .notes-search {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .note-text {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .note-pin,
+      [data-os-theme="light"] .note-del {
+        color: rgba(20, 24, 40, 0.55);
+      }
+      [data-os-theme="light"] .note-color.is-on {
+        box-shadow: 0 0 0 2px #1c2030;
+      }
+      [data-os-theme="light"] .notes-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .mon-card {
+        border-color: rgba(20, 24, 40, 0.1);
+        background: rgba(20, 24, 40, 0.04);
+      }
+      [data-os-theme="light"] .mon-label {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .mon-bar {
+        background: rgba(20, 24, 40, 0.1);
+      }
+      [data-os-theme="light"] .mon-note {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .mon-row {
+        border-bottom-color: rgba(20, 24, 40, 0.07);
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .mon-row b {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .mon-app-chip {
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+
+      /* 日历/图片查看器/浏览器：浅色 */
+      [data-os-theme="light"] .cal-title,
+      [data-os-theme="light"] .cal-event-title {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .cal-nav,
+      [data-os-theme="light"] .cal-today,
+      [data-os-theme="light"] .cal-add,
+      [data-os-theme="light"] .view-btn {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .cal-week {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .cal-cell {
+        color: rgba(20, 24, 40, 0.75);
+      }
+      [data-os-theme="light"] .cal-cell:hover {
+        background: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .cal-cell.is-today {
+        color: #fff;
+      }
+      [data-os-theme="light"] .cal-events {
+        border-top-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .cal-events-head {
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .cal-event {
+        background: rgba(20, 24, 40, 0.04);
+      }
+      [data-os-theme="light"] .cal-event-empty {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .viewer-bar,
+      [data-os-theme="light"] .viewer-info {
+        border-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .view-sep {
+        background: rgba(20, 24, 40, 0.1);
+      }
+      [data-os-theme="light"] .viewer-stage {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .viewer-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .viewer-info {
+        color: rgba(20, 24, 40, 0.5);
+      }
+      [data-os-theme="light"] .browser-url {
+        border-color: rgba(20, 24, 40, 0.14);
+        background: rgba(20, 24, 40, 0.05);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .browser-sec {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .browser-link {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.04);
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .browser-link:hover {
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .browser-tip {
+        color: rgba(20, 24, 40, 0.35);
+      }
+      [data-os-theme="light"] .browser-h-item {
+        background: rgba(20, 24, 40, 0.04);
+        color: rgba(20, 24, 40, 0.7);
+      }
+      [data-os-theme="light"] .browser-h-item:hover {
+        background: rgba(20, 24, 40, 0.09);
+      }
+      [data-os-theme="light"] .browser-h-empty {
+        color: rgba(20, 24, 40, 0.35);
+      }
+
+      /* 文件管理器：浅色 */
+      [data-os-theme="light"] .fs-side {
+        background: rgba(20, 24, 40, 0.03);
+        border-right-color: rgba(20, 24, 40, 0.07);
+      }
+      [data-os-theme="light"] .fs-side-item {
+        color: rgba(20, 24, 40, 0.62);
+      }
+      [data-os-theme="light"] .fs-side-item.is-active {
+        background: rgba(111, 140, 255, 0.2);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .fs-search {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.05);
+        color: #1c2030;
+      }
+      [data-os-theme="light"] .fs-sort {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .fs-new {
+        background: rgba(111, 140, 255, 0.24);
+        color: #26307e;
+      }
+      [data-os-theme="light"] .fs-crumb {
+        color: rgba(20, 24, 40, 0.45);
+      }
+      [data-os-theme="light"] .fs-node:hover {
+        background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .fs-node.is-selected {
+        border-color: rgba(111, 140, 255, 0.6);
+        background: rgba(111, 140, 255, 0.14);
+      }
+      [data-os-theme="light"] .fs-node-name {
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .fs-empty {
+        color: rgba(20, 24, 40, 0.4);
+      }
+      [data-os-theme="light"] .fs-detail {
+        border-top-color: rgba(20, 24, 40, 0.08);
+      }
+      [data-os-theme="light"] .fs-detail-name {
+        color: rgba(20, 24, 40, 0.8);
+      }
+      [data-os-theme="light"] .fs-act {
+        border-color: rgba(20, 24, 40, 0.12);
+        background: rgba(20, 24, 40, 0.05);
+        color: rgba(20, 24, 40, 0.75);
+      }
+      [data-os-theme="light"] .fs-act:hover {
+        background: rgba(20, 24, 40, 0.12);
+      }
+      [data-os-theme="light"] .fs-act.is-danger {
+        color: #b03028;
+      }
+      [data-os-theme="light"] .fs-rename-input {
+        background: rgba(20, 24, 40, 0.06);
+        color: rgba(20, 24, 40, 0.9);
+      }
+      [data-os-theme="light"] .fs-confirm-text {
+        color: rgba(20, 24, 40, 0.6);
+      }
+      [data-os-theme="light"] .fs-file-content {
+        background: rgba(20, 24, 40, 0.05);
+        color: rgba(20, 24, 40, 0.82);
+      }
+

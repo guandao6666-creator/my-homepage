@@ -1,0 +1,83 @@
+      /* ---------------- Dock ---------------- */
+
+      .dock {
+        position: absolute;
+        left: 50%;
+        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        transform: translateX(-50%);
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 13px;
+        border-radius: 20px;
+        background: linear-gradient(180deg, rgba(30, 33, 43, 0.62), rgba(18, 20, 28, 0.55));
+        backdrop-filter: blur(24px) saturate(1.7);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .dock-item {
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 12px;
+        background: none;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        will-change: transform;
+        transition: transform 0.12s ease-out;
+      }
+
+      /* 点击按压反馈 */
+      .dock-item:active {
+        transform: translateY(-1px) scale(0.94) !important;
+        transition-duration: 0.05s;
+      }
+
+      /* 程序坞图标：同一套 34px 图形放大到 44px，与桌面/启动台完全一致 */
+      .dock-item .di-glyph {
+        zoom: 1.294; /* 34 → 44px */
+      }
+
+      .dock-sep {
+        width: 1px;
+        height: 30px;
+        margin: 0 2px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .dock-link {
+        display: grid;
+        place-items: center;
+        text-decoration: none;
+      }
+
+      /* Dock 下方的运行指示点 */
+      .dock-item {
+        position: relative;
+      }
+
+      .dock-item.has-open::after,
+      .dock-item.has-hidden::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -6px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        transform: translateX(-50%);
+      }
+
+      .dock-item.has-open::after {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .dock-item.has-hidden::after {
+        background: #8fa6ff;
+        box-shadow: 0 0 8px rgba(143, 166, 255, 0.9);
+      }
+
