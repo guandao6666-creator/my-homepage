@@ -53,7 +53,7 @@ src/content/blog/.sync-manifest.json
 .initial-admin-token
 
 # D1 整库备份（含账号/Session，绝不入库）
-backups/
+/backups/
 *.sql.gz
 *.sql.gz.enc
 

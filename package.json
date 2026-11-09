@@ -32,7 +32,7 @@
     "qa:devices": "node scripts/qa-local-run.mjs devices",
     "qa:pairing-ttl": "node scripts/pairing-ttl-check.mjs",
     "qa:continuity:ui": "node scripts/continuity-ui-qa.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "astro sync && tsc --noEmit",
     "check:version": "node scripts/check-version.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:csp": "node scripts/gen-csp.mjs --check",
