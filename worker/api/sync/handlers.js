@@ -1,16 +1,17 @@
 /**
- * /api/sync/* —— Guandao OS 2.0 云同步
+ * /api/sync/* —— Guandao OS 2.0 云同步（Phase 4：5 个数据域 + 配额）
  *
  * 端点（全部要求有效 Session；写操作校验同源）：
- *   GET  /api/sync/status              每个域的条目数、墓碑数、最后更新时间
+ *   GET  /api/sync/status              每个域的条目数、墓碑数、最后更新时间 + 账号配额
  *   GET  /api/sync/index?domain=       全量索引（id / revision / deleted / updatedAt）
  *   GET  /api/sync/pull?domain=&since= 增量拉取（含 payload）
  *   GET  /api/sync/pull?domain=&ids=   按 id 拉取（索引 diff 之后只取需要的）
  *   POST /api/sync/push                推送变更（乐观锁 revision）
  *
  * 边界：
- *   - domain 只允许 notes / tasks / calendar；
- *   - 单次最多 100 条变更，单条 payload ≤ 128KB，整包 ≤ 768KB；
+ *   - domain 只允许 notes / tasks / calendar / workspace / preferences；
+ *   - 单次最多 100 条变更；单条 payload 默认 ≤ 128KB，preferences 收紧到 32KB；整包 ≤ 768KB；
+ *   - 单账号活实体 ≤ 5000、墓碑 ≤ 2000：超限返回 409 QUOTA_EXCEEDED，不静默丢数据；
  *   - 所有写入都带 user_id，实体 id 只做格式校验，不参与鉴权判断；
  *   - 冲突不覆盖：返回服务端版本，由客户端决定合并（客户端会按 updatedAt 取新）。
  */
@@ -20,18 +21,24 @@ import { assertSameOrigin } from "../guards.js";
 import { authConfig } from "../auth/config.js";
 import { readSession } from "../auth/session.js";
 import {
+  domainPayloadLimit,
+  isSyncDomain,
+  MAX_ENTITIES_PER_USER,
+  MAX_TOMBSTONES_PER_USER,
+  SYNC_DOMAINS,
+} from "./limits.js";
+import {
   applyChange,
   domainStats,
-  isSyncDomain,
+  estimateQuotaDelta,
   listByIds,
   listChanges,
   listIndex,
-  SYNC_DOMAINS,
+  userQuotaStats,
 } from "./store.js";
 
 const PREFIX = "/api/sync";
 const MAX_BATCH = 100;
-const MAX_PAYLOAD_BYTES = 128 * 1024;
 const MAX_BODY_BYTES = 768 * 1024;
 
 export async function handleSyncRequest({ request, env, url, path }) {
@@ -53,7 +60,8 @@ export async function handleSyncRequest({ request, env, url, path }) {
   if (segments.length === 1 && segments[0] === "status" && method === "GET") {
     const domains = [];
     for (const domain of SYNC_DOMAINS) domains.push(await domainStats(env, userId, domain));
-    return ok({ domains, serverTime: Date.now() });
+    const quotas = await userQuotaStats(env, userId);
+    return ok({ domains, quotas, serverTime: Date.now() });
   }
 
   /* ------------------------------ 索引 ------------------------------ */
@@ -97,7 +105,38 @@ export async function handleSyncRequest({ request, env, url, path }) {
       throw new ApiError("BATCH_TOO_LARGE", `单次最多推送 ${MAX_BATCH} 条变更`, 400);
     }
 
-    const changes = rawChanges.map((change, index) => normalizeChange(change, index));
+    const payloadLimit = domainPayloadLimit(domain);
+    const changes = rawChanges.map((change, index) => normalizeChange(change, index, payloadLimit));
+
+    // 配额预检放在写库之前：整批要么进得去，要么明确返回 409，不做「写一半」。
+    const quotas = await userQuotaStats(env, userId);
+    const delta = await estimateQuotaDelta(env, userId, domain, changes);
+    if (quotas.entityCount + delta.entities > MAX_ENTITIES_PER_USER) {
+      throw new ApiError(
+        "QUOTA_EXCEEDED",
+        `云端同步记录已达上限（${MAX_ENTITIES_PER_USER} 条），请先删除一些内容再同步`,
+        409,
+        {
+          scope: "entities",
+          current: quotas.entityCount,
+          limit: MAX_ENTITIES_PER_USER,
+          estimated: delta.entities,
+        },
+      );
+    }
+    if (quotas.tombstoneCount + delta.tombstones > MAX_TOMBSTONES_PER_USER) {
+      throw new ApiError(
+        "QUOTA_EXCEEDED",
+        `云端删除记录过多（上限 ${MAX_TOMBSTONES_PER_USER} 条），请稍后重试`,
+        409,
+        {
+          scope: "tombstones",
+          current: quotas.tombstoneCount,
+          limit: MAX_TOMBSTONES_PER_USER,
+          estimated: delta.tombstones,
+        },
+      );
+    }
 
     const applied = [];
     const conflicts = [];
@@ -119,7 +158,12 @@ function requireDomain(url) {
   return domain;
 }
 
-function normalizeChange(raw, index) {
+/**
+ * @param {any} raw 客户端变更
+ * @param {number} index 批次内序号（0 起，错误文案用 1 起）
+ * @param {number} payloadLimit 该数据域允许的单条 payload 字节数
+ */
+function normalizeChange(raw, index, payloadLimit) {
   const id = typeof raw?.id === "string" ? raw.id.trim() : "";
   if (!id || id.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(id)) {
     throw new ApiError("INVALID_CHANGE", `第 ${index + 1} 条变更的 id 不合法`, 400);
@@ -135,10 +179,10 @@ function normalizeChange(raw, index) {
       throw new ApiError("INVALID_CHANGE", `第 ${index + 1} 条变更缺少内容`, 400);
     }
     const size = byteLength(JSON.stringify(payload));
-    if (size > MAX_PAYLOAD_BYTES) {
+    if (size > payloadLimit) {
       throw new ApiError(
         "PAYLOAD_TOO_LARGE",
-        `第 ${index + 1} 条内容超过 ${Math.round(MAX_PAYLOAD_BYTES / 1024)} KB，请精简后重试`,
+        `第 ${index + 1} 条内容超过 ${Math.round(payloadLimit / 1024)} KB，请精简后重试`,
         400,
       );
     }
@@ -154,4 +198,3 @@ function byteLength(text) {
     return text.length * 2;
   }
 }
-

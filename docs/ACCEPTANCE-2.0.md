@@ -246,3 +246,38 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 5. `qa:plugins` 70/70、`qa:continuity` 45/45、`qa:devices` **31/31** 已由自包含运行器跑通；旧的 `scripts/devices-qa.mjs` 仍需人工 `GDV_TOKEN`，仅作历史浏览器冒烟脚本。
 6. Phase 2 的 2.2 Legacy 与 2.5 Community 仍为 `Partially Verified`，作为**独立遗留项**跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。
 6. 原两项已知缺陷已处理：`PAIRING_ATTEMPTS_EXCEEDED` 不可达分支已删除；撤销后 401 错误码已由 `guards.sessionFailure` / `requireActiveSession` 统一。
+
+---
+
+## Phase 4 · 同步范围扩展与冲突策略（2026-11-09）
+
+> 前置说明：Phase 3 已按分层口径判 `Accepted (Local/CI)`（生产层 `Blocked`），本阶段由所有者直接指派；
+> 生产数据保护门禁（Phase 1.6）未解除，因此本阶段只在本地 / 隔离环境开发与验证，未做任何生产写入、迁移或部署。
+
+| 验收项 | 状态 | 证据 |
+| --- | --- | --- |
+| Workspace 同步域完整 | **通过（本地）** | `src/lib/sync/workspace.ts`；只同步 `preset:false` 自定义空间；payload ≤128KB 且字段/数组/窗口数量限长；`tests/unit/sync-workspace.test.ts` 10 项 |
+| Workspace 增删改传播 | **通过（本地）** | `tests/e2e/sync.spec.ts`（真实 Worker）：推送 rev1→修改 rev2→B 增量拉取；删除 → 墓碑 `deleted:true/deletedAt>0`；旧 `baseRevision` 重推被判删除冲突（不复活）；以墓碑 revision 重建成功 |
+| 双设备一致 / 布局重算 | **通过（本地，协议级）** | 两个独立 `browser.newContext()`（同账号两台设备 Session，`deviceId` 不同）；应用端用 `layout.normalizeSnapshot` + `rescaleSnapshot(cascade:false)` 按当前视口重算，未重写 Window Manager；页面级应用由单测覆盖（见未完成项） |
+| Preferences 白名单有效 | **通过（本地）** | 13 项白名单 + `DEVICE_ONLY_SETTINGS` 排除 `system.mode` / `diagnosticsRetention` / 设备信息；`tests/unit/sync-preferences.test.ts` 7 项；未知键/非法值拒绝 |
+| 主题 / Dock / 时钟可同步 | **通过（本地，协议级）** | `tests/e2e/sync.spec.ts`：A 推送 → B 拉到相同 payload；preferences 33KB→400、同 40KB 在 workspace 域成功（按域限额） |
+| 设备级设置不被覆盖 | **通过（单测）** | 设备级键不在白名单，`validatePreferencesPayload` 拒绝；应用端由 SettingsManager 生效 |
+| 冲突可发现 | **通过（本地）** | `src/lib/sync/conflicts.ts`：最多 50 条、TTL 7 天、去重、脱敏快照；System Center「最近同步冲突」面板 |
+| 保留本地 / 保留云端 | **通过（本地）** | 保留本地以 serverRevision 为 base 重推、乐观锁不关、再冲突返回 `changed`；保留云端 pull→apply→写 revision→清除；重复调用 noop 幂等；`tests/unit/sync-conflicts.test.ts` 12 项 + E2E 协议级冲突链路 |
+| revision 正确 / 并发不静默覆盖 | **通过（本地）** | 服务端 `applyChange` 旧 revision 必返回 conflict；E2E 断言冲突时不覆盖、重推后 revision 递增 |
+| 配额有效 / payload 限制 | **通过（本地）** | 实体 5000 / 墓碑 2000；workspace 128KB、preferences 32KB；超限 409 `QUOTA_EXCEEDED` / 400 `PAYLOAD_TOO_LARGE`；`qa:sync` 实跑 45/45 |
+| 墓碑 90 天清理安全 / 不复活 / 幂等 | **通过（本地）** | 0018 迁移 + `sync_tombstone_ledger`；`purgeExpiredTombstones` 先补台账再删；Cron 每 15 分钟、200/批、2000/次；`qa:sync` 实测过期清理、台账保留 revision 5、旧 base 重推冲突、二次清理 `purged=0` |
+| 原有三域不被破坏 | **通过（本地）** | Notes/Tasks/Calendar 协议、上限与用例保持不变；`qa:sync` 原 20 项保留并扩展 |
+| 质量门禁 | **通过** | `npm run verify`（18 文件 / 331 单测、lint、build、CSP、migrations 18/117）；`npx playwright test` **155 passed**（chromium 67 + worker 64 + firefox 12 + webkit 12；worker 64 含同步 8）；`qa:sync` **45/45**；`qa:devices` 回归 **31/31** |
+| 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、2026-11-06 事故未 Closed → 禁止生产写入、生产迁移、`qa:prod`、部署 |
+
+**Phase 4 整体：`Partially Verified`（本地 / 隔离层全部通过；生产层 `Blocked`）。**
+
+未完成 / 未验证项：
+
+1. 生产 D1 迁移（`0018`）与生产双设备同步验证未执行；本阶段未部署、未运行 `qa:prod`。
+2. 页面级冲突面板/解决动作的浏览器 E2E：本轮 `dist` 由 Phase 4 客户端代码之前的构建提供，`sync.spec.ts` 走协议级验证；`conflicts.ts` / `resolveSyncConflict` 状态机由 `tests/unit/sync-conflicts.test.ts` 覆盖，`systemcenter.ts` 纯函数由 `tests/unit/systemcenter-sync.test.ts` 覆盖。构建后页面级可用性仍需一次人工或后续 E2E 确认。
+3. 5000 活实体 / 2000 墓碑的 409 造数未在 E2E 中执行（成本与 D1 污染考虑），由 `scripts/sync-qa.mjs` 真实触发并覆盖。
+4. 两台物理设备的人工冒烟未做；`qa:devices` 与 `sync.spec.ts` 使用的是真实浏览器 Context + 本地 Worker，但不等于生产环境。
+5. Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。
+

@@ -5,6 +5,7 @@
  * 窗口布局与通知偏好；虚拟桌面只负责管理窗口。两者并存，互不覆盖。
  */
 
+import { normalizeSnapshot, rescaleSnapshot, type Viewport, type WindowState } from "../core/layout";
 import { safeUrl } from "../html";
 import { emit, escapeHtml, ls, modal, shell, uid, type Ctx, type WinStateLike } from "./core";
 import { findTheme, readThemeState, applyTheme } from "./themes";
@@ -27,6 +28,8 @@ export type Workspace = {
   dnd: boolean;
   createdAt: number;
   updatedAt: number;
+  /** 2.0 跨设备同步：保存时的视口，用于恢复时重算窗口几何（旧数据没有，按当前视口只做边界收敛） */
+  viewport?: Viewport;
 };
 
 type WsState = { v: 1; list: Workspace[]; current: string };
@@ -128,6 +131,39 @@ export const currentWorkspace = () => read().list.find((w) => w.id === read().cu
    捕获 / 应用
    ============================================================ */
 
+/** 当前 shell 视口；workespace 快照与窗口重算都以它为目标尺寸 */
+const currentViewport = (ctx: Ctx): Viewport => {
+  try {
+    const rect = ctx.windows.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+    if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+      return { width, height };
+    }
+  } catch {
+    /* 桌面 DOM 尚未完成布局 */
+  }
+  const width = Number(window.innerWidth) || 1280;
+  const height = Number(window.innerHeight) || 800;
+  return { width: Math.round(width), height: Math.round(height) };
+};
+
+const toWinStateMap = (windows: Record<string, WindowState>): Record<string, WinStateLike> => {
+  const map: Record<string, WinStateLike> = {};
+  for (const [app, state] of Object.entries(windows)) {
+    map[app] = {
+      left: state.left,
+      top: state.top,
+      width: state.width,
+      height: state.height,
+      minimized: state.minimized,
+      maximized: state.maximized,
+      space: state.space,
+    };
+  }
+  return map;
+};
+
 const capture = (base: Workspace, ctx: Ctx): Workspace => {
   const install = readInstall();
   const themeState = readThemeState();
@@ -144,6 +180,7 @@ const capture = (base: Workspace, ctx: Ctx): Workspace => {
       .filter(Boolean),
     windows: {},
     dnd: readPrefs().dnd,
+    viewport: currentViewport(ctx),
     updatedAt: Date.now(),
   };
 };
@@ -197,6 +234,18 @@ export const applyWorkspace = async (id: string, ctx: Ctx, opts: { silent?: bool
   const st = read();
   const ws = st.list.find((w) => w.id === id);
   if (!ws) return;
+
+  // 跨设备恢复：窗口几何按「保存时视口 → 当前视口」重算。
+  // 只换算坐标/尺寸并写回工作空间，不改变 restoreWindows 的开关窗顺序与语义。
+  if (ws.windows && Object.keys(ws.windows).length > 0) {
+    const viewport = currentViewport(ctx);
+    const snapshot = normalizeSnapshot({ windows: ws.windows, viewport: ws.viewport }, viewport);
+    ws.windows = toWinStateMap(rescaleSnapshot(snapshot, viewport, { cascade: false }).windows);
+    ws.viewport = viewport;
+  } else if (!ws.viewport) {
+    ws.viewport = currentViewport(ctx);
+  }
+
   const hideTransition = showTransition(ws.name);
   await new Promise((r) => window.setTimeout(r, 180));
   st.current = id;

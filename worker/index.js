@@ -17,6 +17,7 @@ import { runScheduledBackups } from "./api/backups/handlers.js";
 import { runDeletionMaintenance, runPrivacyCleanup } from "./api/privacy/handlers.js";
 import { runDataMonitor, runBackupMonitor } from "./api/admin/monitor.js";
 import { runCommunityMaintenance } from "./api/community/maintenance.js";
+import { runSyncTombstoneMaintenance } from "./api/sync/maintenance.js";
 import { SCRIPT_HASHES } from "./api/csp-hashes.js";
 
 // Workflow 类必须从 Worker 入口导出，供 Workflows binding 绑定。
@@ -323,6 +324,12 @@ export default {
     ctx.waitUntil(
       runBackupMonitor(env).catch((error) => {
         console.error("[monitor] backup monitor failed:", error?.message ?? error);
+      }),
+    );
+    // 2.0 Phase 4：清理超过 90 天的同步墓碑；台账保留，旧 baseRevision 重推仍会被拦下。
+    ctx.waitUntil(
+      runSyncTombstoneMaintenance(env).catch((error) => {
+        console.error("[sync] tombstone maintenance failed:", error?.message ?? error);
       }),
     );
   },

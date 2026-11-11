@@ -780,6 +780,72 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 
 **结论：`Accepted (Local/CI)`；生产层 `Blocked`。** 本地 / 隔离环境与 GitHub Actions 全部通过（quality 三 job 全绿、E2E 147 passed）；生产部署、生产验证、物理设备与真机项按 Phase 1.6 门禁未执行，不写成「已验证」。PR #1 仅用于触发 CI，验证后已关闭、未合并 `main`，分支 `ci/phase3-verify` 保留。
 
+### 16.17 Phase 4 云同步扩展与冲突解决（2026-11-09）
+
+**本阶段未部署生产、未应用生产迁移**；以下结果全部来自本地 / 隔离环境（`wrangler dev --local` + 本地 D1）与真实浏览器 Context。
+
+**1. 五个同步数据域**
+
+- 迁移 `0018_sync_cloud_expansion.sql`：重建 `sync_entities` 的 domain CHECK（`notes / tasks / calendar / workspace / preferences`）并新增 `deleted_at`；
+  旧表改名保留为 `sync_entities_legacy_v1`（不 DROP，可回滚）；新增 `sync_tombstone_ledger`（防复活）与 `sync_cleanup_log`（审计，保留 200 行）。
+- `worker/api/sync/limits.js`：按域 payload 上限（workspace 128 KB、preferences 32 KB、其余 128 KB）、单用户实体 5000、墓碑 2000、TTL 90 天。
+- `worker/api/sync/store.js`：墓碑写 `deleted_at` 与台账；实体行已清理时用台账拦截旧 `baseRevision`（返回合成 `deleted` 冲突，**不复活**）；
+  新增配额统计/写前估算/分批清理（200/批）。
+- `worker/api/sync/handlers.js`：`/status` 增加 `quotas`；push 按域校验并返回 409 `QUOTA_EXCEEDED` / 400 `PAYLOAD_TOO_LARGE`。
+- `worker/index.js`：现有 `*/15` Cron 增加独立捕获异常的墓碑清理任务。
+
+**2. Workspace 同步（4.1）**
+
+- 新增 `src/lib/sync/workspace.ts`：只同步 `preset:false` 的自定义工作空间；payload ≤128 KB，名称/数组/窗口/组件均限长；
+  跨端应用时用 `layout.normalizeSnapshot` + `rescaleSnapshot(cascade:false)` 按当前视口重算窗口几何，未重写 Window Manager；
+  删除用 known-id 追踪合成墓碑，同 id 重建可撤销删除。
+- `src/lib/os14/workspaces.ts`：`Workspace` 增加 `viewport`，`capture()` 写入，`applyWorkspace` 在恢复窗口前重算几何。
+
+**3. Preferences 同步（4.2）**
+
+- 新增 `src/lib/sync/preferences.ts`：**13 项白名单**（主题/材质/圆角/强调色/动画、图标文字/时钟秒/Dock 自动隐藏与位置/组件透明度、勿扰/音量、更新通道）；
+  显式排除 `system.mode`、`system.diagnosticsRetention` 与全部设备级信息；payload ≤32 KB；未知键/非法值拒绝；应用走 SettingsManager。
+
+**4. 冲突可视化与解决（4.3）**
+
+- 新增 `src/lib/sync/conflicts.ts`：最多 50 条、TTL 7 天、按 `${domain}:${entityId}` 去重、受控快照 ≤4KB/边且脱敏、仅本地不上传。
+- `providers.ts`：5 域注册；冲突时保留「服务端版本落回本地」并记录冲突元数据；`resolveSyncConflict` 支持保留本地（以 serverRevision 重推，乐观锁不关，
+  再次冲突返回 `changed`）与保留云端（pull→apply→revision→清除），重复调用 noop 幂等。
+- System Center 云端设置：新增配额 KPI（实体/5000、墓碑/2000）与「最近同步冲突」面板（域/实体/时间/revision、保留本地/保留云端、清理已解决）。
+
+**5. 质量门禁（本机实跑）**
+
+| 门禁 | 结果 |
+| --- | --- |
+| `npm run verify` | 通过：typecheck、**18 文件 / 331 单测**、security:test 六组、`check:unused` 18、`check:astro` 0 errors/0 warnings/149 hints、`check:html-security` 291 处全审查、lint、build 29 pages、CSP 12 哈希/30 HTML |
+| `npm run check:migrations`（verify 内） | **18 个迁移 / 117 个索引**；两条历史遗留 `idx_backups_*` 重复索引 warning（非本阶段引入） |
+| `npx playwright test`（整包一次运行） | **155 passed（2.9m）**：chromium 67 + worker 64 + firefox 12 + webkit 12 |
+| 其中 worker project | **64 passed**（真实 Worker 8788：签名 19 / 沙箱 11 / 设备 12 / OAuth 14 / **同步 8**） |
+| `npm run qa:sync` | **45/45**（含 `--test-scheduled` 真实触发清理、配额 5000→409、preferences 40KB→400、台账防复活、清理幂等） |
+| `npm run qa:devices` | **31/31**（回归，无回退） |
+| `npm run qa:prod` | **禁止执行**（Phase 1.6 门禁未解除） |
+
+同步 E2E（`tests/e2e/sync.spec.ts`）连续 3 次全绿（20.3 / 20.5 / 20.5s，8 项）：两个独立 `browser.newContext()` 分别使用同账号两台设备的真实 Session，
+覆盖 workspace 推送/索引/拉取/修改/墓碑/防复活/重建、preferences 按域限额、冲突与保留本地/云端链路、参数边界 400/403/413、账号隔离与配额自洽。
+开始与结束均调用仅本机的 `POST /__e2e/reset-sync` 清理夹具，可重复运行。
+
+**6. 顺带发现与处理**
+
+1. SQLite 不能修改 CHECK 约束 → 0018 采用「旧表改名保留 + 新建 + 复制数据」，保留回滚路径，不删除任何用户数据。
+2. D1 的 IN 参数上限 → 批量查询按 ≤100 分块，避免大用户量下查询失败。
+3. E2E 首次失败是测试假设错误（`/api/auth/me` 不走 `{success,data}` 信封），按真实契约修正测试，未改产品代码。
+
+**7. 未完成 / 风险**
+
+- 生产 D1 迁移（0018）与生产双设备同步验证未执行；未部署、未运行 `qa:prod`。
+- 页面级冲突面板/解决动作的浏览器 E2E 未做：`dist` 由 Phase 4 客户端代码合入前的构建提供，`sync.spec.ts` 走协议级；
+  客户端状态机由 `tests/unit/sync-conflicts.test.ts` 覆盖，UI 纯函数由 `tests/unit/systemcenter-sync.test.ts` 覆盖；构建后应补一次页面级确认。
+- 5000 实体 / 2000 墓碑的 409 造数不在 E2E 中，由 `qa:sync` 真实触发。
+- 90 天 TTL 采用「TTL + 台账」策略；离线超过 90 天的设备再同步会收到 deleted 冲突（预期）。清理日志未接外部告警。
+- Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪。
+
+**结论：`Partially Verified`（本地 / 隔离层通过；生产层 `Blocked`）。** 全部本地门禁与真实浏览器 Context 证据通过；生产迁移、生产验证、页面级冲突 UI E2E 与物理设备冒烟按 Phase 1.6 门禁未执行，不写成「已验证」。
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash

@@ -37,6 +37,14 @@ import { applySettings } from "../apply";
 import { getOs20 } from "../bridge";
 import { MANIFEST_BY_ID } from "../manifests";
 import { localTombstones } from "../../sync/providers";
+import {
+  CONFLICT_TTL_MS,
+  MAX_CONFLICTS,
+  clearConflicts,
+  conflictStats,
+  listConflicts,
+  type SyncConflict,
+} from "../../sync/conflicts";
 
 type Tab = "appearance" | "personal" | "apps" | "plugins" | "cloud" | "devices" | "privacy" | "system";
 
@@ -131,6 +139,180 @@ const syncStateLabel = (state: string): string =>
       unsupported: "未接入",
     } as Record<string, string>
   )[state] ?? state;
+
+/* ============================================================
+   同步冲突与配额（纯函数，便于 Node 单测）
+   ============================================================ */
+
+/** 面板最多展开的冲突条数；更早的记录只提示数量，不一次性铺满 */
+export const CONFLICT_ROW_LIMIT = 5;
+
+/** 冲突记录的本地保留天数，直接由冲突模块的 TTL 推导，避免两处各写一个数字 */
+const CONFLICT_TTL_DAYS = Math.max(1, Math.round(CONFLICT_TTL_MS / 86_400_000));
+
+/** 配额读取失败 / 缺字段时的统一文案（不抛错、不填假数字） */
+export const QUOTA_UNAVAILABLE_TEXT = "配额信息暂不可用";
+
+/** 与 worker/api/sync/limits.js 的上限保持一致；服务端下发 limits 时以服务端为准 */
+const FALLBACK_MAX_ENTITIES = 5000;
+const FALLBACK_MAX_TOMBSTONES = 2000;
+
+const CONFLICT_DOMAIN_LABEL: Record<string, string> = {
+  notes: "Notes",
+  tasks: "Tasks",
+  calendar: "Calendar",
+  workspace: "Workspace",
+  preferences: "Preferences",
+};
+
+const toCount = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 0;
+};
+
+/** 数据域 id → 人话；未知域如实显示原始 id，不假装是已知域 */
+export const conflictDomainLabel = (domain: string): string => {
+  const key = String(domain ?? "").trim();
+  if (!key) return "未知数据域";
+  return CONFLICT_DOMAIN_LABEL[key] ?? key;
+};
+
+/** 实体 id 截断：保留头尾、中间省略；长 id 不撑破面板，title 里仍保留完整值 */
+export function conflictEntityShort(entityId: string, max = 18): string {
+  const text = String(entityId ?? "").trim();
+  if (!text) return "（无 id）";
+  const width = Math.max(8, Math.trunc(Number(max) || 18));
+  if (text.length <= width) return text;
+  const head = Math.max(4, Math.ceil((width - 1) * 0.6));
+  const tail = Math.max(2, width - 1 - head);
+  return `${text.slice(0, head)}…${text.slice(-tail)}`;
+}
+
+/** 检测时间：固定本地格式 YYYY-MM-DD HH:mm，跨平台一致、便于截图和断言 */
+export function formatConflictTime(at: number): string {
+  const ts = Number(at);
+  if (!Number.isFinite(ts) || ts <= 0) return "时间未知";
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return "时间未知";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export type ConflictViewItem = {
+  id: string;
+  domain: string;
+  domainLabel: string;
+  entityId: string;
+  entityShort: string;
+  detectedAt: number;
+  detectedText: string;
+  localRevision: number;
+  serverRevision: number;
+};
+
+/** 冲突列表 → 面板行：默认只留未解决、按检测时间倒序、最多 5 条 */
+export function conflictViewItems(list: SyncConflict[], options: { limit?: number } = {}): ConflictViewItem[] {
+  const rawLimit = options.limit;
+  const limit =
+    typeof rawLimit === "number" && Number.isFinite(rawLimit)
+      ? Math.max(0, Math.trunc(rawLimit))
+      : CONFLICT_ROW_LIMIT;
+  const source = Array.isArray(list) ? list : [];
+  return source
+    .filter((item) => Boolean(item) && item.state !== "resolved")
+    .slice()
+    .sort(
+      (left, right) =>
+        toCount(right.detectedAt) - toCount(left.detectedAt) ||
+        String(left.id ?? "").localeCompare(String(right.id ?? "")),
+    )
+    .slice(0, limit)
+    .map((item) => {
+      const detectedAt = toCount(item.detectedAt);
+      return {
+        id: String(item.id ?? ""),
+        domain: String(item.domain ?? ""),
+        domainLabel: conflictDomainLabel(item.domain),
+        entityId: String(item.entityId ?? ""),
+        entityShort: conflictEntityShort(item.entityId),
+        detectedAt,
+        detectedText: formatConflictTime(detectedAt),
+        localRevision: toCount(item.localRevision),
+        serverRevision: toCount(item.serverRevision),
+      };
+    });
+}
+
+export type SyncQuotaText = {
+  available: boolean;
+  entitiesText: string;
+  tombstonesText: string;
+  entityCount: number;
+  tombstoneCount: number;
+  maxEntities: number;
+  maxTombstones: number;
+};
+
+const formatQuotaCount = (value: number): string =>
+  String(toCount(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+/**
+ * /api/sync/status 的 quotas → 展示文案。
+ * 响应缺失、未登录、离线或字段损坏时 available=false 并统一显示「配额信息暂不可用」，绝不抛出。
+ */
+export function quotaText(quotas: unknown): SyncQuotaText {
+  const unavailable: SyncQuotaText = {
+    available: false,
+    entitiesText: QUOTA_UNAVAILABLE_TEXT,
+    tombstonesText: QUOTA_UNAVAILABLE_TEXT,
+    entityCount: 0,
+    tombstoneCount: 0,
+    maxEntities: FALLBACK_MAX_ENTITIES,
+    maxTombstones: FALLBACK_MAX_TOMBSTONES,
+  };
+  if (!quotas || typeof quotas !== "object") return unavailable;
+  const source = quotas as { entityCount?: unknown; tombstoneCount?: unknown; limits?: unknown };
+  if (source.entityCount === undefined && source.tombstoneCount === undefined) return unavailable;
+  const limits =
+    source.limits && typeof source.limits === "object"
+      ? (source.limits as { maxEntities?: unknown; maxTombstones?: unknown })
+      : {};
+  const entityCount = toCount(source.entityCount);
+  const tombstoneCount = toCount(source.tombstoneCount);
+  const maxEntities = toCount(limits.maxEntities) || FALLBACK_MAX_ENTITIES;
+  const maxTombstones = toCount(limits.maxTombstones) || FALLBACK_MAX_TOMBSTONES;
+  return {
+    available: true,
+    entitiesText: `${formatQuotaCount(entityCount)} / ${formatQuotaCount(maxEntities)}`,
+    tombstonesText: `${formatQuotaCount(tombstoneCount)} / ${formatQuotaCount(maxTombstones)}`,
+    entityCount,
+    tombstoneCount,
+    maxEntities,
+    maxTombstones,
+  };
+}
+
+export type SyncResolveChoice = "local" | "remote";
+
+export type SyncResolveOutcome =
+  | { ok: true; noop?: boolean; resolved?: SyncResolveChoice }
+  | { ok: false; reason: "changed" | "offline" | "unsupported" | "error"; error?: string };
+
+export type ConflictResolveNotice = { tone: "ok" | "warn" | "error"; text: string };
+
+/** 解决结果 → 用户提示。changed 必须让用户重新确认，不能假装解决成功 */
+export function conflictResolveNotice(result: SyncResolveOutcome): ConflictResolveNotice {
+  if (!result || typeof result !== "object") return { tone: "error", text: "解决冲突失败，请稍后重试" };
+  if (result.ok) {
+    if (result.resolved === "local") return { tone: "ok", text: "已保留本地版本，冲突已解决" };
+    if (result.resolved === "remote") return { tone: "ok", text: "已保留云端版本，冲突已解决" };
+    return { tone: "ok", text: "这条冲突已经处理过，无需重复操作" };
+  }
+  if (result.reason === "changed") return { tone: "warn", text: "同步版本已再次变化，请重新确认" };
+  if (result.reason === "offline") return { tone: "warn", text: "当前离线或未登录，无法解决冲突" };
+  if (result.reason === "unsupported") return { tone: "warn", text: "该数据域暂不支持解决冲突" };
+  return { tone: "error", text: "解决冲突失败，请稍后重试" };
+}
 
 /* ============================================================
    外观
@@ -407,6 +589,41 @@ const pluginsView = () => {
    云端
    ============================================================ */
 
+/** 单条冲突：域 + 实体（截断）、检测时间与两边的 revision，以及两个显式选择 */
+const conflictRow = (item: ConflictViewItem): string => {
+  const label = `${item.domainLabel} · ${item.entityShort}`;
+  return `
+    <div class="os20-row">
+      <div class="os20-row-label">
+        <b title="${esc(item.entityId)}">${esc(label)}</b>
+        <span>检测于 ${esc(item.detectedText)} · 本地 revision ${item.localRevision} / 云端 revision ${item.serverRevision}</span>
+      </div>
+      <div class="os20-row-ctl">
+        <button class="g14-btn" type="button" data-conflict-id="${esc(item.id)}" data-conflict-choice="local" aria-label="${esc(`保留本地版本：${label}`)}">保留本地</button>
+        <button class="g14-btn is-ghost" type="button" data-conflict-id="${esc(item.id)}" data-conflict-choice="remote" aria-label="${esc(`保留云端版本：${label}`)}">保留云端</button>
+      </div>
+    </div>`;
+};
+
+/** 「最近同步冲突」面板正文：数量、最多 5 条待处理、清理入口、保留策略说明 */
+const conflictPanelBody = (): string => {
+  const items = conflictViewItems(listConflicts());
+  const stats = conflictStats();
+  const hidden = Math.max(0, stats.open - items.length);
+  return `
+    <div class="os20-inline" style="margin-top:0">
+      <span class="os20-chip ${stats.open > 0 ? "is-warn" : "is-ok"}">${stats.open} 条待处理</span>
+      ${stats.resolved > 0 ? `<span class="os20-chip is-mute">已解决 ${stats.resolved} 条</span>` : ""}
+      ${stats.resolved > 0 ? `<button class="g14-btn is-ghost" type="button" data-conflict-clear-resolved>清理已解决</button>` : ""}
+    </div>
+    ${items.length ? items.map((item) => conflictRow(item)).join("") : `<p class="g14-hint">暂无同步冲突</p>`}
+    ${hidden > 0 ? `<p class="g14-hint">只展开最近 ${items.length} 条；处理完或清理后，更早的 ${hidden} 条会自动顶上来。</p>` : ""}
+    <div class="os20-note">
+      <p>冲突记录只保存在本机：最多 ${MAX_CONFLICTS} 条、保留 ${CONFLICT_TTL_DAYS} 天，只存必要的元数据与受控快照，不上传云端。</p>
+      <p>「保留本地」用本地当前内容重新推送；「保留云端」把云端版本拉回本地。确认前云端版本再次更新时，需要重新确认。</p>
+    </div>`;
+};
+
 const cloudView = () => {
   const kernel = kernelRef;
   if (!kernel) return "";
@@ -473,8 +690,14 @@ const cloudView = () => {
               : "Cloud Mode 且登录后才会接入同步"
           }</span>
         </div>
+        <div class="os20-kpis" style="margin-top:12px">
+          <div class="os20-kpi"><b data-sync-quota-entities>读取中…</b><span>同步实体 / 上限</span></div>
+          <div class="os20-kpi"><b data-sync-quota-tombstones>读取中…</b><span>删除墓碑 / 上限</span></div>
+        </div>
+        <p class="g14-hint">配额来自 <code>/api/sync/status</code> 的真实统计；超出上限时推送返回 409，不会静默丢数据。</p>
         <p class="g14-hint">同步按实体做增量对比与乐观锁：冲突时服务端版本优先落回本地，不会互相覆盖。删除通过墓碑传播，不会在另一台设备上「复活」。</p>`,
       ) +
+      group("最近同步冲突", conflictPanelBody()) +
       group(
         "存储用量",
         `<div class="os20-kpis">
@@ -514,6 +737,42 @@ async function hydrateCloudStorage(root: HTMLElement): Promise<void> {
   } catch {
     usedNode.textContent = "离线，无法读取";
     if (filesNode) filesNode.textContent = "—";
+  }
+}
+
+/**
+ * 同步配额：GET /api/sync/status（同源、credentials include），失败静默降级。
+ * 只更新两个数字节点，不重渲染整页；未登录 / 离线 / 接口未上线一律显示「配额信息暂不可用」，不抛错。
+ */
+async function hydrateSyncQuota(root: HTMLElement): Promise<void> {
+  const entitiesNode = root.querySelector<HTMLElement>("[data-sync-quota-entities]");
+  const tombstonesNode = root.querySelector<HTMLElement>("[data-sync-quota-tombstones]");
+  if (!entitiesNode && !tombstonesNode) return;
+  const unavailable = quotaText(null);
+  const write = (entitiesText: string, tombstonesText: string) => {
+    if (entitiesNode) entitiesNode.textContent = entitiesText;
+    if (tombstonesNode) tombstonesNode.textContent = tombstonesText;
+  };
+  try {
+    const response = await fetch("/api/sync/status", {
+      credentials: "include",
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) {
+      write(unavailable.entitiesText, unavailable.tombstonesText);
+      return;
+    }
+    const payload = (await response.json().catch(() => null)) as { data?: { quotas?: unknown } } | null;
+    const quotas = payload?.data?.quotas;
+    if (!quotas) {
+      write(unavailable.entitiesText, unavailable.tombstonesText);
+      return;
+    }
+    const text = quotaText(quotas);
+    write(text.entitiesText, text.tombstonesText);
+  } catch {
+    /* 离线或接口未上线：如实显示不可用，不打扰用户 */
+    write(unavailable.entitiesText, unavailable.tombstonesText);
   }
 }
 
@@ -751,7 +1010,22 @@ export const initSystemCenter = (win: HTMLElement, ctx: Ctx, sys: Sys, kernelArg
 
   const paint = () => {
     host.innerHTML = view();
-    if (tab === "cloud") void hydrateCloudStorage(host);
+    if (tab === "cloud") {
+      void hydrateCloudStorage(host);
+      void hydrateSyncQuota(host);
+    }
+  };
+
+  /** 解决/清理冲突后只刷新云端面板：保留滚动位置，不调用 syncNow、不触发其他数据域 */
+  const refreshCloudPanel = () => {
+    if (tab !== "cloud") return;
+    const scroll = host.querySelector<HTMLElement>(".g14-scroll");
+    const top = scroll?.scrollTop ?? 0;
+    paint();
+    if (top > 0) {
+      const next = host.querySelector<HTMLElement>(".g14-scroll");
+      if (next) next.scrollTop = top;
+    }
   };
 
   const apply = () => {
@@ -863,6 +1137,44 @@ export const initSystemCenter = (win: HTMLElement, ctx: Ctx, sys: Sys, kernelArg
           ctx.toast("同步失败，请到诊断中心查看原因");
           paint();
         });
+      return;
+    }
+
+    const conflictButton = target.closest<HTMLElement>("[data-conflict-id][data-conflict-choice]");
+    if (conflictButton) {
+      const conflictId = conflictButton.dataset.conflictId ?? "";
+      const choice: SyncResolveChoice = conflictButton.dataset.conflictChoice === "remote" ? "remote" : "local";
+      const gos = window as unknown as {
+        GOS20?: {
+          syncResolveConflict?: (id: string, selected: SyncResolveChoice) => Promise<SyncResolveOutcome>;
+        };
+      };
+      const resolve = gos.GOS20?.syncResolveConflict;
+      if (!conflictId || !resolve) {
+        ctx.toast("冲突中心尚未就绪，请刷新页面后重试");
+        return;
+      }
+      (conflictButton as HTMLButtonElement).disabled = true;
+      void resolve(conflictId, choice)
+        .then((result) => {
+          ctx.toast(conflictResolveNotice(result).text);
+        })
+        .catch(() => {
+          ctx.toast("解决冲突失败，请稍后重试");
+        })
+        .finally(() => {
+          // 成功、失败、changed 都重新渲染：列表与 serverRevision 必须和真实状态一致
+          refreshCloudPanel();
+        });
+      return;
+    }
+
+    if (target.closest("[data-conflict-clear-resolved]")) {
+      const resolved = listConflicts({ includeResolved: true }).filter((item) => item.state === "resolved");
+      let removed = 0;
+      for (const item of resolved) removed += clearConflicts({ id: item.id });
+      ctx.toast(removed > 0 ? `已清理 ${removed} 条已解决冲突记录` : "没有可清理的已解决冲突");
+      refreshCloudPanel();
       return;
     }
 

@@ -235,11 +235,13 @@ function seedExpiredPairings() {
 }
 
 /**
- * 仅本地测试辅助服务器：让 Playwright 能重新播种过期配对夹具。
+ * 仅本地测试辅助服务器：给 Playwright 提供两个夹具管理入口。
  *
- * 为什么需要：配对接口在 create 时会顺带 expirePairings()，把夹具里 status='claimed'
- * 的行翻成 'expired'。于是同一进程内第二次跑设备 E2E 时，confirm 会先撞
- * 409 PAIRING_STATE，而不是期望的 410 PAIRING_EXPIRED。
+ * - POST /__e2e/reset-expired：重新播种过期配对夹具。配对接口在 create 时会顺带
+ *   expirePairings()，把夹具里 status='claimed' 的行翻成 'expired'。于是同一进程内
+ *   第二次跑设备 E2E 时，confirm 会先撞 409 PAIRING_STATE，而不是期望的 410 PAIRING_EXPIRED。
+ * - POST /__e2e/reset-sync：清空 qa 账号的云同步实体与墓碑（含清理日志），
+ *   让重复运行的 sync E2E 从干净状态开始，也负责测试结束后的回收。
  *
  * 安全边界：只监听 127.0.0.1、只做夹具播种、只在 scripts/e2e-server.mjs（本地测试脚本）
  * 里存在；它不是 Worker 代码，不会进入生产构建，也不接受任何外部输入。
@@ -270,6 +272,15 @@ function startAdminServer() {
       }
       return;
     }
+    if (request.method === "POST" && request.url === "/__e2e/reset-sync") {
+      try {
+        const reset = resetSyncRows();
+        send(200, { ok: true, deleted: reset.total, rows: reset });
+      } catch (error) {
+        send(500, { ok: false, error: error?.message ?? String(error) });
+      }
+      return;
+    }
     send(404, { ok: false, error: "not_found" });
   });
   server.listen(ADMIN_PORT, "127.0.0.1", () => log(`本地夹具管理端点：${ADMIN_BASE}`));
@@ -294,6 +305,9 @@ function resetFixtureRows() {
       DELETE FROM device_pairings WHERE user_id LIKE 'qa-p3-%';
       DELETE FROM device_activity WHERE device_id IN (SELECT id FROM devices WHERE user_id LIKE 'qa-p3-%');
       DELETE FROM device_sync_state WHERE device_id IN (SELECT id FROM devices WHERE user_id LIKE 'qa-p3-%');
+      DELETE FROM sync_entities WHERE user_id LIKE 'qa-p3-%';
+      DELETE FROM sync_tombstone_ledger WHERE user_id LIKE 'qa-p3-%';
+      DELETE FROM sync_cleanup_log;
       DELETE FROM sessions WHERE user_id LIKE 'qa-p3-%';
       DELETE FROM devices WHERE user_id LIKE 'qa-p3-%';
       DELETE FROM users WHERE id LIKE 'qa-p3-%';
@@ -307,6 +321,41 @@ function resetFixtureRows() {
 /* ------------------------------------------------------------------ */
 /* HTTP                                                                */
 /* ------------------------------------------------------------------ */
+
+/**
+ * 清空 qa 账号的云同步夹具（实体、墓碑台账、清理日志），返回删除行数。
+ *
+ * 为什么需要：云同步 E2E 会推送实体、删除实体产生墓碑；本地 D1 会跨多次运行保留。
+ * 旧实体/墓碑会污染索引、配额与 status 断言，所以测试开始与结束时都要能回收。
+ * 只由 127.0.0.1 的管理端点 POST /__e2e/reset-sync 调用，不是 Worker 代码，也不进入生产。
+ */
+function resetSyncRows() {
+  const rows = {
+    entities: countSyncRows("sync_entities"),
+    tombstones: countSyncRows("sync_tombstone_ledger"),
+    cleanupLog: countSyncRows("sync_cleanup_log"),
+  };
+  d1(`
+    DELETE FROM sync_entities WHERE user_id LIKE 'qa-p3-%';
+    DELETE FROM sync_tombstone_ledger WHERE user_id LIKE 'qa-p3-%';
+    DELETE FROM sync_cleanup_log;
+  `);
+  return {
+    ...rows,
+    total: rows.entities + rows.tombstones + rows.cleanupLog,
+  };
+}
+
+function countSyncRows(table) {
+  const where = table === "sync_cleanup_log" ? "" : " WHERE user_id LIKE 'qa-p3-%'";
+  try {
+    const rows = d1Json(`SELECT COUNT(*) AS n FROM ${table}${where}`);
+    return Number(rows?.[0]?.n) || 0;
+  } catch {
+    // 迁移尚未建表时按 0 处理：reset 不应该因为「还没数据」失败。
+    return 0;
+  }
+}
 
 async function api(path, { method = "GET", body, token = TOKENS.developer, expectRaw = false } = {}) {
   const headers = { accept: "application/json", origin: BASE };

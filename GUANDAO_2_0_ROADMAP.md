@@ -398,8 +398,9 @@
 **周期估算**：1 周
 **目标**：把 Workspace/Preferences 接入同步；把「服务端优先」变成用户可理解的冲突策略。
 
-> 状态：**尚未启动**。Phase 3 已按分层口径判 `Accepted (Local/CI)`（生产层 `Blocked`），
-> Phase 4 本地开发的前置（设备测试基建）已就绪，但启动仍需所有者明确决定。
+> 状态：**已实施（2026-11-09）**，本地 / 隔离环境验证通过；生产未部署、未迁移。
+> 所有者已明确指派 Phase 4；Phase 3 的分层口径（`Accepted (Local/CI)`，生产层 `Blocked`）保持不变，
+> 其双设备 / 同步测试基建（`device.spec.ts`、`qa:devices`、e2e-server fixtures）已复用。
 
 ### 4.1 任务清单
 
@@ -428,6 +429,20 @@
 - 两个新域的 `sync-qa` 用例（推送/拉取/墓碑/冲突）。
 - 双设备 E2E 覆盖工作空间同步。
 - 生产 `qa:prod` 扩展并通过。
+
+### 4.5 执行结果（2026-11-09）
+
+| 项 | 结果 |
+| --- | --- |
+| 4.1 Workspace 同步域 | **Verified（本地）**。`src/lib/sync/workspace.ts` 只同步 `preset:false` 的自定义工作空间；payload 含名称/主题/壁纸/组件/Dock/快捷方式/窗口几何/`viewport`，JSON ≤128KB，id/数组/窗口数量均限长；跨端应用时用 `layout.normalizeSnapshot` + `rescaleSnapshot`（`cascade:false`）按当前视口重算，不重写 Window Manager；删除用 known-id 追踪合成墓碑，同 id 重建可撤销删除；服务端复用 `sync_entities`（`domain=workspace`），修订冲突由乐观锁裁决 |
+| 4.2 Preferences 同步域 | **Verified（本地）**。`src/lib/sync/preferences.ts` 严格 **13 项白名单**（appearance.mode/material/radius/accent/animations、desktop.iconLabels/clockSeconds/dock.autohide/dock.position/widgets.opacity、notifications.dnd/volume、system.updateChannel）；显式排除 `system.mode`、`system.diagnosticsRetention` 与全部设备级信息；payload ≤32KB；未知键/非法值拒绝写入；应用走既有 SettingsManager 与 `settings:change`；首次同步本地 updatedAt=0 让云端赢 |
+| 4.3 冲突可视化 | **Verified（本地）**。`src/lib/sync/conflicts.ts`：最多 50 条、TTL 7 天、按 `${domain}:${entityId}` 去重、受控快照 ≤4KB/边且脱敏、仅本地不上传；System Center 云端设置新增「最近同步冲突」（数量/域/时间/本地与云端 revision/保留本地/保留云端/清理已解决）与配额 KPI；保留本地 = 以 serverRevision 为 base 重推（乐观锁不关，期间再变化返回 `changed` 并保持 open）；保留云端 = pull→apply→写 revision→标记解决；重复调用 noop 幂等 |
+| 4.4 配额与墓碑 | **Verified（本地）**。`migrations/0018_sync_cloud_expansion.sql` 重建 5 域 `sync_entities`（新增 `deleted_at`，旧表保留为 `sync_entities_legacy_v1`）；新增 `sync_tombstone_ledger`（防复活）与 `sync_cleanup_log`；上限：单用户实体 5000 / 墓碑 2000 / workspace 128KB / preferences 32KB；超限 409 `QUOTA_EXCEEDED`，不静默删数据；墓碑 90 天 TTL，`*/15` Cron 分批清理（200/批、2000/次、幂等、写审计、失败不影响其他任务）；旧设备用旧 `baseRevision` 重推被台账判为 deleted 冲突，不复活 |
+| 全量门禁 | `npm run verify` 通过（**18 文件 / 331 单测**；typecheck、security:test 六组、`check:unused` 18、`check:astro` 0 errors/0 warnings/149 hints、`check:html-security` 291 处全审查、lint、build 29 pages、CSP 12 哈希/30 HTML、migrations **18 文件 / 117 索引**）；`npx playwright test` 整包 **155 passed**（chromium 67 + worker 64 + firefox 12 + webkit 12；worker 64 = 签名 19 / 沙箱 11 / 设备 12 / OAuth 14 / **同步 8**）；`npm run qa:sync` **45/45**（含 `--test-scheduled` 触发清理、配额 5000→409、preferences 40KB→400、防复活）；`npm run qa:devices` 回归 **31/31** |
+| 修掉的真实缺陷 | 本阶段未发现既有 Notes/Tasks/Calendar 同步逻辑的阻断性缺陷；实现中处理了两个结构性约束：① SQLite 不能修改 CHECK 约束 → 0018 用「改名保留 + 新建 + 复制」扩展域并保留回滚路径；② D1 的 IN 参数上限 → 批量查询分块（≤100/批）。E2E 首个失败是测试对 `/api/auth/me` 响应形状的假设错误（该接口无 `{success,data}` 信封），已按真实契约修正，未改产品代码 |
+| 已知未修 / 未验证 | 生产 D1 迁移与生产双设备验证（Phase 1.6 门禁未执行）；页面级 `GOS20.syncConflicts/syncResolveConflict` 的浏览器 E2E（dist 为旧构建，本轮由 `tests/unit/sync-conflicts.test.ts` 直接覆盖状态机）；5000 活实体 / 2000 墓碑的 409 E2E 造数（由 `qa:sync` 覆盖）；两条物理设备人工冒烟 |
+| 生产变更 | **无**。未部署、未应用生产迁移、未跑 `qa:prod` |
+| 结论 | **Partially Verified**（本地 / 隔离层全部通过；生产层按 Phase 1.6 门禁 `Blocked`） |
 
 ---
 

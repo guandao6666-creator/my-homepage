@@ -46,7 +46,15 @@ import {
 } from "./migrations";
 import { applySettings, stampVersion } from "./apply";
 import { openOnboarding, shouldShowOnboarding } from "./apps/onboarding";
-import { registerSyncProviders, localTombstones, type SyncRegistration } from "../sync/providers";
+import {
+  localTombstones,
+  registerSyncProviders,
+  resolveSyncConflict,
+  syncConflicts,
+  type SyncConflictChoice,
+  type SyncDomainId,
+  type SyncRegistration,
+} from "../sync/providers";
 
 /** index.astro 暴露的窗口级能力（2.0 不重复实现拖动 / 缩放） */
 export type ShellOps = {
@@ -507,7 +515,7 @@ export function installOs20(input: { ctx: Ctx; sys: Sys }): Os20Runtime {
   let lastAuthenticated = false;
   let syncTimer = 0;
 
-  async function startCloudSync(domain?: "notes" | "tasks" | "calendar"): Promise<void> {
+  async function startCloudSync(domain?: SyncDomainId): Promise<void> {
     if (kernel.settings.get("system.mode") !== "cloud") return;
     if (!kernel.cloud.state().authenticated) return;
 
@@ -592,9 +600,12 @@ export function installOs20(input: { ctx: Ctx; sys: Sys }): Os20Runtime {
     saveLayout,
     migration: () => migrationReport,
     /** 云同步：立即同步 / 当前接入的数据域 / 本地墓碑数量 */
-    syncNow: (domain?: "notes" | "tasks" | "calendar") => startCloudSync(domain),
+    syncNow: (domain?: SyncDomainId) => startCloudSync(domain),
     syncDomains: () => syncRegistration?.domains ?? [],
     syncTombstones: () => localTombstones(),
+    /** 冲突中心：未解决冲突列表 + 按用户选择解决单条冲突 */
+    syncConflicts: () => syncConflicts(),
+    syncResolveConflict: (id: string, choice: SyncConflictChoice) => resolveSyncConflict(kernel, id, choice),
     dispose: () => {
       observer.disconnect();
       offClosed();
