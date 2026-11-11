@@ -813,7 +813,7 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
   再次冲突返回 `changed`）与保留云端（pull→apply→revision→清除），重复调用 noop 幂等。
 - System Center 云端设置：新增配额 KPI（实体/5000、墓碑/2000）与「最近同步冲突」面板（域/实体/时间/revision、保留本地/保留云端、清理已解决）。
 
-**5. 质量门禁（本机实跑）**
+**5. 质量门禁（本机实跑 + GitHub Actions）**
 
 | 门禁 | 结果 |
 | --- | --- |
@@ -824,6 +824,9 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 | `npm run qa:sync` | **45/45**（含 `--test-scheduled` 真实触发清理、配额 5000→409、preferences 40KB→400、台账防复活、清理幂等） |
 | `npm run qa:devices` | **31/31**（回归，无回退） |
 | `npm run qa:prod` | **禁止执行**（Phase 1.6 门禁未解除） |
+| GitHub Actions quality | **全绿**（run [42965051693](https://github.com/guandao6666-creator/my-homepage/actions/runs/42965051693)，commit `04cf8f8`）：verify / API smoke（含 `qa:sync` 45 项）/ E2E **155 passed (4.5m)** |
+
+GitHub Actions（`.github/workflows/quality.yml`，run [42965051693](https://github.com/guandao6666-creator/my-homepage/actions/runs/42965051693)，commit `04cf8f8`）三个 job 全绿：Typecheck/Unit/Build、API smoke（真实本地 D1 上 `qa:sync` 45 项）、E2E（四 project，**155 passed / 4.5m**）。CI 使用 Node 22.23.4（`.nvmrc`），与本地 Node 26 的结果一致。
 
 同步 E2E（`tests/e2e/sync.spec.ts`）连续 3 次全绿（20.3 / 20.5 / 20.5s，8 项）：两个独立 `browser.newContext()` 分别使用同账号两台设备的真实 Session，
 覆盖 workspace 推送/索引/拉取/修改/墓碑/防复活/重建、preferences 按域限额、冲突与保留本地/云端链路、参数边界 400/403/413、账号隔离与配额自洽。

@@ -268,7 +268,7 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | 配额有效 / payload 限制 | **通过（本地）** | 实体 5000 / 墓碑 2000；workspace 128KB、preferences 32KB；超限 409 `QUOTA_EXCEEDED` / 400 `PAYLOAD_TOO_LARGE`；`qa:sync` 实跑 45/45 |
 | 墓碑 90 天清理安全 / 不复活 / 幂等 | **通过（本地）** | 0018 迁移 + `sync_tombstone_ledger`；`purgeExpiredTombstones` 先补台账再删；Cron 每 15 分钟、200/批、2000/次；`qa:sync` 实测过期清理、台账保留 revision 5、旧 base 重推冲突、二次清理 `purged=0` |
 | 原有三域不被破坏 | **通过（本地）** | Notes/Tasks/Calendar 协议、上限与用例保持不变；`qa:sync` 原 20 项保留并扩展 |
-| 质量门禁 | **通过** | `npm run verify`（18 文件 / 331 单测、lint、build、CSP、migrations 18/117）；`npx playwright test` **155 passed**（chromium 67 + worker 64 + firefox 12 + webkit 12；worker 64 含同步 8）；`qa:sync` **45/45**；`qa:devices` 回归 **31/31** |
+| 质量门禁 | **通过** | `npm run verify`（18 文件 / 331 单测、lint、build、CSP、migrations 18/117）；`npx playwright test` **155 passed**（chromium 67 + worker 64 + firefox 12 + webkit 12；worker 64 含同步 8）；`qa:sync` **45/45**；`qa:devices` 回归 **31/31**；GitHub Actions quality 全绿（run 42965051693，commit 04cf8f8：verify + API smoke 含 qa:sync 45 项 + E2E 155 passed / 4.5m） |
 | 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、2026-11-06 事故未 Closed → 禁止生产写入、生产迁移、`qa:prod`、部署 |
 
 **Phase 4 整体：`Partially Verified`（本地 / 隔离层全部通过；生产层 `Blocked`）。**

@@ -836,6 +836,7 @@ Infrastructure
 | `npm run verify` | 通过：typecheck、18 文件/331 单测、security:test 六组、`check:unused` 18、`check:astro` 0 errors/0 warnings/149 hints、`check:html-security` 291 处全审查、lint、build 29 pages、CSP 12 哈希/30 HTML、migrations **18/117** |
 | `npx playwright test` | **155 passed (2.9m)**：chromium 67 + worker 64（签名 19 / 沙箱 11 / 设备 12 / OAuth 14 / 同步 8）+ firefox 12 + webkit 12 |
 | `npm run qa:sync` / `npm run qa:devices` | **45/45** / 回归 **31/31** |
+| GitHub Actions quality（run 42965051693，commit `04cf8f8`） | **三个 job 全绿**：Typecheck/Unit/Build、API smoke（含 `qa:sync` 45 项）、E2E **155 passed (4.5m)**；Node 22.23.4 |
 
 ### N.4 风险与未验证项
 
