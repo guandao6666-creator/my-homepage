@@ -897,6 +897,7 @@ Infrastructure
 | `npx playwright test` | **158 passed (2.9m)**：chromium 67 + worker 67（签名 19 / 沙箱 11 / 设备 12 / OAuth 14 / 同步 8 / 教程 2 / 插件发布链 1）+ firefox 12 + webkit 12 |
 | `npm run qa:sync` | **45/45**（Phase 4 域无回归） |
 | 页面级插件安装本地证据 | 20/20，截图 `.shots/p5-page-evidence2-*.png`（未入 Playwright） |
+| GitHub Actions quality（run 43588486049，commit `a84af7e`） | **三个 job 全绿**：Typecheck/Unit/Build（19 文件 / 351 单测、migrations 18/117、CSP 12/30）、API smoke（qa:sync 45/45）、E2E **158 passed (4.4m)**；Node 22.23.4 |
 
 ### O.4 风险与未验证项
 

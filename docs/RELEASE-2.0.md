@@ -863,7 +863,7 @@ GitHub Actions（`.github/workflows/quality.yml`，run [42965051693](https://git
 - 教程测试：新增 `tests/unit/community-tutorial.test.ts`（20）与 `tests/e2e/community-tutorial.spec.ts`（双 Context 全链）。
 - 文档：新增 `docs/architecture/COMMUNITY-PUBLISHING.md`；更新本文件、`GUANDAO_2_0_AUDIT.md`（附录 O）、`GUANDAO_2_0_ROADMAP.md`（5.5）、`docs/ACCEPTANCE-2.0.md`。
 
-**3. 质量门禁（本机实跑）**
+**3. 质量门禁（本机实跑 + GitHub Actions）**
 
 | 门禁 | 结果 |
 | --- | --- |
@@ -872,6 +872,9 @@ GitHub Actions（`.github/workflows/quality.yml`，run [42965051693](https://git
 | `npm run qa:sync` | **45/45**（Phase 4 域无回归） |
 | `npm run qa:community` | **260/260 ×3**（47.5s / 47.6s / 48.0s；清理 R2=OK / 身份=OK / 残留=0） |
 | `npm run qa:plugins` | **107/107 ×2**（原 70 + 新增 37） |
+| GitHub Actions quality | **全绿**（run [43588486049](https://github.com/guandao6666-creator/my-homepage/actions/runs/43588486049)，commit `a84af7e`）：verify（19 文件 / 351 单测、migrations 18/117、CSP 12/30）/ API smoke（qa:sync 45/45）/ E2E **158 passed (4.4m)** |
+
+GitHub Actions quality 全绿（run [43588486049](https://github.com/guandao6666-creator/my-homepage/actions/runs/43588486049)，commit `a84af7e`）：Typecheck/Unit/Build（19 文件 / 351 单测、migrations 18/117、CSP 12/30）、API smoke（本地 D1 上 qa:sync 45/45）、E2E（四 project，**158 passed / 4.4m**）。CI 使用 Node 22.23.4（`.nvmrc`），与本地结果一致。
 
 **4. 安全 / 隔离验证**
 

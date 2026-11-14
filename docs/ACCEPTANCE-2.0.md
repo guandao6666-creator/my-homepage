@@ -292,7 +292,7 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | 插件发布闭环 | **API 级通过；页面级 Partially Verified** | `qa:plugins` **107/107 ×2**（签名→审核→市场→下载→安装→下架→审计）；`plugin-publishing.spec.ts` 1 passed ×2；页面级本地证据 20/20，未入 Playwright |
 | 原有 Notes/Tasks/Calendar 与 Phase 4 同步 | **无回归** | `qa:sync` 45/45；`sync.spec.ts` 8 passed；Playwright 整包 158 passed |
 | 测试数据清理 | **通过** | 复用 `qa-cleanup.mjs` 四重校验；三次运行 R2=OK / 身份=OK / 残留=0；D1 基线 `total_posts=11`、`total_assets=9` 不变 |
-| 质量门禁 | **通过** | `npm run verify`（19 文件 / 351 单测、lint、build 29 pages、CSP 12 哈希/30 HTML、migrations 18/117、html-security 291 处/未审查 0）；`npx playwright test` **158 passed**（chromium 67 + worker 67 + firefox 12 + webkit 12）；`qa:sync` 45/45；`qa:community` 260/260 |
+| 质量门禁 | **通过** | `npm run verify`（19 文件 / 351 单测、lint、build 29 pages、CSP 12 哈希/30 HTML、migrations 18/117、html-security 291 处/未审查 0）；`npx playwright test` **158 passed**（chromium 67 + worker 67 + firefox 12 + webkit 12）；`qa:sync` 45/45；`qa:community` 260/260；GitHub Actions quality 全绿（run 43588486049，commit a84af7e：verify 19 文件/351 单测 + API smoke（qa:sync 45/45）+ E2E 158 passed / 4.4m） |
 | 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、2026-11-06 事故未 Closed → 禁止生产写入、生产迁移、`qa:prod`、部署 |
 
 **Phase 5 整体：`Partially Verified`（本地 / 隔离层全部通过；生产发布链 `Blocked`）。**
