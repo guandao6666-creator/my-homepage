@@ -51,3 +51,12 @@ src/content/blog/.sync-manifest.json
 
 # 首次管理员初始化临时令牌（用完删除）
 .initial-admin-token
+
+# D1 整库备份（含账号/Session，绝不入库）
+/backups/
+*.sql.gz
+*.sql.gz.enc
+
+# Playwright 本地测试产物（含 trace / 截图，绝不入库）
+test-results/
+playwright-report/

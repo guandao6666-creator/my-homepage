@@ -84,6 +84,90 @@ export const CATALOG: AppMeta[] = [
     ],
   },
   {
+    id: "systemcenter",
+    name: "系统设置",
+    glyph: "di-gear",
+    category: "system",
+    version: "2.0.0",
+    author: A,
+    tagline: "外观、应用、插件、云端、设备与隐私的统一入口",
+    desc: "2.0 的统一设置中心：八类设置全部真实落盘，改完立即生效。应用权限可以逐项撤销，云端模式切换不会清空本地数据，启动报告与降级项也能在这里看到。",
+    features: ["外观 / 个性化 / 桌面设置", "应用与插件权限管理", "云端模式与同步状态", "设备与隐私审计", "系统版本与启动报告"],
+    permissions: ["read", "write"],
+    size: "内置",
+    featured: true,
+    isNew: true,
+    builtin: true,
+    release: "2026-11-05",
+    changelog: [{ v: "2.0.0", date: "2026-11-05", items: ["统一设置中心", "权限管理与审计", "启动报告"] }],
+    screens: [
+      { name: "外观", hint: "主题、壁纸与材质" },
+      { name: "应用", hint: "权限逐项开关" },
+      { name: "系统", hint: "版本与启动报告" },
+    ],
+  },
+  {
+    id: "updatecenter",
+    name: "更新中心",
+    glyph: "di-fresh",
+    category: "system",
+    version: "2.0.0",
+    author: A,
+    tagline: "版本、构建信息与数据保护检查",
+    desc: "2.0 是静态网站部署：更新意味着新的资源版本被部署，页面重新加载后生效，不伪装成内核热更新。这里能看到当前版本、构建时间、服务端版本、插件兼容性与迁移前快照。",
+    features: ["当前版本与构建信息", "服务端版本检查（真实请求）", "插件兼容性检查", "数据保护与迁移快照", "更新历史"],
+    permissions: ["read"],
+    size: "内置",
+    builtin: true,
+    release: "2026-11-05",
+    changelog: [{ v: "2.0.0", date: "2026-11-05", items: ["版本检查", "兼容性检查", "数据保护"] }],
+    screens: [{ name: "更新", hint: "检查与版本" }, { name: "历史", hint: "发布记录" }],
+  },
+  {
+    id: "market",
+    name: "应用与资源市场",
+    glyph: "di-store",
+    category: "system",
+    version: "2.0.0",
+    author: A,
+    tagline: "应用、插件、主题、组件、壁纸与工作空间",
+    desc: "统一的市场入口。所有资源都走同一套十二步安装校验：来源、版本、兼容性、Manifest、权限、下载、校验、安装与登记，失败会明确指出卡在哪一步。",
+    features: ["六类资源统一搜索", "安装前权限确认", "真实安装步骤进度", "社区与插件市场聚合"],
+    permissions: ["read", "write", "link"],
+    size: "内置",
+    featured: true,
+    isNew: true,
+    builtin: true,
+    release: "2026-11-05",
+    changelog: [{ v: "2.0.0", date: "2026-11-05", items: ["统一市场", "统一安装流程"] }],
+    screens: [{ name: "发现", hint: "分类与搜索" }, { name: "详情", hint: "权限与安装步骤" }],
+  },
+  {
+    id: "community",
+    name: "Guandao Community",
+    glyph: "di-community",
+    category: "network",
+    version: "1.6.0",
+    author: A,
+    tagline: "创作、分享与发现桌面作品",
+    desc: "Guandao OS 1.6 的社区入口。发布你设计的主题、声明式组件、工作空间与壁纸，浏览其他创作者的作品，点赞、收藏、评论、关注，下载并安装社区资源。所有数据真实存储在 D1，图片与内容包存放在私有 R2；安装会进入原有的主题中心、组件系统、工作空间与壁纸引擎，不会另起一套。",
+    features: ["社区首页、发现、搜索与分类筛选", "主题 / 组件 / 工作空间 / 壁纸 / 教程发布", "真实点赞、收藏、评论、关注与通知", "创作者主页与关注动态", "审核中心、举报与审计日志"],
+    permissions: ["read", "write", "image", "link", "notify"],
+    size: "2.4 MB",
+    featured: true,
+    isNew: true,
+    builtin: true,
+    release: "2026-11-05",
+    changelog: [
+      { v: "1.6.0", date: "2026-11-05", items: ["Guandao Community 与创作者系统", "主题 / 组件 / 工作空间 / 壁纸市场", "互动、通知、举报与人工审核", "社区资源安全安装到原有系统"] },
+    ],
+    screens: [
+      { name: "首页", hint: "精选、最新、真实热门与创作者" },
+      { name: "作品详情", hint: "预览、许可证、版本与评论" },
+      { name: "审核中心", hint: "人工审核、举报与审计" },
+    ],
+  },
+  {
     id: "themes",
     name: "主题中心",
     glyph: "di-themes",
@@ -690,6 +774,14 @@ export const readInstall = (): InstallState => {
     shortcuts: Array.isArray(raw.shortcuts) ? raw.shortcuts : [],
     updatedAt: Number(raw.updatedAt) || Date.now(),
   };
+  // 1.9 修复：1.4 的注释承诺「新增内置应用自动补齐」，但代码只做了浅拷贝，
+  // 老用户升级后新内置应用（例如性能实验室）会被判为未安装而打不开。
+  // 这里真的补齐一次；可选应用仍然保持未安装状态。
+  const now = Date.now();
+  for (const meta of CATALOG) {
+    if (meta.optional) continue;
+    if (!merged.installed[meta.id]) merged.installed[meta.id] = { version: meta.version, at: now };
+  }
   cache = merged;
   return merged;
 };

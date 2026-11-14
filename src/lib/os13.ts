@@ -11,10 +11,13 @@
  *
  * 依赖主脚本通过 initOs13(ctx) 注入的能力，不直接访问其闭包。
  */
+import { safeUrl } from "./html";
 import { WALLPAPERS, WALL_CATEGORY_LABEL, wallpaperById, type Wallpaper } from "./wallpapers";
 import { installIcons } from "./icons13";
 
 export type Os13WidgetState = {
+  /** 时钟样式等组件私有配置 */
+  style?: string;
   enabled?: boolean;
   x?: number;
   y?: number;
@@ -96,8 +99,8 @@ type Cfg = {
     hidden: string[];
   };
   widgets: { opacity: number; locked: boolean };
-  motion: { reduce: boolean; particles: boolean };
-  custom: Array<{ id: string; name: string; accent: string; at: number; bytes: number; lum?: number }>;
+  motion: { reduce: boolean; particles: boolean; parallax?: boolean };
+  custom: Array<{ id: string; name: string; accent: string; accent2?: string; at: number; bytes: number; lum?: number }>;
 };
 
 const KEY = "guandao.os13.v1";
@@ -622,11 +625,11 @@ export function initOs13(ctx: Os13Context) {
   const importWallpaper = async (file: File) => {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
       pushToast("只支持 JPG / PNG / WebP");
-      return;
+      return null;
     }
     if (file.size > 24 * 1024 * 1024) {
       pushToast("图片太大了，请控制在 24MB 以内");
-      return;
+      return null;
     }
     pushToast("正在压缩并保存…");
     try {
@@ -654,9 +657,20 @@ export function initOs13(ctx: Os13Context) {
       qsa<HTMLElement>(settingsWin ?? document, "#wall-cats [data-cat]").forEach((b) => b.classList.toggle("is-active", b.dataset.cat === "custom"));
       renderWallGallery();
       pushToast("壁纸已应用并保存在本机");
+      return id;
     } catch {
       pushToast("这张图读不出来，换一张试试");
+      return null;
     }
+  };
+
+  /** 社区壁纸：先由服务端做真实图片校验，用户确认后再下载到本地并交给同一套壁纸引擎 */
+  const importCommunityWallpaper = async (blob: Blob, name: string) => {
+    const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+    const file = new File([blob], `${String(name || "社区壁纸").slice(0, 48)}.${ext}`, {
+      type: blob.type || "image/webp",
+    });
+    return importWallpaper(file);
   };
 
   const removeCustom = async (id: string) => {
@@ -1818,7 +1832,7 @@ export function initOs13(ctx: Os13Context) {
         const fav = cfg.wall.favorites.includes(w.id);
         const thumb = "custom" in w ? objUrls.get(w.id) ?? "" : (w as Wallpaper).thumb;
         return `<button class="wall-card ${active ? "is-active" : ""}" type="button" data-wall-id="${w.id}" title="${w.name}">
-          ${thumb ? `<img src="${thumb}" alt="${w.name}" loading="lazy" decoding="async" />` : `<span class="wc-void">自定义</span>`}
+          ${thumb ? `<img src="${safeUrl(thumb, { allowBlob: true })}" alt="${w.name}" loading="lazy" decoding="async" />` : `<span class="wc-void">自定义</span>`}
           <span class="wc-name">${w.name}</span>
           <span class="wc-fav ${fav ? "is-on" : ""}" data-fav="${w.id}" role="button" aria-label="收藏">★</span>
           ${"custom" in w ? `<span class="wc-del" data-del="${w.id}" role="button" aria-label="删除">✕</span>` : ""}
@@ -2161,6 +2175,8 @@ export function initOs13(ctx: Os13Context) {
   /* 粒子：默认关闭，开启后才创建 canvas */
   let particleCanvas: HTMLCanvasElement | null = null;
   let particleRaf = 0;
+  /** 1.9：记录 startParticles 注册的 resize 监听，停止时能精确摘掉 */
+  let particleResize: (() => void) | null = null;
   const startParticles = () => {
     if (particleCanvas) return;
     const canvas = document.createElement("canvas");
@@ -2204,9 +2220,12 @@ export function initOs13(ctx: Os13Context) {
       particleRaf = requestAnimationFrame(draw);
     };
     draw();
+    particleResize = resize;
     window.addEventListener("resize", resize, { passive: true });
   };
   const stopParticles = () => {
+    if (particleResize) window.removeEventListener("resize", particleResize);
+    particleResize = null;
     cancelAnimationFrame(particleRaf);
     particleCanvas?.remove();
     particleCanvas = null;
@@ -2325,9 +2344,9 @@ export function initOs13(ctx: Os13Context) {
 
     if (cfg.motion.particles) startParticles();
 
-    // 版本号统一到 1.3
-    qsa<HTMLElement>(document, ".mb-version").forEach((el) => (el.textContent = "1.4"));
-    os.dataset.osVersion = "1.4";
+    // 版本号统一从 src/lib/version.ts 读取，不再各处硬编码
+    qsa<HTMLElement>(document, ".mb-version").forEach((el) => (el.textContent = "1.9"));
+    os.dataset.osVersion = "2.0";
 
     window.setInterval(tickAuto, 60_000);
     tickAuto();
@@ -2371,5 +2390,8 @@ export function initOs13(ctx: Os13Context) {
     openSettings,
     arrangeIcons,
     toast: pushToast,
+    /** 1.6：社区壁纸下载后交给同一套壁纸引擎保存 / 应用 */
+    importWallpaperFromBlob: importCommunityWallpaper,
+    removeWallpaper: removeCustom,
   };
 }

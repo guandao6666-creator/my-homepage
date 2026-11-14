@@ -5,10 +5,13 @@
  * 窗口布局与通知偏好；虚拟桌面只负责管理窗口。两者并存，互不覆盖。
  */
 
+import { normalizeSnapshot, rescaleSnapshot, type Viewport, type WindowState } from "../core/layout";
+import { safeUrl } from "../html";
 import { emit, escapeHtml, ls, modal, shell, uid, type Ctx, type WinStateLike } from "./core";
 import { findTheme, readThemeState, applyTheme } from "./themes";
 import { readInstall, writeInstall } from "./catalog";
 import { readPrefs, patchPrefs } from "./prefs";
+import { sendToDevice } from "../continuity/ui";
 
 export type Workspace = {
   id: string;
@@ -25,6 +28,8 @@ export type Workspace = {
   dnd: boolean;
   createdAt: number;
   updatedAt: number;
+  /** 2.0 跨设备同步：保存时的视口，用于恢复时重算窗口几何（旧数据没有，按当前视口只做边界收敛） */
+  viewport?: Viewport;
 };
 
 type WsState = { v: 1; list: Workspace[]; current: string };
@@ -126,6 +131,39 @@ export const currentWorkspace = () => read().list.find((w) => w.id === read().cu
    捕获 / 应用
    ============================================================ */
 
+/** 当前 shell 视口；workespace 快照与窗口重算都以它为目标尺寸 */
+const currentViewport = (ctx: Ctx): Viewport => {
+  try {
+    const rect = ctx.windows.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+    if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+      return { width, height };
+    }
+  } catch {
+    /* 桌面 DOM 尚未完成布局 */
+  }
+  const width = Number(window.innerWidth) || 1280;
+  const height = Number(window.innerHeight) || 800;
+  return { width: Math.round(width), height: Math.round(height) };
+};
+
+const toWinStateMap = (windows: Record<string, WindowState>): Record<string, WinStateLike> => {
+  const map: Record<string, WinStateLike> = {};
+  for (const [app, state] of Object.entries(windows)) {
+    map[app] = {
+      left: state.left,
+      top: state.top,
+      width: state.width,
+      height: state.height,
+      minimized: state.minimized,
+      maximized: state.maximized,
+      space: state.space,
+    };
+  }
+  return map;
+};
+
 const capture = (base: Workspace, ctx: Ctx): Workspace => {
   const install = readInstall();
   const themeState = readThemeState();
@@ -142,6 +180,7 @@ const capture = (base: Workspace, ctx: Ctx): Workspace => {
       .filter(Boolean),
     windows: {},
     dnd: readPrefs().dnd,
+    viewport: currentViewport(ctx),
     updatedAt: Date.now(),
   };
 };
@@ -195,6 +234,18 @@ export const applyWorkspace = async (id: string, ctx: Ctx, opts: { silent?: bool
   const st = read();
   const ws = st.list.find((w) => w.id === id);
   if (!ws) return;
+
+  // 跨设备恢复：窗口几何按「保存时视口 → 当前视口」重算。
+  // 只换算坐标/尺寸并写回工作空间，不改变 restoreWindows 的开关窗顺序与语义。
+  if (ws.windows && Object.keys(ws.windows).length > 0) {
+    const viewport = currentViewport(ctx);
+    const snapshot = normalizeSnapshot({ windows: ws.windows, viewport: ws.viewport }, viewport);
+    ws.windows = toWinStateMap(rescaleSnapshot(snapshot, viewport, { cascade: false }).windows);
+    ws.viewport = viewport;
+  } else if (!ws.viewport) {
+    ws.viewport = currentViewport(ctx);
+  }
+
   const hideTransition = showTransition(ws.name);
   await new Promise((r) => window.setTimeout(r, 180));
   st.current = id;
@@ -269,7 +320,7 @@ const previewOf = (ws: Workspace) => {
   const t = findTheme(ws.theme);
   const wall = t?.wall ?? "aurora";
   return `<div class="ws14-prev" style="--wsa:${t?.accent ?? "#6f8cff"};--wsb:${t?.accent2 ?? "#b06eff"}">
-    <img src="/wallpapers/thumbs/${wall}.webp" alt=""/>
+    <img src="${safeUrl(`/wallpapers/thumbs/${wall}.webp`)}" alt=""/>
     <span class="ws14-prev-veil"></span>
     <span class="ws14-prev-bar"></span>
     <span class="ws14-prev-win"><i></i><b></b><b></b></span>
@@ -350,6 +401,7 @@ export const initWorkspaces = (win: HTMLElement, ctx: Ctx): (() => void) => {
         body: `<div class="g14-menu-list">
           <button class="g14-menu-item" data-mm="rename">重命名</button>
           <button class="g14-menu-item" data-mm="copy">复制一份</button>
+          <button class="g14-menu-item" data-mm="send">发送到设备</button>
           ${ws.preset ? "" : `<button class="g14-menu-item is-danger" data-mm="del">删除</button>`}
         </div>`,
         actions: [{ label: "关闭", value: "" }],
@@ -372,6 +424,20 @@ export const initWorkspaces = (win: HTMLElement, ctx: Ctx): (() => void) => {
             write(st);
             paint();
           });
+        }
+        if (v === "send") {
+          const base = ws.id === currentWorkspace()?.id ? captureCurrentWorkspace(ctx) : clone(ws);
+          const semantic = { ...base, windows: {}, updatedAt: Date.now() };
+          void sendToDevice(ctx, {
+            itemType: "workspace",
+            title: ws.name,
+            resourceId: ws.id,
+            payload: {
+              workspace: semantic,
+              note: `${ws.openApps.length} 个应用 · ${Object.keys(ws.widgets).length} 个组件`,
+            },
+          });
+          return;
         }
         if (v === "copy") {
           const st = read();
@@ -451,7 +517,153 @@ export const initWorkspaceShortcuts = (ctx: Ctx) => {
   });
 };
 
+export const captureCurrentWorkspace = (ctx: Ctx): Workspace => {
+  const st = read();
+  const base = st.list.find((workspace) => workspace.id === st.current) ?? st.list[0];
+  const captured = capture(base, ctx);
+  const map: Record<string, WinStateLike> = {};
+  ctx.windows.querySelectorAll<HTMLElement>(".window").forEach((win) => {
+    const app = win.dataset.app;
+    if (!app) return;
+    map[app] = {
+      left: win.offsetLeft,
+      top: win.offsetTop,
+      width: win.offsetWidth,
+      height: win.offsetHeight,
+      minimized: win.classList.contains("is-minimized"),
+      maximized: win.classList.contains("is-maximized"),
+      space: Number(win.dataset.space) || 1,
+    };
+  });
+  captured.windows = map;
+  return captured;
+};
+
 export const applyWorkspaceByIndex = (n: number, ctx: Ctx) => {
   const ws = read().list[n];
   if (ws) void applyWorkspace(ws.id, ctx);
+};
+
+/* ============================================================
+   Guandao OS 1.6 · 社区工作空间导入
+   —— 只新增一套工作空间，绝不覆盖现有桌面；
+   —— 导入前先把当前工作空间快照写入本地，可回退。
+   ============================================================ */
+
+const SNAPSHOT_KEY = "guandao.os14.ws.snapshots.v1";
+
+export type CommunityWorkspaceResult = {
+  id: string;
+  name: string;
+  missingApps: string[];
+  missingWidgets: string[];
+  themeMissing: boolean;
+  snapshotAt: number;
+};
+
+const makeSnapshot = (st: WsState): number => {
+  const at = Date.now();
+  const snapshots = ls.get<Array<{ at: number; current: string; list: Workspace[] }>>(SNAPSHOT_KEY, []);
+  snapshots.unshift({ at, current: st.current, list: clone(st.list) });
+  ls.set(SNAPSHOT_KEY, snapshots.slice(0, 5));
+  return at;
+};
+
+export const workspaceSnapshots = () =>
+  ls.get<Array<{ at: number; current: string; list: Workspace[] }>>(SNAPSHOT_KEY, []);
+
+export const importCommunityWorkspace = (
+  config: Record<string, unknown>,
+  ctx: Ctx,
+  meta: { postId: string; packageName?: string },
+): CommunityWorkspaceResult => {
+  const st = read();
+  const snapshotAt = makeSnapshot(st);
+
+  const missingApps: string[] = [];
+  const cleanId = (value: unknown) => {
+    const id = String(value ?? "");
+    return /^[a-z0-9][a-z0-9-]{0,40}$/.test(id) ? id : "";
+  };
+  const filterApps = (value: unknown) => {
+    if (!Array.isArray(value)) return [];
+    const out: string[] = [];
+    for (const item of value.slice(0, 40)) {
+      const id = cleanId(item);
+      if (!id) continue;
+      if (!ctx.APPS[id]) {
+        if (!missingApps.includes(id)) missingApps.push(id);
+        continue;
+      }
+      if (!out.includes(id)) out.push(id);
+    }
+    return out;
+  };
+
+  const themeId = String(config.themeId ?? "");
+  const theme = themeId ? findTheme(themeId) : null;
+  const themeMissing = Boolean(themeId) && !theme;
+  const currentTheme = readThemeState().current;
+
+  const missingWidgets: string[] = [];
+  const widgets: Record<string, { enabled?: boolean; size?: "s" | "m" | "l"; x?: number; y?: number }> = {};
+  const rawWidgets = config.widgets && typeof config.widgets === "object" ? (config.widgets as Record<string, unknown>) : {};
+  for (const [id, value] of Object.entries(rawWidgets).slice(0, 40)) {
+    if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(id)) continue;
+    if (!ctx.widgets.ids.includes(id)) {
+      missingWidgets.push(id);
+      continue;
+    }
+    const state = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+    const widget: { enabled?: boolean; size?: "s" | "m" | "l"; x?: number; y?: number } = {};
+    if (state.enabled !== undefined) widget.enabled = state.enabled !== false;
+    if (["s", "m", "l"].includes(String(state.size))) widget.size = state.size as "s" | "m" | "l";
+    for (const axis of ["x", "y"] as const) {
+      const num = Number(state[axis]);
+      if (Number.isFinite(num) && Math.abs(num) <= 20000) widget[axis] = Math.round(num);
+    }
+    widgets[id] = widget;
+  }
+
+  const baseName = String(config.name || meta.packageName || "社区工作空间").trim().slice(0, 24) || "社区工作空间";
+  let name = baseName;
+  if (st.list.some((workspace) => workspace.name === name)) name = `${baseName} · 社区`.slice(0, 24);
+
+  const workspace: Workspace = {
+    id: `ws-com-${meta.postId.slice(0, 8)}-${Date.now().toString(36).slice(-4)}`,
+    name,
+    preset: false,
+    theme: theme ? theme.id : currentTheme,
+    wall: String(config.wallId || theme?.wall || "aurora").slice(0, 60),
+    widgets,
+    dock: filterApps(config.dock),
+    shortcuts: filterApps(config.shortcuts),
+    openApps: filterApps(config.openApps),
+    windows: {},
+    dnd: Boolean(config.dnd),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  st.list.push(workspace);
+  st.current = st.current || workspace.id;
+  write(st);
+
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    missingApps,
+    missingWidgets,
+    themeMissing,
+    snapshotAt,
+  };
+};
+
+export const removeCommunityWorkspace = (id: string): boolean => {
+  const st = read();
+  if (!st.list.some((workspace) => workspace.id === id)) return false;
+  st.list = st.list.filter((workspace) => workspace.id !== id);
+  if (st.current === id) st.current = st.list[0]?.id ?? "daily";
+  write(st);
+  return true;
 };

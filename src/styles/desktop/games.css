@@ -1,0 +1,1494 @@
+      /* ---------------- 水族箱 ---------------- */
+
+      .tank {
+        position: relative;
+        height: 100%;
+        overflow: hidden;
+        cursor: pointer;
+        --phase-speed: 1;
+        --phase-bright: 1;
+        --phase-saturate: 1;
+        background: linear-gradient(180deg, #0a2f45 0%, #0e4762 48%, #071e2c 100%);
+        transition: background 1.4s ease;
+      }
+
+      /* 清晨：水偏青，醒得快（时长倍率 <1 代表更快） */
+      .tank[data-phase="dawn"] {
+        background: linear-gradient(180deg, #0d3d4c 0%, #1a6478 48%, #0a2b36 100%);
+        --phase-speed: 0.85;
+        --phase-bright: 1.06;
+      }
+
+      /* 白天：常态 */
+      .tank[data-phase="day"] {
+        background: linear-gradient(180deg, #0a2f45 0%, #0e4762 48%, #071e2c 100%);
+        --phase-speed: 1;
+      }
+
+      /* 傍晚：水偏紫，慢下来 */
+      .tank[data-phase="dusk"] {
+        background: linear-gradient(180deg, #321a4a 0%, #4d2760 48%, #1b0d28 100%);
+        --phase-speed: 1.35;
+        --phase-bright: 0.86;
+        --phase-saturate: 0.82;
+      }
+
+      /* 深夜：熄灯，游得最慢 */
+      .tank[data-phase="night"] {
+        background: linear-gradient(180deg, #061622 0%, #0a2a3c 48%, #04101a 100%);
+        --phase-speed: 2.1;
+        --phase-bright: 0.66;
+        --phase-saturate: 0.72;
+      }
+
+      .tank::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(120, 220, 255, 0.16), transparent 30%);
+        pointer-events: none;
+      }
+
+      .bubbles {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .bubble {
+        position: absolute;
+        bottom: -14px;
+        width: var(--size);
+        height: var(--size);
+        border-radius: 50%;
+        background: radial-gradient(circle at 32% 30%, rgba(255, 255, 255, 0.95), rgba(130, 215, 255, 0.3));
+        animation: bubbleRise var(--dur) linear infinite;
+        animation-delay: var(--delay);
+      }
+
+      @keyframes bubbleRise {
+        to {
+          transform: translateY(-520px);
+          opacity: 0;
+        }
+      }
+
+      .tank-floor {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 46px;
+        background: radial-gradient(58% 100% at 50% 100%, rgba(36, 104, 104, 0.5), transparent 70%);
+        pointer-events: none;
+      }
+
+      .fish-layer {
+        position: absolute;
+        inset: 0;
+      }
+
+      .fish {
+        position: absolute;
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background-image: var(--bg);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        box-shadow:
+          0 0 0 2px rgba(180, 230, 255, 0.32),
+          0 10px 22px -8px rgba(0, 0, 0, 0.65);
+        animation-name: driftSoft;
+        animation-duration: calc(var(--base-dur, 11s) * var(--phase-speed, 1));
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+        animation-direction: alternate;
+        animation-delay: var(--delay);
+        filter: brightness(var(--phase-bright, 1)) saturate(var(--phase-saturate, 1));
+        transition: filter 1.2s ease;
+      }
+
+      /* 按性格给每条不同的游法 */
+      .fish[data-ai="chatgpt"] {
+        --base-dur: 11s;
+        animation-name: driftSoft;
+      }
+      .fish[data-ai="deepseek"] {
+        --base-dur: 13s;
+        animation-name: driftDeep;
+      }
+      .fish[data-ai="claude"] {
+        --base-dur: 12s;
+        animation-name: driftWide;
+      }
+      .fish[data-ai="grok"] {
+        --base-dur: 9s;
+        animation-name: dashAround;
+        animation-direction: normal;
+      }
+      .fish[data-ai="gemini"] {
+        --base-dur: 14s;
+        animation-name: orbitPath;
+        animation-direction: normal;
+      }
+      .fish[data-ai="wenxin"] {
+        --base-dur: 19s;
+        animation-name: driftSlow;
+      }
+      .fish[data-ai="qwen"] {
+        --base-dur: 15s;
+        animation-name: glideDiagonal;
+      }
+
+      .fish::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: linear-gradient(150deg, rgba(255, 255, 255, 0.26), transparent 46%);
+        pointer-events: none;
+      }
+
+      /* ChatGPT：不紧不慢地上下浮 */
+      @keyframes driftSoft {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(16px, -20px);
+        }
+      }
+
+      /* DeepSeek：喜欢沉在下面，偶尔上来 */
+      @keyframes driftDeep {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(26px, 24px);
+        }
+      }
+
+      /* Claude：稳稳地横着走 */
+      @keyframes driftWide {
+        from {
+          transform: translate(-16px, 2px);
+        }
+        to {
+          transform: translate(16px, -12px);
+        }
+      }
+
+      /* 文心：动得很轻，像懒得动 */
+      @keyframes driftSlow {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(7px, -10px);
+        }
+      }
+
+      /* Grok：横冲直撞 */
+      @keyframes dashAround {
+        0% {
+          transform: translate(0, 0);
+        }
+        28% {
+          transform: translate(104px, -32px);
+        }
+        52% {
+          transform: translate(-64px, 38px);
+        }
+        78% {
+          transform: translate(72px, 16px);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
+
+      /* Gemini：绕着圈转 */
+      @keyframes orbitPath {
+        0% {
+          transform: translate(0, 0);
+        }
+        25% {
+          transform: translate(32px, -18px);
+        }
+        50% {
+          transform: translate(0, -36px);
+        }
+        75% {
+          transform: translate(-32px, -18px);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
+
+      /* 千问：斜着滑，像摇扇子 */
+      @keyframes glideDiagonal {
+        from {
+          transform: translate(0, 0);
+        }
+        to {
+          transform: translate(-24px, -18px);
+        }
+      }
+
+      .fish-name {
+        position: absolute;
+        left: 50%;
+        bottom: -15px;
+        transform: translateX(-50%);
+        font-size: 9px;
+        letter-spacing: 0.02em;
+        color: rgba(215, 238, 255, 0.5);
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      .food {
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        margin: -3px 0 0 -3px;
+        border-radius: 50%;
+        background: #ffd479;
+        box-shadow: 0 0 8px rgba(255, 212, 121, 0.85);
+        animation: foodSink 0.82s ease-in forwards;
+        pointer-events: none;
+      }
+
+      @keyframes foodSink {
+        to {
+          transform: translateY(24px);
+          opacity: 0.35;
+        }
+      }
+
+      .heart {
+        position: absolute;
+        left: 50%;
+        top: -10px;
+        font-size: 14px;
+        color: #ff8fb1;
+        pointer-events: none;
+        animation: heartUp 1.7s ease-out forwards;
+      }
+
+      /* 深夜的瞌睡泡 */
+      .zzz {
+        position: absolute;
+        right: -2px;
+        top: -8px;
+        font-family: var(--font-serif);
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(190, 225, 255, 0.75);
+        pointer-events: none;
+        animation: zzzFloat 3s ease-out forwards;
+      }
+
+      @keyframes zzzFloat {
+        0% {
+          opacity: 0;
+          transform: translate(0, 0) scale(0.7);
+        }
+        22% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+          transform: translate(9px, -28px) scale(1.1);
+        }
+      }
+
+      @keyframes heartUp {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, 0) scale(0.6);
+        }
+        25% {
+          opacity: 1;
+          transform: translate(-50%, -10px) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -40px) scale(1.1);
+        }
+      }
+
+      .tank-hint {
+        position: absolute;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
+        margin: 0;
+        font-size: 10.5px;
+        color: rgba(200, 235, 255, 0.42);
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      /* ---------------- 访客墙 ---------------- */
+
+      .wall {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 16px 20px 18px;
+      }
+
+      .wall-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .wall-count {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .wall-add {
+        margin-left: auto;
+        padding: 7px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background: rgba(111, 140, 255, 0.22);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .wall-add:hover {
+        background: rgba(111, 140, 255, 0.38);
+      }
+
+      .wall-grid {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+        align-content: start;
+        gap: 10px;
+        overflow: auto;
+      }
+
+      .wall-item {
+        display: grid;
+        justify-items: center;
+        gap: 6px;
+        padding: 8px 4px;
+        border-radius: 10px;
+        transition: background-color 0.18s ease;
+      }
+
+      .wall-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .wall-item img {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
+        object-fit: cover;
+      }
+
+      .wall-item span {
+        max-width: 78px;
+        overflow: hidden;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.62);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .wall-empty {
+        grid-column: 1 / -1;
+        margin: 0;
+        padding: 30px 0;
+        font-size: 12.5px;
+        line-height: 1.8;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+      }
+
+      .wall-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .wall-form[hidden] {
+        display: none;
+      }
+
+      .wall-name {
+        flex: 1;
+        min-width: 140px;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        outline: none;
+      }
+
+      .wall-name:focus {
+        border-color: rgba(111, 140, 255, 0.6);
+      }
+
+      .wall-pick {
+        max-width: 168px;
+        overflow: hidden;
+        padding: 8px 12px;
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.66);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .wall-pick:hover {
+        border-color: rgba(111, 140, 255, 0.5);
+        color: #fff;
+      }
+
+      .wall-submit {
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: linear-gradient(150deg, #6f8cff, #9b6bff);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .wall-submit:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      .wall-note {
+        min-height: 16px;
+        margin: 8px 0 0;
+        font-size: 11px;
+        color: rgba(255, 212, 121, 0.85);
+      }
+
+      /* ---------------- 排行榜 ---------------- */
+
+      .rank {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 16px 18px 14px;
+      }
+
+      .rank-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .rank-status {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .rank-join {
+        margin-left: auto;
+        padding: 7px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 8px;
+        background: rgba(142, 230, 168, 0.18);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .rank-join:hover:not(:disabled) {
+        background: rgba(142, 230, 168, 0.32);
+      }
+
+      .rank-join:disabled {
+        cursor: default;
+        opacity: 0.72;
+      }
+
+      .rank-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 4px;
+        overflow: auto;
+      }
+
+      .rank-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 8px;
+      }
+
+      .rank-row.is-top {
+        background: rgba(255, 212, 121, 0.08);
+      }
+
+      .rank-no {
+        width: 20px;
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
+      .rank-row.is-top .rank-no {
+        color: #ffd479;
+      }
+
+      .rank-name {
+        flex: 1;
+        overflow: hidden;
+        font-size: 12.5px;
+        color: #f2f5fa;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .rank-time {
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .rank-empty {
+        margin: 0;
+        padding: 26px 0;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+      }
+
+      .rank-note {
+        margin: 10px 0 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
+      /* ---------------- 每日抽奖 ---------------- */
+
+      .draw {
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        gap: 16px;
+        height: 100%;
+        padding: 20px;
+      }
+
+      .draw-card {
+        display: grid;
+        place-items: center;
+        width: 148px;
+        height: 186px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 14px;
+        background: linear-gradient(160deg, rgba(111, 140, 255, 0.28), rgba(155, 107, 255, 0.16));
+        box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.8);
+        transition: background 0.4s ease, border-color 0.4s ease;
+      }
+
+      .draw-card.is-shaking {
+        animation: drawShake 0.12s linear infinite;
+      }
+
+      .draw-card.is-bonus {
+        border-color: rgba(255, 212, 121, 0.5);
+        background: linear-gradient(160deg, rgba(255, 212, 121, 0.34), rgba(209, 144, 42, 0.18));
+      }
+
+      @keyframes drawShake {
+        0%,
+        100% {
+          transform: rotate(-1.6deg) translateY(0);
+        }
+        50% {
+          transform: rotate(1.6deg) translateY(-3px);
+        }
+      }
+
+      .draw-mark {
+        font-family: var(--font-serif);
+        font-size: 44px;
+        line-height: 1;
+        color: rgba(255, 255, 255, 0.85);
+      }
+
+      .draw-text {
+        max-width: 320px;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.9;
+        color: rgba(255, 255, 255, 0.78);
+        text-align: center;
+      }
+
+      .draw-btn {
+        padding: 10px 22px;
+        border: 0;
+        border-radius: 10px;
+        background: linear-gradient(150deg, #6f8cff, #9b6bff);
+        color: #fff;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      .draw-btn:disabled {
+        cursor: default;
+        opacity: 0.55;
+      }
+
+      /* ---------------- 民主议会 ---------------- */
+
+      .council {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 16px 20px 14px;
+      }
+
+      .council-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .council-status {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .council-tip {
+        margin-left: auto;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .council-retry {
+        padding: 3px 10px;
+        border: 1px solid rgba(167, 139, 250, 0.42);
+        border-radius: 6px;
+        background: rgba(167, 139, 250, 0.16);
+        color: #d9c9ff;
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .council-retry:hover {
+        background: rgba(167, 139, 250, 0.3);
+      }
+
+      .council-retry[hidden] {
+        display: none;
+      }
+
+      .council-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 16px;
+        overflow: auto;
+        padding-right: 6px;
+      }
+
+      .council-list::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .council-list::-webkit-scrollbar-thumb {
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .council-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .council-item {
+        display: grid;
+        gap: 7px;
+      }
+
+      .council-title {
+        margin: 0;
+        font-size: 13px;
+        color: #fff;
+      }
+
+      .council-opts {
+        display: grid;
+        gap: 5px;
+      }
+
+      .council-opt {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        overflow: hidden;
+        padding: 9px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        color: inherit;
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.2s ease, background-color 0.2s ease;
+      }
+
+      .council-opt:not(:disabled):hover {
+        border-color: rgba(167, 139, 250, 0.5);
+        background: rgba(167, 139, 250, 0.1);
+      }
+
+      .council-opt:disabled {
+        cursor: default;
+      }
+
+      .council-bar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, rgba(167, 139, 250, 0.32), rgba(109, 40, 217, 0.22));
+        transition: width 0.6s cubic-bezier(0.2, 0.8, 0.3, 1);
+      }
+
+      .council-opt.is-mine {
+        border-color: rgba(167, 139, 250, 0.6);
+      }
+
+      .council-opt.is-mine .council-bar {
+        background: linear-gradient(90deg, rgba(167, 139, 250, 0.5), rgba(109, 40, 217, 0.36));
+      }
+
+      .council-label {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+        color: rgba(255, 255, 255, 0.85);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .council-num {
+        position: relative;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .council-opt.is-mine .council-num {
+        color: #d9c9ff;
+      }
+
+      .council-meta {
+        margin: 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.34);
+      }
+
+      .council-empty {
+        margin: 0;
+        padding: 40px 0;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+        text-align: center;
+      }
+
+      /* ---------------- 匿名树洞 ---------------- */
+
+      .hole {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 14px 18px 10px;
+      }
+
+      .hole-top {
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .hole-topic-label {
+        margin: 0 0 4px;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
+      .hole-topic {
+        margin: 0;
+        font-family: var(--font-serif);
+        font-size: 15px;
+        color: #ffd479;
+      }
+
+      .hole-form {
+        display: grid;
+        gap: 6px;
+        margin: 12px 0;
+      }
+
+      .hole-input {
+        width: 100%;
+        min-height: 56px;
+        max-height: 140px;
+        padding: 9px 11px;
+        resize: vertical;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12.5px;
+        line-height: 1.7;
+        outline: none;
+      }
+
+      .hole-input:focus {
+        border-color: rgba(168, 191, 133, 0.6);
+      }
+
+      .hole-form-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .hole-count {
+        font-size: 10.5px;
+        font-variant-numeric: tabular-nums;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .hole-send {
+        margin-left: auto;
+        padding: 7px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: linear-gradient(150deg, #7f9e5a, #4a6b34);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .hole-send:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+
+      .hole-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .hole-item {
+        position: relative;
+        padding: 11px 13px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .hole-item.is-featured {
+        border-color: rgba(255, 212, 121, 0.3);
+        background: rgba(255, 212, 121, 0.05);
+      }
+
+      .hole-badge {
+        position: absolute;
+        top: -6px;
+        right: 10px;
+        padding: 2px 7px;
+        border-radius: 4px;
+        background: linear-gradient(150deg, #ffd479, #d19a2e);
+        color: #3a2a08;
+        font-size: 9px;
+        font-weight: 600;
+      }
+
+      .hole-text {
+        margin: 0 0 8px;
+        font-size: 12.5px;
+        line-height: 1.85;
+        color: rgba(255, 255, 255, 0.86);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .hole-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.34);
+      }
+
+      .hole-nick {
+        color: rgba(168, 191, 133, 0.9);
+      }
+
+      .hole-reply-toggle {
+        margin-left: auto;
+        padding: 2px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 5px;
+        background: none;
+        color: rgba(255, 255, 255, 0.5);
+        font: inherit;
+        font-size: 10.5px;
+        cursor: pointer;
+      }
+
+      .hole-reply-toggle:hover {
+        border-color: rgba(255, 255, 255, 0.25);
+        color: #fff;
+      }
+
+      .hole-replies {
+        display: grid;
+        gap: 7px;
+        margin-top: 10px;
+        padding-top: 9px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.08);
+      }
+
+      .hole-reply {
+        font-size: 11.5px;
+        line-height: 1.75;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .hole-reply-nick {
+        margin-right: 6px;
+        color: rgba(168, 191, 133, 0.85);
+      }
+
+      .hole-reply-empty {
+        margin: 0;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.28);
+      }
+
+      .hole-reply-form {
+        display: flex;
+        gap: 6px;
+      }
+
+      .hole-reply-input {
+        flex: 1;
+        min-width: 0;
+        padding: 6px 9px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 11.5px;
+        outline: none;
+      }
+
+      .hole-reply-form button {
+        padding: 6px 12px;
+        border: 0;
+        border-radius: 6px;
+        background: rgba(168, 191, 133, 0.3);
+        color: #d9e8c2;
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .hole-empty {
+        margin: 0;
+        padding: 40px 0;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.35);
+        text-align: center;
+      }
+
+      .hole-status {
+        min-height: 14px;
+        margin: 6px 0 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.32);
+      }
+
+      /* ---------------- 新闻联播 ---------------- */
+
+      .news {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 16px 18px 12px;
+      }
+
+      .news-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .news-avatar {
+        width: 46px;
+        height: 58px;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+      }
+
+      .news-name {
+        margin: 0 0 3px;
+        font-family: var(--font-serif);
+        font-size: 15px;
+        color: #fff;
+      }
+
+      .news-date {
+        margin: 0;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .news-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 13px;
+        overflow: auto;
+        padding: 14px 2px 8px;
+      }
+
+      .news-item {
+        display: grid;
+        gap: 5px;
+        opacity: 0;
+        animation: newsIn 0.5s ease forwards;
+      }
+
+      @keyframes newsIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .news-tag {
+        justify-self: start;
+        padding: 1px 7px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 9.5px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .news-text {
+        margin: 0;
+        font-size: 12.5px;
+        line-height: 1.9;
+        color: rgba(255, 255, 255, 0.82);
+      }
+
+      .news-foot {
+        margin: 6px 0 0;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.28);
+        text-align: right;
+      }
+
+      /* ---------------- 社会网络 ---------------- */
+
+      .social {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 14px 18px 10px;
+      }
+
+      .social-me {
+        margin-bottom: 14px;
+      }
+
+      .social-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border: 1px solid rgba(240, 171, 252, 0.22);
+        border-radius: 12px;
+        background: linear-gradient(150deg, rgba(240, 171, 252, 0.13), rgba(126, 34, 206, 0.09));
+      }
+
+      .social-face {
+        flex: none;
+        width: 52px;
+        height: 66px;
+        object-fit: contain;
+      }
+
+      .social-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .social-name {
+        margin: 0 0 3px;
+        font-size: 14px;
+        color: #fff;
+      }
+
+      .social-bio {
+        margin: 0 0 5px;
+        overflow: hidden;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.55);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .social-meta {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin: 0;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .social-role {
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.62);
+      }
+
+      .social-edit {
+        flex: none;
+        padding: 5px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 7px;
+        background: none;
+        color: rgba(255, 255, 255, 0.7);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .social-edit:hover {
+        border-color: rgba(240, 171, 252, 0.5);
+        color: #fff;
+      }
+
+      .social-card-btns {
+        display: grid;
+        gap: 5px;
+        flex: none;
+      }
+
+      .social-edit.is-quiet {
+        border-color: transparent;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 10px;
+      }
+
+      .auth-form {
+        display: grid;
+        gap: 8px;
+        padding: 14px 16px;
+        border: 1px solid rgba(240, 171, 252, 0.26);
+        border-radius: 12px;
+        background: rgba(240, 171, 252, 0.07);
+      }
+
+      .auth-title {
+        margin: 0;
+        font-size: 14px;
+        color: #fff;
+      }
+
+      .auth-note {
+        margin: 0 0 2px;
+        font-size: 10.5px;
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .auth-bar {
+        display: flex;
+        gap: 8px;
+        margin-top: 2px;
+      }
+
+      .auth-btn {
+        flex: 1;
+        padding: 7px 0;
+        border: 0;
+        border-radius: 7px;
+        background: linear-gradient(150deg, #c084fc, #7e22ce);
+        color: #fff;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .auth-btn.is-ghost {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .auth-btn:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+
+      .auth-msg {
+        min-height: 14px;
+        margin: 2px 0 0;
+        font-size: 10.5px;
+        color: #ffb4b4;
+      }
+
+      .hole-auth,
+      .council-auth {
+        margin-bottom: 12px;
+      }
+
+      .hole-auth:empty,
+      .council-auth:empty {
+        display: none;
+      }
+
+      .hole-auth-tip {
+        margin: 8px 0 0;
+        font-size: 10.5px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .social-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .social-tip {
+        margin-left: auto;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.28);
+      }
+
+      .social-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        align-content: start;
+        gap: 7px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .social-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 11px;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .social-row-face {
+        flex: none;
+        width: 32px;
+        height: 40px;
+        object-fit: contain;
+      }
+
+      .social-row-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .social-row-name {
+        margin: 0 0 2px;
+        font-size: 12px;
+        color: #fff;
+      }
+
+      .social-row-bio {
+        margin: 0;
+        overflow: hidden;
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.4);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .social-row-role {
+        flex: none;
+        font-size: 9.5px;
+        color: rgba(255, 255, 255, 0.35);
+      }
+
+      .social-follow {
+        flex: none;
+        padding: 4px 11px;
+        border: 1px solid rgba(240, 171, 252, 0.4);
+        border-radius: 6px;
+        background: rgba(240, 171, 252, 0.14);
+        color: #f3d9ff;
+        font: inherit;
+        font-size: 10.5px;
+        cursor: pointer;
+      }
+
+      .social-follow.is-on {
+        border-color: rgba(255, 255, 255, 0.14);
+        background: transparent;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .social-form {
+        display: grid;
+        gap: 8px;
+        padding: 12px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .social-picks {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .social-pick {
+        width: 38px;
+        height: 46px;
+        padding: 2px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+      }
+
+      .social-pick img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .social-pick.is-on {
+        border-color: rgba(240, 171, 252, 0.7);
+        background: rgba(240, 171, 252, 0.15);
+      }
+
+      .social-input {
+        padding: 7px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.04);
+        color: #eef1f7;
+        font: inherit;
+        font-size: 12px;
+        outline: none;
+      }
+
+      .social-input:focus {
+        border-color: rgba(240, 171, 252, 0.6);
+      }
+
+      .social-form-bar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .social-cancel {
+        padding: 6px 14px;
+        border: 0;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.07);
+        color: rgba(255, 255, 255, 0.6);
+        font: inherit;
+        font-size: 11.5px;
+        cursor: pointer;
+      }
+
+      .social-save {
+        padding: 6px 16px;
+        border: 0;
+        border-radius: 7px;
+        background: linear-gradient(150deg, #c084fc, #7e22ce);
+        color: #fff;
+        font: inherit;
+        font-size: 11.5px;
+        cursor: pointer;
+      }
+
+      .social-empty {
+        margin: 0;
+        padding: 40px 0;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.35);
+        text-align: center;
+      }
+

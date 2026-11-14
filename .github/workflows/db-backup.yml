@@ -1,0 +1,67 @@
+# Guandao OS · D1 每日整库备份
+#
+# 安全边界：
+# - 备份文件 AES-256-GCM 加密后才上传到现有 R2 的私有前缀 backups/d1/；
+# - 不把备份文件上传为 GitHub Artifact；
+# - 缺少 Secrets 时明确失败，不静默跳过；
+# - 不执行任何恢复、删除、迁移。
+name: d1-backup
+
+on:
+  schedule:
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: d1-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Check required secrets
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BACKUP_KEY: ${{ secrets.D1_BACKUP_KEY }}
+        run: |
+          missing=0
+          if [ -z "$CF_TOKEN" ]; then echo "::error::缺少 CLOUDFLARE_API_TOKEN"; missing=1; fi
+          if [ -z "$CF_ACCOUNT" ]; then echo "::error::缺少 CLOUDFLARE_ACCOUNT_ID"; missing=1; fi
+          if [ -z "$BACKUP_KEY" ]; then echo "::error::缺少 D1_BACKUP_KEY（base64 32 字节）"; missing=1; fi
+          exit "$missing"
+
+      - name: Create encrypted backup and upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_BACKUP_KEY: ${{ secrets.D1_BACKUP_KEY }}
+        run: |
+          node scripts/db-backup.mjs backup --remote --confirm-production --encrypt --upload --dir backups/d1
+
+      - name: Verify latest backup
+        run: |
+          META=$(ls -1t backups/d1/*.json | head -n 1)
+          node scripts/db-backup.mjs verify --meta "$META"
+          node scripts/db-backup.mjs restore-check --meta "$META"
+
+      - name: Cleanup ephemeral files
+        if: always()
+        run: rm -rf backups/d1

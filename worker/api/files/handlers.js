@@ -1,6 +1,7 @@
 /** /api/files/* 业务处理。所有分支都要求有效 Session。 */
 
 import { ApiError, ok } from "../http.js";
+import { assertSameOrigin, readJson } from "../guards.js";
 import { authConfig } from "../auth/config.js";
 import { readSession } from "../auth/session.js";
 import {
@@ -516,23 +517,9 @@ async function requireFolder(env, userId, id) {
   return folder;
 }
 
-async function readJson(request) {
-  try {
-    return await request.json();
-  } catch {
-    throw new ApiError("INVALID_JSON", "请求格式不正确", 400);
-  }
-}
-
-function assertSameOrigin(request, origin) {
-  const requestOrigin = request.headers.get("origin");
-  if (requestOrigin) {
-    if (requestOrigin !== origin) throw new ApiError("CSRF_REJECTED", "请求来源不被允许", 403);
-    return;
-  }
-  if (request.headers.get("sec-fetch-site") === "same-origin") return;
-  throw new ApiError("CSRF_REJECTED", "请求来源不被允许", 403);
-}
+/**
+ * 读取 JSON 请求体统一走 guards.js（1 MB 上限，声明长度 + 实际字节双校验）。
+ */
 
 /* 空回收站：删除 R2 对象后再删 D1 记录，失败时保留可重试状态。 */
 export async function emptyTrash(env, userId) {

@@ -1,0 +1,368 @@
+      /* ---------------- Spotlight 全局搜索 ---------------- */
+
+      .spotlight {
+        position: fixed;
+        inset: 0;
+        z-index: 8000;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 16vh;
+        background: rgba(6, 8, 14, 0.4);
+        backdrop-filter: blur(6px);
+        animation: spotFade 0.18s ease;
+      }
+
+      .spotlight[hidden] {
+        display: none;
+      }
+
+      @keyframes spotFade {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      .spotlight-box {
+        width: min(560px, 92vw);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(24, 27, 38, 0.92);
+        box-shadow: 0 32px 80px -24px rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(28px) saturate(1.6);
+        overflow: hidden;
+        animation: spotIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+      }
+
+      @keyframes spotIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .spotlight-input-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .spotlight-icon {
+        width: 17px;
+        height: 17px;
+        color: rgba(255, 255, 255, 0.45);
+        flex: none;
+      }
+
+      #spotlight-input {
+        flex: 1;
+        border: 0;
+        background: none;
+        outline: none;
+        color: #fff;
+        font-size: 16px;
+      }
+
+      .spotlight-kbd,
+      .spotlight-foot kbd {
+        padding: 2px 6px;
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .spotlight-results {
+        max-height: 340px;
+        overflow-y: auto;
+        padding: 6px;
+      }
+
+      .spot-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 0;
+        border-radius: 9px;
+        background: none;
+        color: #eef1f7;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .spot-item.is-active {
+        background: rgba(111, 140, 255, 0.24);
+      }
+
+      .spot-kind {
+        flex: none;
+        width: 34px;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.5);
+        text-align: center;
+      }
+
+      .spot-main {
+        flex: 1;
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+      }
+
+      .spot-title {
+        font-size: 13px;
+        color: #fff;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .spot-sub {
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .spot-enter {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .spot-empty {
+        padding: 24px;
+        text-align: center;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .spotlight-foot {
+        display: flex;
+        justify-content: flex-end;
+        gap: 14px;
+        padding: 8px 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 10.5px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* ---------------- Mission Control 任务视图 ---------------- */
+
+      .mission {
+        position: fixed;
+        inset: 0;
+        z-index: 7000;
+        display: flex;
+        flex-direction: column;
+        padding: 44px 32px 32px;
+        background: rgba(6, 8, 14, 0.62);
+        backdrop-filter: blur(22px) saturate(1.4);
+        animation: spotFade 0.2s ease;
+      }
+
+      .mission[hidden] {
+        display: none;
+      }
+
+      .mission-top {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 24px;
+      }
+
+      .mission-title {
+        font-size: 16px;
+        font-weight: 650;
+        color: #fff;
+        flex: none;
+      }
+
+      .mission-desks {
+        display: flex;
+        gap: 10px;
+        flex: 1;
+        overflow-x: auto;
+      }
+
+      .mc-desk {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 96px;
+        padding: 10px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex: none;
+      }
+
+      .mc-desk.is-active {
+        border-color: rgba(111, 140, 255, 0.7);
+        background: rgba(111, 140, 255, 0.22);
+      }
+
+      .mc-desk-name {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .mc-desk-count {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      .mc-desk-add {
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        font-size: 18px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .mc-desk-add:disabled {
+        opacity: 0.3;
+        cursor: default;
+      }
+
+      .mission-close {
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+        flex: none;
+      }
+
+      .mission-grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 22px;
+        align-content: start;
+        overflow-y: auto;
+      }
+
+      .mc-card {
+        position: relative;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(24, 27, 38, 0.9);
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        animation: mcIn 0.24s var(--os-ease) both;
+      }
+
+      .mc-card:hover {
+        transform: translateY(-4px) scale(1.02);
+        border-color: rgba(111, 140, 255, 0.6);
+        box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+      }
+
+      .mc-card.is-other {
+        opacity: 0.6;
+      }
+
+      @keyframes mcIn {
+        from {
+          opacity: 0;
+          transform: translateY(12px) scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .mc-card-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .mc-dots {
+        display: flex;
+        gap: 4px;
+      }
+      .mc-dots i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .mc-card-title {
+        flex: 1;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.7);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mc-card-close {
+        width: 18px;
+        height: 18px;
+        border: 0;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 13px;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .mc-card-close:hover {
+        background: #ff5f57;
+        color: #fff;
+      }
+
+      .mc-card-body {
+        display: grid;
+        place-items: center;
+        height: 110px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .mc-glyph {
+        zoom: 1.294; /* 34 → 44px，与程序坞同尺寸 */
+        border-radius: 11px;
+      }
+
+      .mc-card-space {
+        position: absolute;
+        bottom: 8px;
+        right: 10px;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      .mc-empty {
+        grid-column: 1 / -1;
+        padding: 60px 0;
+        text-align: center;
+        font-size: 13px;
+        line-height: 2;
+        color: rgba(255, 255, 255, 0.45);
+      }
+

@@ -1,0 +1,352 @@
+/* ============================================================
+   Guandao OS 1.8 · Adaptive Shell
+   桌面 / 平板 / 窗口窄宽度 三套密度；移动端见 mobile.css
+   ============================================================ */
+
+/* ------------------------------ 平板外壳 ------------------------------ */
+
+html[data-shell="tablet"] .menubar {
+  height: 46px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
+html[data-shell="tablet"] .mb-menu-btn {
+  min-height: 36px;
+  padding: 0 11px;
+}
+
+html[data-shell="tablet"] .mb-brand-text,
+html[data-shell="tablet"] .mb-version {
+  display: none;
+}
+
+html[data-shell="tablet"] .mb-menu {
+  flex: 0 0 auto;
+  gap: 0;
+}
+
+html[data-shell="tablet"] .mb-menu-btn,
+html[data-shell="tablet"] .mb-time-btn,
+html[data-shell="tablet"] #mb-date {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+html[data-shell="tablet"] .mb-menu-btn {
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+html[data-shell="tablet"] .mb-status {
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+html[data-shell="tablet"] .dock {
+  --dock-size: 58px;
+  --dock-pad: 9px;
+  bottom: 14px;
+  border-radius: 22px;
+}
+
+html[data-shell="tablet"] .dock-item {
+  border-radius: 15px;
+}
+
+html[data-shell="tablet"] .desk-icon {
+  width: 96px;
+  padding: 10px 6px;
+  gap: 7px;
+}
+
+html[data-shell="tablet"] .desk-icon .di-label {
+  font-size: 11.5px;
+}
+
+html[data-shell="tablet"] .desk-hint,
+html[data-shell="tablet"] .desk-pet {
+  display: none;
+}
+
+html[data-shell="tablet"] .widget {
+  width: min(34vw, 268px);
+}
+
+html[data-shell="tablet"] .widget[data-size="l"] {
+  width: min(46vw, 360px);
+}
+
+html[data-shell="tablet"] .window {
+  border-radius: 18px;
+}
+
+html[data-shell="tablet"] .window .titlebar {
+  height: 42px;
+  padding: 0 14px;
+}
+
+html[data-shell="tablet"] .window .dot {
+  width: 13px;
+  height: 13px;
+}
+
+html[data-shell="tablet"] .window .win-body {
+  font-size: 12.5px;
+}
+
+html[data-shell="tablet"] .launchpad .lp-grid {
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 14px;
+}
+
+html[data-shell="tablet"] .control-center {
+  width: min(400px, calc(100vw - 40px));
+}
+
+/* 触屏：所有关键点击目标不小于 44px（WCAG 2.5.5 建议值） */
+html[data-pointer="coarse"] .mb-menu-btn,
+html[data-pointer="coarse"] .dock-item,
+html[data-pointer="coarse"] .g14-nav,
+html[data-pointer="coarse"] .c14-nav button,
+html[data-pointer="coarse"] .c14-today,
+html[data-pointer="coarse"] .n14-folder,
+html[data-pointer="coarse"] .n14-item,
+html[data-pointer="coarse"] .n14-icon,
+html[data-pointer="coarse"] .tk14-check,
+html[data-pointer="coarse"] .g14-btn,
+html[data-pointer="coarse"] .cdrv-nav-item,
+html[data-pointer="coarse"] .gdv-nav-item,
+html[data-pointer="coarse"] .gbk-nav-item,
+html[data-pointer="coarse"] .gsc-nav-item,
+html[data-pointer="coarse"] .cty-nav button {
+  min-height: 44px;
+}
+
+html[data-pointer="coarse"] .window .dot {
+  width: 16px;
+  height: 16px;
+}
+
+html[data-pointer="coarse"] .window .dot::after {
+  inset: -8px;
+}
+
+/* 触屏不保留悬停才出现的内容：菜单、工具栏常驻 */
+html[data-pointer="coarse"] .n14-item {
+  padding: 11px 10px;
+}
+
+html[data-pointer="coarse"] .tk14-acts {
+  opacity: 1;
+}
+
+/* ------------------------------ 超宽屏 ------------------------------ */
+
+@media (min-width: 1800px) {
+  html[data-shell="desktop"] .window {
+    max-width: min(1480px, calc(100vw - 120px));
+    max-height: calc(100vh - 150px);
+  }
+
+  html[data-shell="desktop"] .widgets {
+    right: 40px;
+    gap: 18px;
+  }
+
+  html[data-shell="desktop"] .widget {
+    width: 258px;
+  }
+
+  html[data-shell="desktop"] .desk-icon {
+    width: 104px;
+  }
+
+  html[data-shell="desktop"] .dock {
+    --dock-size: 52px;
+  }
+}
+
+/* --------------------- 窗口变窄：按容器宽度重排 --------------------- */
+
+.window[data-w="md"] .n14 {
+  grid-template-columns: 122px 188px minmax(0, 1fr);
+}
+
+.window[data-w="md"] .n14-side-head,
+.window[data-w="md"] .n14-side-foot {
+  padding-inline: 8px;
+}
+
+.window[data-w="sm"] .n14 {
+  grid-template-columns: 168px minmax(0, 1fr);
+}
+
+.window[data-w="sm"] .n14-side {
+  display: none;
+}
+
+.window[data-w="sm"] .n14-list {
+  border-right: 1px solid var(--g-line);
+}
+
+.window[data-w="sm"] .n14-ed-bar {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.window[data-w="sm"] .n14-ed-acts {
+  gap: 2px;
+}
+
+.window[data-w="md"] .c14-body,
+.window[data-w="md"] .c14-body.is-list {
+  grid-template-columns: minmax(0, 1fr) 204px;
+}
+
+.window[data-w="sm"] .c14-body,
+.window[data-w="sm"] .c14-body.is-list {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.window[data-w="sm"] .c14-side {
+  border-left: 0;
+  border-top: 1px solid var(--g-line);
+  max-height: 38%;
+}
+
+.window[data-w="sm"] .c14-head {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.window[data-w="sm"] .c14-tools {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.window[data-w="sm"] .c14-search {
+  flex: 1 1 120px;
+}
+
+.window[data-w="md"] .cdrv-side {
+  width: 190px;
+}
+
+.window[data-w="sm"] .cdrv {
+  flex-direction: column;
+}
+
+.window[data-w="sm"] .cdrv-side {
+  width: auto;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  overflow-x: auto;
+  border-right: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.window[data-w="sm"] .cdrv-brand,
+.window[data-w="sm"] .cdrv-quota {
+  display: none;
+}
+
+.window[data-w="sm"] .cdrv-nav {
+  flex-direction: row;
+  gap: 4px;
+}
+
+.window[data-w="sm"] .cdrv-nav-item {
+  white-space: nowrap;
+}
+
+.window[data-w="md"] .gdv-side {
+  width: 206px;
+}
+
+.window[data-w="sm"] .gdv {
+  flex-direction: column;
+}
+
+.window[data-w="sm"] .gdv-side {
+  width: auto;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  overflow-x: auto;
+  border-right: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.window[data-w="sm"] .gdv-brand,
+.window[data-w="sm"] .gdv-side-foot {
+  display: none;
+}
+
+.window[data-w="sm"] .gdv-nav {
+  flex-direction: row;
+}
+
+.window[data-w="sm"] .gdv-nav-item {
+  white-space: nowrap;
+}
+
+.window[data-w="sm"] .gbk,
+.window[data-w="sm"] .gsc {
+  flex-direction: column;
+}
+
+.window[data-w="sm"] .gbk-side,
+.window[data-w="sm"] .gsc-side {
+  width: auto;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  overflow-x: auto;
+  border-right: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.window[data-w="sm"] .gbk-brand,
+.window[data-w="sm"] .gsc-brand,
+.window[data-w="sm"] .gbk-side-foot,
+.window[data-w="sm"] .gsc-side-foot {
+  display: none;
+}
+
+.window[data-w="sm"] .gbk-nav,
+.window[data-w="sm"] .gsc-nav {
+  flex-direction: row;
+  gap: 4px;
+}
+
+.window[data-w="sm"] .g14-shell {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.window[data-w="sm"] .g14-side {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 8px;
+  border-right: 0;
+  border-bottom: 1px solid var(--g-line);
+  overflow-x: auto;
+}
+
+.window[data-w="sm"] .g14-side-title {
+  display: none;
+}
+
+.window[data-w="sm"] .g14-nav {
+  white-space: nowrap;
+  height: 34px;
+}
+
+.window[data-w="md"] .g14-shell {
+  grid-template-columns: 132px minmax(0, 1fr);
+}
+

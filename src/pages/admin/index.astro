@@ -982,6 +982,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
 </style>
 
 <script>
+  import { escapeHtml } from "../../lib/html";
   import {
     cloudConfig,
     signIn,
@@ -1381,11 +1382,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     }
   }
 
-  function escapeHtml(text: string) {
-    return String(text).replace(/[&<>"]/g, (ch) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string,
-    );
-  }
+  // 2.3.1：统一使用 src/lib/html.ts 的实现（此处原有一份 4 字符本地副本）
 
   /* ---------------------------- editor -------------------------- */
 
@@ -1541,7 +1538,7 @@ SUPABASE_ANON_KEY=你的_anon_key</code></pre>
     const orderRaw = fields.seriesOrder.value.trim();
     const seriesOrder = orderRaw ? Math.trunc(Number(orderRaw)) : null;
 
-    if (orderRaw && (!Number.isFinite(seriesOrder) || seriesOrder < 1)) {
+    if (orderRaw && (seriesOrder === null || !Number.isFinite(seriesOrder) || seriesOrder < 1)) {
       editorError.textContent = "系列序号要是大于 0 的整数。";
       editorError.hidden = false;
       fields.seriesOrder.focus();

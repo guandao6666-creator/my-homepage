@@ -6,6 +6,7 @@
  * 再通过 #os[data-theme14] 给 CSS 提供差异化钩子。
  */
 
+import { safeUrl } from "../html";
 import { WALLPAPERS, wallpaperById } from "../wallpapers";
 import {
   badge,
@@ -571,7 +572,7 @@ const themePreview = (theme: ThemeDef) => {
   const light = theme.mode === "light";
   return `
     <div class="g14-theme-prev ${light ? "is-light" : ""}" style="--tp-accent:${theme.accent};--tp-accent2:${theme.accent2}" data-radius="${theme.radius}">
-      <img src="${wall.thumb}" alt="" loading="lazy" />
+      <img src="${safeUrl(wall.thumb)}" alt="" loading="lazy" />
       <span class="g14-tp-veil"></span>
       <span class="g14-tp-menubar"></span>
       <span class="g14-tp-win">

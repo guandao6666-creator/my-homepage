@@ -549,20 +549,20 @@ const cloud = cloudConfig();
     const key = root.dataset.key || "";
     if (!base || !key) return;
 
-    const form = document.getElementById("comment-form");
+    const form = document.getElementById("comment-form") as HTMLFormElement | null;
     const list = document.getElementById("comment-list");
     const empty = document.getElementById("comments-empty");
     const countEl = document.getElementById("comments-count");
     const hint = document.getElementById("comment-hint");
-    const submitBtn = document.getElementById("comment-submit");
-    const authorInput = document.getElementById("c-author");
-    const bodyInput = document.getElementById("c-body");
+    const submitBtn = document.getElementById("comment-submit") as HTMLButtonElement | null;
+    const authorInput = document.getElementById("c-author") as HTMLInputElement | null;
+    const bodyInput = document.getElementById("c-body") as HTMLTextAreaElement | null;
 
     const headers = { apikey: key, "Content-Type": "application/json" };
     // 写操作要带登录凭证，否则 RLS 里 auth.uid() 是空的，带 user_id 的留言会被拒
     const writeHeaders = () =>
       session ? { ...headers, Authorization: `Bearer ${session.accessToken}` } : headers;
-    const enc = (v) => encodeURIComponent(v);
+    const enc = (v: unknown) => encodeURIComponent(String(v));
 
     const VISITOR_KEY = "guandao.visitor";
     const LIKED_KEY = "guandao.liked";
@@ -571,7 +571,7 @@ const cloud = cloudConfig();
     const HEART =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21.2l7.7-7.7 1.1-1a5.5 5.5 0 0 0 0-7.9Z"/></svg>';
 
-    let items = [];
+    let items: any[] = [];
     const likeCount = new Map();
 
     /* --------------------------- 登录状态 --------------------------- */
@@ -868,7 +868,7 @@ const cloud = cloudConfig();
       author.className = "reply-author";
       author.maxLength = 24;
       author.placeholder = "你的昵称";
-      author.autocomplete = "nickname";
+      author.setAttribute("autocomplete", "nickname");
       try {
         author.value = session ? nameFromSession() : localStorage.getItem(NICK_KEY) || "";
       } catch {

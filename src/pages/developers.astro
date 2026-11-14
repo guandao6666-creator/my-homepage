@@ -1,0 +1,1305 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import {
+  OS_VERSION,
+  SDK_VERSION,
+  PLUGIN_LIMITS,
+  PLUGIN_TYPE_META,
+  PERMISSIONS,
+  LICENSES,
+  PLUGIN_CATEGORIES,
+} from "../../shared/plugin-spec.js";
+
+const toc = [
+  ["overview", "概览"],
+  ["quick-start", "快速开始"],
+  ["manifest", "Manifest"],
+  ["sdk", "SDK Reference"],
+  ["application", "应用插件"],
+  ["widget", "组件插件"],
+  ["command", "命令插件"],
+  ["file-handler", "文件处理"],
+  ["permissions", "权限"],
+  ["sandbox", "沙箱"],
+  ["testing", "测试"],
+  ["publishing", "发布"],
+  ["updating", "更新与回退"],
+  ["troubleshooting", "排错"],
+  ["appendix", "附录"],
+];
+
+const manifestSample = `{
+  "manifestVersion": 1,
+  "id": "com.example.markdown",
+  "name": "Markdown 速记",
+  "version": "1.0.0",
+  "description": "在独立窗口里写 Markdown，保存到插件自己的命名空间。",
+  "author": { "name": "Example Studio", "url": "https://example.com" },
+  "type": "application",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "category": "productivity",
+  "license": "MIT",
+  "compatibility": { "minimumOSVersion": "1.7.0", "sdkVersion": 1 },
+  "permissions": ["window.open", "plugin.storage.read", "plugin.storage.write"],
+  "networkDomains": [],
+  "dependencies": [],
+  "screenshots": [],
+  "contributes": {}
+}`;
+
+const treeSample = `my-plugin/
+├── guandao.plugin.json
+├── src/
+│   ├── index.html
+│   ├── style.css
+│   ├── app.js
+│   └── icon.svg
+└── README.md`;
+
+const cliSample = `node cli/guandao.mjs create my-plugin \\
+  --id com.example.markdown \\
+  --name "Markdown 速记" \\
+  --type application
+
+node cli/guandao.mjs validate my-plugin
+node cli/guandao.mjs dev my-plugin
+node cli/guandao.mjs package my-plugin
+node cli/guandao.mjs publish my-plugin \\
+  --cookie "gauth_sid=..." \\
+  --changelog "第一个版本"`;
+
+const appHtml = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <h1>Markdown 速记</h1>
+    <textarea id="editor" placeholder="写点什么…"></textarea>
+    <button id="save">保存</button>
+    <script src="app.js"></script>
+  </body>
+</html>`;
+
+const appJs = `(function () {
+  var editor = document.getElementById("editor");
+
+  async function load() {
+    try {
+      var saved = await guandao.storage.get("draft");
+      if (saved) editor.value = saved;
+    } catch (error) {
+      // 没有 plugin.storage.read 授权时会走到这里
+      console.warn(error.code, error.message);
+    }
+  }
+
+  document.getElementById("save").addEventListener("click", async function () {
+    try {
+      await guandao.storage.set("draft", editor.value);
+      await guandao.notifications.success("已保存", "草稿写入了插件自己的命名空间");
+    } catch (error) {
+      await guandao.ui.toast("保存失败：" + error.message);
+    }
+  });
+
+  guandao.lifecycle.on("ready", load);
+})();`;
+
+const widgetManifest = `{
+  "type": "widget",
+  "entry": "index.html",
+  "permissions": ["desktop.add_widget", "theme.read"],
+  "contributes": {
+    "widget": {
+      "title": "我的时钟",
+      "defaultSize": "m",
+      "height": 132,
+      "description": "跟随主题配色的时钟"
+    }
+  }
+}`;
+
+const commandManifest = `{
+  "type": "command",
+  "entry": "index.html",
+  "permissions": ["desktop.register_command", "notes.create", "notification.show"],
+  "contributes": {
+    "command": [
+      {
+        "command": "quicknote.new",
+        "title": "新建一条快速便签",
+        "description": "写入 Guandao Notes"
+      }
+    ]
+  }
+}`;
+
+const commandJs = `guandao.commands.register([
+  { command: "quicknote.new", title: "新建一条快速便签" }
+]);
+
+guandao.commands.onInvoke(async function (payload) {
+  if (payload.command !== "quicknote.new") return;
+  var note = await guandao.notes.create({
+    title: "快速便签",
+    body: "由插件创建",
+    tags: ["插件"]
+  });
+  await guandao.notifications.success("已创建", note.title);
+});`;
+
+const fileHandlerManifest = `{
+  "type": "file-handler",
+  "entry": "index.html",
+  "permissions": ["files.pick", "files.read_selected"],
+  "contributes": {
+    "fileHandler": {
+      "extensions": ["md", "markdown"],
+      "mimeTypes": ["text/markdown"],
+      "actions": ["preview", "edit"]
+    }
+  }
+}`;
+
+const networkSample = `// 清单里必须同时声明 network.fetch 与域名
+// "permissions": ["network.fetch"],
+// "networkDomains": ["api.example.com"]
+
+var response = await guandao.network.fetch("https://api.example.com/v1/items", {
+  method: "GET",
+  headers: { accept: "application/json" }
+});
+
+// 响应由系统代理返回：{ status, contentType, text, truncated, bytes }
+console.log(response.status, response.text);`;
+
+const bundleSample = `{
+  "format": "guandao-plugin",
+  "formatVersion": 1,
+  "manifest": { "...": "完整 Manifest" },
+  "files": [
+    { "path": "index.html", "encoding": "utf8", "content": "<!doctype html>..." },
+    { "path": "icon.svg", "encoding": "utf8", "content": "<svg ...>" }
+  ],
+  "filesDigest": "64 位十六进制 SHA-256"
+}`;
+
+const apiRows = [
+  ["GET", "/api/plugins", "市场列表（published + 已审核版本）"],
+  ["GET", "/api/plugins/:id", "插件详情、版本、评价聚合"],
+  ["GET", "/api/plugins/:id/package", "下载插件包（需登录，校验 SHA-256）"],
+  ["POST", "/api/plugins/install", "安装并写入权限授权"],
+  ["POST", "/api/plugins/:id/enable|disable", "启用 / 禁用"],
+  ["POST", "/api/plugins/:id/update", "更新（新增权限需重新确认）"],
+  ["POST", "/api/plugins/:id/rollback", "回退到已审核的历史版本"],
+  ["DELETE", "/api/plugins/:id/install", "卸载并撤销全部授权"],
+  ["GET/POST/DELETE", "/api/plugins/:id/permissions", "查看 / 授权 / 撤销"],
+  ["POST", "/api/plugins/net", "插件外部请求代理（域名白名单）"],
+  ["GET/PATCH", "/api/developer/profile", "开发者资料"],
+  ["GET/POST", "/api/developer/plugins", "我的插件 / 创建草稿"],
+  ["POST", "/api/developer/plugins/:id/versions", "上传版本（Schema + 摘要校验）"],
+  ["POST", "/api/developer/plugins/:id/submit", "提交审核"],
+  ["GET", "/api/plugins/admin/queue/pending", "审核队列（staff）"],
+  ["POST", "/api/plugins/admin/:id/review", "通过 / 拒绝（staff，不能自审）"],
+  ["POST", "/api/plugins/admin/:id/takedown", "紧急下架（admin）"],
+  ["GET", "/api/plugins/admin/audit", "审计日志（staff）"],
+];
+
+const riskLabel = { low: "低", medium: "中", high: "高" };
+---
+
+<BaseLayout
+  title="Guandao SDK · 插件开发文档"
+  description="Guandao OS 1.7 插件开发文档：Manifest 规范、SDK 接口、沙箱模型、权限系统、测试与发布流程。"
+  canonical="/developers/"
+>
+  <section class="dev-hero">
+    <div class="wrap dev-hero-inner">
+      <div>
+        <span class="eyebrow">Guandao SDK · OS {OS_VERSION} · SDK {SDK_VERSION}</span>
+        <h1>把想法做成插件，<br /><em>交给别人的桌面。</em></h1>
+        <p class="dev-lede">
+          插件跑在独立沙箱里，通过有限、稳定、需要用户授权的 SDK 与系统交互。
+          你不需要接触数据库、文件系统、Session 或任何密钥——这是平台的责任，也是插件的边界。
+        </p>
+        <div class="dev-actions">
+          <a class="btn btn--solid" href="#quick-start">开始写第一个插件</a>
+          <a class="btn" href="#sandbox">看安全模型</a>
+        </div>
+      </div>
+      <dl class="dev-facts">
+        <div><dt>插件类型</dt><dd>6 种</dd></div>
+        <div><dt>权限</dt><dd>{PERMISSIONS.length} 项，默认拒绝</dd></div>
+        <div><dt>插件包上限</dt><dd>{Math.round(PLUGIN_LIMITS.bundleBytes / 1024 / 1024)} MB</dd></div>
+        <div><dt>运行隔离</dt><dd>双层 opaque iframe</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <div class="wrap dev-layout">
+    <aside class="dev-toc" aria-label="文档目录">
+      <p class="dev-toc-title">目录</p>
+      <ol>
+        {toc.map(([id, label], index) => (
+          <li><a href={`#${id}`}><span>{String(index + 1).padStart(2, "0")}</span>{label}</a></li>
+        ))}
+      </ol>
+      <div class="dev-toc-note">
+        <b>本地仓库</b>
+        <p>CLI 位于 <code>cli/</code>，规范文件是 <code>shared/plugin-spec.js</code>，两侧共用同一份校验。</p>
+      </div>
+    </aside>
+
+    <main class="dev-main">
+      <section id="overview" class="dev-section">
+        <h2>1 · 概览</h2>
+        <p>
+          Guandao OS 1.7 把「应用」拆成了可安装的插件。插件是一份带清单的静态包：
+          HTML、CSS、JS 与静态资源，运行在宿主创建的双层沙箱 iframe 中，所有能力通过
+          postMessage RPC 请求，由宿主按权限逐条放行。
+        </p>
+        <div class="dev-types">
+          {Object.entries(PLUGIN_TYPE_META).map(([key, meta]) => (
+            <article>
+              <span class="dev-type-ico">{meta.icon}</span>
+              <div>
+                <h3>{meta.label}</h3>
+                <p>{meta.desc}</p>
+                <code>{key}</code>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div class="dev-callout">
+          <b>三条硬规则</b>
+          <ul>
+            <li>不允许把第三方代码动态 import 进主页面；不允许 eval / new Function。</li>
+            <li>插件自报的 pluginId 不可信，身份由宿主与 iframe 实例、MessageChannel 绑定。</li>
+            <li>没有声明的权限永远拿不到；声明了但用户不勾选，同样拿不到。</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="quick-start" class="dev-section">
+        <h2>2 · 快速开始</h2>
+        <p>
+          CLI 零依赖，直接跑仓库里的脚本。它会生成一个可运行的插件骨架，包含 Manifest、
+          入口 HTML、样式、脚本与图标。
+        </p>
+        <pre><code>{cliSample}</code></pre>
+        <div class="dev-tree">
+          <pre><code>{treeSample}</code></pre>
+          <p>
+            <code>src/</code> 里的相对路径会保持原样；<code>package</code> 时按路径排序、
+            计算 <code>filesDigest</code>，再打包成单个 JSON 文本（<code>.gplug</code>）。
+          </p>
+        </div>
+        <h3>最小可运行 Manifest</h3>
+        <pre><code>{manifestSample}</code></pre>
+      </section>
+
+      <section id="manifest" class="dev-section">
+        <h2>3 · Plugin Manifest</h2>
+        <p>
+          Manifest 是插件唯一的身份与能力声明。服务端、浏览器与 CLI 使用同一份
+          <code>shared/plugin-spec.js</code> 校验，不存在「客户端能过、服务端不能过」的偏差。
+        </p>
+        <div class="dev-table">
+          <table>
+            <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><code>manifestVersion</code></td><td>number</td><td>固定为 1</td></tr>
+              <tr><td><code>id</code></td><td>string</td><td>2–5 段小写反向域名，全局唯一，发布后不可改</td></tr>
+              <tr><td><code>name</code></td><td>string</td><td>2–{PLUGIN_LIMITS.nameLength} 字符</td></tr>
+              <tr><td><code>version</code></td><td>string</td><td>SemVer，必须严格递增</td></tr>
+              <tr><td><code>description</code></td><td>string</td><td>10–2000 字符</td></tr>
+              <tr><td><code>author</code></td><td>object</td><td><code>name</code> 必填，<code>url</code> 必须是 https</td></tr>
+              <tr><td><code>type</code></td><td>string</td><td>application / widget / command / file-handler / theme / integration</td></tr>
+              <tr><td><code>entry</code></td><td>string</td><td>插件包内的 HTML 路径；主题插件可为空</td></tr>
+              <tr><td><code>compatibility</code></td><td>object</td><td>最低系统版本 + SDK 版本</td></tr>
+              <tr><td><code>permissions</code></td><td>string[]</td><td>只能使用系统权限目录里的 ID</td></tr>
+              <tr><td><code>networkDomains</code></td><td>string[]</td><td>申请 <code>network.fetch</code> 时必填</td></tr>
+              <tr><td><code>dependencies</code></td><td>object[]</td><td>id + 版本范围，最多 {PLUGIN_LIMITS.dependencies} 个</td></tr>
+              <tr><td><code>contributes</code></td><td>object</td><td>widget / command / fileHandler / theme 的声明</td></tr>
+              <tr><td><code>icon</code> · <code>screenshots</code></td><td>string / string[]</td><td>插件包内的相对路径，最多 {PLUGIN_LIMITS.screenshots} 张预览图</td></tr>
+              <tr><td><code>license</code></td><td>string</td><td>{LICENSES.join(" / ")}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>路径与体积限制</h3>
+        <ul class="dev-list">
+          <li>路径不允许 <code>..</code>、反斜杠、绝对路径、盘符或空段；</li>
+          <li>禁止 .php / .wasm / .exe / .node / .sh / .bat 等可执行或后端文件；</li>
+          <li>单包 ≤ {Math.round(PLUGIN_LIMITS.bundleBytes / 1024 / 1024)} MB，最多 {PLUGIN_LIMITS.files} 个文件，单文件 ≤ {Math.round(PLUGIN_LIMITS.fileBytes / 1024)} KB；</li>
+          <li>未知权限、未知类型、缺失入口一律拒绝，不做「猜测式」兼容。</li>
+        </ul>
+        <h3>插件包格式</h3>
+        <pre><code>{bundleSample}</code></pre>
+        <p>
+          <code>filesDigest</code> 是文件清单的稳定序列化摘要；服务端另外保存整个包文本的
+          SHA-256。安装时两者都会复核，任何一处不一致都会中止安装。
+        </p>
+      </section>
+
+      <section id="sdk" class="dev-section">
+        <h2>4 · SDK Reference</h2>
+        <p>
+          SDK 由宿主注入到插件文档最前面，全局变量是 <code>guandao</code>。所有方法返回
+          Promise；失败时 reject 一个带 <code>code</code> 的 Error。单次参数上限
+          {Math.round(PLUGIN_LIMITS.rpcPayloadBytes / 1024)} KB，宿主 8 秒超时。
+        </p>
+        <div class="dev-table">
+          <table>
+            <thead><tr><th>模块</th><th>方法</th><th>需要权限</th></tr></thead>
+            <tbody>
+              <tr><td rowspan="6"><code>guandao.ui</code></td><td><code>toast(text)</code></td><td>无（限频）</td></tr>
+              <tr><td><code>notify(&#123; title, body, level &#125;)</code></td><td>notification.show</td></tr>
+              <tr><td><code>dialog(&#123; title, message, actions &#125;)</code></td><td>dialog.open</td></tr>
+              <tr><td><code>openApp(appId)</code></td><td>desktop.open_app</td></tr>
+              <tr><td><code>setTitle</code> · <code>resize</code> · <code>close</code></td><td>无</td></tr>
+              <tr><td><code>theme()</code></td><td>theme.read</td></tr>
+              <tr><td rowspan="5"><code>guandao.storage</code></td><td><code>get(key)</code></td><td>plugin.storage.read</td></tr>
+              <tr><td><code>keys()</code></td><td>plugin.storage.read</td></tr>
+              <tr><td><code>set(key, value)</code></td><td>plugin.storage.write</td></tr>
+              <tr><td><code>delete(key)</code></td><td>plugin.storage.write</td></tr>
+              <tr><td><code>clear()</code></td><td>plugin.storage.write</td></tr>
+              <tr><td rowspan="6"><code>guandao.files</code></td><td><code>pick(&#123; accept, multiple &#125;)</code></td><td>files.pick</td></tr>
+              <tr><td><code>read(token)</code></td><td>files.read_selected</td></tr>
+              <tr><td colspan="2" class="dev-sub">文件必须由用户在宿主对话框里主动选择，token 10 分钟失效，单文件 ≤ 256 KB。</td></tr>
+              <tr><td><code>guandao.network.fetch(url, options)</code></td><td>network.fetch</td></tr>
+              <tr><td><code>guandao.commands.register(list)</code></td><td>desktop.register_command</td></tr>
+              <tr><td><code>guandao.commands.onInvoke(fn)</code></td><td>无（仅接收自己插件的命令）</td></tr>
+              <tr><td rowspan="3"><code>guandao.notes</code></td><td><code>create(note)</code></td><td>notes.create</td></tr>
+              <tr><td><code>readSelected()</code></td><td>notes.read_selected</td></tr>
+              <tr><td colspan="2" class="dev-sub">读取会弹出选择器，只返回用户点选的那一条。</td></tr>
+              <tr><td rowspan="2"><code>guandao.calendar</code></td><td><code>createEvent(event)</code></td><td>calendar.create_event</td></tr>
+              <tr><td><code>readSelected()</code></td><td>calendar.read_selected</td></tr>
+              <tr><td><code>guandao.lifecycle</code></td><td><code>on("ready" | "command" | "theme-change")</code> · <code>reportError</code></td><td>无</td></tr>
+              <tr><td><code>guandao.device</code></td><td><code>info()</code></td><td>无（只读环境信息）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dev-callout is-warn">
+          <b>不要做的事</b>
+          <p>
+            不要尝试读写 <code>window.parent</code>、<code>document.cookie</code>、
+            <code>localStorage</code> 或直接 fetch 外部地址。沙箱的 origin 是 opaque，
+            这些访问会被浏览器拒绝；网络出口也被 CSP 关闭，只能走宿主代理。
+          </p>
+        </div>
+      </section>
+
+      <section id="application" class="dev-section">
+        <h2>5 · Application Plugin</h2>
+        <p>
+          应用插件通过 Window Manager 打开，支持拖动、缩放、最小化与关闭。关闭窗口时宿主会
+          销毁 iframe、MessagePort 与所有监听，插件不会留下后台循环。
+        </p>
+        <div class="dev-split">
+          <pre><code>{appHtml}</code></pre>
+          <pre><code>{appJs}</code></pre>
+        </div>
+        <p class="dev-muted">
+          统计与性能：浏览器不向页面暴露每个 iframe 的真实 CPU / 内存。管理器只展示
+          运行上下文数量、请求次数、存储占用与日志，不编造精确数字。
+        </p>
+      </section>
+
+      <section id="widget" class="dev-section">
+        <h2>6 · Widget Plugin</h2>
+        <p>
+          组件插件由桌面组件系统加载，尺寸来自 <code>contributes.widget.height</code>，
+          背景保持透明，方便跟随壁纸。组件被移除时，宿主通过 MutationObserver 检测节点
+          断开并销毁沙箱。
+        </p>
+        <pre><code>{widgetManifest}</code></pre>
+        <p>
+          组件插件同样需要 <code>desktop.add_widget</code> 权限；没有授权时安装成功但不会
+          自动放到桌面，用户可以在插件管理器里重新添加。
+        </p>
+      </section>
+
+      <section id="command" class="dev-section">
+        <h2>7 · Command Plugin</h2>
+        <p>
+          命令插件没有常驻窗口。命令面板（<kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>K</kbd>）
+          执行命令时，宿主会创建一个隐藏的短生命周期沙箱，把 <code>command</code> 事件发进去，
+          20 秒后回收。
+        </p>
+        <pre><code>{commandManifest}</code></pre>
+        <pre><code>{commandJs}</code></pre>
+        <p class="dev-muted">
+          运行期注册的命令必须是 Manifest 中声明过的子集，不能静默新增。
+        </p>
+      </section>
+
+      <section id="file-handler" class="dev-section">
+        <h2>8 · File Handler Plugin</h2>
+        <p>
+          文件处理插件声明自己支持的扩展名、MIME 与动作。它不能遍历文件系统，也不能读取
+          用户没有主动选择的文件；沙箱里没有文件系统 API。
+        </p>
+        <pre><code>{fileHandlerManifest}</code></pre>
+        <p>
+          当前版本里，文件处理插件通过插件管理器打开，再由 <code>files.pick</code> 选择文件。
+          与文件管理器的自动关联尚未开放，这一点在「已知限制」里明确列出，不用伪装的集成。
+        </p>
+      </section>
+
+      <section id="permissions" class="dev-section">
+        <h2>9 · 权限系统</h2>
+        <p>
+          默认拒绝。安装前会按模块分组展示每一项权限、作用、是否涉及私人数据、是否访问外部
+          网络；用户可以全部拒绝，插件仍会安装，但相关调用会失败。
+        </p>
+        <div class="dev-table dev-table--perms">
+          <table>
+            <thead><tr><th>权限 ID</th><th>模块</th><th>风险</th><th>说明</th></tr></thead>
+            <tbody>
+              {PERMISSIONS.map((permission) => (
+                <tr class:list={[{ "is-sensitive": permission.sensitive }]}>
+                  <td><code>{permission.id}</code>{permission.sensitive && <em>私人数据</em>}</td>
+                  <td>{permission.module}</td>
+                  <td><span class:list={["dev-risk", `is-${permission.risk}`]}>{riskLabel[permission.risk]}</span></td>
+                  <td>{permission.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <h3>撤销与升级</h3>
+        <ul class="dev-list">
+          <li>撤销权限会立即销毁对应插件的运行上下文，下一次调用返回 <code>PERMISSION_DENIED</code>；</li>
+          <li>更新版本时如果新增权限，必须重新征求同意，不能静默扩大；</li>
+          <li>回退到旧版本时，新版本才有的权限会随回退一起撤销；</li>
+          <li>卸载后全部授权清除；被下架的插件立即停止运行，但用户数据保留。</li>
+        </ul>
+      </section>
+
+      <section id="sandbox" class="dev-section">
+        <h2>10 · 沙箱隔离</h2>
+        <p>
+          插件代码永远不在主页面执行。链路是：主页面 → 同源运行器（<code>/sandbox/runner.html</code>）
+          → 插件文档。两层 iframe 都只授予 <code>allow-scripts</code>，没有
+          <code>allow-same-origin</code>，实际 origin 是 opaque（<code>"null"</code>）。
+        </p>
+        <div class="dev-diagram" role="img" aria-label="主页面、沙箱运行器与插件 iframe 的隔离链路">
+          <div class="dev-node is-host">
+            <b>Guandao OS 主页面</b>
+            <span>Cookie · D1 · R2 · Window Manager</span>
+          </div>
+          <div class="dev-arrow"><span>MessageChannel（Port1）</span></div>
+          <div class="dev-node">
+            <b>运行器 /sandbox/runner.html</b>
+            <span>sandbox="allow-scripts" · opaque origin</span>
+          </div>
+          <div class="dev-arrow"><span>postMessage（校验 event.source）</span></div>
+          <div class="dev-node is-plugin">
+            <b>插件文档</b>
+            <span>sandbox="allow-scripts" · Blob URL · 注入 SDK</span>
+          </div>
+        </div>
+        <h3>通信与身份</h3>
+        <ol class="dev-list">
+          <li>宿主创建 iframe，收到 <code>HELLO</code> 后确认 <code>event.source === iframe.contentWindow</code>；</li>
+          <li>宿主新建 MessageChannel，把 <code>port2</code> 转移给运行器，会话与 iframe 实例绑定；</li>
+          <li>运行器只转发自己创建的那个子 iframe 的消息，并用挂载时的 pluginId 覆盖插件自报值；</li>
+          <li>宿主按 <code>METHOD → 权限</code> 表逐条校验，再做频率、体积、超时限制；</li>
+          <li>任何一环失败都返回结构化错误，不静默降级。</li>
+        </ol>
+        <h3>CSP</h3>
+        <p>
+          沙箱文档使用独立 CSP：<code>script-src 'unsafe-inline'</code>（插件自身脚本）、
+          <code>connect-src 'none'</code>（禁止直接联网）、<code>img-src data: blob:</code>
+          （禁止用图片外链做数据外泄）、<code>frame-ancestors 'self'</code>。
+          主页面仍是哈希白名单 CSP，没有 <code>unsafe-eval</code>。
+        </p>
+        <h3>独立子域（可选）</h3>
+        <p>
+          当前部署把运行器放在同源路径下，靠 <code>sandbox</code> 属性获得 opaque origin。
+          如果要把边界再推一层，可以为 <code>sandbox.guandao.xin</code> 单独建一个
+          Cloudflare Worker / Pages 项目，把 <code>public/sandbox/</code> 部署过去，并在
+          主应用里把 <code>RUNNER_URL</code> 改成该域名。需要同时调整主页面 CSP 的
+          <code>frame-src</code>，并保证该域名不设置任何 Cookie。
+        </p>
+      </section>
+
+      <section id="testing" class="dev-section">
+        <h2>11 · 测试</h2>
+        <div class="dev-table">
+          <table>
+            <thead><tr><th>命令</th><th>验证什么</th></tr></thead>
+            <tbody>
+              <tr><td><code>guandao validate</code></td><td>Manifest、路径、大小、入口、权限、摘要规则</td></tr>
+              <tr><td><code>guandao dev</code></td><td>本地 Mock Host，支持存储 / 通知 / 对话框 / 主题</td></tr>
+              <tr><td><code>guandao preview</code></td><td>从打好的 .gplug 加载并校验摘要</td></tr>
+              <tr><td><code>npm run qa:plugins</code></td><td>真实 D1 + R2：安装、权限、更新、回退、下架、审计</td></tr>
+              <tr><td><code>npm run qa:plugins:ui</code></td><td>浏览器：沙箱启动、SDK 调用、DOM / localStorage 隔离</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Mock Host 只用于开发，不替代系统测试：它不会真的写 D1、不会执行审核，也不会模拟
+          紧急下架。涉及权限与安全的结论，必须在 Guandao OS 里验证。
+        </p>
+      </section>
+
+      <section id="publishing" class="dev-section">
+        <h2>12 · 发布</h2>
+        <ol class="dev-steps">
+          <li><b>创建草稿</b><span>在开发者中心填写插件 ID、类型、分类与许可证。ID 与类型创建后不可改。</span></li>
+          <li><b>上传版本</b><span>上传 .gplug。服务端校验 Manifest、路径、大小、filesDigest 与包 SHA-256。</span></li>
+          <li><b>提交审核</b><span>进入队列；审核员会看到权限、摘要、体积与更新日志。不能审核自己的插件。</span></li>
+          <li><b>通过发布</b><span>版本标记为 approved，插件进入市场；下载与安装计数从真实行为累计。</span></li>
+        </ol>
+        <p>
+          包本体存 R2（私有桶），市场下载通过受控 API：校验发布状态与 SHA-256 后才返回文本，
+          并给对象加 <code>Content-Security-Policy: sandbox</code>，避免被当作页面直接执行。
+        </p>
+      </section>
+
+      <section id="updating" class="dev-section">
+        <h2>13 · 更新与回退</h2>
+        <ul class="dev-list">
+          <li>版本号必须严格递增，SemVer；同一版本不能重复上传。</li>
+          <li>已发布插件提交新版本时，插件不会从市场消失，但新版本要审核通过才可安装。</li>
+          <li>新增权限 → 用户在更新对话框里再次确认；拒绝则更新中止。</li>
+          <li>更新不会覆盖插件自己的存储；回退同理，只替换代码与版本记录。</li>
+          <li>回退目标必须是审核通过的历史版本，权限取交集，不会保留新版本独有的能力。</li>
+        </ul>
+      </section>
+
+      <section id="troubleshooting" class="dev-section">
+        <h2>14 · 排错</h2>
+        <div class="dev-errors">
+          <div><code>PERMISSION_DENIED</code><p>用户没有授予对应权限。到插件管理器 → 权限里勾选；不要试图绕过。</p></div>
+          <div><code>ENTRY_MISSING</code><p>Manifest 的 entry 指向的文件不在 src/ 里，或路径大小写不一致。</p></div>
+          <div><code>UNSAFE_PATH</code><p>路径包含 ..、反斜杠、绝对路径，或使用了禁止的扩展名。</p></div>
+          <div><code>FILES_DIGEST_MISMATCH</code><p>打包后文件被改过，或 CLI 与 Manifest 版本不一致。重新 package。</p></div>
+          <div><code>PACKAGE_INTEGRITY_ERROR</code><p>下载到的包与服务端记录的 SHA-256 不一致，安装会被中止。</p></div>
+          <div><code>TIMEOUT</code><p>宿主 8 秒内没有完成处理。检查是否在 ui.dialog 里等待用户操作过久。</p></div>
+          <div><code>STORAGE_QUOTA</code><p>插件命名空间超过 256 KB。清理旧键，或把大文件放到插件包内。</p></div>
+          <div><code>PLUGIN_BLOCKED</code><p>插件被管理员紧急下架。用户数据保留，但不能继续运行或安装。</p></div>
+          <div><code>SELF_REVIEW</code><p>开发者不能审核自己的插件，需要另一位审核员处理。</p></div>
+        </div>
+      </section>
+
+      <section id="appendix" class="dev-section">
+        <h2>附录 · API 与限制</h2>
+        <h3>接口清单</h3>
+        <div class="dev-table">
+          <table>
+            <thead><tr><th>方法</th><th>路径</th><th>作用</th></tr></thead>
+            <tbody>
+              {apiRows.map(([method, path, desc]) => (
+                <tr><td><code>{method}</code></td><td><code>{path}</code></td><td>{desc}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <h3>运行限制</h3>
+        <dl class="dev-limits">
+          <div><dt>单插件存储</dt><dd>{Math.round(PLUGIN_LIMITS.storageBytes / 1024)} KB / {PLUGIN_LIMITS.storageKeys} 键</dd></div>
+          <div><dt>RPC</dt><dd>{PLUGIN_LIMITS.rpcPerWindow} 次 / {PLUGIN_LIMITS.rpcWindowMs / 1000} 秒</dd></div>
+          <div><dt>单次参数</dt><dd>{Math.round(PLUGIN_LIMITS.rpcPayloadBytes / 1024)} KB</dd></div>
+          <div><dt>通知</dt><dd>{PLUGIN_LIMITS.notificationsPerMinute} 条 / 分钟</dd></div>
+          <div><dt>同时安装</dt><dd>{PLUGIN_LIMITS.installedPlugins} 个</dd></div>
+          <div><dt>分类</dt><dd>{PLUGIN_CATEGORIES.join(" / ")}</dd></div>
+        </dl>
+        <p class="dev-muted">
+          文档随代码一起维护。权限目录、限制与校验规则直接来自
+          <code>shared/plugin-spec.js</code>，页面上的数字不是手写的。
+        </p>
+      </section>
+
+      <footer class="dev-foot">
+        <p>Guandao OS {OS_VERSION} · Open Desktop · Extend Your System.</p>
+        <p>
+          有问题先看排错，再看 <a href="/about/">关于我</a>，或者在
+          <a href="/">桌面</a>里打开社区。
+        </p>
+      </footer>
+    </main>
+  </div>
+</BaseLayout>
+
+<style>
+  .dev-hero {
+    padding: 64px 0 48px;
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(80% 120% at 12% 0%, var(--accent-wash), transparent 62%),
+      var(--paper);
+  }
+
+  .dev-hero-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.7fr);
+    gap: 48px;
+    align-items: end;
+  }
+
+  .dev-hero h1 {
+    margin: 14px 0 16px;
+    font-family: var(--font-serif);
+    font-size: clamp(30px, 4vw, 46px);
+    font-weight: 600;
+    line-height: 1.22;
+    letter-spacing: -0.015em;
+  }
+
+  .dev-hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .dev-lede {
+    margin: 0;
+    max-width: 560px;
+    font-size: 15px;
+    line-height: 1.85;
+    color: var(--ink-2);
+  }
+
+  .dev-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .dev-facts {
+    margin: 0;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .dev-facts > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .dev-facts > div:last-child {
+    border-bottom: 0;
+  }
+
+  .dev-facts dt {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .dev-facts dd {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .dev-layout {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 56px;
+    padding-top: 44px;
+    padding-bottom: 80px;
+  }
+
+  .dev-toc {
+    position: sticky;
+    top: 88px;
+    align-self: start;
+    font-size: 12.5px;
+  }
+
+  .dev-toc-title {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .dev-toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-left: 1px solid var(--line);
+  }
+
+  .dev-toc li a {
+    display: flex;
+    gap: 9px;
+    padding: 5px 0 5px 14px;
+    margin-left: -1px;
+    border-left: 2px solid transparent;
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+
+  .dev-toc li a:hover {
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+
+  .dev-toc li span {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    padding-top: 2px;
+  }
+
+  .dev-toc-note {
+    margin-top: 22px;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunk);
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.65;
+  }
+
+  .dev-toc-note b {
+    color: var(--ink);
+    font-size: 11.5px;
+  }
+
+  .dev-toc-note p {
+    margin: 4px 0 0;
+  }
+
+  .dev-main {
+    min-width: 0;
+  }
+
+  .dev-section {
+    padding-bottom: 40px;
+    margin-bottom: 36px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .dev-section:last-of-type {
+    border-bottom: 0;
+  }
+
+  .dev-section h2 {
+    margin: 0 0 16px;
+    font-family: var(--font-serif);
+    font-size: 25px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .dev-section h3 {
+    margin: 26px 0 10px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .dev-section p {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--ink-2);
+  }
+
+  .dev-section code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--surface-sunk);
+    color: var(--ink);
+  }
+
+  .dev-section pre {
+    margin: 12px 0 16px;
+    padding: 16px 18px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: #1b1e18;
+    overflow: auto;
+  }
+
+  .dev-section pre code {
+    padding: 0;
+    background: none;
+    color: #e6e9de;
+    font-size: 11.5px;
+    line-height: 1.75;
+    white-space: pre;
+  }
+
+  .dev-types {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 18px 0;
+  }
+
+  .dev-types article {
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .dev-type-ico {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    background: var(--accent-wash);
+    color: var(--accent);
+    font-size: 15px;
+  }
+
+  .dev-types h3 {
+    margin: 0 0 3px;
+    font-size: 13px;
+  }
+
+  .dev-types p {
+    margin: 0 0 5px;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .dev-types code {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .dev-callout {
+    margin: 18px 0;
+    padding: 14px 16px;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--accent-wash);
+  }
+
+  .dev-callout.is-warn {
+    border-left-color: #b07d2a;
+    background: #fbf4e6;
+  }
+
+  .dev-callout b {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12.5px;
+  }
+
+  .dev-callout ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+  }
+
+  .dev-callout li,
+  .dev-callout p {
+    margin: 3px 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  .dev-tree {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .dev-tree pre {
+    margin-top: 0;
+  }
+
+  .dev-tree p {
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: var(--muted);
+  }
+
+  .dev-table {
+    margin: 14px 0 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: auto;
+    background: var(--surface);
+  }
+
+  .dev-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .dev-table th,
+  .dev-table td {
+    padding: 9px 12px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--line);
+    line-height: 1.65;
+  }
+
+  .dev-table th {
+    background: var(--surface-sunk);
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .dev-table tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .dev-table td code {
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+
+  .dev-table--perms td:last-child {
+    color: var(--ink-2);
+  }
+
+  .dev-table tr.is-sensitive {
+    background: #fdf6f4;
+  }
+
+  .dev-table td em {
+    display: inline-block;
+    margin-left: 5px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: #f7e3de;
+    color: #a04a3a;
+    font-size: 9px;
+    font-style: normal;
+  }
+
+  .dev-risk {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    border: 1px solid var(--line-strong);
+    color: var(--muted);
+  }
+
+  .dev-risk.is-high {
+    border-color: #d9b3aa;
+    color: #a04a3a;
+  }
+
+  .dev-risk.is-medium {
+    border-color: #ddc9a4;
+    color: #8a6526;
+  }
+
+  .dev-risk.is-low {
+    border-color: #c3d3c1;
+    color: var(--accent);
+  }
+
+  .dev-list {
+    margin: 10px 0 14px;
+    padding-left: 20px;
+  }
+
+  .dev-list li {
+    margin: 6px 0;
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: var(--ink-2);
+  }
+
+  .dev-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .dev-split pre {
+    margin: 0;
+  }
+
+  .dev-muted {
+    color: var(--muted) !important;
+    font-size: 12.5px !important;
+  }
+
+  .dev-sub {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .dev-diagram {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin: 18px 0;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-sunk);
+  }
+
+  .dev-node {
+    flex: 1;
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .dev-node b {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .dev-node span {
+    font-size: 10px;
+    line-height: 1.55;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+
+  .dev-node.is-host {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .dev-node.is-plugin {
+    border-style: dashed;
+  }
+
+  .dev-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 92px;
+    text-align: center;
+  }
+
+  .dev-arrow span {
+    font-size: 9px;
+    line-height: 1.5;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    position: relative;
+  }
+
+  .dev-arrow span::before {
+    content: "→";
+    display: block;
+    font-size: 18px;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .dev-steps {
+    margin: 12px 0 16px;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+
+  .dev-steps li {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 14px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--line);
+    counter-increment: step;
+  }
+
+  .dev-steps li:last-child {
+    border-bottom: 0;
+  }
+
+  .dev-steps b {
+    font-size: 12.5px;
+  }
+
+  .dev-steps span {
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--ink-2);
+  }
+
+  .dev-errors {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .dev-errors > div {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .dev-errors code {
+    display: inline-block;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: #a04a3a;
+    background: #fdf1ee;
+  }
+
+  .dev-errors p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  .dev-limits {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 24px;
+    margin: 12px 0 16px;
+    padding: 4px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .dev-limits > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 12.5px;
+  }
+
+  .dev-limits dt {
+    color: var(--muted);
+  }
+
+  .dev-limits dd {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .dev-section kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--surface);
+  }
+
+  .dev-section kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--surface);
+  }
+
+  .dev-foot {
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .dev-foot p {
+    margin: 4px 0;
+  }
+
+  .dev-foot a {
+    color: var(--accent);
+  }
+
+  @media (max-width: 940px) {
+    .dev-hero-inner {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+
+    .dev-layout {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    .dev-toc {
+      position: static;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .dev-toc ol {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      border-left: 0;
+    }
+
+    .dev-toc li a {
+      border-left: 0;
+      padding: 3px 0;
+    }
+
+    .dev-toc-note {
+      display: none;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .dev-types,
+    .dev-split,
+    .dev-tree,
+    .dev-errors,
+    .dev-limits {
+      grid-template-columns: 1fr;
+    }
+
+    .dev-diagram {
+      flex-direction: column;
+    }
+
+    .dev-arrow {
+      flex: 0 0 auto;
+      padding: 4px 0;
+    }
+
+    .dev-arrow span::before {
+      content: "↓";
+    }
+
+    .dev-steps li {
+      grid-template-columns: 1fr;
+      gap: 3px;
+    }
+
+    .dev-hero {
+      padding-top: 44px;
+    }
+  }
+</style>

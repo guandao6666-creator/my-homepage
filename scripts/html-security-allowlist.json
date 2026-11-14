@@ -1,0 +1,402 @@
+{
+  "$comment": "HTML 安全静态检查的已审查清单。每条必须写 reason；文件级条目带 count，新增同类代码会导致数量不符并让检查失败。",
+  "generatedAt": "2026-11-07",
+  "entries": [
+    {
+      "kind": "sink",
+      "file": "src/components/Comments.astro",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/account/client.ts",
+      "count": 1,
+      "reason": "人工复核 4 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/account/client.ts",
+      "count": 3,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/continuity/app.ts",
+      "count": 3,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/continuity/ui.ts",
+      "count": 6,
+      "reason": "人工复核 3 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/icons13.ts",
+      "count": 1,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/leaderboard/index.ts",
+      "count": 4,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/legacy-apps/viewer/index.ts",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/mobile/app.ts",
+      "count": 2,
+      "reason": "人工复核 3 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/mobile/app.ts",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/mobile/ui.ts",
+      "count": 4,
+      "reason": "人工复核 2 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os13.ts",
+      "count": 8,
+      "reason": "人工复核 5 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/os13.ts",
+      "count": 3,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/appcenter.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/apps/calendar.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/apps/gallery.ts",
+      "count": 5,
+      "reason": "人工复核 5 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/apps/music.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/apps/notes.ts",
+      "count": 4,
+      "reason": "人工复核 4 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/apps/reader.ts",
+      "count": 5,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/backup.ts",
+      "count": 14,
+      "reason": "人工复核 11 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/community.ts",
+      "count": 13,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/control.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/core.ts",
+      "count": 2,
+      "reason": "人工复核 2 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/os14/core.ts",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/datacenter.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/desktop.ts",
+      "count": 4,
+      "reason": "人工复核 2 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/devices.ts",
+      "count": 13,
+      "reason": "人工复核 14 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/drive.ts",
+      "count": 9,
+      "reason": "人工复核 5 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/os14/drive.ts",
+      "count": 2,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/files.ts",
+      "count": 4,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/games.ts",
+      "count": 13,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/os14/music-core.ts",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/playground.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/security.ts",
+      "count": 14,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/tasks.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/themes.ts",
+      "count": 5,
+      "reason": "人工复核 8 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/widgetstore.ts",
+      "count": 8,
+      "reason": "人工复核 4 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/workspaces.ts",
+      "count": 2,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os20/apps/market.ts",
+      "count": 6,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os20/apps/onboarding.ts",
+      "count": 8,
+      "reason": "人工复核 7 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os20/apps/systemcenter.ts",
+      "count": 2,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/os20/apps/systemcenter.ts",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os20/apps/updatecenter.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/pairing/page.ts",
+      "count": 2,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/plugins/commands.ts",
+      "count": 2,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/plugins/developer.ts",
+      "count": 9,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/plugins/host.ts",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/plugins/host.ts",
+      "count": 3,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/plugins/manager.ts",
+      "count": 2,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/plugins/market.ts",
+      "count": 4,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/plugins/registry.ts",
+      "count": 4,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/plugins/ui-kit.ts",
+      "count": 2,
+      "reason": "人工复核 3 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/quality/diagnostics.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/quality/diagnostics.ts",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/quality/perflab.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/shell/adaptive.ts",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/shell/pwa.ts",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/pages/admin/index.astro",
+      "count": 14,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/pages/blog/[slug].astro",
+      "count": 2,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/pages/blog/[slug].astro",
+      "count": 1,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "duplicate-escape",
+      "file": "src/pages/blog/index.astro",
+      "count": 1,
+      "reason": "唯一保留的兼容副本：<script is:inline> 不能使用 ESM import，改成模块脚本会改变 CSP 内联哈希；已加一致性测试"
+    },
+    {
+      "kind": "sink",
+      "file": "src/pages/blog/index.astro",
+      "count": 1,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/pages/home.astro",
+      "count": 2,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/pages/index.astro",
+      "count": 47,
+      "reason": "人工复核 17 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/pages/index.astro",
+      "count": 5,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/pages/notes.astro",
+      "count": 2,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    }
+  ]
+}

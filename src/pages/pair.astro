@@ -1,0 +1,28 @@
+---
+import "../styles/pairing.css";
+---
+
+<!doctype html>
+<html lang="zh-CN" data-page="pair">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>设备配对 · Guandao OS</title>
+    <meta name="description" content="把新设备加入你的 Guandao Account。" />
+    <meta name="theme-color" content="#070a11" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+  </head>
+  <body>
+    <main class="pair-root" id="pair-root">
+      <div class="pair-card">
+        <div class="pair-brand"><span>管</span><div><b>Guandao OS</b><i>Device Pairing</i></div></div>
+        <div class="pair-state"><span class="pair-spin"></span><h1>正在读取配对信息</h1></div>
+      </div>
+    </main>
+    <script>
+      import "../lib/pairing/page";
+    </script>
+  </body>
+</html>

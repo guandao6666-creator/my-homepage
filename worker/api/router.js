@@ -11,8 +11,22 @@
  */
 
 import { ApiError, fail, toApiError } from "./http.js";
+import { WORKER_VERSION, VERSION_HEADER } from "./version.js";
+import { matchRateRule, rateLimit } from "./ratelimit.js";
 import { healthHandler } from "./health.js";
 import { handleFilesRequest } from "./files/handlers.js";
+import { handleSyncRequest } from "./sync/handlers.js";
+import { handleDevicesRequest } from "./devices/handlers.js";
+import { handlePairingRequest } from "./pairing/handlers.js";
+import { handleContinuityRequest } from "./continuity/handlers.js";
+import { handleBackupsRequest } from "./backups/handlers.js";
+import { handlePrivacyRequest } from "./privacy/handlers.js";
+import { handleCommunityRequest } from "./community/handlers.js";
+import { handleAdminRequest } from "./admin/r2.js";
+import { handleAdminMonitorRequest } from "./admin/monitor.js";
+import { handleAdminBackupRequest } from "./admin/backup.js";
+import { handlePluginsRequest } from "./plugins/handlers.js";
+import { handleDeveloperRequest } from "./plugins/developer.js";
 import {
   authCallback,
   authDevices,
@@ -48,11 +62,82 @@ export async function handleApiRequest(request, env) {
   const route = ROUTES.get(path);
 
   try {
-    const filesResponse = await handleFilesRequest({ request, env, url, path });
-    if (filesResponse) {
-      filesResponse.headers.set("x-request-id", requestId);
-      return filesResponse;
+    // 频率限制先于任何业务逻辑执行：登录、上传、导出、删除、下载、同步都有独立配额，
+    // 其余接口走宽松的全局上限。
+    // 2.0：/api/health 不再完全跳过限流（120 次/分钟），避免匿名探针无限消耗 D1 + R2。
+    let gate = null;
+    {
+      const rule = matchRateRule(path, request.method);
+      gate = await rateLimit(env, request, rule);
+      if (!gate.allowed) {
+        return fail(
+          new ApiError("RATE_LIMITED", `请求过于频繁，请 ${gate.retryAfter} 秒后再试`, 429),
+          {
+            requestId,
+            headers: {
+              "retry-after": String(gate.retryAfter),
+              "x-ratelimit-limit": String(gate.limit),
+              "x-ratelimit-remaining": "0",
+              "x-ratelimit-reset": String(Math.ceil(gate.resetAt / 1000)),
+            },
+          },
+        );
+      }
     }
+
+    const stamp = (response) => {
+      try {
+        response.headers.set("x-request-id", requestId);
+        // 1.9：所有 API 响应都带版本，方便确认线上到底跑的是哪一版
+        response.headers.set(VERSION_HEADER, WORKER_VERSION);
+        if (gate) {
+          response.headers.set("x-ratelimit-limit", String(gate.limit));
+          response.headers.set("x-ratelimit-remaining", String(gate.remaining));
+        }
+      } catch {
+        // 上游 fetch 响应头可能是 immutable，这里不为了两个诊断头重建响应体。
+      }
+      return response;
+    };
+
+    const pluginsResponse = await handlePluginsRequest({ request, env, url, path });
+    if (pluginsResponse) return stamp(pluginsResponse);
+
+    const adminResponse = await handleAdminRequest({ request, env, url, path });
+    if (adminResponse) return stamp(adminResponse);
+
+    const monitorResponse = await handleAdminMonitorRequest({ request, env, url, path });
+    if (monitorResponse) return stamp(monitorResponse);
+
+    const backupResponse = await handleAdminBackupRequest({ request, env, url, path });
+    if (backupResponse) return stamp(backupResponse);
+
+    const developerResponse = await handleDeveloperRequest({ request, env, url, path });
+    if (developerResponse) return stamp(developerResponse);
+
+    const communityResponse = await handleCommunityRequest({ request, env, url, path });
+    if (communityResponse) return stamp(communityResponse);
+
+    const filesResponse = await handleFilesRequest({ request, env, url, path });
+    if (filesResponse) return stamp(filesResponse);
+
+    const syncResponse = await handleSyncRequest({ request, env, url, path });
+    if (syncResponse) return stamp(syncResponse);
+
+    const pairingResponse = await handlePairingRequest({ request, env, url, path });
+    if (pairingResponse) return stamp(pairingResponse);
+
+    const continuityResponse = await handleContinuityRequest({ request, env, url, path });
+    if (continuityResponse) return stamp(continuityResponse);
+
+    const devicesResponse = await handleDevicesRequest({ request, env, url, path });
+    if (devicesResponse) return stamp(devicesResponse);
+
+    const backupsResponse = await handleBackupsRequest({ request, env, url, path });
+    if (backupsResponse) return stamp(backupsResponse);
+
+    const privacyResponse = await handlePrivacyRequest({ request, env, url, path });
+    if (privacyResponse) return stamp(privacyResponse);
 
     if (!route) {
       throw new ApiError("NOT_FOUND", "接口不存在", 404);
@@ -74,7 +159,7 @@ export async function handleApiRequest(request, env) {
       return new Response(null, { status: response.status, headers: response.headers });
     }
 
-    return response;
+    return stamp(response);
   } catch (error) {
     if (!(error instanceof ApiError)) {
       console.error(`[api] ${requestId} unhandled:`, error?.stack ?? error);

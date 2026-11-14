@@ -1,0 +1,317 @@
+      /* ---------------- 桌面小组件 ---------------- */
+
+      .widgets {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+      }
+
+      .widget {
+        position: absolute;
+        width: var(--wg-w, 184px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(20, 23, 33, 0.62);
+        backdrop-filter: blur(20px) saturate(1.5);
+        box-shadow:
+          0 12px 32px -14px rgba(0, 0, 0, 0.7),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        pointer-events: auto;
+        overflow: hidden;
+        transition:
+          border-color 0.2s ease,
+          box-shadow 0.2s ease,
+          opacity 0.18s ease;
+        animation: widgetIn 0.3s var(--os-ease);
+      }
+
+      /* 竖向空间不够时，低优先级卡片先收起：保留高度可测量，避免反复跳动 */
+      .widget.is-squeezed {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .widget:hover {
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow:
+          0 18px 40px -16px rgba(0, 0, 0, 0.8),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+
+      .widget.is-dragging {
+        cursor: grabbing;
+        /* 入场动画也会写 transform，拖动时先停掉，避免抢控制权 */
+        animation: none;
+        opacity: 1;
+        border-color: rgba(255, 255, 255, 0.24);
+        box-shadow:
+          0 32px 60px -18px rgba(0, 0, 0, 0.92),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        will-change: transform;
+      }
+
+      @keyframes widgetIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .widget-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 13px 0;
+        cursor: grab;
+        user-select: none;
+        /* 交给指针事件处理，别让浏览器把拖拽当成滚动手势抢走 */
+        touch-action: none;
+      }
+
+      .widget-title {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: rgba(255, 255, 255, 0.62);
+      }
+
+      .widget-grip {
+        font-size: 10px;
+        line-height: 1;
+        color: rgba(255, 255, 255, 0.28);
+        letter-spacing: -2px;
+        transition: color 0.2s ease;
+      }
+
+      .widget:hover .widget-grip {
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .widget-body {
+        padding: 9px 13px 13px;
+      }
+
+      /* 时钟 */
+      .w-time {
+        font-family: var(--font-mono);
+        font-size: 30px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: 0.01em;
+        font-variant-numeric: tabular-nums;
+      }
+      .w-date {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: 2px;
+      }
+
+      /* 日历 */
+      .w-cal-title {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 6px;
+        text-align: center;
+      }
+      .w-cal-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+        text-align: center;
+      }
+      .w-cal-h {
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.35);
+        padding-bottom: 3px;
+      }
+      .w-cal-grid span {
+        font-size: 10px;
+        padding: 3px 0;
+        color: rgba(255, 255, 255, 0.72);
+        border-radius: 4px;
+      }
+      .w-cal-grid span.is-today {
+        background: var(--os-accent);
+        color: #fff;
+        font-weight: 700;
+      }
+
+      /* 天气 */
+      .w-wx-main {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .w-wx-temp {
+        font-family: var(--font-mono);
+        font-size: 24px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .w-wx-desc {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .w-wx-sub {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-top: 4px;
+      }
+      .w-loading {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* 待办 */
+      .w-todo-input {
+        width: 100%;
+        padding: 5px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font: inherit;
+        font-size: 11px;
+        outline: none;
+      }
+      .w-todo-input:focus {
+        border-color: var(--os-accent);
+      }
+      .w-todo-list {
+        list-style: none;
+        margin: 8px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 4px;
+        max-height: 110px;
+        overflow-y: auto;
+      }
+      .w-todo-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .w-todo-check {
+        width: 14px;
+        height: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 10px;
+        line-height: 12px;
+        text-align: center;
+        flex: none;
+      }
+      .w-todo-item.is-done .w-todo-check {
+        background: var(--os-success);
+        border-color: var(--os-success);
+        color: #0a2016;
+      }
+      .w-todo-item.is-done .w-todo-text {
+        text-decoration: line-through;
+        opacity: 0.5;
+      }
+      .w-todo-text {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .w-todo-del {
+        border: 0;
+        background: none;
+        color: rgba(255, 255, 255, 0.35);
+        cursor: pointer;
+        font-size: 13px;
+        padding: 0 2px;
+      }
+      .w-todo-del:hover {
+        color: #ff5f57;
+      }
+      .w-todo-empty {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.35);
+        text-align: center;
+        padding: 8px 0;
+      }
+
+      /* 系统信息 */
+      .w-sys-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10.5px;
+        padding: 3px 0;
+        color: rgba(255, 255, 255, 0.55);
+      }
+      .w-sys-row b {
+        color: #fff;
+        font-weight: 600;
+      }
+
+      /* 短屏（13 寸笔记本 768/800）收紧卡片内部留白，
+         让 5 张卡尽量都能排下；再矮就由 stackWidgets 按优先级收纳 */
+      @media (max-height: 820px) and (min-width: 721px) {
+        :root {
+          --wg-w: 176px;
+        }
+        .widget-head {
+          padding: 8px 12px 0;
+        }
+        .widget-title {
+          font-size: 10.5px;
+        }
+        .widget-body {
+          padding: 7px 12px 10px;
+        }
+        .w-time {
+          font-size: 24px;
+        }
+        .w-cal-title {
+          margin-bottom: 3px;
+        }
+        .w-cal-h {
+          padding-bottom: 1px;
+        }
+        .w-cal-grid span {
+          padding: 1px 0;
+        }
+        .w-wx-temp {
+          font-size: 21px;
+        }
+        .w-todo-list {
+          max-height: 76px;
+          margin-top: 6px;
+        }
+        .w-sys-row {
+          padding: 1px 0;
+        }
+      }
+
+      @media (max-height: 700px) and (min-width: 721px) {
+        :root {
+          --wg-w: 168px;
+        }
+        .w-time {
+          font-size: 23px;
+        }
+        .w-cal-grid {
+          gap: 1px;
+        }
+        .w-cal-grid span {
+          font-size: 9.5px;
+          padding: 1px 0;
+        }
+        .w-todo-list {
+          max-height: 66px;
+        }
+      }
+

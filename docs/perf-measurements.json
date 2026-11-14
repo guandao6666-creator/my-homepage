@@ -1,0 +1,47 @@
+{
+  "measuredAt": "2026-11-05T09:03:59.924Z",
+  "environment": {
+    "browser": "Google Chrome (channel=chrome, Playwright)",
+    "viewport": "1440x900",
+    "throttle": "无（本机直连，非真实移动网络）",
+    "build": "dist（astro build 产物）"
+  },
+  "runs": [
+    {
+      "label": "冷启动（新上下文，无缓存）",
+      "ttfb": 4,
+      "domContentLoaded": 117,
+      "load": 140,
+      "fcp": 348,
+      "lcp": 348,
+      "cls": 0.001,
+      "transferTotal": 1191976,
+      "byType": {
+        "link": 457263,
+        "img": 243256,
+        "script": 489339,
+        "fetch": 1545,
+        "other": 573
+      },
+      "resourceCount": 23
+    },
+    {
+      "label": "二次访问（同一上下文，已缓存）",
+      "ttfb": 4,
+      "domContentLoaded": 54,
+      "load": 64,
+      "fcp": 216,
+      "lcp": 232,
+      "cls": 0.002,
+      "transferTotal": 1545,
+      "byType": {
+        "link": 0,
+        "img": 0,
+        "script": 0,
+        "fetch": 1545,
+        "other": 0
+      },
+      "resourceCount": 22
+    }
+  ]
+}

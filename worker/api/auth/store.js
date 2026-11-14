@@ -80,16 +80,16 @@ export async function touchUserLogin(env, userId) {
 /* OAuth state                                                         */
 /* ------------------------------------------------------------------ */
 
-export async function createOAuthState(env, { intent, verifier }) {
+export async function createOAuthState(env, { intent, verifier, purpose = "auth" }) {
   const state = randomToken(32);
   const stateHash = await sha256Hex(state);
   const now = nowMs();
 
   await env.DB.prepare(
-    `INSERT INTO oauth_states (id, state_hash, code_verifier, intent, expires_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO oauth_states (id, state_hash, code_verifier, intent, purpose, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
-    .bind(crypto.randomUUID(), stateHash, verifier, intent, now + STATE_TTL_MS, now)
+    .bind(crypto.randomUUID(), stateHash, verifier, intent, purpose, now + STATE_TTL_MS, now)
     .run();
 
   // 顺手清理过期记录，避免表无限增长。
@@ -186,10 +186,12 @@ export async function createSessionRow(env, { userId, tokenHash, deviceId, userA
 export async function findSessionByTokenHash(env, tokenHash) {
   return env.DB.prepare(
     `SELECT s.id AS session_id, s.user_id, s.device_id, s.expires_at AS session_expires_at,
-            s.created_at AS session_created_at, s.last_used_at,
+            s.created_at AS session_created_at, s.last_used_at, s.revoked_at AS session_revoked_at,
+            d.revoked_at AS device_revoked_at, d.status AS device_status,
             u.*
        FROM sessions s
        JOIN users u ON u.id = s.user_id
+       LEFT JOIN devices d ON d.id = s.device_id AND d.user_id = s.user_id
       WHERE s.token_hash = ?`,
   )
     .bind(tokenHash)
@@ -210,11 +212,26 @@ export async function deleteSessionByHash(env, tokenHash) {
   await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
 }
 
+/** 撤销而非删除：保留记录用于设备活动与安全审计。 */
+export async function revokeSessionByHash(env, tokenHash, now = nowMs()) {
+  const row = await env.DB.prepare(
+    "SELECT id, user_id, device_id FROM sessions WHERE token_hash = ? AND revoked_at IS NULL",
+  )
+    .bind(tokenHash)
+    .first();
+  if (!row) return null;
+
+  await env.DB.prepare("UPDATE sessions SET revoked_at = ? WHERE id = ?")
+    .bind(now, row.id)
+    .run();
+  return row;
+}
+
 export async function listSessions(env, userId, currentSessionId) {
   const rows = await env.DB.prepare(
     `SELECT id, device_id, user_agent, expires_at, created_at, last_used_at
        FROM sessions
-      WHERE user_id = ? AND expires_at > ?
+      WHERE user_id = ? AND expires_at > ? AND revoked_at IS NULL
       ORDER BY created_at DESC
       LIMIT 20`,
   )
@@ -233,30 +250,57 @@ export async function listSessions(env, userId, currentSessionId) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Devices                                                             */
+/* 清理                                                                */
 /* ------------------------------------------------------------------ */
-
-export async function upsertDevice(env, { deviceId, userId, name, platform }) {
-  const now = nowMs();
-  await env.DB.prepare(
-    `INSERT INTO devices (id, user_id, name, platform, last_seen_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT (id) DO UPDATE SET
-       user_id = excluded.user_id,
-       name = excluded.name,
-       platform = excluded.platform,
-       last_seen_at = excluded.last_seen_at,
-       revoked_at = NULL`,
-  )
-    .bind(deviceId, userId, name, platform, now, now)
-    .run();
-}
 
 export function purgeExpired(env) {
   const cutoff = nowMs();
   return env.DB.batch([
+    // 过期会话直接删除；已撤销的保留 30 天用于审计，再清理。
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(cutoff),
+    env.DB.prepare("DELETE FROM sessions WHERE revoked_at IS NOT NULL AND revoked_at < ?").bind(
+      cutoff - 30 * 24 * 3600 * 1000,
+    ),
     env.DB.prepare("DELETE FROM oauth_states WHERE expires_at < ?").bind(cutoff - 86_400_000),
     env.DB.prepare("DELETE FROM setup_tickets WHERE expires_at < ?").bind(cutoff - 86_400_000),
   ]);
+}
+
+/* ------------------------------------------------------------------ */
+/* 注销前的重新验证票据                                                */
+/* ------------------------------------------------------------------ */
+
+export async function createReauthTicket(env, userId, purpose = "delete") {
+  const token = randomToken(32);
+  const tokenHash = await sha256Hex(token);
+  const now = nowMs();
+
+  await env.DB.prepare("DELETE FROM reauth_tickets WHERE user_id = ? AND consumed_at IS NULL")
+    .bind(userId)
+    .run();
+
+  await env.DB.prepare(
+    `INSERT INTO reauth_tickets (id, user_id, token_hash, purpose, expires_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(crypto.randomUUID(), userId, tokenHash, purpose, now + 10 * 60 * 1000, now)
+    .run();
+
+  return token;
+}
+
+export async function getReauthTicket(env, token) {
+  const hash = await sha256Hex(token);
+  return env.DB.prepare(
+    `SELECT * FROM reauth_tickets
+      WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
+  )
+    .bind(hash, nowMs())
+    .first();
+}
+
+export async function consumeReauthTicket(env, id) {
+  await env.DB.prepare("UPDATE reauth_tickets SET consumed_at = ? WHERE id = ?")
+    .bind(nowMs(), id)
+    .run();
 }

@@ -10,6 +10,21 @@ import path from "node:path";
 const root = path.resolve(process.cwd(), "dist");
 const port = Number(process.argv[2] || 4321);
 
+// 与 worker/index.js 保持一致：手机访问 / 时直接 302 到 /m/，
+// 不把桌面主包发给手机。`?desktop=1` 是底栏「桌面」入口的显式选择。
+const MOBILE_UA = /iPhone|iPod|Android.+Mobile|Windows Phone|Mobi/i;
+
+function mobileCompanionRedirect(req) {
+  if (req.method !== "GET" && req.method !== "HEAD") return null;
+  const url = new URL(req.url || "/", "http://localhost");
+  if (url.pathname !== "/" && url.pathname !== "/index.html") return null;
+  if (url.searchParams.get("desktop") === "1") return null;
+  const hint = req.headers["sec-ch-ua-mobile"];
+  const mobile = hint === "?1" || (hint !== "?0" && MOBILE_UA.test(req.headers["user-agent"] || ""));
+  if (!mobile) return null;
+  return `/m/${url.search}`;
+}
+
 const types = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -46,6 +61,12 @@ async function resolveFile(urlPath) {
 }
 
 createServer(async (req, res) => {
+  const companion = mobileCompanionRedirect(req);
+  if (companion) {
+    res.writeHead(302, { Location: companion, "Cache-Control": "no-store" });
+    res.end();
+    return;
+  }
   const file = await resolveFile(req.url || "/");
   if (!file) {
     const notFound = path.join(root, "404.html");

@@ -139,8 +139,8 @@ const filtered = (): AppMeta[] => {
   const q = state.query.trim().toLowerCase();
   let list = CATALOG.slice();
   if (state.tab === "cat" && state.cat) list = list.filter((m) => m.category === state.cat);
-  if (state.tab === "new") list = list.filter((m) => m.isNew || m.version.startsWith("1.4"));
-  if (state.tab === "updated") list = list.filter((m) => m.version.startsWith("1.4"));
+  if (state.tab === "new") list = list.filter((m) => m.isNew || m.version.startsWith("1.6") || m.version.startsWith("1.4"));
+  if (state.tab === "updated") list = list.filter((m) => m.version.startsWith("1.6") || m.version.startsWith("1.4"));
   if (state.tab === "hot") {
     const stats = readStats();
     list.sort((a, b) => (stats[b.id] ?? 0) - (stats[a.id] ?? 0) || Number(b.featured) - Number(a.featured));
@@ -281,7 +281,7 @@ const discoverView = () => {
   const featured = CATALOG.filter((m) => m.featured).slice(0, 3);
   const hot = filteredHot();
   const fresh = CATALOG.filter((m) => m.isNew || m.release >= "2026-11-01").slice(0, 4);
-  const updated = CATALOG.filter((m) => m.version.startsWith("1.4")).slice(0, 4);
+  const updated = CATALOG.filter((m) => m.version.startsWith("1.6") || m.version.startsWith("1.4")).slice(0, 4);
   return `
     <div class="g14-store-scroll">
       ${heroCard(META_BY_ID.playground ?? featured[0])}

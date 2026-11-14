@@ -13,6 +13,7 @@
  */
 
 import { json } from "./http.js";
+import { WORKER_VERSION, RELEASE_NAME, VERSION_HEADER } from "./version.js";
 
 const D1_TIMEOUT_MS = 2000;
 const R2_TIMEOUT_MS = 2000;
@@ -34,12 +35,15 @@ export async function healthHandler({ env }) {
     {
       success: healthy,
       status: healthy ? "ok" : "degraded",
+      // 1.9：带上版本号，任何一次线上请求都能对应到具体发布
+      version: WORKER_VERSION,
+      releaseName: RELEASE_NAME,
       services,
       details: { d1: d1.details, r2: r2.details },
       checkedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
     },
-    { status: healthy ? 200 : 503 },
+    { status: healthy ? 200 : 503, headers: { [VERSION_HEADER]: WORKER_VERSION } },
   );
 }
 

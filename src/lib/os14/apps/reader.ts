@@ -19,6 +19,7 @@ import {
   uid,
   type Ctx,
 } from "../core";
+import { sendToDevice } from "../../continuity/ui";
 
 export type Book = {
   id: string;
@@ -75,6 +76,7 @@ const body = () => `
           <button type="button" data-rd-font="+">A＋</button>
           <button type="button" data-rd-tone>☀</button>
           <button type="button" data-rd-mark>书签</button>
+          <button type="button" data-rd-send title="发送阅读位置到设备">⇥</button>
         </div>
       </header>
       <div class="rd14-progress"><i data-rd-bar></i></div>
@@ -178,6 +180,21 @@ export const initReader = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
   win.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
+
+    if (t.closest("[data-rd-send]")) {
+      const book = st.books.find((item) => item.id === currentId);
+      if (!book) {
+        ctx.toast("先在左侧选一本书");
+        return;
+      }
+      void sendToDevice(ctx, {
+        itemType: "reading",
+        title: book.title,
+        resourceId: book.id,
+        payload: { title: book.title, progress: book.progress },
+      });
+      return;
+    }
     if (t.closest("[data-rd-import]")) {
       pickFile(".txt,.md,.markdown,text/plain,text/markdown", true, async (files) => {
         let ok = 0;

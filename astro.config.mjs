@@ -14,6 +14,13 @@ export default defineConfig({
     inlineStylesheets: "auto",
   },
   vite: {
+    define: {
+      // 2.0：构建时间与构建号在编译时注入（更新中心展示真实构建信息，不伪造）
+      __GUANDAO_BUILD_AT__: JSON.stringify(new Date().toISOString()),
+      __GUANDAO_BUILD_ID__: JSON.stringify(
+        `${Date.now().toString(36)}-${process.env.GITHUB_SHA?.slice(0, 7) ?? "local"}`,
+      ),
+    },
     build: {
       // 降到 es2019：Safari 13 和部分国产浏览器解析不了 ??= 这类 ES2021 语法，
       // 一旦解析失败整段脚本都不执行，页面会永远停在「正在加载」。

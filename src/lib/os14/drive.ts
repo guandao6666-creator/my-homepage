@@ -5,7 +5,13 @@
  * 这里所有数据来自 /api/files，文件本体在 R2，元数据在 D1。
  */
 
+// 1.9：应用样式跟着应用代码一起按需加载，不再压进首屏 CSS
+import { safeUrl } from "../html";
+import "../../styles/drive.css";
 import { escapeHtml, fmtBytes, fmtDateTime, modal } from "./core";
+import { reportDriveSync } from "../devices/client";
+import { sendToDevice } from "../continuity/ui";
+import type { Ctx } from "./core";
 
 type DriveFile = {
   id: string;
@@ -110,7 +116,7 @@ export const renderDrive = () => `
   </div>
 `;
 
-export const initDrive = (win: HTMLElement): (() => void) => {
+export const initDrive = (win: HTMLElement, ctx?: Ctx): (() => void) => {
   const root = win.querySelector<HTMLElement>("[data-drive]");
   if (!root) return () => undefined;
 
@@ -188,8 +194,14 @@ export const initDrive = (win: HTMLElement): (() => void) => {
       allFolders = (await api<{ folders: DriveFolder[] }>("/api/files/folders")).folders || [];
       await loadQuota();
       render();
+      // 真实完成一次云端读取后上报同步结果；失败不会影响文件浏览。
+      void reportDriveSync({ result: "success" });
     } catch (error) {
       grid.innerHTML = `<div class="cdrv-empty"><span>⚠</span><p>${escapeHtml(error instanceof Error ? error.message : "加载失败")}</p><button type="button" data-refresh>重试</button></div>`;
+      void reportDriveSync({
+        result: "failed",
+        message: error instanceof Error ? error.message : "云端读取失败",
+      });
     } finally {
       loading = false;
     }
@@ -258,7 +270,7 @@ export const initDrive = (win: HTMLElement): (() => void) => {
     const fileCards = items.map((file) => {
       const thumb =
         file.category === "image"
-          ? `<img src="/api/files/${file.id}/content" alt="" loading="lazy" />`
+          ? `<img src="${safeUrl(`/api/files/${file.id}/content`)}" alt="" loading="lazy" />`
           : `<span class="di-glyph ${iconFor(file)}"></span>`;
       return `<article class="cdrv-card" data-file="${file.id}" draggable="true">
         <div class="cdrv-thumb">${thumb}${file.isFavorite ? '<i class="cdrv-star">★</i>' : ""}</div>
@@ -371,6 +383,7 @@ export const initDrive = (win: HTMLElement): (() => void) => {
     const buttons: Array<[string, string]> = type === "file"
       ? [
           ["preview", "预览"],
+          ["send", "发送到设备"],
           ["download", "下载"],
           ["rename", "重命名"],
           ["favorite", item.isFavorite ? "取消收藏" : "收藏"],
@@ -403,6 +416,25 @@ export const initDrive = (win: HTMLElement): (() => void) => {
   };
 
   const handleAction = async (type: "file" | "folder", item: DriveFile | DriveFolder, action: string) => {
+    if (type === "file" && action === "send") {
+      const file = item as DriveFile;
+      if (!ctx) {
+        toast("当前环境不支持接力", true);
+        return;
+      }
+      void sendToDevice(ctx, {
+        itemType: "file",
+        title: file.name,
+        resourceId: file.id,
+        payload: {
+          name: file.name,
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          category: file.category,
+        },
+      });
+      return;
+    }
     if (type === "folder") {
       if (action === "open") {
         folderId = item.id;
@@ -479,10 +511,10 @@ export const initDrive = (win: HTMLElement): (() => void) => {
   const preview = async (file: DriveFile) => {
     const url = `/api/files/${file.id}/content`;
     let content = "";
-    if (file.category === "image") content = `<img class="cdrv-prev-img" src="${url}" alt="${escapeHtml(file.name)}" />`;
-    else if (file.category === "audio") content = `<audio class="cdrv-prev-audio" controls src="${url}"></audio>`;
-    else if (file.category === "video") content = `<video class="cdrv-prev-video" controls src="${url}"></video>`;
-    else if (file.mimeType === "application/pdf") content = `<iframe class="cdrv-prev-pdf" src="${url}" title="PDF"></iframe>`;
+    if (file.category === "image") content = `<img class="cdrv-prev-img" src="${safeUrl(url, { allowBlob: true, allowData: true })}" alt="${escapeHtml(file.name)}" />`;
+    else if (file.category === "audio") content = `<audio class="cdrv-prev-audio" controls src="${safeUrl(url, { allowBlob: true, allowData: true })}"></audio>`;
+    else if (file.category === "video") content = `<video class="cdrv-prev-video" controls src="${safeUrl(url, { allowBlob: true, allowData: true })}"></video>`;
+    else if (file.mimeType === "application/pdf") content = `<iframe class="cdrv-prev-pdf" src="${safeUrl(url, { allowBlob: true })}" title="PDF"></iframe>`;
     else if (file.mimeType.startsWith("text/")) {
       const text = await fetch(url, { credentials: "same-origin" }).then((response) => response.text()).catch(() => "");
       content = `<pre class="cdrv-prev-text">${escapeHtml(text.slice(0, 20000))}</pre>`;

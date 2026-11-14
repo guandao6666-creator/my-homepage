@@ -37,17 +37,15 @@ import { SITE } from "../lib/site";
 
 <script>
   import { cloudConfig, listCloudNotes, type CloudNote } from "../lib/cloud";
+    // 2.3：HTML 转义统一入口
+    import { escapeHtml } from "../lib/html";
 
   (() => {
     const feed = document.getElementById("note-feed");
     const state = document.getElementById("note-state");
     if (!feed || !state) return;
 
-    const escapeHtml = (text: string) =>
-      String(text).replace(
-        /[&<>"]/g,
-        (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string,
-      );
+    // 2.3：escapeHtml 已统一到 ../lib/html.ts，此处不再保留本地副本
 
     /** 纯文本 + 自动识别链接 */
     const renderBody = (text: string) =>

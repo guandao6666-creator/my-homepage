@@ -1,0 +1,213 @@
+# Guandao OS · 质量门禁（2.0）
+#
+# 触发：向 main 提交 / 发起 PR / 手动。
+# 目标：任何「类型错误、单元测试失败、版本号漂移、迁移冲突、CSP 哈希漂移、构建失败」
+# 都不允许进入 main。
+#
+# 边界：
+# - 不保存任何 Cloudflare / GitHub / Supabase 密钥；
+# - 不做自动部署：生产发布仍是人工执行 `npm run cf:deploy`（见 docs/RELEASE-2.0.md）；
+# - 现有 auto-publish / comment-notify 两个定时任务不受影响。
+
+name: quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck / Unit / Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Version consistency
+        run: npm run check:version
+
+      - name: Migration static check
+        run: npm run check:migrations
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Unused direct dependencies
+        run: npm run check:unused
+
+      - name: Astro template type check
+        run: npm run check:astro
+
+      - name: ESLint (security rules)
+        run: npm run lint
+
+      - name: Unit tests (vitest)
+        run: npm run test:unit
+
+      - name: QA cleanup guard tests
+        run: npm run test:qa-cleanup
+
+      - name: Security protection tests (backup / monitor / logging)
+        run: npm run security:test
+
+      - name: Build (astro build + CSP hashes)
+        run: npm run build
+
+      - name: CSP hashes match dist
+        # 2.0：必须校验哈希与 dist 一致，而不只是「非空」。
+        # 否则「没先 build 就 deploy」会让线上白屏，而 CI 仍然是绿的。
+        run: npm run check:csp
+
+      - name: Verify Worker syntax
+        run: |
+          node --check worker/index.js
+          node --check worker/api/router.js
+          node --check worker/api/auth/handlers.js
+          node --check worker/api/backups/store.js
+
+      - name: Apply D1 migrations against local D1
+        run: npx wrangler d1 migrations apply guandao-db --local
+        env:
+          WRANGLER_SEND_METRICS: "false"
+          CI: "true"
+
+      - name: Upload build output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  api:
+    name: API smoke (wrangler dev --local)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: verify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Apply D1 migrations (local)
+        run: npx wrangler d1 migrations apply guandao-db --local
+        env:
+          WRANGLER_SEND_METRICS: "false"
+          CI: "true"
+
+      - name: Start Worker
+        # 本地 Worker 只用于接口回归：不需要真实 OAuth / R2 凭据
+        run: |
+          npx wrangler dev --local --port 8787 > /tmp/wrangler.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8787/api/health > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "Worker 未在 60 秒内就绪"; tail -50 /tmp/wrangler.log; exit 1
+        env:
+          WRANGLER_SEND_METRICS: "false"
+          CI: "true"
+
+      - name: API smoke assertions
+        run: |
+          set -e
+          health=$(curl -s http://127.0.0.1:8787/api/health)
+          echo "$health" | grep -q '"version":"2.0.0"'
+          echo "$health" | grep -q '"services"'
+          # 未登录访问用户数据必须是 401，不能是 200
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/api/files)
+          test "$code" = "401"
+          # 未知接口必须是 JSON 404
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/api/does-not-exist)
+          test "$code" = "404"
+          # 代理只放行 /rest|auth|storage/v1
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/sb/anything)
+          test "$code" = "404"
+          # 版本响应头
+          curl -sI http://127.0.0.1:8787/api/health | grep -qi 'x-guandao-version: 2.0.0'
+          echo "API smoke ok"
+
+      - name: Worker log on failure
+        if: failure()
+        run: tail -100 /tmp/wrangler.log || true
+
+      - name: Sync API QA (own wrangler on :8791)
+        # 云同步是 2.0 唯一新增的跨设备数据通道：乐观锁、墓碑、用户隔离
+        # 都必须在真实 HTTP + 真实 D1 上验证，单元测试覆盖不到。
+        run: npm run qa:sync
+
+  e2e:
+    name: E2E (Playwright + Chrome)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: verify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Firefox / WebKit engines
+        # e2e project 现在覆盖三个浏览器族群：Chrome（channel: "chrome"，运行器自带）、
+        # Firefox（firefox-worker）、WebKit（webkit-worker，Safari 家族引擎，≠ 真机 Safari）。
+        # 只装这两个；Chrome 继续用运行器自带版本，避免额外下载。
+        run: npx playwright install --with-deps firefox webkit
+
+      - name: Run E2E
+        # 四个 project 全部在这里跑：chromium（静态 dist UI）、worker（8788 真实 Worker：
+        # 签名 / 沙箱 / 设备 / OAuth）、firefox-worker、webkit-worker（device.spec.ts）。
+        # worker project 的 e2e-server 会自行迁移本地 D1 并生成夹具，无需额外 step。
+        run: npm run test:e2e
+        env:
+          CI: "true"
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            test-results
+            playwright-report
+          retention-days: 7

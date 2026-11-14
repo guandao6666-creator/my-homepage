@@ -9,6 +9,14 @@
 /404.html
   Cache-Control: no-store
 
+# Service Worker 必须每次校验，否则旧版本会一直占着 scope
+/sw.js
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /
+
+/manifest.webmanifest
+  Content-Type: application/manifest+json; charset=utf-8
+
 # Astro 产出的带哈希资源，内容一变文件名就变，可以长期缓存
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable

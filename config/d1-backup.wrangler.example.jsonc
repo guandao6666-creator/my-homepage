@@ -1,0 +1,44 @@
+// Guandao OS · D1 独立备份资源示例（不要直接部署本文件）
+//
+// 用途：项目所有者创建独立 R2 Bucket 与 D1 只读 Token 后，把以下片段合并进
+// `wrangler.jsonc`，再执行一次人工确认的部署。
+//
+// 本任务未修改 wrangler.jsonc、未创建 Bucket、未创建 Token、未部署。
+//
+// 必需人工操作：
+// 1. 创建私有 R2 Bucket：guandao-db-backups（禁止公开访问）
+// 2. 创建 D1 导出用 API Token（最小权限，见 docs/operations/D1-BACKUP.md）
+// 3. wrangler secret put D1_REST_API_TOKEN
+// 4. wrangler secret put BACKUP_ENCRYPTION_KEY
+// 5. 可选：wrangler secret put BACKUP_ALERT_WEBHOOK
+// 6. 合并以下配置并人工部署
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+
+  // 非敏感配置；DATABASE_ID 与当前 wrangler.jsonc 一致
+  "vars": {
+    "ACCOUNT_ID": "e40e3f33f13aabaae2c6da6c36b38749",
+    "DATABASE_ID": "9c89b111-bd89-47a6-8615-2c838993ede5",
+    "DATABASE_NAME": "guandao-db"
+  },
+
+  // 每日 UTC 19:00 由主 Worker Cron 调用 env.BACKUP_WORKFLOW.create()。
+// 不要在这里配置 Workflows "schedules"：当前账号是免费 Workers 计划，
+// Cloudflare 会拒绝 scheduled Workflows。主配置增加：
+//   "triggers": { "crons": ["*/15 * * * *", "0 19 * * *"] }
+  "workflows": [
+    {
+      "name": "guandao-d1-backup",
+      "binding": "BACKUP_WORKFLOW",
+      "class_name": "D1BackupWorkflow"
+    }
+  ],
+
+  // 独立 Bucket；不得复用 guandao-files
+  "r2_buckets": [
+    {
+      "binding": "DB_BACKUPS",
+      "bucket_name": "guandao-db-backups"
+    }
+  ]
+}

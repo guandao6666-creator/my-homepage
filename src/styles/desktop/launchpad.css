@@ -1,0 +1,261 @@
+      /* ---------------- 启动台（全屏应用网格） ---------------- */
+      .launchpad {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        display: flex;
+        flex-direction: column;
+        padding: calc(env(safe-area-inset-top, 0px) + 22px) 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+        /* 底色够实，桌面图标和窗口不会从背后透出来糊成一片 */
+        background:
+          radial-gradient(120% 90% at 50% 0%, rgba(38, 42, 62, 0.97), rgba(8, 10, 17, 0.97) 70%),
+          #080a11;
+        backdrop-filter: blur(30px) saturate(1.2);
+        -webkit-backdrop-filter: blur(30px) saturate(1.2);
+        overflow-y: auto;
+        animation: lp-in 0.18s ease;
+      }
+      .launchpad[hidden] {
+        display: none;
+      }
+      @keyframes lp-in {
+        from { opacity: 0; transform: scale(1.04); }
+        to { opacity: 1; transform: none; }
+      }
+      .lp-close {
+        position: fixed;
+        z-index: 6;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        right: 16px;
+        width: 36px;
+        height: 36px;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      .lp-inner {
+        margin: auto 0;
+        width: 100%;
+        max-width: 880px;
+        align-self: center;
+      }
+      .lp-grid {
+        display: grid;
+        /* 列数由 JS 写进 --lp-cols：默认 7 列正好 3 行排满 21 个应用 */
+        grid-template-columns: repeat(var(--lp-cols, 7), minmax(0, 1fr));
+        gap: 32px 10px;
+        justify-items: center;
+      }
+      /* 最后一行只剩一个图标时居中摆放，避免孤零零挂在最左边 */
+      .lp-grid.is-orphan > .lp-icon:last-child {
+        grid-column: 2 / -2;
+      }
+      .lp-icon {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        max-width: 120px;
+        padding: 10px 6px;
+        border: 0;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.92);
+        cursor: pointer;
+        border-radius: 16px;
+        /* 竖向滑动交给浏览器滚动，横向不抢；长按后才由脚本接管拖动 */
+        touch-action: pan-y;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+        transition:
+          background-color 0.18s ease,
+          transform 0.18s var(--os-ease);
+      }
+      .lp-icon:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-2px);
+      }
+      .lp-icon:active {
+        background: rgba(255, 255, 255, 0.12);
+        transform: scale(0.97);
+      }
+      .lp-icon .di-glyph {
+        zoom: 2; /* 34 → 68px，启动台是「大图标」场景 */
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+      }
+      .lp-label {
+        font-size: 12.5px;
+        line-height: 1.3;
+        max-width: 100%;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      }
+      /* 手机上启动台用 4 列，图标小一号，21 个应用正好排进一屏 */
+      @media (max-width: 720px) {
+        .lp-inner {
+          max-width: 100%;
+        }
+        /* 手机上应用多到要滚动，标题栏吸顶，图标不会从标题上方露出来 */
+        .lp-top {
+          position: sticky;
+          top: calc(-22px - env(safe-area-inset-top, 0px));
+          z-index: 4;
+          margin: calc(-22px - env(safe-area-inset-top, 0px)) -20px 14px;
+          padding: calc(30px + env(safe-area-inset-top, 0px)) 62px 12px 20px;
+          background: linear-gradient(180deg, #0a0c13 0%, #0a0c13 calc(100% - 12px), rgba(10, 12, 19, 0));
+        }
+        .launchpad {
+          /* 应用变多时靠滚动查看，底部留白把最后一行托出来 */
+          padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 36px);
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+        }
+        .lp-grid {
+          gap: 18px 6px;
+        }
+        .lp-icon {
+          gap: 8px;
+          max-width: 88px;
+          padding: 8px 4px;
+          border-radius: 14px;
+        }
+        .lp-icon .di-glyph {
+          zoom: 1.47; /* 34 → 50px */
+        }
+        .lp-label {
+          font-size: 11.5px;
+        }
+      }
+      /* 启动台顶栏（标题 / 完成 / 恢复默认） */
+      .lp-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding-right: 46px;
+      }
+      .lp-title {
+        font-size: 17px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .lp-top-actions { display: flex; gap: 8px; }
+      .lp-done,
+      .lp-reset {
+        border: 0;
+        border-radius: 999px;
+        padding: 7px 16px;
+        font-size: 13px;
+        line-height: 1;
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        cursor: pointer;
+      }
+      .lp-done { background: #2f7cf6; }
+      .lp-done:hover,
+      .lp-reset:hover { filter: brightness(1.08); }
+      .lp-hint {
+        margin: 16px auto 0;
+        text-align: center;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      /* 图标内的移除角标（仅编辑态显示） */
+      .lp-icon { position: relative; }
+      .lp-remove {
+        position: absolute;
+        top: -5px;
+        left: -5px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ff3b30;
+        color: #fff;
+        border: 0;
+        font-size: 11px;
+        line-height: 20px;
+        text-align: center;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        z-index: 2;
+      }
+      .lp-editing .lp-remove { display: flex; }
+      /* 拖拽时的占位符 */
+      .lp-ph {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1.5px dashed rgba(255, 255, 255, 0.45);
+      }
+      .lp-ph .di-glyph,
+      .lp-ph .lp-label,
+      .lp-ph .lp-remove { visibility: hidden; }
+      /* 正在被拖动的图标 */
+      .lp-icon.lp-dragging {
+        transform: scale(1.12);
+        box-shadow: 0 16px 38px rgba(0, 0, 0, 0.55);
+        transition: none;
+        touch-action: none;
+      }
+      /* 编辑态：图标轻微抖动（被拖动的那个不抖） */
+      .lp-editing .lp-icon:not(.lp-dragging) {
+        animation: lp-jiggle 0.32s ease-in-out infinite;
+      }
+      @keyframes lp-jiggle {
+        0%, 100% { transform: rotate(-1.2deg); }
+        50% { transform: rotate(1.2deg); }
+      }
+      /* 启动台触发图标（dock 上的 2×2 点阵） */
+      .di-grid {
+        background:
+          radial-gradient(circle at 33% 33%, #fff 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 67% 33%, #fff 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 33% 67%, #fff 0 2.4px, transparent 2.6px),
+          radial-gradient(circle at 67% 67%, #fff 0 2.4px, transparent 2.6px),
+          rgba(255, 255, 255, 0.14);
+      }
+      .di-grid::before,
+      .di-grid::after { content: none; }
+
+      /* 桌面模式下，手机浮动窗口标题栏增大触摸热区、禁止拖动时页面滚动 */
+      body.is-touch-desktop .titlebar {
+        touch-action: none;
+        height: 46px;
+        padding: 0 12px;
+      }
+      body.is-touch-desktop .dots {
+        gap: 12px;
+      }
+      body.is-touch-desktop .dot {
+        width: 14px;
+        height: 14px;
+      }
+      /* 视觉仍是小球，热区向外扩 6px，拇指不用瞄 */
+      body.is-touch-desktop .dot::after {
+        content: "";
+        position: absolute;
+        inset: -6px;
+        border-radius: 50%;
+      }
+      body.is-touch-desktop .resize-handle {
+        width: 28px;
+        height: 28px;
+      }
+      body.is-touch-desktop .desk-icon {
+        min-height: 64px;
+        width: 100%;
+      }
+
+      @media (max-width: 360px) {
+        .lp-grid { --lp-cols: 3; }
+      }
+

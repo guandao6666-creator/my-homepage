@@ -71,7 +71,7 @@ export type PlayerSnapshot = {
 
 class MusicCore {
   private state: MusicState;
-  private audio: Audio | null = null;
+  private audio: HTMLAudioElement | null = null;
   private listeners = new Set<(s: PlayerSnapshot) => void>();
   private objectUrl: string | null = null;
   private loading = false;
@@ -101,7 +101,7 @@ class MusicCore {
     }
   }
 
-  private ensureAudio(): Audio {
+  private ensureAudio(): HTMLAudioElement {
     if (this.audio) return this.audio;
     const audio = new Audio();
     audio.preload = "metadata";

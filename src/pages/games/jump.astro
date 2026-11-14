@@ -236,8 +236,8 @@ import Icon from "../../components/Icon.astro";
     }
 
     function updateScore() {
-      scoreEl.textContent = String(score);
-      bestEl.textContent = `最高 ${best}`;
+      if (scoreEl) scoreEl.textContent = String(score);
+      if (bestEl) bestEl.textContent = `最高 ${best}`;
     }
 
     /* ---------------- 跳跃 ---------------- */

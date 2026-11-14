@@ -1,0 +1,539 @@
+      /* ---------------- 桌面 ---------------- */
+
+      .desk {
+        position: absolute;
+        inset: 36px 0 0;
+      }
+
+      .desk-icons {
+        position: absolute;
+        top: 22px;
+        left: 20px;
+        display: grid;
+        /* 列数由 JS 按可用高度算好后写进 --di-rows：
+           先竖向排满一列，再往右开新列，永远不会溢出屏幕 */
+        grid-auto-flow: column;
+        grid-template-rows: repeat(var(--di-rows, 7), min-content);
+        grid-auto-columns: 78px;
+        gap: 12px 4px;
+        align-content: start;
+        justify-content: start;
+      }
+
+      .desk-icon {
+        width: 78px;
+        display: grid;
+        justify-items: center;
+        align-content: start;
+        gap: 8px;
+        padding: 8px 6px 7px;
+        border: 0;
+        border-radius: 14px;
+        background: none;
+        color: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition:
+          background-color 0.2s ease,
+          box-shadow 0.2s ease,
+          transform 0.2s var(--os-ease);
+      }
+
+      .desk-icon .di-glyph {
+        zoom: 1.294; /* 34 → 44px */
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.28));
+        transition:
+          transform 0.2s var(--os-ease),
+          filter 0.2s ease;
+      }
+
+      /* 悬停：整格给出可点区域，图形单独浮起，层次比单纯变色清晰 */
+      .desk-icon:hover {
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .desk-icon:hover .di-glyph {
+        transform: translateY(-2px) scale(1.05);
+        filter: drop-shadow(0 8px 15px rgba(0, 0, 0, 0.38));
+      }
+
+      .desk-icon:active {
+        transform: scale(0.96);
+      }
+
+      .desk-icon:active .di-glyph {
+        transform: scale(0.98);
+      }
+
+      .desk-icon:focus-visible {
+        outline: 2px solid rgba(143, 166, 255, 0.9);
+        outline-offset: 1px;
+      }
+
+      a.desk-icon {
+        text-decoration: none;
+        color: inherit;
+      }
+
+      /* 图标基准尺寸：内部所有 ::before/::after 都按 34px 画。
+         桌面 44 / 程序坞 44 / 启动台 68 都靠 zoom 等比放大，
+         保证同一套图形在任何位置都长得一样。 */
+      .di-glyph {
+        --di-base: 34px;
+        width: var(--di-base);
+        height: var(--di-base);
+        border-radius: 8px; /* 34px 下约 23%，接近系统图标比例 */
+        position: relative;
+        box-sizing: border-box;
+        flex: none;
+        overflow: hidden;
+        /* 统一材质：顶部高光 + 内侧一圈极淡描边 + 底部压暗，
+           避免有的图标有立体感、有的扁平 */
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.32),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+      }
+
+      .di-label {
+        font-size: 11.5px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        line-height: 1.3;
+        max-width: 100%;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: rgba(255, 255, 255, 0.9);
+        text-shadow:
+          0 1px 2px rgba(0, 0, 0, 0.72),
+          0 0 12px rgba(0, 0, 0, 0.32);
+      }
+
+      /* 大屏（2K/4K）上图标和卡片都放大一档，否则整片桌面会显得空 */
+      @media (min-width: 1700px) {
+        :root {
+          --wg-w: 196px;
+        }
+        .desk-icons {
+          grid-auto-columns: 88px;
+        }
+        .desk-icon {
+          width: 88px;
+        }
+        .desk-icon .di-glyph {
+          zoom: 1.53; /* 34 → 52px */
+        }
+        .di-label {
+          font-size: 12px;
+        }
+      }
+
+      /* 图标：文件夹 */
+      .di-folder {
+        background: linear-gradient(180deg, #7fa6ff 0%, #4a6df0 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      }
+      .di-folder::before {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 7px;
+        width: 15px;
+        height: 5px;
+        border-radius: 2px 2px 0 0;
+        background: rgba(255, 255, 255, 0.55);
+      }
+      .di-folder::after {
+        content: "";
+        position: absolute;
+        inset: 11px 5px 6px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.88);
+      }
+
+      /* 图标：人 */
+      .di-person {
+        background: linear-gradient(180deg, #93b6e4 0%, #4f6a94 100%);
+      }
+      .di-person::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 7px;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.9);
+        transform: translateX(-50%);
+      }
+      .di-person::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: 6px;
+        width: 20px;
+        height: 12px;
+        border-radius: 10px 10px 3px 3px;
+        background: rgba(255, 255, 255, 0.9);
+        transform: translateX(-50%);
+      }
+
+      /* 图标：终端 */
+      .di-term {
+        background: linear-gradient(180deg, #2f3444 0%, #171a24 100%);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .di-term::before {
+        content: ">_";
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 13px;
+        color: #7ef0b0;
+      }
+
+      /* 图标：唱片 */
+      .di-music {
+        background: linear-gradient(140deg, #ff9ec2 0%, #a83f74 100%);
+      }
+      .di-music::before {
+        content: "";
+        position: absolute;
+        inset: 8px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .di-music::after {
+        content: "";
+        position: absolute;
+        inset: 15px;
+        border-radius: 50%;
+        background: #a83f74;
+      }
+
+      /* 图标：奖杯 */
+      .di-ach {
+        background: linear-gradient(160deg, #ffd479 0%, #d1902a 100%);
+      }
+      .di-ach::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 7px;
+        width: 16px;
+        height: 15px;
+        border-radius: 0 0 9px 9px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .di-ach::after {
+        content: "";
+        position: absolute;
+        left: 13px;
+        bottom: 7px;
+        width: 8px;
+        height: 7px;
+        border-radius: 0 0 2px 2px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+
+      /* 图标：水母 */
+      .di-tank {
+        background: linear-gradient(160deg, #66d6ff 0%, #1a72b8 100%);
+      }
+      .di-tank::before {
+        content: "";
+        position: absolute;
+        left: 8px;
+        top: 8px;
+        width: 18px;
+        height: 13px;
+        border-radius: 9px 9px 5px 5px;
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .di-tank::after {
+        content: "";
+        position: absolute;
+        left: 12px;
+        top: 21px;
+        width: 10px;
+        height: 7px;
+        border-radius: 0 0 6px 6px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      /* 图标：头像墙 */
+      .di-wall {
+        background: linear-gradient(160deg, #ffb47a 0%, #d9603a 100%);
+      }
+      .di-wall::before {
+        content: "";
+        position: absolute;
+        inset: 7px;
+        background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 3.2px, transparent 3.6px);
+        background-size: 10px 10px;
+      }
+
+      /* 图标：柱状排行 */
+      .di-rank {
+        background: linear-gradient(160deg, #8ee6a8 0%, #2f9a5e 100%);
+      }
+      .di-rank::before {
+        content: "";
+        position: absolute;
+        left: 8px;
+        bottom: 8px;
+        width: 5px;
+        height: 8px;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow:
+          7px -5px 0 rgba(255, 255, 255, 0.95),
+          14px -11px 0 rgba(255, 255, 255, 0.95);
+      }
+
+      /* 图标：礼物盒 */
+      .di-draw {
+        background: linear-gradient(160deg, #ff7a86 0%, #c02848 100%);
+      }
+      .di-draw::before {
+        content: "";
+        position: absolute;
+        inset: 12px 6px 6px;
+        border-radius: 2px;
+        background:
+          linear-gradient(#c02848, #c02848) center / 4px 100% no-repeat,
+          linear-gradient(#c02848, #c02848) center / 100% 4px no-repeat,
+          rgba(255, 255, 255, 0.94);
+      }
+      .di-draw::after {
+        content: "";
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        top: 8px;
+        height: 4px;
+        border-radius: 1px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+
+      /* 图标：投票箱 */
+      .di-vote {
+        background: linear-gradient(160deg, #a78bfa 0%, #6d28d9 100%);
+      }
+      .di-vote::before {
+        content: "";
+        position: absolute;
+        left: 7px;
+        top: 13px;
+        width: 20px;
+        height: 12px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .di-vote::after {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 9px;
+        width: 12px;
+        height: 3px;
+        border-radius: 1px;
+        background: #6d28d9;
+      }
+
+      /* 图标：树洞 */
+      .di-hole {
+        background: linear-gradient(160deg, #cfe0a8 0%, #7f9955 100%);
+      }
+      .di-hole::before {
+        content: "";
+        position: absolute;
+        left: 8px;
+        top: 9px;
+        width: 18px;
+        height: 16px;
+        border-radius: 50%;
+        /* 纯深色 + 左上内阴影，读起来才像「挖出来的洞」而不是一颗球 */
+        background: #0c0805;
+        box-shadow:
+          inset 2px 3px 5px rgba(0, 0, 0, 0.95),
+          inset -1px -1px 2px rgba(255, 255, 255, 0.07),
+          0 0 0 1.5px rgba(255, 255, 255, 0.3);
+      }
+
+      /* 图标：电视机 */
+      .di-tv {
+        background: linear-gradient(160deg, #7dd3fc 0%, #0369a1 100%);
+      }
+      .di-tv::before {
+        content: "";
+        position: absolute;
+        inset: 11px 5px 7px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.94);
+      }
+      .di-tv::after {
+        content: "";
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        top: 14px;
+        bottom: 10px;
+        border-radius: 1px;
+        background: #0369a1;
+      }
+
+      /* 图标：网络 */
+      .di-net {
+        background: linear-gradient(160deg, #f0abfc 0%, #7e22ce 100%);
+      }
+      .di-net::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 9px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow:
+          9px 5px 0 rgba(255, 255, 255, 0.95),
+          2px 13px 0 rgba(255, 255, 255, 0.95);
+      }
+      .di-net::after {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 12px;
+        width: 11px;
+        height: 9px;
+        border-top: 1.5px solid rgba(255, 255, 255, 0.45);
+        border-right: 1.5px solid rgba(255, 255, 255, 0.45);
+        transform: skewY(-32deg);
+      }
+
+      /* 图标：齿轮 */
+      .di-gear {
+        background: linear-gradient(180deg, #a9b4c9 0%, #6b7688 100%);
+      }
+      .di-gear::before {
+        content: "";
+        position: absolute;
+        inset: 9px;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.9);
+      }
+      .di-gear::after {
+        content: "";
+        position: absolute;
+        inset: 15px;
+        border-radius: 50%;
+        background: rgba(40, 44, 56, 0.9);
+      }
+
+      /* 图标：房子 */
+      .di-home {
+        background: linear-gradient(180deg, #8fd8a8 0%, #3f9a68 100%);
+      }
+      .di-home::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 7px;
+        width: 16px;
+        height: 16px;
+        background: rgba(255, 255, 255, 0.92);
+        transform: translateX(-50%) rotate(45deg);
+        border-radius: 2px;
+      }
+      .di-home::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: 6px;
+        width: 16px;
+        height: 11px;
+        background: rgba(255, 255, 255, 0.92);
+        transform: translateX(-50%);
+        border-radius: 0 0 3px 3px;
+      }
+
+      .desk-hint {
+        position: absolute;
+        left: 50%;
+        bottom: 110px;
+        transform: translateX(-50%);
+        margin: 0;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.36);
+        transition: opacity 0.4s ease;
+      }
+
+      /* ---------------- 桌面宠物 ---------------- */
+
+      .desk-pet {
+        position: absolute;
+        /* 让开右侧小组件栏，避免默认位置压住「系统信息」卡片 */
+        right: calc(var(--wg-w, 184px) + 40px);
+        bottom: 100px;
+        z-index: 24;
+        width: 86px;
+        height: 122px;
+        cursor: grab;
+        touch-action: none;
+        transition: transform 0.2s ease;
+      }
+
+      .desk-pet:hover {
+        transform: translateY(-3px);
+      }
+
+      .desk-pet.is-dragging {
+        cursor: grabbing;
+        transition: none;
+      }
+
+      .pet-img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-drag: none;
+        filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.55));
+      }
+
+      .pet-say {
+        position: absolute;
+        right: 8px;
+        bottom: calc(100% + 4px);
+        max-width: 156px;
+        margin: 0;
+        padding: 6px 10px;
+        border-radius: 10px 10px 2px 10px;
+        background: #f5f7fc;
+        box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.7);
+        font-size: 11.5px;
+        line-height: 1.5;
+        color: #171a22;
+        white-space: nowrap;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        pointer-events: none;
+      }
+
+      .pet-say.show {
+        opacity: 1;
+        transform: none;
+      }
+
+      .desk-hint.is-gone {
+        opacity: 0;
+      }
+
