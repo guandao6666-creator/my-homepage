@@ -849,6 +849,47 @@ GitHub Actions（`.github/workflows/quality.yml`，run [42965051693](https://git
 
 **结论：`Partially Verified`（本地 / 隔离层通过；生产层 `Blocked`）。** 全部本地门禁与真实浏览器 Context 证据通过；生产迁移、生产验证、页面级冲突 UI E2E 与物理设备冒烟按 Phase 1.6 门禁未执行，不写成「已验证」。
 
+### 16.18 Phase 5 社区与市场发布链（2026-11-11）
+
+**1. 目标与范围**
+
+在不重写社区产品与插件市场的前提下，把社区 / 插件从「代码已实现」推进到「完整发布链经过真实、可重复验证」：5.1 社区发布链 E2E、5.2 Tutorials 复用与展示、5.3 审核/举报/下架/审计闭环；插件沿用 Phase 3 签名策略与 UnifiedInstaller。
+
+**2. 本阶段交付**
+
+- `scripts/community-qa.mjs` 重写为自包含 14 段 / 260 项断言 + 31 项清理断言（真实 `wrangler dev --local`、新 QA 身份、唯一 runId）；`scripts/qa-local-run.mjs` 增 `community` target（`--test-scheduled`）；`scripts/seed-qa-local.mjs` 增 `QA_COMMUNITY_TOKENS`；`scripts/lib/qa-cleanup.mjs` 的 `CHILD_TABLES` 追加 7 张社区表；`package.json` 的 `qa:community` 改为自包含包装器。
+- 修复真实缺陷：`src/lib/os14/community.ts` 的 `loadDetail` 曾把 tutorial 排除在拉包之外，导致教程正文永不渲染。
+- 插件 QA：`scripts/plugins-qa.mjs` 新增 37 项完整发布链（Ed25519 签名 verified → submit → 审核 → 市场 → 下载复算 SHA-256 → 安装 → takedown → 审计）；新增 `tests/e2e/plugin-publishing.spec.ts`（4 Context）。
+- 教程测试：新增 `tests/unit/community-tutorial.test.ts`（20）与 `tests/e2e/community-tutorial.spec.ts`（双 Context 全链）。
+- 文档：新增 `docs/architecture/COMMUNITY-PUBLISHING.md`；更新本文件、`GUANDAO_2_0_AUDIT.md`（附录 O）、`GUANDAO_2_0_ROADMAP.md`（5.5）、`docs/ACCEPTANCE-2.0.md`。
+
+**3. 质量门禁（本机实跑）**
+
+| 门禁 | 结果 |
+| --- | --- |
+| `npm run verify` | exit 0；19 文件 / **351 单测**；html-security 291 处全审查；lint；build 29 pages；CSP 12 哈希/30 HTML；migrations 18/117 |
+| `npx playwright test` | **158 passed（2.9m）**：chromium 67 + worker 67（签名 19 / 沙箱 11 / 设备 12 / OAuth 14 / 同步 8 / 教程 2 / 插件发布链 1）+ firefox 12 + webkit 12 |
+| `npm run qa:sync` | **45/45**（Phase 4 域无回归） |
+| `npm run qa:community` | **260/260 ×3**（47.5s / 47.6s / 48.0s；清理 R2=OK / 身份=OK / 残留=0） |
+| `npm run qa:plugins` | **107/107 ×2**（原 70 + 新增 37） |
+
+**4. 安全 / 隔离验证**
+
+- 权限：所有非 GET 走 `assertSameOrigin`；审核接口服务端 `isStaff`（403），敏感动作 `requireAdminRole`；普通用户 403、未登录 401、下架后公开 404。
+- 上传：`assertImage` magic bytes、大小上限、所有权校验；R2 先写后 D1，D1 失败清理对象，无孤儿。
+- 清理：复用 `scripts/lib/qa-cleanup.mjs` 四重校验（QA id/email 正则、期望身份重读、目标数量上限、删除行数断言），失败抛错不退化；三轮运行后 D1 基线 `total_posts=11`、`total_assets=9` 不变、残留 0。
+- 未新增生产调试接口；未绕过 Phase 3 签名与权限策略。
+
+**5. 未完成 / 风险**
+
+- 生产发布链未执行（生产 D1/R2 写入、生产迁移、部署、`qa:prod` 均按 Phase 1.6 门禁禁止；备份告警未配置、2026-11-06 事故未 Closed）。
+- 插件客户端安装的页面级证据为本地证据脚本（真实桌面页 + UnifiedInstaller，20/20 + 截图），未并入 Playwright；Playwright 内为协议级。
+- 教程无页面级浏览器 E2E；正文渲染由 `renderMarkdown` 源码守卫 + API/单测覆盖。
+- `follow` 正向链路在无 UUID 创作者的新库 SKIP（API 强制 UUID 属生产设计）。
+- `seed-qa-local.mjs` 复用唯一 admin 并清其其它 session，与 e2e fixtures 共用 admin 时不可并发；spec 已做回退。
+
+**结论：`Partially Verified`（本地 / 隔离层通过；生产层 `Blocked`）。** 社区与插件发布链在真实 Worker + 本地 D1/R2 上完整通过并可重复运行；生产发布链与页面级插件安装（Playwright 内）未执行，不写成「已验证」。
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash

@@ -17,7 +17,7 @@
     "postbuild": "node scripts/gen-csp.mjs",
     "qa:os14": "node scripts/os14-qa.mjs",
     "qa:os14:full": "astro build && node scripts/os14-qa.mjs",
-    "qa:community": "node scripts/community-qa.mjs",
+    "qa:community": "node scripts/qa-local-run.mjs community",
     "cf:dev": "wrangler dev",
     "cf:deploy": "npm run build && wrangler deploy",
     "cf:link": "node scripts/link-d1.mjs",

@@ -837,7 +837,9 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
       await ensureMeta();
       const data = await api.getPost(id);
       let manifest: Manifest | null = null;
-      if (data.post.type !== "tutorial" && data.package) {
+      // 教程正文存放在内容包里，和其他类型一样需要拉取并校验后才能渲染；
+      // 教程不显示安装按钮（见 paintDetail），因此这里不会触发安装流程。
+      if (data.package) {
         try {
           const verified = await api.fetchVerifiedPackage(id);
           manifest = verified.manifest as unknown as Manifest;

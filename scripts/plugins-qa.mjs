@@ -18,6 +18,17 @@
 
 import crypto from "node:crypto";
 
+import {
+  base64urlDecode,
+  base64urlEncode,
+  buildSignatureEnvelope,
+  bundleDigests,
+  keyIdForPublicKey,
+  registerProofPayloadText,
+  signEd25519,
+  signaturePayloadBytes,
+} from "../shared/plugin-signature.js";
+
 const BASE = (process.env.QA_BASE || "http://127.0.0.1:8787").replace(/\/+$/, "");
 const ORIGIN = process.env.QA_ORIGIN || BASE;
 const ADMIN = process.env.QA_ADMIN_COOKIE || "gauth_sid=qa-plugin-admin-token-1234567890";
@@ -121,6 +132,56 @@ async function uploadVersion(cookie, bundle, changelog = "QA 版本", pluginId =
     method: "POST",
     cookie,
     body: { bundle: typeof bundle === "string" ? bundle : bundle.text, changelog },
+  });
+}
+
+/* ============================================================
+   Phase 5：发布者 Ed25519 密钥与签名上传（API 级）
+   ============================================================ */
+
+/** 按共享签名规范生成一对本地 Ed25519 密钥，并产出「持有证明」。 */
+async function generatePublisherKey(userId, label = "QA Phase 5") {
+  const subtle = crypto.webcrypto.subtle;
+  const pair = await subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  const raw = new Uint8Array(await subtle.exportKey("raw", pair.publicKey));
+  const publicKey = base64urlEncode(raw);
+  const keyId = await keyIdForPublicKey(raw);
+  const issuedAt = Date.now();
+  const proof = base64urlEncode(
+    new Uint8Array(
+      await subtle.sign(
+        { name: "Ed25519" },
+        pair.privateKey,
+        new TextEncoder().encode(registerProofPayloadText({ userId, publicKey, keyId, issuedAt })),
+      ),
+    ),
+  );
+  return { privateKey: pair.privateKey, publicKey, keyId, issuedAt, proof, label };
+}
+
+/** 用本地私钥给插件包生成共享规范签名封装（服务端不接触私钥）。 */
+async function signBundle(bundle, { key, userId, overrides = {} } = {}) {
+  const parsed = JSON.parse(bundle.text || String(bundle));
+  const digests = await bundleDigests(parsed, parsed.files);
+  const envelope = buildSignatureEnvelope({
+    keyId: key.keyId,
+    publisherId: userId,
+    pluginId: parsed.manifest.id,
+    version: parsed.manifest.version,
+    filesDigest: digests.filesDigest,
+    manifestDigest: digests.manifestDigest,
+    signedAt: Date.now(),
+    ...overrides,
+  });
+  const signature = await signEd25519(key.privateKey, signaturePayloadBytes(envelope));
+  return { ...envelope, sig: base64urlEncode(signature) };
+}
+
+async function uploadSignedVersion(cookie, bundle, signature, changelog = "QA 签名版本", pluginId = PLUGIN_ID) {
+  return request(`/api/developer/plugins/${encodeURIComponent(pluginId)}/versions`, {
+    method: "POST",
+    cookie,
+    body: { bundle: bundle.text, changelog, signature },
   });
 }
 
@@ -558,6 +619,324 @@ async function main() {
     body: installBody,
   });
   check("跨站写入被拒绝", csrf.status === 403 && csrf.json?.error?.code === "CSRF_REJECTED");
+
+  /* ============================================================
+     [11] Phase 5 完整发布链：草稿 → 签名上传 → 审核 → 市场 → 下载 → 安装 → 下架 → 清理
+     签名复用 shared/plugin-signature.js（与 Phase 3 同一协议，不另造）。
+     ============================================================ */
+  console.log("\n[11] Phase 5 完整发布链（签名 · 审核 · 市场 · 下载 · 安装 · 下架）");
+  const P5_ID = `com.qa.p5${suffix}`;
+  const P5_NAME = `P5 Signed Toolkit ${suffix}`;
+  const P5_PERMISSIONS = ["window.open", "plugin.storage.read"];
+
+  const p5Create = await request("/api/developer/plugins", {
+    method: "POST",
+    cookie: DEV,
+    body: {
+      id: P5_ID,
+      name: P5_NAME,
+      type: "application",
+      category: "developer",
+      description: "Phase 5 完整发布链测试插件（签名 → 审核 → 市场 → 安装 → 下架）。",
+      license: "MIT",
+    },
+  });
+  check(
+    "P5 开发者草稿创建成功",
+    p5Create.status === 200 && p5Create.json?.data?.plugin?.id === P5_ID && p5Create.json?.data?.plugin?.status === "draft",
+    p5Create.text.slice(0, 140),
+  );
+
+  const p5BadPermission = await uploadVersion(
+    DEV,
+    buildBundle({ id: P5_ID, permissions: ["root.everything"] }),
+    "P5 非法权限",
+    P5_ID,
+  );
+  check(
+    "P5 Manifest 未知权限被拒绝",
+    p5BadPermission.status === 422 && /UNKNOWN_PERMISSION/.test(p5BadPermission.text),
+    p5BadPermission.text.slice(0, 160),
+  );
+
+  const p5Traversal = await uploadVersion(
+    DEV,
+    buildBundle({
+      id: P5_ID,
+      files: [
+        { path: "index.html", encoding: "utf8", content: "<!doctype html><html><body>p5</body></html>" },
+        { path: "../evil.js", encoding: "utf8", content: "alert(1)" },
+      ],
+    }),
+    "P5 路径穿越",
+    P5_ID,
+  );
+  check("P5 Manifest 路径穿越被拒绝", p5Traversal.status === 422, p5Traversal.text.slice(0, 160));
+
+  const p5Profile = await request("/api/developer/profile", { cookie: DEV });
+  const p5PublisherId = p5Profile.json?.data?.profile?.id;
+  check(
+    "P5 开发者资料返回发布者身份",
+    p5Profile.status === 200 && typeof p5PublisherId === "string" && p5PublisherId.length > 8,
+    String(p5PublisherId),
+  );
+
+  const p5Key = await generatePublisherKey(p5PublisherId, `QA P5 ${suffix}`);
+  const p5KeyRegister = await request("/api/developer/keys", {
+    method: "POST",
+    cookie: DEV,
+    body: {
+      publicKey: p5Key.publicKey,
+      keyId: p5Key.keyId,
+      issuedAt: p5Key.issuedAt,
+      proof: p5Key.proof,
+      label: p5Key.label,
+    },
+  });
+  check(
+    "P5 Ed25519 发布密钥登记成功",
+    p5KeyRegister.status === 200 &&
+      p5KeyRegister.json?.data?.key?.keyId === p5Key.keyId &&
+      p5KeyRegister.json?.data?.key?.status === "active",
+    p5KeyRegister.text.slice(0, 160),
+  );
+
+  const p5Bundle = buildBundle({ id: P5_ID, permissions: P5_PERMISSIONS, manifest: { name: P5_NAME } });
+  const p5Parsed = JSON.parse(p5Bundle.text);
+  const p5Digests = await bundleDigests(p5Parsed, p5Parsed.files);
+  check("P5 包摘要可按共享规范本地复算", p5Digests.filesDigest === p5Bundle.filesDigest, p5Digests.filesDigest);
+
+  const p5Signature = await signBundle(p5Bundle, { key: p5Key, userId: p5PublisherId });
+  check(
+    "P5 本地签名封装为 ed25519/base64url 且签名为 64 字节",
+    p5Signature.spec === 1 &&
+      p5Signature.alg === "ed25519" &&
+      p5Signature.keyId === p5Key.keyId &&
+      base64urlDecode(p5Signature.sig).length === 64,
+    JSON.stringify({ spec: p5Signature.spec, alg: p5Signature.alg, keyId: p5Signature.keyId }),
+  );
+
+  const p5Forged = await signBundle(p5Bundle, {
+    key: p5Key,
+    userId: p5PublisherId,
+    overrides: { pluginId: `${P5_ID}.forged` },
+  });
+  const p5ForgedUpload = await uploadSignedVersion(DEV, p5Bundle, p5Forged, "P5 伪造签名", P5_ID);
+  check(
+    "P5 签名绑定的插件 ID 不符被拒绝",
+    p5ForgedUpload.status === 422 && p5ForgedUpload.json?.error?.code === "SIGNATURE_INVALID",
+    p5ForgedUpload.text.slice(0, 200),
+  );
+
+  const p5Upload = await uploadSignedVersion(DEV, p5Bundle, p5Signature, "Phase 5 签名版本", P5_ID);
+  const p5Checksum = p5Upload.json?.data?.version?.checksum;
+  check(
+    "P5 签名版本 v1.0.0 上传成功",
+    p5Upload.status === 200 && p5Upload.json?.data?.version?.version === "1.0.0" && /^[a-f0-9]{64}$/.test(p5Checksum || ""),
+    p5Upload.text.slice(0, 200),
+  );
+  check(
+    "P5 上传版本签名状态为 verified",
+    p5Upload.json?.data?.version?.signature?.status === "verified" &&
+      p5Upload.json?.data?.version?.signature?.keyId === p5Key.keyId,
+    JSON.stringify(p5Upload.json?.data?.version?.signature),
+  );
+
+  const p5Submit = await request(`/api/developer/plugins/${encodeURIComponent(P5_ID)}/submit`, {
+    method: "POST",
+    cookie: DEV,
+  });
+  check("P5 提交审核进入 pending_review", p5Submit.status === 200 && p5Submit.json?.data?.status === "pending_review");
+
+  const p5MarketBefore = await request(`/api/plugins?q=${encodeURIComponent(P5_NAME)}&limit=30`);
+  check(
+    "P5 审核前不进入市场",
+    p5MarketBefore.status === 200 && (p5MarketBefore.json?.data?.items || []).every((item) => item.id !== P5_ID),
+  );
+
+  const p5AnonReview = await request(`/api/plugins/admin/${encodeURIComponent(P5_ID)}/review`, {
+    method: "POST",
+    body: { decision: "approve", version: "1.0.0", note: "anon" },
+  });
+  check("P5 未登录不能审核", p5AnonReview.status === 401);
+
+  const p5MemberReview = await request(`/api/plugins/admin/${encodeURIComponent(P5_ID)}/review`, {
+    method: "POST",
+    cookie: OTHER,
+    body: { decision: "approve", version: "1.0.0", note: "nope" },
+  });
+  check("P5 普通用户不能审核", p5MemberReview.status === 403 && p5MemberReview.json?.error?.code === "FORBIDDEN");
+
+  const p5Approve = await request(`/api/plugins/admin/${encodeURIComponent(P5_ID)}/review`, {
+    method: "POST",
+    cookie: ADMIN,
+    body: { decision: "approve", version: "1.0.0", note: "Phase 5 QA 通过" },
+  });
+  check(
+    "P5 管理员审核通过并发布",
+    p5Approve.status === 200 && p5Approve.json?.data?.status === "published",
+    p5Approve.text.slice(0, 160),
+  );
+
+  const p5Market = await request(`/api/plugins?q=${encodeURIComponent(P5_NAME)}&limit=30`);
+  const p5MarketItem = (p5Market.json?.data?.items || []).find((item) => item.id === P5_ID);
+  check("P5 审核后出现在市场列表", p5Market.status === 200 && Boolean(p5MarketItem), p5Market.text.slice(0, 160));
+  check(
+    "P5 市场卡片签名 verified 且已审核",
+    p5MarketItem?.security?.signature?.status === "verified" &&
+      p5MarketItem?.security?.signature?.keyId === p5Key.keyId &&
+      p5MarketItem?.security?.audited === true,
+    JSON.stringify(p5MarketItem?.security),
+  );
+
+  const p5Detail = await request(`/api/plugins/${encodeURIComponent(P5_ID)}`);
+  const p5Plugin = p5Detail.json?.data?.plugin;
+  check(
+    "P5 公开详情签名 verified 且审核标记为真",
+    p5Detail.status === 200 &&
+      p5Plugin?.security?.signature?.status === "verified" &&
+      p5Plugin?.security?.audited === true &&
+      p5Plugin?.version === "1.0.0",
+    p5Detail.text.slice(0, 200),
+  );
+  const p5Versions = p5Detail.json?.data?.versions || [];
+  check(
+    "P5 版本历史为 approved 且签名状态保留",
+    p5Versions.length === 1 &&
+      p5Versions[0].version === "1.0.0" &&
+      p5Versions[0].status === "approved" &&
+      p5Versions[0].signature?.status === "verified",
+    JSON.stringify(p5Versions.map((version) => ({ v: version.version, s: version.status, sig: version.signature?.status }))),
+  );
+
+  const p5AnonPackage = await request(`/api/plugins/${encodeURIComponent(P5_ID)}/package?version=1.0.0`);
+  check("P5 未登录不能下载", p5AnonPackage.status === 401);
+
+  const p5Package = await request(`/api/plugins/${encodeURIComponent(P5_ID)}/package?version=1.0.0`, { cookie: OTHER });
+  const p5PackageText = p5Package.json?.data?.packageJson || "";
+  check("P5 登录后可下载真实插件包", p5Package.status === 200 && p5PackageText.length > 0, p5Package.text.slice(0, 160));
+  check(
+    "P5 下载包 SHA-256 本地复算与上传/响应一致",
+    sha256(p5PackageText) === p5Checksum && p5Package.json?.data?.checksum === p5Checksum,
+    `local=${sha256(p5PackageText).slice(0, 12)} server=${String(p5Package.json?.data?.checksum).slice(0, 12)}`,
+  );
+  check(
+    "P5 下载响应签名 verified 且带发布者公钥",
+    p5Package.json?.data?.signature?.status === "verified" &&
+      (p5Package.json?.data?.publisherKeys || []).some((key) => key.keyId === p5Key.keyId && key.status === "active"),
+    JSON.stringify(p5Package.json?.data?.signature),
+  );
+
+  const p5InstallBody = {
+    pluginId: P5_ID,
+    version: "1.0.0",
+    packageHash: p5Checksum,
+    permissions: P5_PERMISSIONS,
+  };
+  const p5AnonInstall = await request("/api/plugins/install", { method: "POST", body: p5InstallBody });
+  check("P5 未登录不能安装", p5AnonInstall.status === 401);
+
+  const p5Install = await request("/api/plugins/install", { method: "POST", cookie: OTHER, body: p5InstallBody });
+  check(
+    "P5 安装成功并保存签名信任",
+    p5Install.status === 200 &&
+      p5Install.json?.data?.installation?.version === "1.0.0" &&
+      p5Install.json?.data?.signature?.status === "verified",
+    p5Install.text.slice(0, 200),
+  );
+
+  const p5Installed = await request("/api/plugins/installed", { cookie: OTHER });
+  const p5InstalledItem = (p5Installed.json?.data?.items || []).find((item) => item.id === P5_ID);
+  check(
+    "P5 安装记录含版本、授权与签名",
+    p5InstalledItem?.installation?.version === "1.0.0" &&
+      Array.isArray(p5InstalledItem?.granted) &&
+      p5InstalledItem.granted.length === P5_PERMISSIONS.length &&
+      p5InstalledItem?.security?.signature?.status === "verified",
+    JSON.stringify(p5InstalledItem?.installation),
+  );
+
+  const p5InstallAgain = await request("/api/plugins/install", { method: "POST", cookie: OTHER, body: p5InstallBody });
+  const p5InstalledAgain = await request("/api/plugins/installed", { cookie: OTHER });
+  const p5InstallRows = (p5InstalledAgain.json?.data?.items || []).filter((item) => item.id === P5_ID);
+  check(
+    "P5 重复安装幂等（不产生重复记录）",
+    p5InstallAgain.status === 200 && p5InstallRows.length === 1,
+    `status=${p5InstallAgain.status} rows=${p5InstallRows.length}`,
+  );
+
+  const p5Takedown = await request(`/api/plugins/admin/${encodeURIComponent(P5_ID)}/takedown`, {
+    method: "POST",
+    cookie: ADMIN,
+    body: { reason: "Phase 5 QA 紧急下架：验证下架后下载与安装不可用" },
+  });
+  check(
+    "P5 管理员紧急下架成功",
+    p5Takedown.status === 200 && p5Takedown.json?.data?.status === "blocked",
+    p5Takedown.text.slice(0, 160),
+  );
+
+  const p5DownloadBlocked = await request(`/api/plugins/${encodeURIComponent(P5_ID)}/package?version=1.0.0`, {
+    cookie: OTHER,
+  });
+  check(
+    "P5 下架后下载返回 409",
+    p5DownloadBlocked.status === 409 && p5DownloadBlocked.json?.error?.code === "NOT_PUBLISHED",
+    p5DownloadBlocked.text.slice(0, 160),
+  );
+  const p5InstallBlocked = await request("/api/plugins/install", { method: "POST", cookie: DEV, body: p5InstallBody });
+  check(
+    "P5 下架后安装返回 409 PLUGIN_BLOCKED",
+    p5InstallBlocked.status === 409 && p5InstallBlocked.json?.error?.code === "PLUGIN_BLOCKED",
+    p5InstallBlocked.text.slice(0, 160),
+  );
+  const p5DetailBlocked = await request(`/api/plugins/${encodeURIComponent(P5_ID)}`);
+  check("P5 下架后公开详情不可见", p5DetailBlocked.status === 404);
+
+  const p5Audit = await request(`/api/plugins/admin/audit/${encodeURIComponent(P5_ID)}`, { cookie: ADMIN });
+  const p5AuditItems = p5Audit.json?.data?.items || [];
+  const p5Actions = p5AuditItems.map((item) => item.action);
+  check(
+    "P5 审计日志覆盖发布链关键动作",
+    ["plugin.create", "plugin.version_upload", "plugin.submit", "plugin.review.approve", "plugin.install", "plugin.takedown"].every(
+      (action) => p5Actions.includes(action),
+    ),
+    p5Actions.join(","),
+  );
+  check(
+    "P5 审计记录保留签名状态",
+    p5AuditItems.some((item) => item.action === "plugin.version_upload" && item.detail?.signatureStatus === "verified"),
+    JSON.stringify(p5AuditItems.map((item) => ({ action: item.action, signatureStatus: item.detail?.signatureStatus }))),
+  );
+
+  const p5Uninstall = await request(`/api/plugins/${encodeURIComponent(P5_ID)}/install`, {
+    method: "DELETE",
+    cookie: OTHER,
+  });
+  check("P5 用户可以卸载", p5Uninstall.status === 200 && p5Uninstall.json?.data?.ok === true);
+  const p5AfterUninstall = await request("/api/plugins/installed", { cookie: OTHER });
+  check(
+    "P5 卸载后安装记录与授权被清除",
+    !(p5AfterUninstall.json?.data?.items || []).some((item) => item.id === P5_ID),
+  );
+
+  const p5Revoke = await request(`/api/developer/keys/${encodeURIComponent(p5Key.keyId)}/revoke`, {
+    method: "POST",
+    cookie: DEV,
+    body: { reason: "Phase 5 QA 清理测试密钥" },
+  });
+  check(
+    "P5 测试发布密钥已撤销清理",
+    p5Revoke.status === 200 && p5Revoke.json?.data?.key?.status === "revoked",
+    p5Revoke.text.slice(0, 160),
+  );
+  const p5Keys = await request("/api/developer/keys", { cookie: DEV });
+  check(
+    "P5 密钥列表反映撤销状态",
+    (p5Keys.json?.data?.keys || []).some((key) => key.keyId === p5Key.keyId && key.status === "revoked"),
+  );
+  // 清理说明：插件下架（blocked）后无删除 API，与既有脚本一致保留 blocked 记录并撤销密钥；
+  // 唯一标记（P5_ID / P5_NAME）确保不污染市场列表。
 
   console.log(`\n${results.length - failures}/${results.length} 项通过`);
   if (failures) {

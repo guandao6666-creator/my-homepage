@@ -40,6 +40,17 @@ const CHILD_TABLES = new Set([
   "data_export_jobs",
   "data_exports",
   "data_deletion_jobs",
+  // Guandao Community（0009_community.sql）：以下表都有 user_id 列，可随 QA 账号级联。
+  // 顺序约定（由 scripts/community-qa.mjs 负责）：先删 posts 依赖行（likes/favorites/
+  // comments/notifications/view_daily、packages/versions、reports、audit），再删
+  // assembly 资源（community_assets），最后才允许按 user_id 清理 roles/profile。
+  "community_assets",
+  "community_likes",
+  "community_favorites",
+  "community_comments",
+  "community_notifications",
+  "community_roles",
+  "community_profiles",
 ]);
 
 function assertSafeLiteral(value, label) {

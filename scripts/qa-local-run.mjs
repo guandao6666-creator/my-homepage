@@ -6,6 +6,7 @@
 //   node scripts/qa-local-run.mjs plugins
 //   node scripts/qa-local-run.mjs continuity
 //   node scripts/qa-local-run.mjs devices
+//   node scripts/qa-local-run.mjs community   （额外带 --test-scheduled，供清理触发维护任务）
 //
 // 做的事：
 //   1. 确认 dist/ 已构建（缺失时先执行 npm run build）；
@@ -36,6 +37,7 @@ const TARGETS = {
   plugins: join(ROOT, "scripts", "plugins-qa.mjs"),
   continuity: join(ROOT, "scripts", "continuity-qa.mjs"),
   devices: join(ROOT, "scripts", "devices-api-qa.mjs"),
+  community: join(ROOT, "scripts", "community-qa.mjs"),
 };
 
 function baseEnv() {
@@ -103,7 +105,7 @@ async function main() {
   const targetName = process.argv[2];
   const targetScript = TARGETS[targetName];
   if (!targetScript) {
-    console.error(`[qa-local] 未知目标：${targetName ?? "(空)"}；可用：plugins | continuity | devices`);
+    console.error(`[qa-local] 未知目标：${targetName ?? "(空)"}；可用：plugins | continuity | devices | community`);
     process.exitCode = 2;
     return;
   }
@@ -121,7 +123,10 @@ async function main() {
 
   const logFd = openSync(LOG_FILE, "w");
   console.log(`[qa-local] 启动 wrangler dev --local（${base}）…`);
-  const server = spawn(process.execPath, [WRANGLER, "dev", "--local", "--port", String(port)], {
+  // community 需要 --test-scheduled 才能用 POST /__scheduled 触发维护任务清理 R2 孤儿。
+  const devArgs = ["dev", "--local", "--port", String(port)];
+  if (targetName === "community") devArgs.push("--test-scheduled");
+  const server = spawn(process.execPath, [WRANGLER, ...devArgs], {
     cwd: ROOT,
     env: baseEnv(),
     stdio: ["ignore", logFd, logFd],

@@ -24,7 +24,8 @@ const PORT = Number(process.env.E2E_PORT || 4399);
 const API_PORT = Number(process.env.E2E_API_PORT || 8788);
 
 /** 需要真实 Worker 的 spec —— 只有这些进 `worker` project。 */
-const WORKER_SPEC = /(plugin-signature|sandbox-worker|sandbox-origin|device|oauth|sync)\.spec\.ts$/;
+const WORKER_SPEC =
+  /(plugin-signature|plugin-publishing|sandbox-worker|sandbox-origin|device|oauth|sync|community-tutorial)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: "./tests/e2e",

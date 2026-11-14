@@ -11,6 +11,10 @@
 //   qa-continuity-phone-token-1234567890    同一 dev 账号的第二台设备 qa-dev-phone
 //   qa-plugin-other-token-1234567890        独立账号（越权测试对象）
 //
+// qa:community 追加身份（scripts/community-qa.mjs 依赖）：
+//   qa-community-creator-token-1234567890   qa-community-creator（member，发布链）
+//   qa-community-other-token-1234567890     qa-community-other（member，越权/举报）
+//
 // 说明：
 //   * token 只以 SHA-256 形式写库，明文只出现在本地测试脚本里，不是生产凭据。
 //   * 数据库只允许一个 admin：若本地已有其他 admin（例如 e2e-server 的 qa-p3-admin），
@@ -43,6 +47,16 @@ export const QA_TOKENS = {
   dev: "qa-plugin-dev-token-1234567890",
   phone: "qa-continuity-phone-token-1234567890",
   other: "qa-plugin-other-token-1234567890",
+};
+
+/**
+ * qa:community 固定身份（仅本地 D1；token 只用于本地 Session）。
+ * creator 是普通成员（发布 -> pending_review 的审核链），other 是独立成员（越权/举报）。
+ * admin 复用 QA_TOKENS.admin（seed 会复用本地唯一 admin 账号）。
+ */
+export const QA_COMMUNITY_TOKENS = {
+  creator: "qa-community-creator-token-1234567890",
+  other: "qa-community-other-token-1234567890",
 };
 
 export function sha256Hex(value) {
@@ -113,6 +127,23 @@ export function seedQaFixtures() {
       displayName: "QA Plugin Other",
       role: "member",
     },
+    // qa:community 专用身份（只承载社区发布链/审核/举报测试数据）。
+    {
+      id: "qa-community-creator",
+      email: "qa-community-creator@example.test",
+      githubId: 990010,
+      githubUsername: "qa-community-creator",
+      displayName: "QA Community Creator",
+      role: "member",
+    },
+    {
+      id: "qa-community-other",
+      email: "qa-community-other@example.test",
+      githubId: 990011,
+      githubUsername: "qa-community-other",
+      displayName: "QA Community Other",
+      role: "member",
+    },
   ];
 
   for (const user of users) {
@@ -141,6 +172,8 @@ export function seedQaFixtures() {
     { id: "qa-dev-laptop", userId: "qa-plugin-dev", name: "QA Laptop", type: "laptop", browser: "Chrome", os: "Windows" },
     { id: "qa-dev-phone", userId: "qa-plugin-dev", name: "QA Phone", type: "mobile", browser: "Chrome", os: "Android" },
     { id: "qa-dev-other", userId: "qa-plugin-other", name: "QA Other 设备", type: "desktop", browser: "Chrome", os: "Windows" },
+    { id: "qa-dev-community-creator", userId: "qa-community-creator", name: "QA Community Creator 设备", type: "desktop", browser: "Chrome", os: "Windows" },
+    { id: "qa-dev-community-other", userId: "qa-community-other", name: "QA Community Other 设备", type: "desktop", browser: "Chrome", os: "Windows" },
   ];
   for (const device of devices) {
     statements.push(
@@ -165,8 +198,12 @@ export function seedQaFixtures() {
     { id: "qa-sess-dev", userId: "qa-plugin-dev", token: QA_TOKENS.dev, device: "qa-dev-laptop" },
     { id: "qa-sess-phone", userId: "qa-plugin-dev", token: QA_TOKENS.phone, device: "qa-dev-phone" },
     { id: "qa-sess-other", userId: "qa-plugin-other", token: QA_TOKENS.other, device: "qa-dev-other" },
+    { id: "qa-sess-community-creator", userId: "qa-community-creator", token: QA_COMMUNITY_TOKENS.creator, device: "qa-dev-community-creator" },
+    { id: "qa-sess-community-other", userId: "qa-community-other", token: QA_COMMUNITY_TOKENS.other, device: "qa-dev-community-other" },
   ];
-  const tokenHashes = Object.values(QA_TOKENS).map((token) => `'${sha256Hex(token)}'`).join(", ");
+  const tokenHashes = [...Object.values(QA_TOKENS), ...Object.values(QA_COMMUNITY_TOKENS)]
+    .map((token) => `'${sha256Hex(token)}'`)
+    .join(", ");
   statements.push(`DELETE FROM sessions WHERE token_hash IN (${tokenHashes})`);
   for (const session of sessions) {
     statements.push(
@@ -188,6 +225,24 @@ export function seedQaFixtures() {
     statements.push(`DELETE FROM ${table} WHERE user_id IN (${userIds})`);
   }
   statements.push("DELETE FROM rate_limits");
+
+  // ---- 社区身份资料：固定显示名，避免作者名断言随 ensureProfile 漂移 -------
+  // community_profiles 只由 QA 账号承载；community_roles 是测试临时提升审核员时
+  // 留下的行，必须清掉，否则下一轮 creator 会带着 moderator 角色启动。
+  const communityUsers = ["qa-community-creator", "qa-community-other"];
+  const communityProfileNames = {
+    "qa-community-creator": "QA 社区创作者",
+    "qa-community-other": "QA 社区其他成员",
+  };
+  for (const userId of communityUsers) {
+    statements.push(
+      `INSERT INTO community_profiles (user_id, display_name, bio, creator_title, visibility, restriction, restriction_reason, created_at, updated_at)
+       VALUES ('${userId}', '${communityProfileNames[userId]}', '', 'QA', 'public', 'none', NULL, ${now}, ${now})
+       ON CONFLICT (user_id) DO UPDATE SET display_name = excluded.display_name, visibility = 'public',
+                                           restriction = 'none', restriction_reason = NULL, updated_at = excluded.updated_at`,
+    );
+  }
+  statements.push(`DELETE FROM community_roles WHERE user_id IN (${communityUsers.map((id) => `'${id}'`).join(", ")})`);
 
   runSql(statements.join(";\n"));
   return { adminId, users: users.length, devices: devices.length, sessions: sessions.length };

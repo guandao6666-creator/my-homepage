@@ -281,3 +281,28 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 4. 两台物理设备的人工冒烟未做；`qa:devices` 与 `sync.spec.ts` 使用的是真实浏览器 Context + 本地 Worker，但不等于生产环境。
 5. Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。
 
+## Phase 5 · 社区与市场发布链（2026-11-11）
+
+| 验收项 | 结果 | 证据 |
+| --- | --- | --- |
+| 5.1 社区发布链（草稿→上传→提交→审核→公开→下载/安装） | **通过（本地 / 隔离）** | `npm run qa:community` **260/260 ×3**（47.5s/47.6s/48.0s）；14 段覆盖上传安全、草稿可见性、成员待审、管理员与 moderator 审核闭环、公开列表/详情、计数分离、版本链、举报、审计、设置权限 |
+| 5.1 安装与计数 | **通过** | 下载包 SHA-256 校验；`download_count` 仅 `package?count=1` 增加；`view_count` 独立；失败不增计数；重复安装按既有规则 |
+| 5.2 Tutorials 教程 | **通过（本地）** | 复用 `community_posts`（`post_type='tutorial'` 已存在），**不新增表/迁移**；单测 20、E2E 2 passed；修复教程正文不渲染缺陷；旧帖子与 Feed 无回归 |
+| 5.3 举报 / 审核 / 下架 / 审计 | **通过（本地）** | 举报 201/重复 409；dismiss/hide_post/delete_post；approve/reject/hide/restore/delete；审计 action + targetId；普通用户 403、未登录 401；下架后公开 404；R2 未物理删除 |
+| 插件发布闭环 | **API 级通过；页面级 Partially Verified** | `qa:plugins` **107/107 ×2**（签名→审核→市场→下载→安装→下架→审计）；`plugin-publishing.spec.ts` 1 passed ×2；页面级本地证据 20/20，未入 Playwright |
+| 原有 Notes/Tasks/Calendar 与 Phase 4 同步 | **无回归** | `qa:sync` 45/45；`sync.spec.ts` 8 passed；Playwright 整包 158 passed |
+| 测试数据清理 | **通过** | 复用 `qa-cleanup.mjs` 四重校验；三次运行 R2=OK / 身份=OK / 残留=0；D1 基线 `total_posts=11`、`total_assets=9` 不变 |
+| 质量门禁 | **通过** | `npm run verify`（19 文件 / 351 单测、lint、build 29 pages、CSP 12 哈希/30 HTML、migrations 18/117、html-security 291 处/未审查 0）；`npx playwright test` **158 passed**（chromium 67 + worker 67 + firefox 12 + webkit 12）；`qa:sync` 45/45；`qa:community` 260/260 |
+| 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、2026-11-06 事故未 Closed → 禁止生产写入、生产迁移、`qa:prod`、部署 |
+
+**Phase 5 整体：`Partially Verified`（本地 / 隔离层全部通过；生产发布链 `Blocked`）。**
+
+未完成 / 未验证项：
+
+1. 生产发布链未执行：未创建生产测试资源、未写生产 D1/R2、未应用生产迁移、未部署、未运行 `qa:prod`。
+2. 插件客户端安装的页面级证据来自本地证据脚本（真实桌面页 + UnifiedInstaller，20/20 + 截图），未并入 Playwright 套件；Playwright 内为协议级验证。
+3. 教程没有页面级浏览器 E2E；正文渲染由 `renderMarkdown` 源码守卫 + API 断言 + 单测覆盖。
+4. `follow` 正向链路在无 UUID 创作者的新库会 SKIP（API 强制 UUID 属生产设计）。
+5. 物理设备人工冒烟未做；本地双 Context 与真实浏览器不代替真机。
+6. Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪。
+

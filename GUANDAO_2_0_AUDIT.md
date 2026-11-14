@@ -862,3 +862,61 @@ Infrastructure
 | 文档 | `docs/architecture/WORKSPACE-SYNC.md`、`PREFERENCES-SYNC.md`、`SYNC-CONFLICTS.md`、`docs/operations/SYNC-RETENTION.md` |
 
 **Phase 4 结论：`Partially Verified`。** 本地 / 隔离层全部门禁通过；生产迁移、生产验证、页面级冲突 UI E2E 与物理设备冒烟未执行（生产层 `Blocked`），不写成「已验证」。
+
+## 附录 O：Phase 5 社区与市场发布链（2026-11-11）
+
+### O.1 改造前真实结构（审计结论）
+
+- 社区资源：`community_posts`（`post_type` theme/widget/workspace/wallpaper/**tutorial**；status draft/pending_review/published/hidden/rejected/deleted；visibility public/unlisted）→ `community_packages`（active/deleted、checksum_sha256）→ `package_versions`（UNIQUE(package_id, version)、published_at）→ `community_assets`（kind + mime 白名单 + status ready/deleting/deleted）。
+- 举报/审计：`community_reports`（open/reviewing/resolved/dismissed、UNIQUE reporter+target）、`community_audit_logs`（actor/action/target/detail_json）。
+- 权限：所有非 GET 走 `assertSameOrigin`；admin 前缀要求 `isStaff`（moderator 或 admin），敏感动作在 `admin.js` 内 `requireAdminRole`（仅 admin）；`loadPost` 可见性 = published 或 owner 或 staff，deleted 默认 404。
+- 上传：先 R2 `put` 再 D1 batch，D1 失败 `cleanupObjects` 回滚；`assertImage` 校验 magic bytes；object key 服务端生成 `users/<userId>/community/<kind>/<assetId>.<ext>`。
+- 插件发布：Developer Center（草稿/上传/提交/撤销）→ 管理员审核 approve/reject/block → 市场只返回 `plugins.status='published'` → 下载时动态复验签名与 SHA-256 → 安装校验版本/哈希/签名/权限。
+- 改造前缺口：没有完整「草稿→上传→提交→审核→公开→安装」的真实可重复 E2E；旧 `scripts/community-qa.mjs` 依赖手工起服务与手工 seed、未覆盖审计/清理/R2 孤儿/教程；插件 QA 未覆盖完整发布链与签名结合。
+
+### O.2 本阶段实现与修复
+
+- `scripts/community-qa.mjs` 重写（+1941 行）：自包含 14 段、260 项断言 + 31 项清理断言；真实 Worker `wrangler dev --local`，新 QA 身份 + 每轮唯一 runId；覆盖上传/草稿/待审/审核/公开/计数/版本/互动/举报/审计/设置权限/清理。
+- `scripts/seed-qa-local.mjs`：新增 `QA_COMMUNITY_TOKENS`（creator/other，github_id 990010/990011）+ 设备/session/profile upsert + roles 清理；复用本地唯一 admin，不碰生产。
+- `scripts/qa-local-run.mjs`：新增 `community` target；仅 community 加 `--test-scheduled`（用于观察维护任务）。
+- `scripts/lib/qa-cleanup.mjs`：`CHILD_TABLES` 追加 7 张含 `user_id` 的社区表并加顺序注释；四重校验与数量限制未放宽。
+- `package.json`：`qa:community` 改为 `node scripts/qa-local-run.mjs community`（原先需手工起 8787）。
+- `src/lib/os14/community.ts` 修复真实缺陷：`loadDetail` 条件 `data.post.type !== "tutorial" && data.package` → `data.package`；否则教程正文存于 `manifest.configuration.content` 却永不拉包、详情正文区不渲染。
+- `scripts/plugins-qa.mjs` +379 行：新增 [11] Phase 5 完整发布链 37 项（Ed25519 签名 → 上传 verified → submit → 权限 → approve → 市场 → 下载 SHA-256 → 安装 → takedown → 审计）。
+- 新增 `tests/e2e/plugin-publishing.spec.ts`（4 Context）、`tests/e2e/community-tutorial.spec.ts`（双 Context）、`tests/unit/community-tutorial.test.ts`（20 项）；`playwright.config.ts` 的 `WORKER_SPEC` 加入 `plugin-publishing`、`community-tutorial`。
+
+### O.3 实测结果
+
+| 项 | 结果 |
+| --- | --- |
+| `npm run qa:community` | **260/260 ×3**，47.5s / 47.6s / 48.0s，exit 0；清理 R2=OK / 身份=OK / 残留=0 |
+| `npm run qa:plugins` | **107/107 ×2**（原 70 + 新增 37） |
+| `tests/e2e/plugin-publishing.spec.ts` | 1 passed ×2 |
+| `tests/e2e/community-tutorial.spec.ts` | 2 passed ×2；`tests/unit/community-tutorial.test.ts` 20 passed ×2 |
+| `npm run verify` | exit 0：19 文件 / **351 单测**；html-security 291 处全审查；build 29 pages；CSP 12/30；migrations 18/117 |
+| `npx playwright test` | **158 passed (2.9m)**：chromium 67 + worker 67（签名 19 / 沙箱 11 / 设备 12 / OAuth 14 / 同步 8 / 教程 2 / 插件发布链 1）+ firefox 12 + webkit 12 |
+| `npm run qa:sync` | **45/45**（Phase 4 域无回归） |
+| 页面级插件安装本地证据 | 20/20，截图 `.shots/p5-page-evidence2-*.png`（未入 Playwright） |
+
+### O.4 风险与未验证项
+
+1. 生产发布链未执行：未写生产 D1/R2、未应用生产迁移、未部署、未跑 `qa:prod`（Phase 1.6 门禁）。
+2. 页面级插件安装仅有本地证据脚本，未纳入 Playwright；Playwright 中为协议级 `plugin-publishing.spec.ts`。
+3. 教程无页面级浏览器 E2E；正文渲染由 `renderMarkdown` 源码守卫 + API/单测覆盖。
+4. `follow` 正向链路在无 UUID 创作者的新库 SKIP（API 强制 UUID 属生产设计）。
+5. `seed-qa-local.mjs` 复用唯一 admin 并清其其它 session：与 e2e fixtures 共用 admin 时不可并发；spec 已做 fixtures → seed 回退。
+6. R2 物理删除依赖维护任务重试；测试清理以 D1 状态 + 维护任务结果复核，不直接枚举桶。
+
+### O.5 证据索引
+
+| 证据 | 位置 |
+| --- | --- |
+| 发布链 QA | `scripts/community-qa.mjs`（14 段 / 260 项）、`scripts/qa-local-run.mjs`、`scripts/seed-qa-local.mjs` |
+| 清理守卫 | `scripts/lib/qa-cleanup.mjs`（`CHILD_TABLES` 扩展） |
+| 教程修复 | `src/lib/os14/community.ts`（`loadDetail`） |
+| 教程测试 | `tests/unit/community-tutorial.test.ts`、`tests/e2e/community-tutorial.spec.ts` |
+| 插件发布链 | `scripts/plugins-qa.mjs` [11]、`tests/e2e/plugin-publishing.spec.ts` |
+| 页面级证据 | `.shots/_p5-page-install-evidence2.mjs`、`.shots/p5-page-evidence2-*.png`（本地，未提交） |
+| 文档 | `docs/architecture/COMMUNITY-PUBLISHING.md` |
+
+**Phase 5 结论：`Partially Verified`。** 本地 / 隔离层与真实浏览器 API 证据全部通过；生产发布链、页面级插件安装（Playwright 内）与真机冒烟未执行（生产层 `Blocked`），不写成「已验证」。
