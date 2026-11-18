@@ -242,3 +242,14 @@
 - 合成 click 到不了委托处理器（实测无 toast、按钮不禁用），因此页面用例只断言「真实渲染」，
   点击后的状态机仍由 `tests/unit/sync-conflicts.test.ts` 覆盖——不写会误判的断言。
 - 加上 Round 12 的配额 409，D 批两项均已闭环。同步相关 10 passed。
+
+---
+
+## 2026-11-18 · Round 14 · E1 / E3（虚拟桌面、组件、平板断点）
+
+- P1-5：`desktop.spec.ts` 新增 2 条——新建桌面 → 切换 → 刷新仍保留；组件中心开关
+  真实挂载/移除桌面组件并持久化。菜单与任务视图改用 DOM click，避开动画/浮层。
+- P4-1：新增 `tablet.spec.ts`——820/1024 判 tablet、1280/1440 判 desktop、390 仍跳 /m/；
+  平板分支断言菜单栏 46px 与 `--dock-size: 58px`（adaptive.css 的真实规则）。
+- 证据：desktop + tablet 15 passed；verify exit 0。
+- 未做：E2 follow 正向（需 UUID 创作者夹具）、F 教程页面断言、G–I 生产与文档。

@@ -257,3 +257,54 @@ test.describe("桌面外壳", () => {
     await expect(reopened).toContainText("Web Vitals");
   });
 });
+
+test.describe("P1-5 · 虚拟桌面与组件", () => {
+  test("新建桌面后切换生效，刷新仍保留", async ({ page }) => {
+    await bootDesktop(page);
+    const dots = page.locator("#spaces .space-dot");
+    const before = await dots.count();
+    expect(before).toBeGreaterThanOrEqual(2);
+
+    // 菜单与任务视图都可能在动画中，DOM click 更稳
+    await page.locator('[data-menu-btn="window"]').evaluate((el) => (el as HTMLElement).click());
+    await page.locator('[data-menu-panel="window"] [data-menu-action="mission"]').evaluate((el) => (el as HTMLElement).click());
+    await expect(page.locator("#mission")).toBeVisible({ timeout: 10_000 });
+    await page.locator("[data-desk-add]").evaluate((el) => (el as HTMLElement).click());
+
+    await expect(dots).toHaveCount(before + 1, { timeout: 10_000 });
+    const newId = (await dots.last().getAttribute("data-space")) ?? "";
+    expect(newId).not.toBe("");
+
+    await dots.last().evaluate((el) => (el as HTMLElement).click());
+    await expect(page.locator("#os")).toHaveAttribute("data-space", newId);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => !document.getElementById("boot"), null, { timeout: 20_000 });
+    await expect(page.locator("#spaces .space-dot")).toHaveCount(before + 1);
+  });
+
+  test("组件中心开关会真正挂载/移除桌面组件，刷新后保留", async ({ page }) => {
+    await bootDesktop(page);
+    const widget = page.locator('.widget[data-widget="clock"]');
+    const hadIt = (await widget.count()) > 0;
+
+    await page.evaluate(() =>
+      (window as unknown as { GOS14: { ctx: { openApp: (id: string) => void } } }).GOS14.ctx.openApp("widgetstore"),
+    );
+    const win = page.locator('.window[data-app="widgetstore"]');
+    await expect(win.locator(".g14-wcard").first()).toBeVisible({ timeout: 20_000 });
+
+    const toggle = win.locator('[data-widget-id="clock"] [data-wtoggle]').first();
+    const label = (await toggle.innerText()).trim();
+    await toggle.evaluate((el) => (el as HTMLElement).click());
+
+    if (/移除/.test(label) || hadIt) {
+      await expect(widget).toHaveCount(0, { timeout: 10_000 });
+    } else {
+      await expect(widget).toHaveCount(1, { timeout: 10_000 });
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => !document.getElementById("boot"), null, { timeout: 20_000 });
+      await expect(page.locator('.widget[data-widget="clock"]')).toHaveCount(1);
+    }
+  });
+});
