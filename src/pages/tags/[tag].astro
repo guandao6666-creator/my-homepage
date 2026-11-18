@@ -3,6 +3,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import PostCard from "../../components/PostCard.astro";
 import { getAllPosts, collectTags, postsWithTag, tagHue } from "../../lib/posts";
 import { SITE } from "../../lib/site";
+import "../../styles/blog-pixel.css";
 
 export async function getStaticPaths() {
   const posts = await getAllPosts();
@@ -25,7 +26,8 @@ const siblings = collectTags(all).filter((item) => item.tag !== tag).slice(0, 8)
   description={`${SITE.author}关于「${tag}」的全部文章，共 ${posts.length} 篇。`}
   canonical={`/tags/${encodeURIComponent(tag)}/`}
 >
-  <section class="tag-hero" style={`--hue:${hue}`}>
+  <div class="blog-pixel">
+  <section class="page-head tag-hero" style={`--hue:${hue}`}>
     <div class="wrap">
       <nav class="crumb" aria-label="面包屑">
         <a href="/home/">首页</a><span>/</span><a href="/tags/">标签</a><span>/</span><span>{tag}</span>
@@ -53,56 +55,31 @@ const siblings = collectTags(all).filter((item) => item.tag !== tag).slice(0, 8)
       <a class="pill" href="/tags/">全部 →</a>
     </div>
   </div>
+  </div>
 </BaseLayout>
 
 <style>
   .tag-hero {
     position: relative;
-    padding: 30px 0 34px;
-    border-bottom: 1px solid var(--line);
     overflow: hidden;
   }
 
   .tag-hero::before {
     content: "";
     position: absolute;
-    top: -80px;
-    left: -60px;
+    top: -90px;
+    left: -70px;
     width: 320px;
     height: 320px;
     border-radius: 50%;
-    background: radial-gradient(circle, hsl(var(--hue) 45% 60% / 0.18), transparent 70%);
+    background: radial-gradient(circle, hsl(var(--hue) 60% 60% / 0.16), transparent 70%);
     pointer-events: none;
-  }
-
-  .crumb {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12.5px;
-    color: var(--muted);
-    margin-bottom: 26px;
-  }
-
-  .crumb a:hover {
-    color: var(--accent);
-  }
-
-  h1 {
-    margin: 12px 0 10px;
-    font-size: clamp(32px, 4.6vw, 44px);
-    letter-spacing: -0.02em;
   }
 
   .tag-hero p {
     margin: 0;
-    color: var(--muted);
+    color: var(--px-soft);
     font-size: 14px;
-  }
-
-  .post-list {
-    margin-top: 8px;
-    border-bottom: 1px solid var(--line);
   }
 
   .siblings {
@@ -114,17 +91,11 @@ const siblings = collectTags(all).filter((item) => item.tag !== tag).slice(0, 8)
   }
 
   .siblings-label {
-    font-size: 11px;
+    margin-right: 6px;
+    font-family: var(--px-pix);
+    font-size: 10.5px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--muted);
-    margin-right: 6px;
-  }
-
-  .siblings .pill em {
-    font-style: normal;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    opacity: 0.6;
+    color: var(--px-faint);
   }
 </style>

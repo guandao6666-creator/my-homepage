@@ -3,6 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import Icon from "../components/Icon.astro";
 import { getAllPosts, type Post } from "../lib/posts";
 import { SITE, formatShortDate } from "../lib/site";
+import "../styles/blog-pixel.css";
 
 const posts = await getAllPosts();
 
@@ -37,6 +38,7 @@ const firstPost = posts[posts.length - 1];
   description={`${SITE.author}的全部文章归档：共 ${posts.length} 篇，跨越 ${groups.length} 个年份，按时间排列。`}
   canonical="/archive/"
 >
+  <div class="blog-pixel">
   <section class="page-head">
     <div class="wrap">
       <span class="eyebrow">
@@ -102,33 +104,15 @@ const firstPost = posts[posts.length - 1];
       <Icon name="arrow-right" size={13} />
     </a>
   </div>
+  </div>
 </BaseLayout>
 
 <style>
-  .page-head {
-    padding: 58px 0 34px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .page-head h1 {
-    margin: 14px 0 12px;
-    font-size: clamp(34px, 5vw, 46px);
-    letter-spacing: -0.03em;
-  }
-
-  .page-lede {
-    margin: 0;
-    max-width: 40em;
-    color: var(--muted);
-    font-size: 14.5px;
-    line-height: 1.9;
-  }
-
   .archive-layout {
     display: grid;
-    grid-template-columns: 108px minmax(0, 1fr);
-    gap: 44px;
-    padding-top: 40px;
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 40px;
+    padding-top: 32px;
   }
 
   .year-nav {
@@ -136,7 +120,7 @@ const firstPost = posts[posts.length - 1];
     top: 92px;
     align-self: start;
     display: grid;
-    gap: 2px;
+    gap: 4px;
   }
 
   .year-nav a {
@@ -144,29 +128,29 @@ const firstPost = posts[posts.length - 1];
     align-items: baseline;
     justify-content: space-between;
     gap: 8px;
-    padding: 6px 10px;
-    border-radius: 8px;
-    font-family: var(--font-mono);
-    font-size: 12.5px;
-    color: var(--muted);
-    transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+    padding: 6px 9px;
+    font-family: var(--px-pix);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--px-faint);
+    transition: background-color 0.15s linear, color 0.15s linear;
   }
 
   .year-nav a:hover {
-    background: var(--surface-sunk);
-    color: var(--accent-ink);
+    color: var(--px-gold);
+    background: var(--px-panel-2);
   }
 
   .year-nav em {
     font-style: normal;
-    font-size: 10.5px;
+    font-size: 10px;
     opacity: 0.7;
   }
 
   .timeline {
     position: relative;
     padding-left: 26px;
-    border-left: 1px solid var(--line);
+    border-left: 2px solid #142a5c;
   }
 
   .year {
@@ -175,48 +159,50 @@ const firstPost = posts[posts.length - 1];
   }
 
   .year + .year {
-    margin-top: 46px;
+    margin-top: 42px;
   }
 
   .year-title {
     display: flex;
     align-items: baseline;
     gap: 12px;
-    font-size: 30px;
-    letter-spacing: -0.02em;
+    font-family: var(--px-hand);
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #fff;
   }
 
   .year-title::before {
     content: "";
     position: absolute;
-    left: -31px;
-    top: 12px;
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--paper);
-    border: 2px solid var(--accent);
+    left: -32px;
+    top: 11px;
+    width: 12px;
+    height: 12px;
+    background: var(--px-gold);
+    box-shadow: 0 0 0 3px #142a5c;
   }
 
   .year-title span {
-    font-family: var(--font-sans);
-    font-size: 11.5px;
+    font-family: var(--px-pix);
+    font-size: 11px;
     font-weight: 400;
-    color: var(--muted);
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
+    color: var(--px-faint);
   }
 
   .month {
-    margin-top: 22px;
+    margin-top: 20px;
   }
 
   .month h3 {
-    font-family: var(--font-mono);
+    font-family: var(--px-pix);
     font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.12em;
+    font-weight: 400;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: var(--px-cyan);
   }
 
   .month ul {
@@ -226,7 +212,7 @@ const firstPost = posts[posts.length - 1];
   }
 
   .month li + li {
-    border-top: 1px dashed var(--line);
+    border-top: 1px dashed #142a5c;
   }
 
   .month a {
@@ -236,19 +222,19 @@ const firstPost = posts[posts.length - 1];
     align-items: baseline;
     padding: 9px 2px;
     font-size: 14px;
-    color: var(--ink-2);
-    transition: color 0.2s var(--ease), padding-left 0.2s var(--ease);
+    color: var(--px-soft);
+    transition: color 0.15s linear, padding-left 0.15s linear;
   }
 
   .month a:hover {
-    color: var(--accent-ink);
+    color: var(--px-gold);
     padding-left: 6px;
   }
 
   .month time {
-    font-family: var(--font-mono);
+    font-family: var(--px-pix);
     font-size: 11.5px;
-    color: var(--muted);
+    color: var(--px-faint);
   }
 
   .month .title {
@@ -259,29 +245,10 @@ const firstPost = posts[posts.length - 1];
 
   .month .meta {
     flex: none;
-    font-size: 11.5px;
-    color: var(--muted);
+    font-family: var(--px-pix);
+    font-size: 11px;
+    color: var(--px-faint);
     opacity: 0.8;
-  }
-
-  .empty {
-    padding: 52px 0 8px;
-    font-size: 14px;
-    color: var(--muted);
-  }
-
-  .back {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 40px;
-    font-size: 13px;
-    color: var(--muted);
-    transition: color 0.2s var(--ease);
-  }
-
-  .back:hover {
-    color: var(--accent-ink);
   }
 
   @media (max-width: 760px) {

@@ -75,9 +75,16 @@ const gradient = coverGradient(post);
 }
 
 <style>
-  /* ---------------- row ---------------- */
+  /* 博客内统一用「纸页」卡片：四向硬描边 + 内侧斜面，无圆角 */
   .row {
-    border-top: 1px solid var(--line);
+    background: var(--px-paper);
+    box-shadow: var(--px-paper-frame);
+    transition: transform 0.16s steps(2, end), background-color 0.16s linear;
+  }
+
+  .row:hover {
+    transform: translateY(-3px);
+    background: var(--px-paper-2);
   }
 
   .row-link {
@@ -85,20 +92,15 @@ const gradient = coverGradient(post);
     grid-template-columns: auto 1fr auto;
     align-items: start;
     gap: 20px;
-    padding: 26px 8px 26px 4px;
-    transition: background-color 0.25s var(--ease);
-  }
-
-  .row-link:hover {
-    background: color-mix(in srgb, var(--surface-sunk) 60%, transparent);
+    padding: 24px 28px 22px;
   }
 
   .row-index {
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    color: var(--muted);
-    padding-top: 5px;
-    letter-spacing: 0.06em;
+    padding-top: 3px;
+    font-family: var(--px-pix);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: #b3924f;
   }
 
   .row-main {
@@ -107,29 +109,33 @@ const gradient = coverGradient(post);
 
   .row-meta {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    font-size: 12px;
-    color: var(--muted);
-    letter-spacing: 0.02em;
+    font-family: var(--px-pix);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    color: var(--px-paper-soft);
+  }
+
+  .row-meta time {
+    color: #7a5c1c;
   }
 
   .sep {
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
+    width: 4px;
+    height: 4px;
     background: currentColor;
-    opacity: 0.45;
+    opacity: 0.5;
   }
 
   .pin {
-    margin-left: 2px;
-    padding: 1px 7px;
-    border-radius: 999px;
-    background: var(--accent-wash);
-    color: var(--accent-ink);
-    font-size: 10.5px;
+    padding: 2px 6px 1px;
+    font-family: var(--px-pix);
+    font-size: 10px;
     letter-spacing: 0.04em;
+    color: #a4331f;
+    box-shadow: 0 0 0 1px #c0573f;
   }
 
   /* 留言数 / 点赞数：由 BaseLayout 的脚本填充，0 时保持 hidden */
@@ -138,60 +144,77 @@ const gradient = coverGradient(post);
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--muted);
+    color: var(--px-paper-soft);
   }
 
   .cmt::before,
   .lks::before {
     content: "";
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
+    width: 4px;
+    height: 4px;
     background: currentColor;
-    opacity: 0.45;
+    opacity: 0.5;
   }
 
   .row h3 {
-    margin: 9px 0 7px;
-    font-size: 20.5px;
-    line-height: 1.45;
-    transition: color 0.2s var(--ease);
+    margin: 11px 0 8px;
+    font-family: var(--px-hand);
+    font-size: 23px;
+    font-weight: 600;
+    line-height: 1.42;
+    letter-spacing: 0.02em;
+    color: var(--px-paper-ink);
+    transition: color 0.16s linear;
   }
 
-  .row-link:hover h3 {
-    color: var(--accent-ink);
+  .row:hover h3 {
+    color: #7a4d13;
   }
 
   .row p {
     margin: 0;
-    color: var(--muted);
+    color: #5b4f36;
     font-size: 14px;
-    line-height: 1.8;
+    line-height: 1.85;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
 
+  .row p:empty {
+    display: none;
+  }
+
   .row-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 13px;
+    margin-top: 14px;
+  }
+
+  .row-tags .pill {
+    padding: 4px 8px 3px;
+    border: 0;
+    border-radius: 0;
+    font-family: var(--px-pix);
+    font-size: 11.5px;
+    color: #7a5c1c;
+    background: #e4d5ae;
+    box-shadow: inset 2px 2px 0 0 #c9b483;
   }
 
   .row-arrow {
-    color: var(--muted);
     padding-top: 4px;
+    color: #8a5a1c;
     opacity: 0;
     transform: translate(-4px, 4px);
-    transition: opacity 0.25s var(--ease), transform 0.25s var(--ease), color 0.25s var(--ease);
+    transition: opacity 0.16s linear, transform 0.16s steps(2, end);
   }
 
-  .row-link:hover .row-arrow {
+  .row:hover .row-arrow {
     opacity: 1;
     transform: none;
-    color: var(--accent);
   }
 
   /* ---------------- card ---------------- */
@@ -203,35 +226,33 @@ const gradient = coverGradient(post);
     display: flex;
     flex-direction: column;
     height: 100%;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface);
-    overflow: hidden;
-    transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease),
-      border-color 0.35s var(--ease);
+    background: var(--px-paper);
+    box-shadow: var(--px-paper-frame);
+    transition: transform 0.16s steps(2, end), background-color 0.16s linear;
   }
 
   .card-link:hover {
     transform: translateY(-3px);
-    border-color: var(--line-strong);
-    box-shadow: var(--shadow-md);
+    background: var(--px-paper-2);
   }
 
   .thumb {
     position: relative;
     aspect-ratio: 16 / 9;
-    background: var(--cover);
+    /* 无封面时 coverGradient 偏浅，压一层深蓝让它沉下去；有封面图不受影响 */
+    background: linear-gradient(rgba(6, 17, 46, 0.72), rgba(6, 17, 46, 0.72)), var(--cover);
     overflow: hidden;
     isolation: isolate;
+    border-bottom: 4px solid var(--px-edge);
   }
 
   .thumb::after {
     content: "";
     position: absolute;
     inset: 0;
-    background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.5) 1px, transparent 0);
-    background-size: 14px 14px;
-    opacity: 0.4;
+    background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.45) 1px, transparent 0);
+    background-size: 16px 16px;
+    opacity: 0.35;
     mix-blend-mode: soft-light;
   }
 
@@ -239,7 +260,7 @@ const gradient = coverGradient(post);
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.6s var(--ease);
+    transition: transform 0.5s steps(6, end);
   }
 
   .card-link:hover .thumb img {
@@ -249,11 +270,12 @@ const gradient = coverGradient(post);
   .thumb-glyph {
     position: absolute;
     inset: auto auto 14px 18px;
-    font-family: var(--font-serif);
+    z-index: 1;
+    font-family: var(--px-hand);
     font-size: 26px;
-    color: rgba(255, 255, 255, 0.92);
-    text-shadow: 0 2px 12px rgba(30, 40, 28, 0.35);
-    letter-spacing: 0.04em;
+    color: #fff;
+    text-shadow: 2px 2px 0 var(--px-edge);
+    letter-spacing: 0.06em;
   }
 
   .card-body {
@@ -268,18 +290,28 @@ const gradient = coverGradient(post);
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11.5px;
-    color: var(--muted);
+    font-family: var(--px-pix);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--px-paper-soft);
   }
 
   .card h3 {
-    font-size: 19px;
+    font-family: var(--px-hand);
+    font-size: 20px;
+    font-weight: 600;
     line-height: 1.45;
+    color: var(--px-paper-ink);
+    transition: color 0.16s linear;
+  }
+
+  .card-link:hover h3 {
+    color: #7a4d13;
   }
 
   .card p {
     margin: 0;
-    color: var(--muted);
+    color: #5b4f36;
     font-size: 13.5px;
     line-height: 1.8;
     display: -webkit-box;
@@ -288,31 +320,38 @@ const gradient = coverGradient(post);
     overflow: hidden;
   }
 
+  .card p:empty {
+    display: none;
+  }
+
   .card-cta {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     margin-top: auto;
     padding-top: 12px;
-    font-size: 12.5px;
-    color: var(--accent-ink);
+    font-family: var(--px-pix);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: #8a5a1c;
   }
 
   .card-link:hover .card-cta {
     gap: 10px;
+    color: var(--px-paper-ink);
   }
 
   @media (max-width: 600px) {
     .row-link {
       grid-template-columns: 1fr auto;
       gap: 12px;
-      padding: 22px 4px;
+      padding: 20px 18px;
     }
     .row-index {
       display: none;
     }
     .row h3 {
-      font-size: 18.5px;
+      font-size: 20px;
     }
     .row-arrow {
       opacity: 1;

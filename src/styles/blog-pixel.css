@@ -1905,3 +1905,158 @@ body:has(.blog-pixel) .lightbox img {
     animation: none;
   }
 }
+
+/* ============================================================
+   博客内页通用外壳：首页 / 归档 / 标签 / 系列 / 碎片
+   这些页面共用同一套页头、区块标题与列表容器
+   ============================================================ */
+.blog-pixel .page-head {
+  position: relative;
+  padding: 52px 0 30px;
+}
+
+.blog-pixel .page-head h1 {
+  margin: 16px 0 14px;
+  font-family: var(--px-hand);
+  font-size: clamp(34px, 4.8vw, 46px);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 3px 3px 0 #1f4cb3, 6px 6px 0 var(--px-edge);
+}
+
+.blog-pixel .page-lede {
+  margin: 0;
+  max-width: 42em;
+  color: var(--px-soft);
+  font-size: 14.5px;
+  line-height: 1.95;
+}
+
+.blog-pixel .eyebrow {
+  color: var(--px-cyan);
+  font-family: var(--px-pix);
+  font-weight: 400;
+  letter-spacing: 0.16em;
+}
+
+.blog-pixel .eyebrow::before {
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.blog-pixel .section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.blog-pixel .section-head h2 {
+  margin: 10px 0 0;
+  font-family: var(--px-hand);
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 600;
+  line-height: 1.35;
+  color: #fff;
+}
+
+.blog-pixel .section-head .more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 0;
+  font-family: var(--px-pix);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: var(--px-gold);
+}
+
+.blog-pixel .section-head .more:hover {
+  color: #fff;
+}
+
+/* 列表容器：卡片自带 4px 硬边框，靠 gap 留出边框外的空间 */
+.blog-pixel .post-list {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding-bottom: 4px;
+  border-bottom: 0;
+}
+
+.blog-pixel .empty {
+  padding: 44px 0;
+  color: var(--px-faint);
+  font-size: 14px;
+}
+
+.blog-pixel .back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 36px;
+  font-family: var(--px-pix);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: var(--px-cyan);
+}
+
+.blog-pixel .back:hover {
+  color: var(--px-gold);
+}
+
+.blog-pixel .back svg {
+  transform: rotate(180deg);
+}
+
+/* 面包屑（标签页 / 系列页共用） */
+.blog-pixel .crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 22px;
+  font-family: var(--px-pix);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--px-faint);
+}
+
+.blog-pixel .crumb a {
+  color: var(--px-cyan);
+}
+
+.blog-pixel .crumb a:hover {
+  color: #fff;
+}
+
+.blog-pixel .crumb-current {
+  color: var(--px-soft);
+}
+
+/* 深色页面上的普通胶囊：统一成像素 chip */
+.blog-pixel .pill {
+  padding: 5px 9px 4px;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--px-pix);
+  font-size: 11.5px;
+  color: var(--px-cyan);
+  background: var(--px-panel-2);
+  box-shadow: inset 2px 2px 0 0 var(--px-slot-lo);
+}
+
+.blog-pixel a.pill:hover {
+  color: #1d1503;
+  background: var(--px-gold);
+  border: 0;
+}
+
+.blog-pixel .pill em {
+  font-style: normal;
+  font-size: 10px;
+  opacity: 0.65;
+}
