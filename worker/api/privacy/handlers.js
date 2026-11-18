@@ -21,6 +21,7 @@ import {
 import { hashStream, sha256Hex } from "../backups/crypto.js";
 import { publicRateLimitRules, rateLimitStats } from "../ratelimit.js";
 import { logSecurityEvent, pruneSecurityEvents } from "./events.js";
+import { isLastActiveAdmin } from "./last-admin.js";
 import {
   activeDeletion,
   activeExport,
@@ -1138,6 +1139,17 @@ async function deleteAccountHandler(env, request, user, userId) {
     throw new ApiError("ACK_REQUIRED", "必须确认历史备份也会被删除", 400);
   }
 
+  // 2.0 事故护栏：唯一的管理员注销后 users 表会归零，登录入口随之锁死
+  // （countAdmins=0 且未配置初始化密钥 → setup_disabled，GitHub 授权都进不去）。
+  // 这里放在消费重新验证票据之前，避免用户白走一遍 GitHub 授权才被拒。
+  if (await isLastActiveAdmin(env.DB, userId)) {
+    throw new ApiError(
+      "LAST_ADMIN",
+      "你是当前唯一的管理员，注销会让站点无法再登录；请先把管理员身份转交给其他成员",
+      409,
+    );
+  }
+
   const config = authConfig(env, request);
   const ticketToken = getCookie(request, REAUTH_COOKIE);
   if (!ticketToken) throw new ApiError("REAUTH_REQUIRED", "请先通过 GitHub 重新验证身份", 403);
@@ -1340,6 +1352,21 @@ async function runAccountDeletion(env, request, user, userId, job, config) {
     if (!checkpoint.auditId) {
       throw new ApiError("AUDIT_REQUIRED", "删除审计缺失，已中止账号删除", 500);
     }
+
+    // 兜底：从发起注销到真正删除 users 之间角色可能变化（例如期间被并发降级），
+    // 删除前再判一次。命中时把账号恢复到可用状态，避免停在 pending_deletion
+    // 里既登录不了、也无法再次发起注销。
+    if (await isLastActiveAdmin(env.DB, userId)) {
+      await env.DB.prepare("UPDATE users SET deletion_state = 'none' WHERE id = ?")
+        .bind(userId)
+        .run();
+      throw new ApiError(
+        "LAST_ADMIN",
+        "你是当前唯一的管理员，注销会让站点无法再登录；请先把管理员身份转交给其他成员",
+        409,
+      );
+    }
+
     await logSecurityEvent(env, {
       userId,
       eventType: "account_deletion_completed",
