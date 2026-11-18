@@ -125,7 +125,8 @@ async function ensureServer(api: APIRequestContext) {
     stdio: "ignore",
     env: { ...process.env, TEMP: path.join(ROOT, ".wrangler", "tmpdir"), TMP: path.join(ROOT, ".wrangler", "tmpdir") },
   }).unref();
-  const readyUrl = `http://127.0.0.1:8789/__e2e/ready`;
+  const adminPort = process.env.E2E_ADMIN_PORT || String(Number(process.env.E2E_API_PORT || 8788) + 1);
+  const readyUrl = `http://127.0.0.1:${adminPort}/__e2e/ready`;
   const deadline = Date.now() + 240_000;
   while (Date.now() < deadline) {
     try {
@@ -136,7 +137,7 @@ async function ensureServer(api: APIRequestContext) {
     }
     await sleep(1_000);
   }
-  throw new Error("e2e-server 未能在 240 秒内就绪（8789 /__e2e/ready）");
+  throw new Error(`e2e-server 未能在 240 秒内就绪（${adminPort} /__e2e/ready）`);
 }
 
 async function viewerWith(headers: Record<string, string>) {

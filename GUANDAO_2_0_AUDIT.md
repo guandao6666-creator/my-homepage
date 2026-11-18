@@ -921,3 +921,52 @@ Infrastructure
 | 文档 | `docs/architecture/COMMUNITY-PUBLISHING.md` |
 
 **Phase 5 结论：`Partially Verified`。** 本地 / 隔离层与真实浏览器 API 证据全部通过；生产发布链、页面级插件安装（Playwright 内）与真机冒烟未执行（生产层 `Blocked`），不写成「已验证」。
+
+## 附录 P：Phase 2 收尾（2.2 应用接口化 / 2.5 社区拆分完成，2026-11-14）
+
+### P.1 改造前真实结构
+
+- 2.2：`src/pages/index.astro` 6,605 行；5/17 低耦合应用已迁 `src/lib/legacy-apps/`；其余 12 个应用仍读外壳闭包（terminal 10 项、settings 12 项、树洞/议会/社交共享 auth 链、水族箱/访客墙/新闻/监视器共享游戏循环与全局窗口集合）；`LegacyAppContext` 仅 4 项能力。
+- 2.5：`src/lib/os14/community.ts` 3,131 行；已拆 6 模块共 342 行；`initCommunity` 内仍 73 个闭包函数；批次 1/4 完成；7 个 loader 的自由变量已用 AST 列出（creatorsSort / explore / meta,viewer / creatorPostSort,creatorPostType,view / applyViewerChrome,meta,notificationsPage / loadHome,searchState,view / creations*、installedCache、meta）。
+- HTML 安全扫描基线 291 处（sink 60、url-assign 5、url-interp 0、duplicate 1 已修）。
+
+### P.2 本阶段实现
+
+- 2.2 外壳能力接口化：`src/lib/legacy-apps/types.ts` 新增 5 类显式 port——`shell`（closeWindow/setTheme/setWallpaper/runExtensionCommand/makeId）、`auth`（formHtml/read/ensureFreshToken/signOut/onChange）、`lifecycle`（interval/timeout/onGlobal/dispose）、`achievements`（list/state/unlock）、`desktopFacilities`（openWindowCount/openWindowTitles/deskCount/bootedAt/appTitles/phase），每个字段 JSDoc 注明使用方与暴露理由；`lifecycle.ts` 用 WeakMap 登记 interval/timeout/全局监听，`registerLegacyApps` 把 init 包装为 `cleanup(){cleanup?.();dispose(win)}`，由 `__gosCleanup`/closeWin 调用。
+- `src/pages/index.astro` 复用原闭包构造端口并注入 `registerLegacyApps(ctx)`；APPS 静态条目 12→2（terminal 键序锚点 + settings），legacyInit 分支 11→1，运行时 17 键序由 E2E 断言保持；**16/17 应用迁出**（terminal、treehole、council、social、aquarium、visitors、news、monitor、browser、draw、achievements 等；`src/lib/legacy-apps/` 21 文件 / 2,639 行），index.astro 6,605→**4,832 行**（−1,773 行 / −73,279 B）。`settings` 按文档 §6 判定标准保留：依赖壁纸/主题/程序坞/小组件/数据备份等 12+ 项外壳状态，逐项说明「迁出只是透传、不减耦合，等 Core Settings API」。
+- 2.5 社区拆分：`CommunityContext` 扩容（meta/viewer/explore/searchState/排序筛选/creations*/notificationsPage/installedCache/loadHome 等，全部返回闭包同一引用）→ 7 个 loader 全部迁入 `loaders.ts`（617 行）；批次 3–4 新增 `detail.ts`（357）、`publish.ts`（515）、`interactions.ts`（422）、`moderation.ts`（279）、`upload.ts`（65），上下文再扩 win/toast/isStaff/isAdmin/getView/getLastTab/setLastTab 与 detailCache/publishState/versionState/moderation*；community.ts 3,131→**1,271 行**，11 模块合计 2,648 行；导出面仍是 `["initCommunity","renderCommunity"]`。DOM 事件代理、启动 IIFE、init 壳层、ctx 对象与 render/init 本体有意保留（同一 DOM 生命周期，拆出会破坏事件委托与 cleanup）。
+- HTML 安全 allowlist：按 scanner 真实计数统一更新（sink 60 = index 28 + community 7 + legacy 19 + detail 1 + publish 5；url-assign 5 = index 3 + terminal 1 + visitors 1），守恒验证为纯搬迁、无新增注入点；每处 reason 注明来源与转义依据。
+
+### P.3 实测结果
+
+| 项 | 结果 |
+| --- | --- |
+| `npm run verify` | exit 0：19 文件 / **357 单测**；security:test 六组（11/8/9/11/4/6）；check:unused 18；check:astro 345 files 0 errors/0 warnings/163 hints；check:html-security **291/未审查 0**；lint；build 29 pages；CSP 12 哈希/30 HTML；migrations 18/117 |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **171 passed（3.9m）**：chromium **80** + worker **67**（签名 19 / 沙箱 11 / 设备 12 / OAuth 14 / 同步 8 / 教程 2 / 插件发布链 1）+ firefox-worker 12 + webkit-worker 12 |
+| 2.2 迁移回归 | `legacy-apps.spec.ts` **25 passed**（新增 13 项：第二批 11 应用打开/交互/关闭 + 生命周期）；`lifecycle.spec.ts` 计数 listeners 5→5、timeouts 1→1、intervals 1→1、rafs 0→0 |
+| 2.5 导出面/工具 | `tests/unit/community.test.ts` 11 passed；community.test 导出面仍只有 `initCommunity`/`renderCommunity` |
+| `npm run qa:sync` | **45/45**（Phase 4 五域无回归） |
+| `npm run qa:devices` | **31/31**（设备中心无回归） |
+
+### P.4 风险与未验证
+
+1. `settings` 未迁移：等待 Core Settings API；当前仍依赖 index.astro 闭包，属有意保留而非遗漏（文档 §6 有逐项理由）。
+2. 已知债务：`initRank` 的 `void load()` 未随窗口取消；legacy 网络请求暂无取消 port。
+3. 行为差异仅两处：应用自清 interval 改为 `lifecycle.dispose` 统一清理；auth-change 监听改为窗口级回收——功能不变、无视觉/DOM/class/`guandao.*` 键变化。
+4. APPS 键序依赖 terminal 字面量锚点 + 原地覆盖，后续维护不得改为 delete 后重加。
+5. 同一工作区并发跑 Playwright/verify 会共享 `.wrangler/state` 本地 D1 互相干扰（已写入 `LEGACY-APPLICATIONS.md` §11）；Clash Verge 占用 8789 时须用 `E2E_ADMIN_PORT=18789`。
+6. 生产未变更：未写生产 D1/R2、未应用生产迁移、未部署、未跑 `qa:prod`；本阶段只影响前端模块拆分与 HTML 安全 allowlist 计数。
+
+### P.5 证据索引
+
+| 证据 | 位置 |
+| --- | --- |
+| 2.2 架构与端口契约 | `docs/architecture/LEGACY-APPLICATIONS.md`（§6 未迁移理由、§11 并发教训） |
+| 2.2 实现 | `src/lib/legacy-apps/**`（types/lifecycle/index + 16 应用）、`src/pages/index.astro` |
+| 2.2 测试 | `tests/unit/legacy-apps.test.ts`、`tests/e2e/legacy-apps.spec.ts`、`tests/e2e/lifecycle.spec.ts` |
+| 2.5 架构 | `docs/architecture/COMMUNITY-ARCHITECTURE.md`（v2，2026-11-14） |
+| 2.5 实现 | `src/lib/os14/community.ts` + `src/lib/os14/community/**`（11 模块 / 2,648 行） |
+| 2.5 测试 | `tests/unit/community.test.ts` |
+| HTML 安全 | `scripts/html-security-allowlist.json`（291 处 / 未审查 0） |
+
+**Phase 2 结论：`Verified`（本地 / CI 层）。** 2.1/2.2/2.3/2.4/2.5 全部完成并回归通过；生产层事项（部署/生产验证）仍按 Phase 1.6 门禁 `Blocked`，不计入本结论。

@@ -32,3 +32,17 @@ export type PublishState = {
   wallpapersChanged: boolean;
   coverChanged: boolean;
 };
+
+/** 详情页缓存（闭包内 `detailCache`）；字段同搬迁前一致 */
+export type DetailCache = {
+  data: Awaited<ReturnType<typeof api.getPost>>;
+  manifest: Manifest | null;
+  comments: Awaited<ReturnType<typeof api.getComments>> | null;
+  commentsPage: number;
+};
+
+/** 新版本发布状态（闭包内 `versionState`） */
+export type VersionState = { post: Post; manifest: Manifest | null; baseVersion: string };
+
+/** 审核中心的标签页（闭包内 `moderationTab`） */
+export type ModerationTab = "queue" | "reports" | "users" | "settings" | "invites" | "audit";

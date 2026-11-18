@@ -22,6 +22,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT || 4399);
 const API_PORT = Number(process.env.E2E_API_PORT || 8788);
+// 本地夹具管理端口。默认 API_PORT+1，但允许用 E2E_ADMIN_PORT 覆盖：
+// 本机 Clash Verge 等用户态代理可能占用 8789（IPv6 双栈），此时用
+// `E2E_ADMIN_PORT=18789 npx playwright test ...` 即可绕开，不影响 Worker 端口。
+const ADMIN_PORT = Number(process.env.E2E_ADMIN_PORT || API_PORT + 1);
 
 /** 需要真实 Worker 的 spec —— 只有这些进 `worker` project。 */
 const WORKER_SPEC =
@@ -55,7 +59,7 @@ export default defineConfig({
       // `${API_PORT}/api/health`——Worker 在 buildFixtures() 完成前就已健康，
       // 测试会与夹具的 wrangler d1 execute 写入抢同一本地 D1（曾导致 ECONNRESET）。
       command: "node scripts/e2e-server.mjs",
-      url: `http://127.0.0.1:${API_PORT + 1}/__e2e/ready`,
+      url: `http://127.0.0.1:${ADMIN_PORT}/__e2e/ready`,
       reuseExistingServer: true,
       timeout: 240_000,
       stdout: "pipe",

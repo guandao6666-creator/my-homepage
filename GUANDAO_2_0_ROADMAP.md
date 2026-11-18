@@ -178,22 +178,22 @@
 > 取证脚本与架构文档已提交 `a712d96`。
 > 权威说明见 [`docs/architecture/DESKTOP-CSS.md`](docs/architecture/DESKTOP-CSS.md)。
 
-### 2.2 执行结果（2026-11-07）
+### 2.2 执行结果（2026-11-14）
 
 | 项 | 结果 |
 | --- | --- |
-| 已迁移应用 | **5 个**：`posts`（文章）/ `about`（关于）/ `rank`（排行榜）/ `calc`（计算器）/ `viewer`（图片查看器） |
-| 新模块 | `src/lib/legacy-apps/`：8 文件 / 470 行（含 `types.ts` 与共享上报 `leaderboard/report.ts`） |
-| 接入方式 | 复用 `registerApp`；能力经 `LegacyAppContext` 显式注入，注册点位于 `renderDock()` 之前 |
-| `index.astro` | 7,765 → **7,439 行**（迁移）→ **6,605 行**（清理死代码后；331,283 → 283,007 B） |
-| 重复实现 | 排行榜上报由外壳与窗口共用一份（`RANK_NAME_KEY` 键名保持不变） |
-| 回归 | E2E **36/36**（新增 12）；单测 **123/123**（新增 8）；`verify` 绿；`qa:sync` 20/20 |
-| 未迁移 | 12 个应用仍读闭包：终端/设置为 10–12 项外壳依赖，树洞/议会/社会网络共享认证链路 |
-| 死代码清理 | **已删除 831 行**：`notes`/`calendar`/`files`/`music` 旧实现被 os14 同名应用覆盖，不可达 |
-| 结论 | **Partially Verified**：低耦合应用一类已完整迁移并验证；高耦合应用需先做外壳能力接口化 |
+| 已迁移应用 | **16 / 17**：第一批 5 个（`posts` / `about` / `rank` / `calc` / `viewer`）+ 第二批 11 个（`achievements` / `aquarium` / `visitors` / `draw` / `council` / `treehole` / `news` / `social` / `monitor` / `browser` / `terminal`） |
+| 未迁移 | **1 个：`settings`**——依赖壁纸 / 主题 / 程序坞 / 小组件 / 备份等 **12+ 项外壳状态**；按判断标准（迁出后仍需十余次闭包透传 ≠ 解耦）保留，理由逐项写入架构文档 §6，等 Core Settings API 出现后再迁 |
+| 新模块 | `src/lib/legacy-apps/`：**21 文件 / 2,639 行**（`types.ts` 193 / `lifecycle.ts` 64 / `index.ts` 78 / 16 个应用 / `quotes.ts` 35 / `report.ts` 35） |
+| 外壳能力接口化 | `LegacyAppContext` 新增 5 类显式 port：`shell`（关窗/主题/壁纸/命令/`makeId`）、`auth`（登录表单/读取/续期/退出/变更）、`lifecycle`（interval/timeout/全局监听/dispose）、`achievements`（列表/状态/解锁）、`desktopFacilities`（窗口数/标题/桌面数/启动时间/应用标题/phase） |
+| 生命周期 | `lifecycle.ts` 用 WeakMap 登记资源；`registerLegacyApps` 把 init 包成 `cleanup(){cleanup?.();dispose(win)}`，由 `__gosCleanup` 在关窗时统一释放（语义与 1.0 一致） |
+| `index.astro` | **6,605 → 4,832 行**（283,037 → 209,758 B，−1,773 行 / −73,279 B）；APPS 静态条目 12→2、legacyInit 分支 11→1；运行时 APPS **17 键序**由 E2E 断言保护 |
+| 行为兼容 | 视觉 / DOM / class / 事件 / `guandao.*` 存储键零变化；3 个一次性脚本对比 git HEAD 的模板与字符串字面量，9 个模板应用 body 逐字节一致；唯一实现差异是自清 interval 改为 `dispose(win)` 统一清、`auth-change` 监听改为窗口级回收 |
+| 回归 | 单测 **357/357**（含 `tests/unit/legacy-apps.test.ts` 14 项，含「模块不出现 `readAuth`/`authFormHtml`/`writeState`/`window.GOS14`」源码扫描）；chromium 全量 **80 passed**；`legacy-apps.spec.ts` **25 passed**（新增 13 项，含生命周期计数 listeners 5→5 / timeouts 1→1 / intervals 1→1）；`tsc` 0、`check:astro` 0 error / `lint` 0、build 29 页 + CSP 12 哈希 |
+| 结论 | **Verified（本地 / CI）**：外壳能力接口化 + 16 个应用迁出，全部行为回归通过；`settings` 保留原因已记录 |
 
-> 行数不是本阶段目标（`index.astro` 早已低于 12,000 行）。
-> 判断标准是「迁出的应用不再依赖闭包」，而不是删掉多少行。
+> 判断标准是「迁出的应用不再依赖闭包」，而不是删掉多少行；`settings` 按该标准保留。
+> 已知非本阶段债务：`initRank` 的 `void load()` 未随窗口取消；网络请求尚无取消 port（建议与 2.4 的 AbortController 一起做）。
 > 权威说明见 [`docs/architecture/LEGACY-APPLICATIONS.md`](docs/architecture/LEGACY-APPLICATIONS.md)。
 
 ### 2.3 执行结果（2026-11-07）
@@ -251,41 +251,44 @@
 
 > 权威说明见 [`docs/architecture/EVENT-LIFECYCLE.md`](docs/architecture/EVENT-LIFECYCLE.md)。
 
-### 2.5 批次 1 执行结果（2026-11-07）
+### 2.5 执行结果（2026-11-14）
 
 | 项 | 结果 |
 | --- | --- |
 | 原始规模 | `community.ts` **3,350 行 / 171,279 字节** |
-| 公开导出 | **只有 2 个**：`renderCommunity`、`initCommunity` |
-| 已拆出 | `community/{types,constants,ui}.ts`，合计 **252 行**（类型 / 常量 / 纯渲染工具） |
-| `community.ts` 现在 | **3,163 行**（-187），作为兼容入口，导出面不变 |
-| 兼容性 | 有测试锁定导出面 = `["initCommunity","renderCommunity"]` |
-| 未完成 | `initCommunity` 内 **73 个函数**仍共享同一闭包（批次 2–4） |
-| 全量门禁 | `verify` **195 单测**；E2E **64**；`qa:sync` 20/20 |
-| 结论 | **Partially Verified** |
+| 公开导出 | **只有 2 个**：`renderCommunity`、`initCommunity`（测试锁定） |
+| 批次 1 | `community/{types,constants,notifications,ui}.ts`，252 行（类型 / 常量 / 通知文案 / 纯渲染工具） |
+| 批次 2 | `CommunityContext` 扩 17 项 getter/setter（`getMeta` / `getViewer` / `getExplore` / `getSearchState` / 各排序筛选 / `getInstalledCache` / `loadHome` 等）+ `loaders.ts` 迁出 **9 个 loader**（617 行） |
+| 批次 3/4 | `detail.ts` 357（详情/评论/预览/许可证）、`publish.ts` 515（发布/版本/Manifest/上传）、`interactions.ts` 422（点赞/收藏/安装/更新/编辑/删除/举报）、`moderation.ts` 279（审核队列/动作）、`upload.ts` 65（图片选择/上传） |
+| 最终模块 | **11 个模块 / 2,648 行** |
+| `community.ts` 现在 | **1,271 行**（3,350 → 3,131 → 2,718 → 1,271，累计 **−2,079 行**） |
+| 有意保留 | DOM 事件代理层（2 click / change / 2 submit / keydown / window 监听 + cleanup）、启动 IIFE、编排壳层（openTab / setBody / showError / needLogin / ensureMeta…）、9 个 loader wrapper、`communityCtx` 对象——均绑定同一 DOM 生命周期，拆出会破坏事件委托与清理语义 |
+| 状态共享 | 仍为单一闭包，经 `CommunityContext` getter/setter 暴露；**未复制第二份状态** |
+| 兼容性 | 导出面不变；事件委托、CSS 类名、localStorage 键、文案、计数语义均未变 |
+| 测试与门禁 | `tsc` 0；`tests/unit/community.test.ts` **11/11**；lint / build（29 页 + CSP 12 哈希）/ `check:csp` 通过；`os20.spec + desktop.spec` **15 passed**；HTML 安全扫描：`community.ts` 13 处拆为 7 + `detail.ts` 1 + `publish.ts` 5（总数守恒 13，0 新增），allowlist 已按真实计数更新 |
+| 结论 | **Verified（本地 / CI）** |
 
-> 说明：本轮只完成零风险的纯逻辑层。剩余 73 个函数需要先抽 context 对象，
-> 与 Phase 2.2 的 5 应用迁移同量级，留给专门批次。
-> 详见 [`docs/architecture/COMMUNITY-ARCHITECTURE.md`](docs/architecture/COMMUNITY-ARCHITECTURE.md)。
+> 方法：先用 TypeScript 编译器 API 求每个函数的真实自由变量 → 扩 `CommunityContext` → 每次只搬 1 组 →
+> `tsc` 立即验证 → 全部完成后跑单测 / build / CSP / 相关 E2E。
+> 权威说明见 [`docs/architecture/COMMUNITY-ARCHITECTURE.md`](docs/architecture/COMMUNITY-ARCHITECTURE.md)。
 
-### Phase 2 阶段判断（2026-11-07）
+### Phase 2 阶段判断（2026-11-14）
 
 | 阶段 | 状态 |
 | --- | --- |
 | 2.1 Desktop CSS | Verified |
-| 2.2 Legacy Applications | Partially Verified |
+| 2.2 Legacy Applications | **Verified**（16/17 应用迁出；`settings` 按判断标准保留并记录理由） |
 | 2.3 / 2.3.1 HTML Security | Verified |
 | 2.4 Event Lifecycle | Verified |
-| 2.5 Community | **Partially Verified**（批次 1/4） |
+| 2.5 Community | **Verified**（批次 1–4 完成；1,271 行，事件代理层有意保留） |
 
-**Phase 2 整体：`Partially Verified`** —— 2.5 未完成，按验收标准不能标记 Verified，
-因此**不进入 Phase 3**。
+**Phase 2 整体：`Verified`（本地 / CI）** —— 2.2 与 2.5 的遗留项已补齐；生产行为未变，无生产部署。
 
-架构现状：`index.astro` 6,603 行；`community.ts` 3,163 行；CSS 已独立；
-旧应用已迁出 `src/lib/legacy-apps/`；HTML 安全统一（291 处注入点全部登记）；
-资源生命周期有 19 项契约测试 + 7 项计数基线。
+架构现状：`index.astro` 4,832 行；`community.ts` 1,271 行；CSS 已独立；
+16 个旧应用已迁出 `src/lib/legacy-apps/`（21 文件 / 2,639 行）；HTML 安全统一（291 处注入点全部登记，
+allowlist 按本次迁移真实计数更新）；资源生命周期有 19 项契约测试 + 7 项计数基线。
 
-任务 2.5 批次 2（列表/搜索迁移）尚未开始。
+质量门禁（2026-11-14 本机实跑）：`npm run verify` exit 0（19 文件 / **357 单测**；html-security 291/未审查 0；migrations 18/117）；`npx playwright test` **171 passed**（chromium **80** + worker 67 + firefox 12 + webkit 12）；`npm run qa:sync` **45/45**；`npm run qa:devices` **31/31**。
 
 ### 2.2 前置条件
 
@@ -348,9 +351,9 @@
 
 ### 3.5 执行结果（2026-11-08 收尾更新）
 
-> 前置状态说明：Phase 2 整体仍为 `Partially Verified`（2.2 Legacy、2.5 Community 未完成），
-> 本路线图此前的结论是「不进入 Phase 3」。本次是**所有者直接指派 Phase 3**；
-> Phase 2 的状态不因本阶段工作而变化，也没有在本阶段里顺手修改 Phase 2 的代码。
+> 前置状态说明（历史记录）：Phase 3 执行当时 Phase 2 整体为 `Partially Verified`（2.2 Legacy、2.5 Community 未完成），
+> 路线图此前的结论是「不进入 Phase 3」；本次是**所有者直接指派 Phase 3**，且未在 Phase 3 里顺手修改 Phase 2 代码。
+> **2026-11-14 更新**：Phase 2 的 2.2 / 2.5 遗留项已另行补齐，Phase 2 整体升为 `Verified（本地 / CI）`（见 §2.2 / §2.5 执行结果）。
 
 | 项 | 结果 |
 | --- | --- |
@@ -389,7 +392,7 @@
 物理设备冒烟与真机 Safari/iOS 未做。**不标记「全部通过」；Phase 4 是否启动由所有者另行决定。**
 
 处置记录：PR #1（`ci/phase3-verify` → `main`）仅用于触发 CI，验证后已关闭、未合并；
-`main` 仍为 `e8603f7`。Phase 2 的 2.2 / 2.5 遗留作为独立项跟踪，不阻塞 Phase 4。
+`main` 仍为 `e8603f7`。Phase 2 的 2.2 / 2.5 遗留项已于 2026-11-14 补齐（见 §2.2 / §2.5 执行结果），不再作为独立跟踪项。
 
 ---
 

@@ -776,7 +776,7 @@ id/email/github_username/created_at；目标行数必须为 1；关联资源 >10
 - 独立 Sandbox Origin：已有本地真实两源隔离实测（`tests/e2e/sandbox-origin.spec.ts`）；但生产域名/证书/Worker route **未创建**，且实测发现 Cookie 作用域是 host（换端口不隔离），落地必须使用独立 host。
 - 真实 10 分钟配对 TTL 已由 `npm run qa:pairing-ttl` 覆盖；两台物理设备的人工冒烟未做。
 - 导航逃逸只能事后惩罚；D1 是安装完整性信任根（安装接口不读 R2 原文）。
-- Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。
+- Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。**（2026-11-14 已补齐并升为 `Verified（本地 / CI）`，见 §16.19。）**
 
 **结论：`Accepted (Local/CI)`；生产层 `Blocked`。** 本地 / 隔离环境与 GitHub Actions 全部通过（quality 三 job 全绿、E2E 147 passed）；生产部署、生产验证、物理设备与真机项按 Phase 1.6 门禁未执行，不写成「已验证」。PR #1 仅用于触发 CI，验证后已关闭、未合并 `main`，分支 `ci/phase3-verify` 保留。
 
@@ -845,7 +845,7 @@ GitHub Actions（`.github/workflows/quality.yml`，run [42965051693](https://git
   客户端状态机由 `tests/unit/sync-conflicts.test.ts` 覆盖，UI 纯函数由 `tests/unit/systemcenter-sync.test.ts` 覆盖；构建后应补一次页面级确认。
 - 5000 实体 / 2000 墓碑的 409 造数不在 E2E 中，由 `qa:sync` 真实触发。
 - 90 天 TTL 采用「TTL + 台账」策略；离线超过 90 天的设备再同步会收到 deleted 冲突（预期）。清理日志未接外部告警。
-- Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪。
+- Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪。**（2026-11-14 已补齐并升为 `Verified（本地 / CI）`，见 §16.19。）**
 
 **结论：`Partially Verified`（本地 / 隔离层通过；生产层 `Blocked`）。** 全部本地门禁与真实浏览器 Context 证据通过；生产迁移、生产验证、页面级冲突 UI E2E 与物理设备冒烟按 Phase 1.6 门禁未执行，不写成「已验证」。
 
@@ -892,6 +892,77 @@ GitHub Actions quality 全绿（run [43588486049](https://github.com/guandao6666
 - `seed-qa-local.mjs` 复用唯一 admin 并清其其它 session，与 e2e fixtures 共用 admin 时不可并发；spec 已做回退。
 
 **结论：`Partially Verified`（本地 / 隔离层通过；生产层 `Blocked`）。** 社区与插件发布链在真实 Worker + 本地 D1/R2 上完整通过并可重复运行；生产发布链与页面级插件安装（Playwright 内）未执行，不写成「已验证」。
+
+### 16.19 Phase 2 收尾（2026-11-14）
+
+**1. 目标与范围**
+
+补齐 Phase 2 的两项遗留：2.2 旧版应用迁移后半段（外壳能力接口化 + 剩余应用迁出）、2.5 社区模块拆分的后续批次；不改桌面视觉、不重写 Core/Window Manager，不改变任何 `guandao.*` 存储键与既有事件行为。
+
+**2. 本阶段交付**
+
+- 2.2：`src/lib/legacy-apps/types.ts` 新增 5 类显式 port（`shell` / `auth` / `lifecycle` / `achievements` / `desktopFacilities`，逐字段 JSDoc）；`lifecycle.ts` 用 WeakMap 登记 interval/timeout/全局监听，窗口关闭统一 `dispose`。`src/pages/index.astro` 复用原闭包构造并注入端口，APPS 静态条目 12→2、legacyInit 分支 11→1、**16/17 应用迁出**（`src/lib/legacy-apps/` 21 文件 / 2,639 行），index.astro 6,605→**4,832 行**；`settings` 依赖 12+ 项外壳状态，按判定标准保留（文档 §6 说明）。
+- 2.5：`CommunityContext` 扩容后 7 个 loader 全部迁出（`loaders.ts` 617 行），批次 3–4 新增 `detail.ts`（357）、`publish.ts`（515）、`interactions.ts`（422）、`moderation.ts`（279）、`upload.ts`（65）；`community.ts` 3,131→**1,271 行**，11 模块合计 2,648 行，导出面仍只有 `initCommunity`/`renderCommunity`。
+- HTML 安全 allowlist 按真实计数更新（sink 60 = index 28 + community 7 + legacy 19 + detail 1 + publish 5；url-assign 5），纯搬迁守恒、未审查 0。
+- 文档：`docs/architecture/LEGACY-APPLICATIONS.md` 重写（452 行）、`COMMUNITY-ARCHITECTURE.md` v2；ROADMAP/ACCEPTANCE/AUDIT（附录 P）同步。
+
+**3. 质量门禁（本机实跑）**
+
+| 门禁 | 结果 |
+| --- | --- |
+| `npm run verify` | exit 0；19 文件 / **357 单测**；html-security 291 处全审查；lint；build 29 pages；CSP 12 哈希/30 HTML；migrations 18/117 |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **171 passed（3.9m）**：chromium **80** + worker **67**（签名 19 / 沙箱 11 / 设备 12 / OAuth 14 / 同步 8 / 教程 2 / 插件发布链 1）+ firefox 12 + webkit 12 |
+| `npm run qa:sync` | **45/45**（五域无回归） |
+| `npm run qa:devices` | **31/31**（设备中心无回归） |
+
+**4. 风险与未完成**
+
+- `settings` 未迁移：等待 Core Settings API（12+ 外壳依赖，硬迁只是透传）。
+- 已知债务：`initRank` 的 `void load()` 不随窗口取消；legacy 网络请求无取消 port。
+- 并发注意：同工作区并发 Playwright/verify 共享 `.wrangler/state` 本地 D1 会互扰；Clash Verge 占 8789 时须 `E2E_ADMIN_PORT=18789`。
+- 生产未变更：未写生产 D1/R2、未应用生产迁移、未部署、未跑 `qa:prod`。
+
+**结论：Phase 2 `Verified`（本地 / CI 层）。** 2.1–2.5 全部完成且全量回归通过；生产部署/验证仍按 Phase 1.6 门禁 `Blocked`。
+
+### 16.20 Phase 6.1 · 旧版应用懒加载（2026-11-18）
+
+**1. 目标与范围**
+
+把 16 个旧版应用的**实现**移出入口 chunk，元数据保持同步可读。不改窗口系统、不改 `registerApp` 契约、
+不改 5 类 port、不改任何 `guandao.*` 存储键与事件行为；不修改 `settings`（仍在外壳）。
+
+**2. 交付**
+
+- 新增 `src/lib/legacy-apps/manifest.ts`：16 条 `{id,title,width,height,glyph,load}`，顺序 = 1.0 时代 APPS 键序。
+- `src/lib/legacy-apps/index.ts`：删除 16 个静态 import，`registerLegacyApps` 统一注册 `load()`；
+  新增 `adapt()` 把模块 + ctx 适配成 `{body, init}`（init 仍包一层 `lifecycle.dispose`）。
+- `types.ts`：新增 `LegacyLazyAppModule` / `LegacyAppManifestEntry`；`LegacyAppSpec.body` 改可选，新增 `load?`。
+- 复用外壳**既有**懒加载通道（骨架屏 / 12 秒超时 / 崩溃卡片 / `recordAppMetric`），未新增第二套机制。
+- 测试：`tests/unit/legacy-apps.test.ts` 适配为异步并新增 3 项（清单元数据与模块导出一致、`load().body()` 与模块直调一致、注册全部按需）。
+- 文档：`docs/architecture/LEGACY-APPLICATIONS.md` 新增 §4.6 / §9.1。
+
+**3. 实测**
+
+| 项 | 结果 |
+| --- | --- |
+| 入口 chunk | **525,102 B → 482,939 B**（−42,163 B / −8.0%） |
+| 应用分块 | 76,003 B / 18 文件，按需下载 |
+| 单测 | 19 文件 / **359 passed**（legacy-apps 16 项，原 13） |
+| 目标 spec E2E | **27 passed**：`legacy-apps` 25 + `lifecycle` 2（含 20 次开关监听器不增长） |
+| 全量 E2E | **171 passed (4.2m)**，exit 0，与改造前同数量 |
+| build / CSP | exit 0，29 页；12 哈希 / 30 HTML 一致 |
+
+**4. 未达标与风险**
+
+- 入口仍 **482,939 B > 450 KB**，任务记为 `部分完成`，不得写成 6.1 完成。
+  剩余归因：`index.astro` 内联脚本 15.8%、`os13.ts` 10.4%、`widgetstore` 6.6%、`catalog` 4.5%、插件层 7.7%。
+- 元数据双处维护（清单 + 模块导出），仅靠单测防漂移；新增应用必须同时改两处。
+- 首次打开应用多一次 chunk 请求（有骨架屏、12 秒超时、可重试崩溃卡片兜底）。
+- 环境：本机沙箱 safe-delete 守卫会在 `astro build` 清理 `dist/.prerender`、Playwright 清理 `test-results` 时中断进程；
+  规避方式已写入 `docs/AI-BUILD-STATUS.md`。该现象不影响 CI。
+- 生产未变更：未部署、未应用迁移、未跑 `qa:prod`。
+
+**结论：6.1 `Partially Verified`（本地 / CI 层）。**
 
 ### 16.4 回滚预案（已确认可用，未实际执行）
 

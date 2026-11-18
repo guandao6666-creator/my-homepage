@@ -173,21 +173,22 @@ Worker + 静态资源部署、`/api/health`、`/api/auth/status`、未登录 401
 | Phase 2.1 验收口径 | **已修订（2026-11-07 所有者决定）** | 2.1 收敛为「结构 / 语义 / 视觉」；首屏 ≤ 200 KB 移交 Phase 6.2，起点基线 476,749 B |
 | Phase 6.2 首屏 CSS | **未达标（待 Phase 6 处理）** | 当前 476,749 B；仅桌面样式包本身 273,238 B，需先做非首屏样式延迟加载 |
 | Phase 2.1 取证缺口 | **已关闭** | `1440x900-dialog` 已恢复复采且 diff=0；截图脚本已入库 `a712d96` |
-| Phase 2.2 旧应用迁移 | **Partially Verified** | 5 个低耦合应用迁至 `src/lib/legacy-apps/`；复用 `registerApp` + `LegacyAppContext`；`index.astro` 7,765 → 6,605 行 |
-| Phase 2.2 回归证据 | **通过** | E2E 36/36（新增 12 项）；单测 123/123（新增 8 项）；`verify` 绿；`qa:sync` 20/20 |
-| Phase 2.2 未迁移应用 | **12 个仍读闭包** | 终端 10 项 / 设置 12 项外壳依赖；树洞·议会·社会网络共享认证链路；需先做外壳能力接口化 |
+| Phase 2.2 旧应用迁移 | **Verified（本地 / CI）** | 16/17 应用迁至 `src/lib/legacy-apps/`（21 文件 / 2,639 行）；新增 5 类显式 port（shell/auth/lifecycle/achievements/desktopFacilities）；`index.astro` 6,605 → **4,832 行**；运行时 APPS 17 键序有 E2E 断言 |
+| Phase 2.2 未迁移应用 | **1 个：`settings`（按判断标准保留）** | 依赖壁纸/主题/程序坞/小组件/备份等 12+ 项外壳状态；迁出仍需十余次闭包透传 ≠ 解耦，逐项理由见 LEGACY-APPLICATIONS.md §6 |
+| Phase 2.2 回归证据 | **通过** | 单测 **357/357**（legacy-apps 14 项含「模块不读闭包」源码扫描）；chromium 全量 **80 passed**；`legacy-apps.spec.ts` **25 passed**（新增 13 项含生命周期计数）；tsc 0 / check:astro 0 error / lint 0 / build 29 页 + CSP 12 哈希 |
 | Phase 2.2 死代码清理 | **已完成（831 行）** | `notes`/`calendar`/`files`/`music` 旧实现被 os14 覆盖，已删除；含可达性论证与 `openFromHash()` 深链补偿 |
 | Phase 2.3 统一转义 | **Verified** | `src/lib/html.ts` 为唯一实现；6 处重复已迁移，`blog/index.astro` 内联副本保留并有 20 组一致性测试 |
 | Phase 2.3 安全测试 | **通过** | 单元 **47/47**；DOM **26/26**（含对照组与 7 种危险 URL） |
-| Phase 2.3.1 全量审计 | **Verified** | HTML sink **268**、动态 URL **42**、直接赋值 **22** 全部登记；`check:html-security` 接入 verify，291 处命中 0 未审查 |
+| Phase 2.3.1 全量审计 | **Verified** | HTML sink **268**、动态 URL **42**、直接赋值 **22** 全部登记；`check:html-security` 接入 verify，291 处命中 0 未审查（2026-11-14 按 2.2/2.5 迁移后真实计数更新 allowlist：sink 60 处由 index.astro 47 + community.ts 13 重新分布到 legacy-apps/community 子模块，总数守恒） |
 | Phase 2.3.1 补漏 | **已修复** | 发现并迁移 2 份上一轮正则漏掉的转义副本（`pairing/page.ts`、`admin/index.astro`） |
 | Phase 2.4 资源生命周期 | **Verified** | 复用既有 `ResourceScope`；修复 `once: true` 计数不回收缺陷；新增 Scope 单测 **19 项** |
 | Phase 2.4 开关测试 | **通过** | 20 次开关 7 项计数全部零净增长（监听 5→5 / 定时器 1→1 / 观察器 4→4 / 资源域 7→7 等）+ 4 项功能回归 |
 | Phase 2.4 模块迁移 | **0 个（不需要）** | 审计显示现有 Root/Application/Window/Component 归属正确，按「不为覆盖而强行迁移」处理 |
 | Phase 2.4 Root Disposal | **评估后不启用** | `installRootDisposal` 用 `pagehide`，与 BFCache 冲突；理由见 EVENT-LIFECYCLE.md §6 |
-| Phase 2.5 社区拆分 | **Partially Verified** | 批次 1/4：拆出 `community/{types,constants,ui}.ts`（252 行），`community.ts` 3,350 → 3,163 行，导出面不变 |
-| Phase 2.5 未完成 | **73 个闭包函数** | 仍共享 `initCommunity` 闭包；需先抽 context 对象，留给批次 2–4 |
-| Phase 2 整体 | **Partially Verified** | 2.1/2.3/2.3.1/2.4 Verified；2.2 与 2.5 Partially Verified → **不进入 Phase 3** |
+| Phase 2.5 社区拆分 | **Verified（本地 / CI）** | 批次 1–4 完成：11 个模块 / 2,648 行；`community.ts` 3,350 → **1,271 行**（−2,079）；9 个 loader + 详情/发布/交互/审核/上传全部迁出；导出面、事件委托、存储键、文案不变 |
+| Phase 2.5 有意保留 | **事件代理 / 编排壳层** | DOM 事件代理、启动 IIFE、openTab/setBody 等编排、9 个 loader wrapper 绑定同一 DOM 生命周期，拆出会破坏委托与 cleanup 语义 |
+| Phase 2.5 测试与门禁 | **通过** | tsc 0；`community.test.ts` **11/11**；lint / build（29 页 + CSP 12 哈希）/ `check:csp` 通过；os20+desktop **15 passed**；HTML sink 13 处拆为 community.ts 7 + detail.ts 1 + publish.ts 5（守恒） |
+| Phase 2 整体 | **Verified（本地 / CI）** | 2.1/2.3/2.3.1/2.4/2.2/2.5 全部 Verified；生产行为未变，无生产部署 |
 | Phase 2.2 生命周期 | **通过** | 连续开关 20 次：监听 5→5、timeout 1→1、interval 1→1、资源域 7→7，零增长 |
 | Phase 1.6 D1 备份 Workflow | **生产真实执行成功** | 5 steps complete；SQL 100,976 B |
 | Phase 1.6 每日调度 | **已启用（Worker Cron）** | `0 19 * * *`；版本 `6928916f` |
@@ -204,7 +205,7 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 
 ## Phase 3 · 插件供应链与多设备验证（2026-11-07）
 
-> 前置说明：Phase 2 整体仍为 `Partially Verified`（见上表 2.2 / 2.5），本阶段由所有者**直接指派**，
+> 前置说明：Phase 2 整体仍为 `Partially Verified`（当时见上表 2.2 / 2.5；2026-11-14 已补齐并升为 Verified），本阶段由所有者**直接指派**，
 > 不改变 Phase 2 的结论，也未在本阶段修改 Phase 2 的代码。
 
 | 验收项 | 状态 | 证据 |
@@ -244,7 +245,7 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 3. 真实等待 10 分钟配对 TTL 已由 `npm run qa:pairing-ttl` 覆盖并通过 **12/12**（真实 `sleep`，实测 `elapsedMs=605004`；过期轮询/确认 410、重领 404、设备快照不变）；两台物理设备的人工冒烟仍未做。
 4. 非 Chrome：Firefox 157 与 WebKit 27.2（Safari 家族引擎）均已安装，设备 12 项分别在 `--project=firefox-worker` / `--project=webkit-worker` 通过；真机 Safari / iOS、真实域名下的 CSP 与 Cookie `Secure` 行为仍未验证。
 5. `qa:plugins` 70/70、`qa:continuity` 45/45、`qa:devices` **31/31** 已由自包含运行器跑通；旧的 `scripts/devices-qa.mjs` 仍需人工 `GDV_TOKEN`，仅作历史浏览器冒烟脚本。
-6. Phase 2 的 2.2 Legacy 与 2.5 Community 仍为 `Partially Verified`，作为**独立遗留项**跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。
+6. Phase 2 的 2.2 Legacy 与 2.5 Community 已于 2026-11-14 补齐并升为 `Verified`（见上表）；不再作为遗留项。
 6. 原两项已知缺陷已处理：`PAIRING_ATTEMPTS_EXCEEDED` 不可达分支已删除；撤销后 401 错误码已由 `guards.sessionFailure` / `requireActiveSession` 统一。
 
 ---
@@ -279,7 +280,7 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 2. 页面级冲突面板/解决动作的浏览器 E2E：本轮 `dist` 由 Phase 4 客户端代码之前的构建提供，`sync.spec.ts` 走协议级验证；`conflicts.ts` / `resolveSyncConflict` 状态机由 `tests/unit/sync-conflicts.test.ts` 覆盖，`systemcenter.ts` 纯函数由 `tests/unit/systemcenter-sync.test.ts` 覆盖。构建后页面级可用性仍需一次人工或后续 E2E 确认。
 3. 5000 活实体 / 2000 墓碑的 409 造数未在 E2E 中执行（成本与 D1 污染考虑），由 `scripts/sync-qa.mjs` 真实触发并覆盖。
 4. 两台物理设备的人工冒烟未做；`qa:devices` 与 `sync.spec.ts` 使用的是真实浏览器 Context + 本地 Worker，但不等于生产环境。
-5. Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪，不阻塞 Phase 4（所有者 2026-11-09 确认）。
+5. Phase 2 的 2.2 Legacy / 2.5 Community 已于 2026-11-14 补齐并升为 `Verified`（见上表）；不再作为遗留项。
 
 ## Phase 5 · 社区与市场发布链（2026-11-11）
 
@@ -304,5 +305,21 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 3. 教程没有页面级浏览器 E2E；正文渲染由 `renderMarkdown` 源码守卫 + API 断言 + 单测覆盖。
 4. `follow` 正向链路在无 UUID 创作者的新库会 SKIP（API 强制 UUID 属生产设计）。
 5. 物理设备人工冒烟未做；本地双 Context 与真实浏览器不代替真机。
-6. Phase 2 的 2.2 Legacy / 2.5 Community 仍为 `Partially Verified`，作为独立遗留项跟踪。
+6. Phase 2 的 2.2 Legacy / 2.5 Community 已于 2026-11-14 补齐并升为 `Verified`（见上表）。
+
+## Phase 6 · 性能与可观测（进行中，2026-11-18 起）
+
+| 验收项 | 目标 | 当前 | 结果 |
+| --- | --- | --- | --- |
+| 6.1 入口 JS | ≤ 450 KB | **482,939 B**（改造前 525,102 B） | **部分完成**：16 个旧版应用实现移出入口，应用分块 76,003 B / 18 文件按需下载；剩余 33 KB |
+| 6.2 首屏 CSS | ≤ 200 KB | 273,238 B | `Not Started` |
+| 6.3 诊断中心真实 LCP/CLS/INP | 真实数值；无数据显示「未采集」 | 采集器 `observeVitals` 已实现，仅性能实验室内部启动；诊断中心无该区块 | `Not Started` |
+| 6.4 生产性能基线进发布报告 | 每次发布记录 DCL/load/资源体积 | 未接入 | `Not Started`（需生产授权） |
+| 不伪造指标 | 禁止静态假数字 | 现有页面未出现伪造数值 | 维持 |
+
+**6.1 本轮证据**：单测 19 文件 / 359 passed（legacy-apps 16 项）；目标 E2E 27 passed；
+全量 E2E **171 passed (4.2m)**；build exit 0 / CSP 12 哈希 30 HTML 一致。
+
+**Phase 6 整体：`Partially Verified`（仅 6.1 的旧应用部分）。** 入口与首屏 CSS 均未达预算，
+不得在阶段结论里写 `Verified`。
 

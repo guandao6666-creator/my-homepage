@@ -1,6 +1,6 @@
 {
   "$comment": "HTML 安全静态检查的已审查清单。每条必须写 reason；文件级条目带 count，新增同类代码会导致数量不符并让检查失败。",
-  "generatedAt": "2026-11-07",
+  "generatedAt": "2026-11-14T11:53:38.063Z",
   "entries": [
     {
       "kind": "sink",
@@ -125,8 +125,8 @@
     {
       "kind": "sink",
       "file": "src/lib/os14/community.ts",
-      "count": 13,
-      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+      "count": 7,
+      "reason": "人工复核 1 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）；Phase 2.5 批次 3/4 拆分后由 13 处降为 7 处，detail.ts 1 + publish.ts 5 承接，合计仍 13 处"
     },
     {
       "kind": "sink",
@@ -383,20 +383,92 @@
     {
       "kind": "sink",
       "file": "src/pages/index.astro",
-      "count": 47,
-      "reason": "人工复核 17 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+      "count": 28,
+      "reason": "人工复核 4 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）；Phase 2.2 迁出 16 个应用后由 47 处降为 28 处，移出部分逐字迁入 src/lib/legacy-apps/*（共 19 处），合计仍 47 处，转义逻辑未变"
     },
     {
       "kind": "url-assign",
       "file": "src/pages/index.astro",
-      "count": 5,
-      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+      "count": 3,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析。Phase 2.2 迁出 2 处至 legacy-apps（terminal/visitors 各 1），合计仍 5 处"
     },
     {
       "kind": "sink",
       "file": "src/pages/notes.astro",
       "count": 2,
       "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/browser/index.ts",
+      "count": 1,
+      "reason": "Phase 2.2 从 src/pages/index.astro 逐字迁出的应用模板（迁移清单见 LEGACY-APPLICATIONS.md）；插值仍经 escapeHtml/safeUrl 或为静态字面量，合计计入原 index.astro 的 47 处（搬出 19、剩余 28，总数守恒）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/council/index.ts",
+      "count": 3,
+      "reason": "Phase 2.2 从 src/pages/index.astro 逐字迁出的应用模板（迁移清单见 LEGACY-APPLICATIONS.md）；插值仍经 escapeHtml/safeUrl 或为静态字面量，合计计入原 index.astro 的 47 处（搬出 19、剩余 28，总数守恒）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/monitor/index.ts",
+      "count": 1,
+      "reason": "Phase 2.2 从 src/pages/index.astro 逐字迁出的应用模板（迁移清单见 LEGACY-APPLICATIONS.md）；插值仍经 escapeHtml/safeUrl 或为静态字面量，合计计入原 index.astro 的 47 处（搬出 19、剩余 28，总数守恒）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/news/index.ts",
+      "count": 1,
+      "reason": "Phase 2.2 从 src/pages/index.astro 逐字迁出的应用模板（迁移清单见 LEGACY-APPLICATIONS.md）；插值仍经 escapeHtml/safeUrl 或为静态字面量，合计计入原 index.astro 的 47 处（搬出 19、剩余 28，总数守恒）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/social/index.ts",
+      "count": 5,
+      "reason": "Phase 2.2 从 src/pages/index.astro 逐字迁出的应用模板（迁移清单见 LEGACY-APPLICATIONS.md）；插值仍经 escapeHtml/safeUrl 或为静态字面量，合计计入原 index.astro 的 47 处（搬出 19、剩余 28，总数守恒）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/terminal/index.ts",
+      "count": 1,
+      "reason": "Phase 2.2 从 src/pages/index.astro 逐字迁出的应用模板（迁移清单见 LEGACY-APPLICATIONS.md）；插值仍经 escapeHtml/safeUrl 或为静态字面量，合计计入原 index.astro 的 47 处（搬出 19、剩余 28，总数守恒）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/treehole/index.ts",
+      "count": 3,
+      "reason": "Phase 2.2 从 src/pages/index.astro 逐字迁出的应用模板（迁移清单见 LEGACY-APPLICATIONS.md）；插值仍经 escapeHtml/safeUrl 或为静态字面量，合计计入原 index.astro 的 47 处（搬出 19、剩余 28，总数守恒）"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/legacy-apps/visitors/index.ts",
+      "count": 4,
+      "reason": "Phase 2.2 从 src/pages/index.astro 逐字迁出的应用模板（迁移清单见 LEGACY-APPLICATIONS.md）；插值仍经 escapeHtml/safeUrl 或为静态字面量，合计计入原 index.astro 的 47 处（搬出 19、剩余 28，总数守恒）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/legacy-apps/terminal/index.ts",
+      "count": 1,
+      "reason": "Phase 2.2 从 index.astro 迁出：终端跳转目标取自站点 posts 静态数据；访客墙 src 为本地 file 的 blob URL（URL.createObjectURL），均非远程不可信输入；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/legacy-apps/visitors/index.ts",
+      "count": 1,
+      "reason": "Phase 2.2 从 index.astro 迁出：终端跳转目标取自站点 posts 静态数据；访客墙 src 为本地 file 的 blob URL（URL.createObjectURL），均非远程不可信输入；属性赋值不经过 HTML 解析"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/community/detail.ts",
+      "count": 1,
+      "reason": "Phase 2.5 批次 3/4 从 src/lib/os14/community.ts 逐字搬迁的评论/发布面板；renderComments/manifestSummary 内部插值全部经 esc；原 13 处拆为 community.ts 7 + detail.ts 1 + publish.ts 5，总数守恒"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os14/community/publish.ts",
+      "count": 5,
+      "reason": "Phase 2.5 批次 3/4 从 src/lib/os14/community.ts 逐字搬迁的评论/发布面板；renderComments/manifestSummary 内部插值全部经 esc；原 13 处拆为 community.ts 7 + detail.ts 1 + publish.ts 5，总数守恒"
     }
   ]
 }
