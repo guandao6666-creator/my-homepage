@@ -326,6 +326,6 @@
 
 ## 2026-11-18 · Round 22 · H1/H2：生产备份已导出
 
--  成功：（438 KB，63 张 CREATE TABLE，含 users / community_posts / sync_entities）。
-- 生产密钥仍缺  / ，H3 门禁不通过 → **未迁移、未部署**。
+- `wrangler d1 export guandao-db --remote` 成功：`.wrangler/backups/prod-20261118-2149.sql`（438 KB，63 张 CREATE TABLE，含 users / community_posts / sync_entities）。
+- 生产密钥仍缺 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`，H3 门禁不通过 → **未迁移、未部署**。
 - 待应用迁移仍为 0017、0018。补齐 webhook 后可直接从 H5 继续。
