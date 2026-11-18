@@ -41,7 +41,7 @@
 | 任务 | 状态 | 证据 |
 | --- | --- | --- |
 | 6.1 入口 JS ≤ 450 KB | **`Verified`（本地）**：525,102 B → **442,621 B**（−82,481 B / −15.7%），应用中心改 `load()` 后达标 | `manifest.ts`、`os14/appcenter/app.ts`；`LEGACY-APPLICATIONS.md` §9.1 |
-| 6.2 首屏 CSS ≤ 200 KB | **`Partially Verified`（未达标）**：首页实际加载 **463,013 B**（18 个样式表），最大单文件 196,151 B；原基线 476,749 B。根因见 D-006 | `scripts/perf-baseline.mjs`、`docs/PERF-BASELINE.md` |
+| 6.2 首屏 CSS ≤ 200 KB | **`Partially Verified`（未达标）**：运行时加载机制已打通（`?url` + `ensureCss`），社区接入后首页 CSS 从 **463,013 → 416,768 B**（17 个样式表）；目标 200 KB 仍未达 | `src/lib/ui/lazy-css.ts`、`scripts/perf-baseline.mjs`、`docs/PERF-BASELINE.md` |
 | 6.3 诊断中心接入真实 LCP/CLS/INP | **`Verified`（本地）**：新增「指标」分区，`observeVitals`（buffered）在本机采集，无数据显示「未采集」、不支持显示「不支持」 | `src/lib/quality/diagnostics.ts`、`tests/e2e/desktop.spec.ts` |
 | 6.4 生产性能基线进发布报告 | `Not Started` | `scripts/prod-e2e.mjs` |
 

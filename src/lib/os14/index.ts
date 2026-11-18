@@ -215,7 +215,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1180,
       height: 740,
       glyph: "di-community",
-      load: () => import("./community").then((m) => ({ body: m.renderCommunity, init: (w) => m.initCommunity(w, ctx) })),
+      load: () => import("./community").then(async (m) => { await m.stylesReady; return { body: m.renderCommunity, init: (w) => m.initCommunity(w, ctx) }; }),
     },
     {
       id: "continuity",

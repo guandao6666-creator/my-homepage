@@ -30,7 +30,8 @@
 | --- | --- | --- | --- | --- |
 | P2-6 | `os13.ts` 巨型闭包拆分 | `Blocked` | 需 Core Settings API | 拆分后入口与设置面板可独立测试 |
 | P2-7 | 6.2 余量（单文件）3.8 KB | 观察 | — | 新增首屏样式前先判断是否真属首屏 |
-| P2-8 | 6.2 真正的延迟加载：CSS `?url` + 运行时 `<link>` | `Not Started` | 需先验证 `?url` 不再被 Astro 注入首页 | 首页样式表数量与总量下降；`load()` 等 CSS 加载完再渲染，无 FOUC |
+| P2-8 | 6.2 延迟加载：CSS `?url` + 运行时 `<link>` | **`Partially Verified`**：机制已打通并接入社区（463,013 → 416,768 B），其余 16 个样式表待接 | 逐应用改造 | 每个应用 `load()` 里 `await m.stylesReady`；每次改造后用 `perf:baseline` 复核 |
+| P2-9 | 6.2 的 200 KB 下限问题 | `Not Started` | `index.css` 196,151 B + `global.css` 8,118 B ≈ 204 KB | 即使全部应用样式延迟，仍需再削 4–10 KB 首屏样式，否则指标不可达 |
 
 ## P3 · 生态与开发者体验
 

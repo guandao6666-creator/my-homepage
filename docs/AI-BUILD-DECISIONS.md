@@ -53,6 +53,16 @@
 - **代价**：每次涉及样式的改动都要重跑 `perf:baseline`；预算不达标时门禁会失败。
 - **教训**：先用脚本定义指标，再改代码。否则容易用相关但不等价的数字确认自己。
 
+## D-007 · 应用 CSS 改用 `?url` + 运行时 `<link>`（2026-11-18）
+
+- **验证**：把 `community.css` 的导入从 `import "...css"` 改成 `import url from "...css?url"` 后重新构建，
+  首页 `<link rel="stylesheet">` 中不再出现该文件，CSS 仍作为独立资源产出 → 说明「被提升」不是不可避免的。
+- **机制**：`src/lib/ui/lazy-css.ts` 的 `ensureCss(url)` 插入 `<link>` 并返回 Promise；
+  应用模块导出 `stylesReady = ensureCss(url)`，注册项 `load()` 里 `await m.stylesReady` 再返回 body/init。
+- **实测**：只接社区一项，首页 CSS 463,013 → **416,768 B**（−46,245 B，正好等于 community.css）。
+- **代价**：每个应用多一个 `?url` 资源与一次 link 插入；加载失败时 resolve（宁可少样式，不卡骨架屏）。
+- **注意**：`index.css`(196 KB) + `global.css`(8 KB) 已接近 200 KB 预算，全部应用样式推迟后仍需再削首屏样式。
+
 ## D-005 · 项目记忆文件复用现有文档，不另起一套
 
 - **选择**：`AI-BUILD-STATUS/BACKLOG/DECISIONS/LOG` 只记「当前状态 / 待办 / 决策 / 每轮记录」，

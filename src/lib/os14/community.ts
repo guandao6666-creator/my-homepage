@@ -8,8 +8,12 @@
  * 社区内容始终以文本方式渲染；Markdown 使用 core.renderMarkdown（先整体转义）。
  */
 
-// 1.9：应用样式跟着应用代码一起按需加载，不再压进首屏 CSS
-import "../../styles/community.css";
+// 6.2：样式走运行时加载（Astro 会把直接 import 的 CSS 提升到首页，见 D-006）
+import communityCssUrl from "../../styles/community.css?url";
+import { ensureCss } from "../ui/lazy-css";
+
+/** `load()` 会等它完成后再渲染，避免无样式闪烁 */
+export const stylesReady = ensureCss(communityCssUrl);
 // 2.3.1：社区封面/头像/资产预览是第三方内容，图片 URL 走协议校验
 import { safeUrl } from "../html";
 import { emptyState, ls, modal, renderMarkdown, shell, type Ctx } from "./core";
