@@ -312,3 +312,12 @@
   写入了 2 个 qa-prod 用户、1 条作品、2 个会话。已立即按 `qa-prod-%` 前缀删除，复核 users/posts/
   sessions/profiles/packages 均为 0，未触碰任何非 qa 行。随后补了 `--help` 保护并重新实跑成功。
 - 结论：P0-2 记 Verified（生产）。P0-1（部署 + 迁移）仍未做。
+
+---
+
+## 2026-11-18 · Round 20 · H 预检（未越过安全边界）
+
+- 生产密钥清单：`APP_ORIGIN`、`BACKUP_ENCRYPTION_KEY`、`GITHUB_CLIENT_ID/SECRET`、`D1_REST_API_TOKEN`。
+  **缺少 `BACKUP_ALERT_WEBHOOK` 与 `DATA_ALERT_WEBHOOK`** → H3 门禁不通过。
+- 生产待应用迁移：`0017_plugin_signatures.sql`、`0018_sync_cloud_expansion.sql`（0018 会重建 sync_entities）。
+- 处置：按计划停在迁移之前，**未部署、未迁移**。补齐两个 webhook 后可继续 H2–H12。
