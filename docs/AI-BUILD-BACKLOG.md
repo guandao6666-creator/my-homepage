@@ -30,8 +30,8 @@
 | --- | --- | --- | --- | --- |
 | P2-6 | `os13.ts` 巨型闭包拆分 | `Blocked` | 需 Core Settings API | 拆分后入口与设置面板可独立测试 |
 | P2-7 | 6.2 余量（单文件）3.8 KB | 观察 | — | 新增首屏样式前先判断是否真属首屏 |
-| P2-8 | 6.2 延迟加载：CSS `?url` + 运行时 `<link>` | **`Partially Verified`**：机制已打通并接入社区（463,013 → 416,768 B），其余 16 个样式表待接 | 逐应用改造 | 每个应用 `load()` 里 `await m.stylesReady`；每次改造后用 `perf:baseline` 复核 |
-| P2-9 | 6.2 的 200 KB 下限问题 | `Not Started` | `index.css` 196,151 B + `global.css` 8,118 B ≈ 204 KB | 即使全部应用样式延迟，仍需再削 4–10 KB 首屏样式，否则指标不可达 |
+| P2-8 | 6.2 延迟加载：CSS `?url` + 运行时 `<link>` | **`Verified`（本地）**：22 个应用样式全部接入，首页样式表 17 → **2** | 已完成 | 新增应用必须同时导出 stylesReady 并由 `lazy()` 包裹 |
+| P2-9 | 6.2 剩余 4,269 B | `Not Started` | 需把主题中心改 `load()` 才能下移 `themes.css`(35 KB) | 入口 CSS 降到 ~170 KB，留出真实余量 |
 
 ## P3 · 生态与开发者体验
 

@@ -1,5 +1,10 @@
 // 6.2：游戏中心样式随 chunk 按需下载（七款游戏的界面规则只在打开游乐场时需要）
-import "../../styles/desktop/games.css";
+import cssUrl1 from "../../styles/desktop/games.css?url";
+import cssUrl2 from "../../styles/os14-games.css?url";
+import { ensureCss } from "../ui/lazy-css";
+
+/** 6.2：样式走运行时加载，`load()` 会等它完成再渲染（Astro 会把直接 import 的 CSS 提升到首页） */
+export const stylesReady = Promise.all([ensureCss(cssUrl1), ensureCss(cssUrl2)]).then(() => undefined);
 
 /**
  * Guandao OS 1.4 · 游乐场
@@ -9,7 +14,6 @@ import "../../styles/desktop/games.css";
  */
 
 // 1.9：应用样式跟着应用代码一起按需加载，不再压进首屏 CSS
-import "../../styles/os14-games.css";
 import { badge, emptyState, escapeHtml, fmtAgo, ls, shell, type Ctx } from "./core";
 import { GAMES, gameById, gameCover, type GameHandle } from "./games";
 import {

@@ -251,6 +251,8 @@ export type LegacyAppModule = {
   body: (ctx: LegacyAppContext) => string;
   /** 返回清理函数时，窗口关闭会调用（见 index.astro 的 __gosCleanup） */
   init?: (win: HTMLElement, ctx: LegacyAppContext) => void | (() => void);
+  /** 6.2：本应用的 CSS 就绪 Promise（走 ?url + ensureCss，见 lib/ui/lazy-css） */
+  stylesReady?: Promise<void>;
 };
 
 /**

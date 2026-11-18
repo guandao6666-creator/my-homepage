@@ -1,5 +1,9 @@
 // 6.2：商店样式随 chunk 按需下载
-import "../../../styles/apps/appcenter.css";
+import cssUrl1 from "../../../styles/apps/appcenter.css?url";
+import { ensureCss } from "../../ui/lazy-css";
+
+/** 6.2：样式走运行时加载，`load()` 会等它完成再渲染（Astro 会把直接 import 的 CSS 提升到首页） */
+export const stylesReady = ensureCss(cssUrl1);
 
 /**
  * Guandao OS 1.4 / 6.1 · 应用中心的界面实现（按需加载）。

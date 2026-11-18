@@ -1,5 +1,9 @@
 // 6.2：本应用样式随 chunk 按需下载
-import "../../../styles/os20/updatecenter.css";
+import cssUrl1 from "../../../styles/os20/updatecenter.css?url";
+import { ensureCss } from "../../ui/lazy-css";
+
+/** 6.2：样式走运行时加载，`load()` 会等它完成再渲染（Astro 会把直接 import 的 CSS 提升到首页） */
+export const stylesReady = ensureCss(cssUrl1);
 
 /**
  * Guandao OS 2.0 · 更新中心

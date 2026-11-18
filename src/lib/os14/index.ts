@@ -36,6 +36,20 @@ export type BootResult = { ctx: Ctx; sys: ReturnType<typeof createSystem>; versi
 
 type LazyInit = (win: HTMLElement) => void | (() => void);
 
+/**
+ * 6.2：包一层「等样式就绪再渲染」。
+ *
+ * 应用模块把 CSS 作为 `?url` 资源导入，并导出 `stylesReady`（见 lib/ui/lazy-css）。
+ * 这里等它完成再交给外壳渲染，避免先出无样式内容再闪一下。
+ * 没有导出 `stylesReady` 的模块立即放行。
+ */
+const lazy = <M extends object, R>(importer: () => Promise<M>, map: (m: M) => R) => () =>
+  importer().then(async (m) => {
+    // 模块可能没有导出 stylesReady（没有专属样式的应用），此时立即放行
+    await (m as unknown as { stylesReady?: Promise<void> }).stylesReady;
+    return map(m);
+  });
+
 type Spec = {
   id: string;
   title: string;
@@ -59,7 +73,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
   /* 桌面外壳必需、必须同步可用：主题、组件、工作空间、应用中心、桌面交互。
      其余应用全部改成 load()，第一次打开时才下载。 */
   const specs: Spec[] = [
-    { id: "appcenter", title: "应用中心", width: 960, height: 660, glyph: "di-appcenter", load: () => import("./appcenter/app").then((m) => ({ body: m.renderAppCenter, init: (w) => m.initAppCenter(w, ctx, sys) })) },
+    { id: "appcenter", title: "应用中心", width: 960, height: 660, glyph: "di-appcenter", load: lazy(() => import("./appcenter/app"), (m) => ({ body: m.renderAppCenter, init: (w) => m.initAppCenter(w, ctx, sys) })) },
 
     /* ---------- 2.0 平台应用 ---------- */
     {
@@ -68,8 +82,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1080,
       height: 740,
       glyph: "di-gear",
-      load: () =>
-        import("../os20/apps/systemcenter").then((m) => ({
+      load: lazy(() => import("../os20/apps/systemcenter"), (m) => ({
           body: m.renderSystemCenter,
           init: (w) => m.initSystemCenter(w, ctx, sys),
         })),
@@ -80,8 +93,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1120,
       height: 760,
       glyph: "di-store",
-      load: () =>
-        import("../os20/apps/market").then((m) => ({
+      load: lazy(() => import("../os20/apps/market"), (m) => ({
           body: m.renderMarket,
           init: (w) => m.initMarket(w, ctx, sys),
         })),
@@ -92,8 +104,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 940,
       height: 700,
       glyph: "di-fresh",
-      load: () =>
-        import("../os20/apps/updatecenter").then((m) => ({
+      load: lazy(() => import("../os20/apps/updatecenter"), (m) => ({
           body: m.renderUpdateCenter,
           init: (w) => {
             const kernel = getKernel();
@@ -111,7 +122,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1000,
       height: 680,
       glyph: "di-mon",
-      load: () => import("../quality/perflab").then((m) => ({ body: m.renderPerfLab, init: (w) => m.initPerfLab(w, ctx) })),
+      load: lazy(() => import("../quality/perflab"), (m) => ({ body: m.renderPerfLab, init: (w) => m.initPerfLab(w, ctx) })),
     },
     {
       id: "diagnostics",
@@ -119,7 +130,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1040,
       height: 700,
       glyph: "di-security",
-      load: () => import("../quality/diagnostics").then((m) => ({ body: m.renderDiagnostics, init: (w) => m.initDiagnostics(w, ctx) })),
+      load: lazy(() => import("../quality/diagnostics"), (m) => ({ body: m.renderDiagnostics, init: (w) => m.initDiagnostics(w, ctx) })),
     },
     {
       id: "control",
@@ -127,7 +138,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 820,
       height: 600,
       glyph: "di-control",
-      load: () => import("./control").then((m) => ({ body: m.renderControl, init: (w) => m.initControl(w, ctx, sys) })),
+      load: lazy(() => import("./control"), (m) => ({ body: m.renderControl, init: (w) => m.initControl(w, ctx, sys) })),
     },
     {
       id: "tasks",
@@ -135,7 +146,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 820,
       height: 600,
       glyph: "di-tasks",
-      load: () => import("./tasks").then((m) => ({ body: m.renderTasks, init: (w) => m.initTasks(w, ctx) })),
+      load: lazy(() => import("./tasks"), (m) => ({ body: m.renderTasks, init: (w) => m.initTasks(w, ctx) })),
     },
     {
       id: "playground",
@@ -143,7 +154,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 900,
       height: 640,
       glyph: "di-play",
-      load: () => import("./playground").then((m) => ({ body: m.renderPlayground, init: (w) => m.initPlayground(w, ctx) })),
+      load: lazy(() => import("./playground"), (m) => ({ body: m.renderPlayground, init: (w) => m.initPlayground(w, ctx) })),
     },
     {
       id: "datacenter",
@@ -151,7 +162,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 880,
       height: 620,
       glyph: "di-data",
-      load: () => import("./datacenter").then((m) => ({ body: m.renderDataCenter, init: (w) => m.initDataCenter(w, ctx) })),
+      load: lazy(() => import("./datacenter"), (m) => ({ body: m.renderDataCenter, init: (w) => m.initDataCenter(w, ctx) })),
     },
     {
       id: "notes",
@@ -159,7 +170,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 920,
       height: 600,
       glyph: "di-note",
-      load: () => import("./apps/notes").then((m) => ({ body: m.renderNotes, init: (w) => m.initNotes(w, ctx) })),
+      load: lazy(() => import("./apps/notes"), (m) => ({ body: m.renderNotes, init: (w) => m.initNotes(w, ctx) })),
     },
     {
       id: "calendar",
@@ -167,7 +178,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 900,
       height: 620,
       glyph: "di-cal",
-      load: () => import("./apps/calendar").then((m) => ({ body: m.renderCalendar, init: (w) => m.initCalendar(w, ctx) })),
+      load: lazy(() => import("./apps/calendar"), (m) => ({ body: m.renderCalendar, init: (w) => m.initCalendar(w, ctx) })),
     },
     {
       id: "files",
@@ -175,7 +186,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 900,
       height: 600,
       glyph: "di-files",
-      load: () => import("./files").then((m) => ({ body: m.renderFiles, init: (w) => m.initFiles(w, ctx) })),
+      load: lazy(() => import("./files"), (m) => ({ body: m.renderFiles, init: (w) => m.initFiles(w, ctx) })),
     },
     {
       id: "drive",
@@ -183,7 +194,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1040,
       height: 680,
       glyph: "di-files",
-      load: () => import("./drive").then((m) => ({ body: m.renderDrive, init: (w) => m.initDrive(w, ctx) })),
+      load: lazy(() => import("./drive"), (m) => ({ body: m.renderDrive, init: (w) => m.initDrive(w, ctx) })),
     },
     {
       id: "devices",
@@ -191,7 +202,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1040,
       height: 680,
       glyph: "di-devices",
-      load: () => import("./devices").then((m) => ({ body: m.renderDevices, init: (w) => m.initDevices(w, ctx) })),
+      load: lazy(() => import("./devices"), (m) => ({ body: m.renderDevices, init: (w) => m.initDevices(w, ctx) })),
     },
     {
       id: "backup",
@@ -199,7 +210,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1060,
       height: 680,
       glyph: "di-backup",
-      load: () => import("./backup").then((m) => ({ body: m.renderBackup, init: (w) => m.initBackup(w, ctx) })),
+      load: lazy(() => import("./backup"), (m) => ({ body: m.renderBackup, init: (w) => m.initBackup(w, ctx) })),
     },
     {
       id: "security",
@@ -207,7 +218,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1080,
       height: 680,
       glyph: "di-security",
-      load: () => import("./security").then((m) => ({ body: m.renderSecurity, init: (w) => m.initSecurity(w, ctx) })),
+      load: lazy(() => import("./security"), (m) => ({ body: m.renderSecurity, init: (w) => m.initSecurity(w, ctx) })),
     },
     {
       id: "community",
@@ -223,7 +234,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1000,
       height: 690,
       glyph: "di-devices",
-      load: () => import("../continuity/app").then((m) => ({ body: m.renderContinuity, init: (w) => m.initContinuity(w, ctx) })),
+      load: lazy(() => import("../continuity/app"), (m) => ({ body: m.renderContinuity, init: (w) => m.initContinuity(w, ctx) })),
     },
     {
       id: "pm",
@@ -231,7 +242,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 980,
       height: 680,
       glyph: "di-widgets",
-      load: () => import("../plugins/manager").then((m) => ({ body: m.renderPluginManager, init: (w) => m.initPluginManager(w, ctx) })),
+      load: lazy(() => import("../plugins/manager"), (m) => ({ body: m.renderPluginManager, init: (w) => m.initPluginManager(w, ctx) })),
     },
     {
       id: "pmarket",
@@ -239,7 +250,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1100,
       height: 720,
       glyph: "di-appcenter",
-      load: () => import("../plugins/market").then((m) => ({ body: m.renderPluginMarket, init: (w) => m.initPluginMarket(w, ctx) })),
+      load: lazy(() => import("../plugins/market"), (m) => ({ body: m.renderPluginMarket, init: (w) => m.initPluginMarket(w, ctx) })),
     },
     {
       id: "pdev",
@@ -247,7 +258,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 1080,
       height: 720,
       glyph: "di-themes",
-      load: () => import("../plugins/developer").then((m) => ({ body: m.renderDeveloperCenter, init: (w) => m.initDeveloperCenter(w, ctx) })),
+      load: lazy(() => import("../plugins/developer"), (m) => ({ body: m.renderDeveloperCenter, init: (w) => m.initDeveloperCenter(w, ctx) })),
     },
     {
       id: "music",
@@ -255,7 +266,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       width: 720,
       height: 560,
       glyph: "di-music",
-      load: () => import("./apps/music").then((m) => ({ body: m.renderMusic, init: (w) => m.initMusic(w, ctx) })),
+      load: lazy(() => import("./apps/music"), (m) => ({ body: m.renderMusic, init: (w) => m.initMusic(w, ctx) })),
     },
     {
       id: "gallery",
@@ -264,7 +275,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       height: 600,
       glyph: "di-gallery",
       optional: true,
-      load: () => import("./apps/gallery").then((m) => ({ body: m.renderGallery, init: (w) => m.initGallery(w, ctx) })),
+      load: lazy(() => import("./apps/gallery"), (m) => ({ body: m.renderGallery, init: (w) => m.initGallery(w, ctx) })),
     },
     {
       id: "reader",
@@ -273,7 +284,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       height: 620,
       glyph: "di-reader",
       optional: true,
-      load: () => import("./apps/reader").then((m) => ({ body: m.renderReader, init: (w) => m.initReader(w, ctx) })),
+      load: lazy(() => import("./apps/reader"), (m) => ({ body: m.renderReader, init: (w) => m.initReader(w, ctx) })),
     },
   ];
 

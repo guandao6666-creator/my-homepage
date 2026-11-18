@@ -55,7 +55,12 @@ export function registerLegacyApps(ctx: LegacyAppContext): void {
       width: entry.width,
       height: entry.height,
       glyph: entry.glyph,
-      load: () => entry.load().then((app) => adapt(app, ctx)),
+      load: () =>
+        entry.load().then(async (app) => {
+          // 6.2：旧应用同样等样式就绪再渲染（CSS 走 ?url + ensureCss）
+          await app.stylesReady;
+          return adapt(app, ctx);
+        }),
     });
   }
 }

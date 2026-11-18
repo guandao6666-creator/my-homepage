@@ -1,5 +1,9 @@
 // 6.2：本应用样式随 chunk 按需下载
-import "../../../styles/apps/legacy-achievements.css";
+import cssUrl1 from "../../../styles/apps/legacy-achievements.css?url";
+import { ensureCss } from "../../ui/lazy-css";
+
+/** 6.2：样式走运行时加载，`load()` 会等它完成再渲染（Astro 会把直接 import 的 CSS 提升到首页） */
+export const stylesReady = ensureCss(cssUrl1);
 
 /**
  * 成就（achievements）· 对应 index.astro 原 `renderAchievements`。

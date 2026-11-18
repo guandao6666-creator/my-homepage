@@ -7,7 +7,12 @@
 
 // 1.9：应用样式跟着应用代码一起按需加载，不再压进首屏 CSS
 import { safeUrl } from "../html";
-import "../../styles/drive.css";
+import cssUrl1 from "../../styles/drive.css?url";
+import { ensureCss } from "../ui/lazy-css";
+
+/** 6.2：样式走运行时加载，`load()` 会等它完成再渲染（Astro 会把直接 import 的 CSS 提升到首页） */
+export const stylesReady = ensureCss(cssUrl1);
+
 import { escapeHtml, fmtBytes, fmtDateTime, modal } from "./core";
 import { reportDriveSync } from "../devices/client";
 import { sendToDevice } from "../continuity/ui";
