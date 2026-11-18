@@ -321,3 +321,11 @@
   **缺少 `BACKUP_ALERT_WEBHOOK` 与 `DATA_ALERT_WEBHOOK`** → H3 门禁不通过。
 - 生产待应用迁移：`0017_plugin_signatures.sql`、`0018_sync_cloud_expansion.sql`（0018 会重建 sync_entities）。
 - 处置：按计划停在迁移之前，**未部署、未迁移**。补齐两个 webhook 后可继续 H2–H12。
+
+---
+
+## 2026-11-18 · Round 22 · H1/H2：生产备份已导出
+
+-  成功：（438 KB，63 张 CREATE TABLE，含 users / community_posts / sync_entities）。
+- 生产密钥仍缺  / ，H3 门禁不通过 → **未迁移、未部署**。
+- 待应用迁移仍为 0017、0018。补齐 webhook 后可直接从 H5 继续。
