@@ -231,3 +231,14 @@
 - 关键口径：墓碑数取自 `sync_entities.deleted = 1`，不是 `sync_tombstone_ledger`——第一次造数失败正是踩了这个。
 - `sync.spec.ts` 新增：实体填满 5000 后 push 1 条 → 409 `details.limit=5000`；建实体 → 填 2000 墓碑 → 删除 → 409 `details.scope=tombstones`；`finally` 清理。9 passed（含新用例 17.7s）。
 - P1-1 页面级冲突用例两次尝试未通过：静态 dist 走「尚未就绪」；worker 下 `openApp("systemcenter")` 后窗口 90s 未出现。已删掉半成品文件，BACKLOG 记 Blocked 并写明现象。
+
+---
+
+## 2026-11-18 · Round 13 · P1-1 冲突面板页面级（D 批收尾）
+
+- 定位到前两次失败的真因：文件没进 `WORKER_SPEC`，实际跑在静态 dist；补进 worker project 后窗口正常打开。
+- `sync-conflicts-page.spec.ts`（worker）：打开系统设置 → 云端 → 断言冲突行、两个按钮、「条待处理」，
+  且页面不含「冲突中心尚未就绪」。1 passed（1.2s）。
+- 合成 click 到不了委托处理器（实测无 toast、按钮不禁用），因此页面用例只断言「真实渲染」，
+  点击后的状态机仍由 `tests/unit/sync-conflicts.test.ts` 覆盖——不写会误判的断言。
+- 加上 Round 12 的配额 409，D 批两项均已闭环。同步相关 10 passed。
