@@ -14,7 +14,7 @@
 
 | # | 任务 | 状态 | 依赖 | 验收 |
 | --- | --- | --- | --- | --- |
-| P1-1 | 页面级插件安装并入 Playwright | `Not Started` | 现有 `plugin-publishing.spec.ts` | 不再依赖 `.shots/_p5-page-install-evidence2.mjs` 手工脚本 |
+| P1-1 | 页面级插件安装并入 Playwright | **`Verified`（本地）**：发布链用例内新增真实桌面安装步骤（市场卡片 → 安装 → 权限确认 → 按钮变「打开」→ 卸载还原） | 已完成 | 不再依赖 `.shots/_p5-page-install-evidence2.mjs` 手工脚本 |
 | P1-2 | `initRank` 的 `void load()` 随窗口取消 | `Not Started` | 需要 fetch 取消 port | 关窗后不再向脱离文档的节点写入 |
 | P1-3 | legacy 网络请求取消 port | `Not Started` | 同上 | `AbortController` 随 `lifecycle.dispose` 触发 |
 

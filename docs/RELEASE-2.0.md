@@ -1098,6 +1098,22 @@ Phase 6 整体仍为 `Partially Verified`（6.2 未达标 + 6.4 未执行）。
 
 **结论：6.2 `Verified`（本地 / CI 层），Phase 6 预算项全部达标。**
 
+### 16.24 P1-1 · 页面级插件安装并入 Playwright（2026-11-18）
+
+**问题**：插件安装的页面级证据一直来自本地脚本 `.shots/_p5-page-install-evidence2.mjs`
+（真实桌面 + UnifiedInstaller，20/20 + 截图），不在 CI 里，回归时不会被执行。
+
+**做法**：在 `tests/e2e/plugin-publishing.spec.ts` 的发布链中插入真实浏览器步骤——
+用 installer 会话打开 `/?desktop=1`，等 `GOS20` 就绪并收敛首次引导/账号面板，
+通过既有全局入口 `GOS20.wm.open("pmarket")` 打开市场，点击插件卡片 → 详情页「安装」→
+权限确认 → 断言按钮变为「打开」（安装完成的唯一用户可见信号），随后调用
+`DELETE /api/plugins/:id/install` 还原安装态，让后续 API 安装断言仍有意义。
+
+**证据**：该用例 `1 passed`（含页面步骤，5.1s）；页面 `pageerror` 为空断言通过。
+
+**边界**：页面步骤只覆盖「安装 → 打开按钮出现」，不覆盖插件窗口内的运行行为
+（那部分由 sandbox / signature 用例覆盖）。
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash

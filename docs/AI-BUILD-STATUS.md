@@ -77,6 +77,8 @@
    是入口体积与可维护性的主要结构性债务，需 Core Settings API 才能干净拆分。
 4. **页面级插件安装**未并入 Playwright（仅本地证据脚本）。
 5. 本地并发跑 Playwright 与 verify 会共享 `.wrangler/state` 本地 D1，互相干扰。
+6. `sandbox-origin.spec.ts` 在全量并发下有偶发失败（2 次全量中 1 次 `origin !== "null"`），
+   单独复跑稳定通过；已记录为抖动，未修改断言。
 
 ## 6. 下一步（按优先级）
 

@@ -168,3 +168,13 @@
 - 新增 E2E：主题中心按需加载（验证 `link[data-gos-css*=themes]` 打开后才插入、卡片渲染）。
 - 踩坑：拆 themes 时把 `ctxRef` 一并删掉，运行期 10 处引用报错；补回声明与 `initThemes` 赋值。
   另 `?'url'` 路径少了一层 `../`，构建报 UNRESOLVED_IMPORT，按实际目录修正。
+
+---
+
+## 2026-11-18 · Round 7 · P1-1 页面级插件安装并入 Playwright
+
+- 在 `plugin-publishing.spec.ts` 的发布链里插入真实桌面步骤：`?desktop=1` → GOS20 →
+  `wm.open("pmarket")` → 卡片 → 安装 → 权限确认 → 断言按钮变「打开」→ API 卸载还原。
+- 目的：把只在本机 `.shots` 脚本里的页面级证据搬进 CI，回归时会真的跑到。
+- 结果：该用例 1 passed（5.1s），`pageerror` 为空。
+- 仍缺：P1-2/P1-3（请求取消 port）；生产 `qa:prod` 仍 Blocked。

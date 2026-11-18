@@ -237,7 +237,7 @@ test.describe("Phase 5 · 插件完整发布链（API 级 E2E）", () => {
     }
   });
 
-  test("发布、验签、下载、安装、下架后 409 全链路", async () => {
+  test("发布、验签、下载、安装、下架后 409 全链路", async ({ browser }) => {
     const devHeaders = as(fixtures, "developer");
     const installerHeaders = as(fixtures, "installer");
     const anonHeaders = { Origin: API_BASE };
@@ -371,6 +371,66 @@ test.describe("Phase 5 · 插件完整发布链（API 级 E2E）", () => {
     expect(sha256(packageJson)).toBe(packageBody.data?.checksum);
     expect(packageBody.data?.signature?.status).toBe("verified");
     expect((packageBody.data?.publisherKeys ?? []).some((key) => key.keyId === keyId && key.status === "active")).toBe(true);
+
+    // [7] 页面级安装：真实桌面从市场点「安装」→ 同意权限 → 按钮变「打开」，然后还原安装态
+    {
+      const pageContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await pageContext.addCookies([{ name: "gauth_sid", value: fixtures.tokens.installer, url: API_BASE, sameSite: "Lax" }]);
+      const page = await pageContext.newPage();
+      const pageErrors: string[] = [];
+      page.on("pageerror", (error) => pageErrors.push(String(error)));
+
+      const response = await page.goto(`${API_BASE}/?desktop=1`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      expect(response?.status()).toBe(200);
+      await page.waitForFunction(() => Boolean((window as unknown as { GOS20?: unknown }).GOS20), null, { timeout: 30_000 });
+      await page.waitForTimeout(2000);
+
+      // 首次引导 / 账号面板可能盖在桌面上（与本地证据脚本一致的收敛逻辑）
+      for (let i = 0; i < 12; i += 1) {
+        const onboarding = page.locator(".os20-onb");
+        if (await onboarding.isVisible().catch(() => false)) {
+          const skip = page.locator("[data-onb-skip]");
+          if (await skip.isVisible().catch(() => false)) await skip.click({ force: true, timeout: 5000 }).catch(() => {});
+          else await page.locator("[data-onb-next]").first().click({ force: true, timeout: 5000 }).catch(() => {});
+          await page.waitForTimeout(400);
+          continue;
+        }
+        const close = page.locator(".gacct-close, .gauth-close").first();
+        if (await close.isVisible().catch(() => false)) {
+          await close.click({ force: true, timeout: 5000 }).catch(() => {});
+          await page.waitForTimeout(300);
+          continue;
+        }
+        break;
+      }
+
+      const opened = await page.evaluate(() => (window as unknown as { GOS20: { wm: { open(id: string): boolean } } }).GOS20.wm.open("pmarket"));
+      expect(opened).toBe(true);
+
+      const card = page.locator(`article[data-open="${PLUGIN_ID}"]`);
+      await expect(card).toBeVisible({ timeout: 30_000 });
+      await card.locator("h3").click();
+
+      const installButton = page.locator('[data-act="install"]').first();
+      await expect(installButton).toBeVisible({ timeout: 20_000 });
+      await installButton.click();
+
+      const dialog = page.locator(".gp-dialog").last();
+      await expect(dialog).toBeVisible({ timeout: 20_000 });
+      const permAll = dialog.locator("[data-perm-all]");
+      if (await permAll.count()) await permAll.first().click().catch(() => {});
+      await dialog.locator('[data-gp-action="ok"]').click();
+
+      // 安装完成的唯一用户可见信号：按钮从「安装」变为「打开」
+      await expect(page.locator('[data-act="open"]').first()).toBeVisible({ timeout: 60_000 });
+      expect(pageErrors, `页面报错：${pageErrors.join("\n")}`).toEqual([]);
+
+      await pageContext.close();
+
+      // 还原：后面的 API 安装断言需要「未安装」状态
+      const uninstall = await installer.request.delete(`/api/plugins/${PLUGIN_ID}/install`, { headers: installerHeaders });
+      expectStatus(uninstall, 200);
+    }
 
     // [7] 安装成功 + 安装记录
     const install = await installer.request.post("/api/plugins/install", {

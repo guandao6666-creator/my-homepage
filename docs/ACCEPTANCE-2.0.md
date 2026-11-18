@@ -301,7 +301,7 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 未完成 / 未验证项：
 
 1. 生产发布链未执行：未创建生产测试资源、未写生产 D1/R2、未应用生产迁移、未部署、未运行 `qa:prod`。
-2. 插件客户端安装的页面级证据来自本地证据脚本（真实桌面页 + UnifiedInstaller，20/20 + 截图），未并入 Playwright 套件；Playwright 内为协议级验证。
+2. ~~插件客户端安装只有本地证据脚本~~ → 2026-11-18 已并入 `plugin-publishing.spec.ts`：真实桌面页打开市场、点安装、确认权限、按钮变「打开」，随后 API 卸载还原，全程在 Playwright 内。
 3. 教程没有页面级浏览器 E2E；正文渲染由 `renderMarkdown` 源码守卫 + API 断言 + 单测覆盖。
 4. `follow` 正向链路在无 UUID 创作者的新库会 SKIP（API 强制 UUID 属生产设计）。
 5. 物理设备人工冒烟未做；本地双 Context 与真实浏览器不代替真机。
