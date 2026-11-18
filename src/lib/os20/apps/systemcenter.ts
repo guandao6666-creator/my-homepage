@@ -1,3 +1,6 @@
+// 6.2：本应用样式随 chunk 按需下载
+import "../../../styles/os20/settings.css";
+
 /**
  * Guandao OS 2.0 · 系统设置（System Center）
  *

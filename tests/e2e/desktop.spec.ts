@@ -174,6 +174,34 @@ test.describe("桌面外壳", () => {
     await expect(win.locator(".g19-card").filter({ hasText: "应用 / 窗口" })).toContainText(/\d+ \/ \d+/);
   });
 
+  test("应用中心按需加载：打开后商店可用，搜索能过滤，不出现崩溃卡片", async ({ page }) => {
+    await bootDesktop(page);
+    const requests: string[] = [];
+    page.on("request", (request) => {
+      if (/\/_astro\/.*\.js/.test(request.url())) requests.push(request.url());
+    });
+
+    await page.locator('.desk-icon[data-app="appcenter"]').click();
+    const win = page.locator('.window[data-app="appcenter"]');
+    await expect(win).toBeVisible();
+    // 6.1：商店界面现在在独立 chunk 里，第一次打开才下载
+    await expect(win.locator(".g14-store")).toBeVisible({ timeout: 15_000 });
+    await expect(win.locator(".g19-loading")).toHaveCount(0);
+    expect(requests.length).toBeGreaterThan(0);
+
+    // 已安装数量是真实数字
+    await expect(win.locator(".g14-store-count b")).toHaveText(/^\d+$/);
+
+    // 搜索走真实过滤：输入后列表只剩命中项
+    const search = win.locator("[data-store-search]");
+    await search.fill("笔记");
+    await expect(win.locator("[data-store-body]")).toContainText("笔记");
+    await expect(win.locator("[data-store-body]")).not.toContainText("浏览器");
+
+    // 不是崩溃卡片
+    await expect(win.locator("[data-g19-crash]")).toHaveCount(0);
+  });
+
   test("诊断中心「指标」只有真实 Web Vitals：无数据写未采集，不写占位值", async ({ page }) => {
     await bootDesktop(page);
     await page.locator('[data-menu-btn="apps"]').click();

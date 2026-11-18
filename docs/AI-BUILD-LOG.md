@@ -102,3 +102,45 @@
 
 - 6.1 收尾：`appcenter` / `workspaces` 的 app UI 改 `load()`；widgetstore 画廊拆分（预计 −12–20 KB）。
 - 6.2 首屏 CSS 审计。
+
+---
+
+## 2026-11-18 · Round 3 · 6.1 收尾 + 6.2 首屏 CSS
+
+### 起点
+
+- 6.1 入口 482,939 B（预算余 −33 KB）；6.2 首屏 CSS 273,238 B（预算余 −73 KB）。
+- 应用中心界面（22.5 KB）仍静态打包，而 `bumpOpen` 才是启动期唯一依赖。
+
+### 完成
+
+1. **应用中心懒加载**：`appcenter.ts` 只留统计，界面迁 `appcenter/app.ts`，注册项改 `load()`。
+   入口 482,939 → **442,621 B**，6.1 达标。
+2. **样式随 chunk 下发**（6.2）：`os14-apps.css` 8 个应用段、`games.css`、`os20.css` 的设置/市场/更新、
+   `os14.css` 的应用中心段、`applications.css` 的关于/终端/音乐/成就段，全部迁到对应模块；
+   内容逐字未改，只改加载时机。首屏 273,238 → **196,151 B**，达标。
+3. **修复真实缺陷**：应用中心在「发现」页输入关键词无反应（`bodyView` 忽略 query）。
+   改为有关键词即走列表视图，并显示「搜索结果 · 共 N 个」。新 E2E 用例覆盖。
+4. 新增 E2E：应用中心按需加载（chunk 请求 / 已安装计数 / 搜索过滤 / 无崩溃卡片）。
+
+### 过程中修的两个自造问题
+
+- 第一次 CSS 切片从注释中间开始，lightningcss 报 `Invalid dangling combinator`；从 git 恢复后按节标题边界重切。
+- 新文件 `appcenter/app.ts` 未在 HTML 安全白名单里，扫描报 1 处未审查；把条目迁到新路径并补理由。
+
+### 测试
+
+| 命令 | 结果 |
+| --- | --- |
+| `npm run verify` | exit 0（19 文件 / 359 单测；292 处全审查；build 29 页；CSP 12/30） |
+| `npx playwright test` | **173 passed（4.2m）** |
+| 截图抽查 | notes / terminal / achievements / appcenter 正常 |
+
+### 数据
+
+- 入口 JS 442,621 B（≤450 KB）；首屏 CSS 196,151 B（≤200 KB）；应用 CSS 文件 28 个。
+- 6.2 余量 3.8 KB，已写进 BACKLOG 观察项。
+
+### 下一项
+
+6.4：把真实构建的 DCL/load/资源体积写入发布报告（本机可做）；生产 `qa:prod` 保持 `Blocked`。

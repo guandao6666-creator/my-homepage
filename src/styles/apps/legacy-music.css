@@ -1,0 +1,159 @@
+/* ============================================================
+   Guandao OS 6.2 · legacy-music 样式（按需加载）
+   从 styles/desktop/applications.css 拆出：只在打开该应用时需要。
+   ============================================================ */
+
+      /* ---------------- 音乐 ---------------- */
+
+      .music {
+        display: grid;
+        gap: 12px;
+        padding: 18px 20px 20px;
+      }
+
+      .music-cover {
+        position: relative;
+        height: 88px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: linear-gradient(135deg, #6f8cff 0%, #b06eff 100%);
+      }
+
+      .cover-disc {
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        width: 62px;
+        height: 62px;
+        margin-top: -31px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #161922 0 16%, #262b38 16% 42%, #161922 42% 100%);
+        animation: discSpin 9s linear infinite;
+      }
+
+      .music-title {
+        margin: 0;
+        font-size: 15px;
+        color: #fff;
+      }
+
+      .music-sub {
+        margin: 2px 0 0;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .music-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .music-play {
+        flex: none;
+        width: 36px;
+        height: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 50%;
+        background: rgba(111, 140, 255, 0.26);
+        color: #fff;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .music-play:hover {
+        background: rgba(111, 140, 255, 0.44);
+      }
+
+      .music-wave {
+        flex: 1;
+        min-width: 0;
+        height: 42px;
+      }
+
+      .music-note {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .music-step {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border: 0;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.66);
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        transition: background-color 0.18s ease, color 0.18s ease;
+      }
+
+      .music-step:hover {
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+      }
+
+      .music-list {
+        max-height: 152px;
+        margin: 14px 0 0;
+        padding: 0;
+        overflow: auto;
+        list-style: none;
+        display: grid;
+        gap: 2px;
+      }
+
+      .music-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 9px;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+      }
+
+      .music-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .music-row.is-current {
+        background: rgba(111, 140, 255, 0.16);
+      }
+
+      .music-row-no {
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+
+      .music-row.is-playing .music-row-no {
+        color: #8fa6ff;
+      }
+
+      .music-row-name {
+        flex: 1;
+        overflow: hidden;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.78);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .music-row.is-current .music-row-name {
+        color: #fff;
+      }
+
+      @keyframes discSpin {
+        to {
+          transform: rotate(360deg);
+        }
+      }

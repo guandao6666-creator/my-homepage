@@ -1,0 +1,123 @@
+/* ============================================================
+   Guandao OS 6.2 · updatecenter（按需加载）
+   从 styles/os20.css 拆出：只有打开对应应用时才会随 chunk 下载。
+   ============================================================ */
+
+/* ---------- 更新中心 ---------- */
+
+.os20-update-state {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 15px;
+  border: 1px solid var(--g-line);
+  border-radius: 12px;
+  background: var(--g-surface);
+}
+
+.os20-update-state b {
+  font-size: 13.5px;
+  color: var(--g-text);
+}
+
+.os20-update-state span {
+  font-size: 12px;
+  color: var(--g-dim);
+  line-height: 1.55;
+}
+
+.os20-update-state.is-ok {
+  border-color: rgba(110, 231, 168, 0.4);
+}
+
+.os20-update-state.is-new {
+  border-color: rgba(111, 140, 255, 0.6);
+  background: rgba(111, 140, 255, 0.1);
+}
+
+.os20-update-state.is-warn {
+  border-color: rgba(255, 212, 121, 0.4);
+}
+
+.os20-update-state.is-danger {
+  border-color: rgba(255, 143, 143, 0.45);
+}
+
+.os20-update-state.is-busy b {
+  color: #b9c8ff;
+}
+
+.os20-check {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.os20-check-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 11px;
+  border: 1px solid var(--g-line);
+  border-radius: 9px;
+  background: var(--g-surface);
+  font-size: 11.5px;
+  color: var(--g-dim);
+}
+
+.os20-check-row b {
+  color: var(--g-text);
+  font-weight: 550;
+}
+
+.os20-releases {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.os20-release {
+  padding: 12px 14px;
+  border: 1px solid var(--g-line);
+  border-radius: 12px;
+  background: var(--g-surface);
+}
+
+.os20-release.is-current {
+  border-color: rgba(111, 140, 255, 0.5);
+  background: rgba(111, 140, 255, 0.08);
+}
+
+.os20-release-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.os20-release-head b {
+  font-size: 13px;
+  color: var(--g-text);
+}
+
+.os20-release-head span {
+  font-size: 11.5px;
+  color: var(--g-dim);
+}
+
+.os20-release-head i {
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--g-faint);
+  margin-left: auto;
+}
+
+.os20-release ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--g-dim);
+}

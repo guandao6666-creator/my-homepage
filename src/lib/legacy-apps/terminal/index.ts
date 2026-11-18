@@ -1,3 +1,6 @@
+// 6.2：本应用样式随 chunk 按需下载
+import "../../../styles/apps/terminal.css";
+
 /**
  * 终端（terminal）· 对应 index.astro 原 `renderTerminal` / `initTerminal`。
  *

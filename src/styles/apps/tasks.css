@@ -1,0 +1,350 @@
+/* ============================================================
+   Guandao OS 6.2 · tasks 应用样式（按需加载）
+   从 styles/os14-apps.css 拆出：只有打开该应用时才会随 chunk 一起下载。
+   ============================================================ */
+
+/* ---------------- 任务与通知 ---------------- */
+
+.tk14-host {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.tk14-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 2px 0 14px;
+  flex-wrap: wrap;
+}
+.tk14-stat {
+  display: grid;
+  gap: 1px;
+}
+.tk14-stat b {
+  font-size: 18px;
+  font-weight: 680;
+  line-height: 1.1;
+}
+.tk14-stat span {
+  font-size: 9px;
+  color: var(--g-faint);
+}
+.tk14-stat.is-warn b {
+  color: var(--os-danger);
+}
+.tk14-top .g14-btn {
+  margin-left: auto;
+}
+.tk14-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--g-line);
+}
+.tk14-search {
+  margin-left: auto;
+  width: 140px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--g-line);
+  border-radius: 7px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  font: inherit;
+  font-size: 10.5px;
+  outline: none;
+}
+.tk14-list {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+}
+.tk14-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--g-line);
+  border-radius: 10px;
+  background: var(--g-card);
+  transition: opacity 0.3s var(--os-ease);
+}
+.tk14-row:hover {
+  border-color: var(--g-line-2);
+}
+.tk14-row.is-done {
+  opacity: 0.5;
+}
+.tk14-check {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 1px;
+  border-radius: 5px;
+  border: 1.5px solid var(--g-line-2);
+  background: transparent;
+  color: transparent;
+  font-size: 10px;
+  cursor: pointer;
+}
+.tk14-check.is-on {
+  background: var(--os-accent);
+  border-color: var(--os-accent);
+  color: #0b1020;
+}
+.tk14-main {
+  flex: 1;
+  min-width: 0;
+}
+.tk14-title {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--g-text);
+}
+.tk14-row.is-done .tk14-title {
+  text-decoration: line-through;
+}
+.tk14-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  font-size: 9px;
+  color: var(--g-faint);
+}
+.tk14-pri {
+  color: var(--pc);
+  font-weight: 600;
+}
+.tk14-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--cc);
+}
+.tk14-cat::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cc);
+}
+.tk14-due.is-late {
+  color: var(--os-danger);
+}
+.tk14-note {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--g-surface-2);
+}
+.tk14-acts {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.tk14-row:hover .tk14-acts {
+  opacity: 1;
+}
+.tk14-acts .g14-btn {
+  min-height: 24px;
+  font-size: 9.5px;
+  padding: 0 6px;
+}
+.tk14-foot {
+  padding-top: 12px;
+}
+.tk14-notifbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--g-line);
+}
+.tk14-notifbar .g14-btn {
+  min-height: 27px;
+  font-size: 10.5px;
+}
+.tk14-dnd {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--g-dim);
+}
+.tk14-dnd input {
+  accent-color: var(--os-accent);
+}
+.tk14-notifs {
+  display: grid;
+  gap: 5px;
+  padding-top: 10px;
+}
+.tk14-notif {
+  display: flex;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--g-line);
+  background: var(--g-surface);
+  position: relative;
+}
+.tk14-notif.is-new {
+  background: var(--os-accent-soft);
+  border-color: var(--os-accent-line);
+}
+.tk14-notif-ico {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 7px;
+  background: var(--g-surface-3);
+  font-size: 11px;
+}
+.tk14-notif b {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.tk14-notif p {
+  margin: 2px 0 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--g-dim);
+}
+.tk14-notif i {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  font-size: 8.5px;
+  color: var(--g-faint);
+}
+.tk14-dot {
+  position: absolute;
+  right: 9px;
+  top: 11px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--os-accent);
+}
+.tk14-stats {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+  padding: 6px 0 16px;
+}
+.tk14-donut {
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  background: conic-gradient(var(--os-accent) calc(var(--p) * 1%), var(--g-surface-3) 0);
+  display: grid;
+  place-items: center;
+}
+.tk14-donut > div {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--g-card-2);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+}
+.tk14-donut b {
+  font-size: 20px;
+  font-weight: 700;
+}
+.tk14-donut span {
+  font-size: 9px;
+  color: var(--g-faint);
+}
+.tk14-bars {
+  display: grid;
+  gap: 7px;
+}
+.tk14-bar-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--g-dim);
+}
+.tk14-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--g-surface-3);
+  overflow: hidden;
+}
+.tk14-track i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.tk14-bar-row b {
+  font-weight: 500;
+  font-size: 9.5px;
+  text-align: right;
+  color: var(--g-faint);
+}
+.tk14-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  height: 96px;
+  padding: 6px 0;
+}
+.tk14-day {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.tk14-daybars {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.tk14-daybars i,
+.tk14-daybars b {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px;
+}
+.tk14-daybars i {
+  background: var(--g-surface-3);
+}
+.tk14-daybars b {
+  background: var(--os-accent);
+}
+.tk14-day span {
+  font-size: 8.5px;
+  color: var(--g-faint);
+}
+.tk14-legend {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  margin-right: 2px;
+}
+.tk14-legend.is-created {
+  background: var(--g-surface-3);
+}
+.tk14-legend.is-done {
+  background: var(--os-accent);
+  margin-left: 8px;
+}

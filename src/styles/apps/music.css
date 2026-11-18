@@ -1,0 +1,261 @@
+/* ============================================================
+   Guandao OS 6.2 · music 应用样式（按需加载）
+   从 styles/os14-apps.css 拆出：只有打开该应用时才会随 chunk 一起下载。
+   ============================================================ */
+
+/* ---------------- Guandao Music ---------------- */
+
+.mu14 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  height: 100%;
+  min-height: 0;
+  color: var(--g-text);
+}
+.mu14-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 18px 14px;
+  border-right: 1px solid var(--g-line);
+}
+.mu14-cover {
+  width: 148px;
+  height: 148px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, #7a8bff, #c66cff);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 24px 44px -26px rgba(0, 0, 0, 0.8);
+  flex: none;
+}
+.mu14-cover span {
+  font-size: 42px;
+  color: rgba(255, 255, 255, 0.35);
+}
+.mu14-info {
+  text-align: center;
+  min-width: 0;
+  width: 100%;
+}
+.mu14-info h3 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mu14-info p {
+  margin: 0;
+  font-size: 10px;
+  color: var(--g-faint);
+}
+.mu14-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.mu14-time {
+  font-size: 9px;
+  color: var(--g-faint);
+  font-variant-numeric: tabular-nums;
+  min-width: 28px;
+}
+.mu14-track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--g-surface-3);
+  cursor: pointer;
+}
+.mu14-track i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--os-accent);
+}
+.mu14-track b {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 3px var(--os-accent-soft);
+}
+.mu14-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mu14-controls button {
+  border: 0;
+  background: transparent;
+  color: var(--g-dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+.mu14-controls button:hover {
+  color: var(--g-text);
+  background: var(--g-surface);
+}
+.mu14-controls button.is-on {
+  color: var(--os-accent);
+}
+.mu14-play {
+  width: 42px;
+  height: 42px;
+  border-radius: 50% !important;
+  background: var(--os-accent) !important;
+  color: #0b1020 !important;
+  font-size: 15px !important;
+  display: grid;
+  place-items: center;
+}
+.mu14-vol {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  font-size: 9px;
+  color: var(--g-faint);
+}
+.mu14-vol input {
+  flex: 1;
+  accent-color: var(--os-accent);
+}
+.mu14-vol b {
+  font-weight: 500;
+  min-width: 30px;
+  text-align: right;
+}
+.mu14-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.mu14-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--g-line);
+}
+.mu14-list-head b {
+  font-size: 12px;
+  font-weight: 620;
+}
+.mu14-list-head span {
+  margin-left: 6px;
+  font-size: 9.5px;
+  color: var(--g-faint);
+}
+.mu14-list-head .g14-btn {
+  min-height: 26px;
+  font-size: 10px;
+  padding: 0 8px;
+}
+.mu14-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 5px;
+}
+.mu14-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 7px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 10.5px;
+}
+.mu14-row:hover {
+  background: var(--g-surface);
+}
+.mu14-row.is-playing {
+  background: var(--os-accent-soft);
+}
+.mu14-num {
+  font-size: 8.5px;
+  color: var(--g-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.mu14-row.is-playing .mu14-num {
+  color: var(--os-accent);
+}
+.mu14-rtitle {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mu14-rtitle i {
+  display: block;
+  font-style: normal;
+  font-size: 8.5px;
+  color: var(--g-faint);
+}
+.mu14-rsize {
+  font-size: 8px;
+  color: var(--g-faint);
+}
+.mu14-del {
+  border: 0;
+  background: transparent;
+  color: var(--g-faint);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+}
+.mu14-del:hover {
+  color: var(--os-danger);
+}
+.mu14-empty {
+  padding: 26px 12px;
+  font-size: 10.5px;
+  color: var(--g-faint);
+  text-align: center;
+}
+.mu14-note {
+  margin: 0;
+  padding: 8px 12px 12px;
+  font-size: 8.5px;
+  line-height: 1.6;
+  color: var(--g-faint);
+  border-top: 1px solid var(--g-line);
+}
+.mu14-note code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+@media (max-width: 760px) {
+  .mu14 {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .mu14-player {
+    border-right: 0;
+    border-bottom: 1px solid var(--g-line);
+    padding: 12px;
+  }
+  .mu14-cover {
+    width: 96px;
+    height: 96px;
+  }
+}

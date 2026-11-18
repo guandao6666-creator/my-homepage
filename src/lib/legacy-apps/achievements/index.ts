@@ -1,3 +1,6 @@
+// 6.2：本应用样式随 chunk 按需下载
+import "../../../styles/apps/legacy-achievements.css";
+
 /**
  * 成就（achievements）· 对应 index.astro 原 `renderAchievements`。
  *

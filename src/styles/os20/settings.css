@@ -1,0 +1,384 @@
+/* ============================================================
+   Guandao OS 6.2 · settings（按需加载）
+   从 styles/os20.css 拆出：只有打开对应应用时才会随 chunk 下载。
+   ============================================================ */
+
+/* ---------- 系统设置 ---------- */
+
+.os20-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px;
+}
+
+.os20-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 14px;
+  border: 1px solid var(--g-line);
+  border-radius: 12px;
+  background: var(--g-surface);
+}
+
+.os20-kpi b {
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--g-text);
+  letter-spacing: -0.01em;
+}
+
+.os20-kpi span {
+  font-size: 11.5px;
+  color: var(--g-dim);
+  line-height: 1.45;
+}
+
+.os20-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+}
+
+.os20-theme {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--g-line);
+  border-radius: 12px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.os20-theme:hover {
+  border-color: var(--g-line-2);
+  transform: translateY(-1px);
+}
+
+.os20-theme.is-active {
+  border-color: rgba(111, 140, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(111, 140, 255, 0.35) inset;
+}
+
+.os20-theme-art {
+  display: block;
+  height: 66px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.os20-theme-art::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--a, #6f8cff), var(--b, #b06eff));
+}
+
+.os20-theme-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 10px;
+}
+
+.os20-theme-meta b {
+  font-size: 12px;
+}
+
+.os20-theme-meta i {
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--g-faint);
+}
+
+.os20-walls {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.os20-wall {
+  padding: 0;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid var(--g-line);
+  border-radius: 10px;
+  background: var(--g-surface);
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.os20-wall span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+
+.os20-wall:hover {
+  border-color: var(--g-line-2);
+}
+
+.os20-wall.is-active {
+  border-color: rgba(111, 140, 255, 0.85);
+  box-shadow: 0 0 0 1px rgba(111, 140, 255, 0.4) inset;
+}
+
+.os20-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.os20-app {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--g-line);
+  border-radius: 12px;
+  background: var(--g-surface);
+}
+
+.os20-app-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.os20-app-meta b {
+  font-size: 13px;
+  color: var(--g-text);
+}
+
+.os20-app-meta > span {
+  font-size: 11.5px;
+  color: var(--g-dim);
+}
+
+.os20-app-acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.os20-perms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.os20-perm {
+  padding: 2px 8px;
+  border: 1px dashed var(--g-line-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--g-faint);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.os20-perm.is-on {
+  border-style: solid;
+  border-color: rgba(110, 231, 168, 0.45);
+  background: rgba(110, 231, 168, 0.1);
+  color: #a9f0c9;
+}
+
+.os20-perm:hover {
+  border-color: var(--g-line-2);
+  color: var(--g-text);
+}
+
+.os20-perm-list,
+.os20-audit,
+.os20-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.os20-perm-row,
+.os20-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--g-line);
+  border-radius: 10px;
+  background: var(--g-surface);
+  font-size: 12px;
+}
+
+.os20-perm-row b,
+.os20-sync-row b {
+  font-size: 12px;
+  color: var(--g-text);
+}
+
+.os20-perm-row span,
+.os20-sync-row span {
+  font-size: 11.5px;
+  color: var(--g-dim);
+}
+
+.os20-sync-row.is-muted {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.os20-audit-row {
+  display: grid;
+  grid-template-columns: 122px minmax(0, 1.1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-left: 2px solid rgba(110, 231, 168, 0.5);
+  border-radius: 8px;
+  background: var(--g-surface);
+  font-size: 11.5px;
+  color: var(--g-dim);
+}
+
+.os20-audit-row.is-denied {
+  border-left-color: rgba(255, 143, 143, 0.6);
+}
+
+.os20-audit-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--g-faint);
+}
+
+.os20-audit-row b {
+  font-size: 11.5px;
+  color: var(--g-text);
+}
+
+.os20-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.os20-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 76px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid var(--g-line);
+  border-radius: 9px;
+  background: var(--g-surface);
+  font-size: 11.5px;
+}
+
+.os20-stage span {
+  color: var(--g-text);
+}
+
+.os20-stage b {
+  font-variant-numeric: tabular-nums;
+  color: var(--g-dim);
+  font-weight: 500;
+}
+
+.os20-stage i {
+  font-style: normal;
+  color: var(--g-faint);
+  text-align: right;
+}
+
+.os20-stage.is-failed {
+  border-color: rgba(255, 143, 143, 0.4);
+}
+
+.os20-stage.is-failed i {
+  color: #ffc0c0;
+}
+
+.os20-stage.is-skipped i {
+  color: var(--g-faint);
+}
+
+.os20-about {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.os20-about-logo {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #6f8cff, #b06eff);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  box-shadow: 0 14px 32px -18px rgba(111, 140, 255, 0.9);
+}
+
+.os20-about h4 {
+  margin: 0 0 3px;
+  font-size: 15px;
+  color: var(--g-text);
+}
+
+.os20-about p {
+  margin: 0 0 2px;
+  font-size: 12px;
+  color: var(--g-dim);
+}
+
+.os20-mode {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.os20-mode-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--g-line);
+  border-radius: 12px;
+  background: var(--g-surface);
+  color: var(--g-dim);
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.os20-mode-btn b {
+  font-size: 13px;
+  color: var(--g-text);
+}
+
+.os20-mode-btn span {
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.os20-mode-btn:hover {
+  border-color: var(--g-line-2);
+}
+
+.os20-mode-btn.is-active {
+  border-color: rgba(111, 140, 255, 0.8);
+  background: rgba(111, 140, 255, 0.12);
+}

@@ -1,0 +1,444 @@
+/* ============================================================
+   Guandao OS 6.2 · notes 应用样式（按需加载）
+   从 styles/os14-apps.css 拆出：只有打开该应用时才会随 chunk 一起下载。
+   ============================================================ */
+
+/* ---------------- Guandao Notes ---------------- */
+
+.n14 {
+  display: grid;
+  grid-template-columns: 148px 218px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  color: var(--g-text);
+}
+.n14-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 9px;
+  border-right: 1px solid var(--g-line);
+  background: var(--g-surface);
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+.n14-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px 4px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--g-faint);
+}
+.n14-side-head button {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--g-dim);
+  cursor: pointer;
+  font-size: 12px;
+}
+.n14-side-head button:hover {
+  background: var(--g-surface-2);
+}
+.n14-folders {
+  display: grid;
+  gap: 2px;
+}
+.n14-folder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--g-dim);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+.n14-folder span {
+  font-size: 9px;
+  opacity: 0.6;
+}
+.n14-folder b {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 9.5px;
+  color: var(--g-faint);
+}
+.n14-folder:hover {
+  background: var(--g-surface-2);
+  color: var(--g-text);
+}
+.n14-folder.is-active {
+  background: var(--os-accent-soft);
+  color: var(--g-text);
+}
+.n14-folder-more {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  display: none;
+  place-items: center;
+  border-radius: 4px;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--g-faint);
+  background: var(--g-surface-2);
+}
+.n14-folder:hover .n14-folder-more {
+  display: grid;
+}
+.n14-side-foot {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--g-line);
+}
+.n14-tool {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--g-line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--g-dim);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.n14-tool:hover {
+  color: var(--g-text);
+  background: var(--g-surface-2);
+}
+.n14-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--g-line);
+}
+.n14-list-head {
+  display: flex;
+  gap: 6px;
+  padding: 10px 9px;
+  border-bottom: 1px solid var(--g-line);
+}
+.n14-search {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--g-line);
+  border-radius: 7px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  font: inherit;
+  font-size: 10.5px;
+  outline: none;
+}
+.n14-search:focus {
+  border-color: var(--os-accent-line);
+}
+.n14-new {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 0;
+  border-radius: 7px;
+  background: var(--os-accent);
+  color: #0b1020;
+  font-size: 14px;
+  cursor: pointer;
+}
+.n14-items {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 5px;
+}
+.n14-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 9px;
+  margin-bottom: 3px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--g-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.n14-item:hover {
+  background: var(--g-surface);
+}
+.n14-item.is-active {
+  background: var(--os-accent-soft);
+  border-color: var(--os-accent-line);
+}
+.n14-item-title {
+  font-size: 11.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.n14-item-sub {
+  font-size: 9.5px;
+  line-height: 1.4;
+  color: var(--g-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.n14-item-meta {
+  font-size: 8.5px;
+  color: var(--g-faint);
+  opacity: 0.75;
+}
+.n14-blank {
+  padding: 18px 10px;
+  font-size: 10.5px;
+  color: var(--g-faint);
+  text-align: center;
+}
+.n14-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 14px 0;
+}
+.n14-editor-empty {
+  margin: auto;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--g-faint);
+  font-size: 11px;
+}
+.n14-editor-empty span {
+  font-size: 26px;
+  opacity: 0.35;
+}
+.n14-editor-empty p {
+  margin: 0;
+}
+.n14-ed-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--g-line);
+}
+.n14-ed-folder {
+  font-size: 9.5px;
+  color: var(--g-faint);
+}
+.n14-ed-acts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.n14-seg {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--g-surface);
+  border: 1px solid var(--g-line);
+}
+.n14-seg button {
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--g-faint);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.n14-seg button.is-active {
+  background: var(--g-surface-3);
+  color: var(--g-text);
+}
+.n14-icon {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--g-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+.n14-icon:hover {
+  background: var(--g-surface-2);
+  color: var(--g-text);
+}
+.n14-icon.is-danger:hover {
+  color: var(--os-danger);
+}
+.n14-title {
+  width: 100%;
+  margin: 10px 0 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--g-text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 650;
+  outline: none;
+}
+.n14-tagbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0 8px;
+}
+.n14-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--g-surface-2);
+  color: var(--g-dim);
+  font-size: 9.5px;
+}
+.n14-tag i {
+  font-style: normal;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.n14-tag i:hover {
+  opacity: 1;
+  color: var(--os-danger);
+}
+.n14-taginput {
+  width: 70px;
+  border: 0;
+  background: transparent;
+  color: var(--g-text);
+  font: inherit;
+  font-size: 9.5px;
+  outline: none;
+}
+.n14-body {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 0 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--g-text);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.9;
+  resize: none;
+  outline: none;
+}
+.n14-preview {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 10px;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--g-text);
+}
+.n14-preview h1,
+.n14-preview h2,
+.n14-preview h3,
+.n14-preview h4 {
+  margin: 14px 0 6px;
+  line-height: 1.4;
+  font-weight: 650;
+}
+.n14-preview h3 {
+  font-size: 16px;
+}
+.n14-preview h4 {
+  font-size: 14px;
+}
+.n14-preview h5 {
+  font-size: 12.5px;
+}
+.n14-preview p {
+  margin: 6px 0;
+  color: var(--g-dim);
+}
+.n14-preview ul,
+.n14-preview ol {
+  margin: 6px 0;
+  padding-left: 20px;
+  color: var(--g-dim);
+}
+.n14-preview code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--g-surface-2);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.n14-preview pre {
+  padding: 10px;
+  border-radius: 9px;
+  background: var(--g-surface);
+  border: 1px solid var(--g-line);
+  overflow-x: auto;
+}
+.n14-preview pre code {
+  background: transparent;
+  padding: 0;
+}
+.n14-preview blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--os-accent);
+  background: var(--os-accent-soft);
+  color: var(--g-dim);
+  border-radius: 0 6px 6px 0;
+}
+.n14-preview a {
+  color: var(--os-accent);
+}
+.n14-preview hr {
+  border: 0;
+  border-top: 1px solid var(--g-line);
+  margin: 12px 0;
+}
+.n14-ed-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0 9px;
+  border-top: 1px solid var(--g-line);
+  font-size: 9px;
+  color: var(--g-faint);
+}
+
+@media (max-width: 760px) {
+  .n14 {
+    grid-template-columns: 120px minmax(0, 1fr);
+  }
+  .n14-editor {
+    display: none;
+  }
+  .n14-list {
+    border-right: 0;
+  }
+}

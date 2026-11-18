@@ -1,0 +1,260 @@
+/* ============================================================
+   Guandao OS 6.2 · files 应用样式（按需加载）
+   从 styles/os14-apps.css 拆出：只有打开该应用时才会随 chunk 一起下载。
+   ============================================================ */
+
+/* ---------------- 文件管理器 ---------------- */
+
+.fs14 {
+  display: grid;
+  grid-template-columns: 158px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  color: var(--g-text);
+}
+.fs14-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 11px 9px;
+  border-right: 1px solid var(--g-line);
+  background: var(--g-surface);
+  overflow-y: auto;
+}
+.fs14-view {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--g-dim);
+  font: inherit;
+  font-size: 10.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.fs14-view span {
+  width: 13px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+.fs14-view b {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 9px;
+  color: var(--g-faint);
+}
+.fs14-view:hover {
+  background: var(--g-surface-2);
+  color: var(--g-text);
+}
+.fs14-view.is-active {
+  background: var(--os-accent-soft);
+  color: var(--g-text);
+}
+.fs14-side-foot {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--g-line);
+}
+.fs14-vnote {
+  margin: 0;
+  font-size: 8px;
+  line-height: 1.6;
+  color: var(--g-faint);
+}
+.fs14-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.fs14-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--g-line);
+  flex-wrap: wrap;
+}
+.fs14-crumb {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--g-faint);
+  min-width: 0;
+  overflow: hidden;
+}
+.fs14-crumb button {
+  border: 0;
+  background: transparent;
+  color: var(--g-dim);
+  font: inherit;
+  font-size: 10.5px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fs14-crumb button:hover {
+  background: var(--g-surface-2);
+  color: var(--g-text);
+}
+.fs14-crumb b {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--g-text);
+}
+.fs14-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.fs14-search {
+  width: 120px;
+  height: 27px;
+  padding: 0 8px;
+  border: 1px solid var(--g-line);
+  border-radius: 6px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  font: inherit;
+  font-size: 10px;
+  outline: none;
+}
+.fs14-sort {
+  height: 27px;
+  padding: 0 4px;
+  border: 1px solid var(--g-line);
+  border-radius: 6px;
+  background: var(--g-surface);
+  color: var(--g-dim);
+  font: inherit;
+  font-size: 10px;
+}
+.fs14-tools .g14-btn {
+  min-height: 27px;
+  font-size: 10px;
+  padding: 0 9px;
+}
+.fs14-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+.fs14-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 11px 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  text-align: center;
+}
+.fs14-card:hover {
+  background: var(--g-surface);
+  border-color: var(--g-line);
+}
+.fs14-card.is-sel {
+  background: var(--os-accent-soft);
+  border-color: var(--os-accent-line);
+}
+.fs14-ico {
+  --di-base: 36px;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.fs14-name {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--g-text);
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-all;
+}
+.fs14-meta {
+  font-size: 8px;
+  color: var(--g-faint);
+}
+.fs14-act {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+}
+.fs14-act button {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--g-faint);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+}
+.fs14-card:hover .fs14-act button {
+  opacity: 1;
+  background: var(--g-surface-2);
+}
+.fs14-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 56px 20px;
+  text-align: center;
+  color: var(--g-faint);
+}
+.fs14-empty span {
+  font-size: 26px;
+  opacity: 0.4;
+}
+.fs14-empty p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--g-dim);
+}
+.fs14-empty-sub {
+  font-size: 10px !important;
+  max-width: 280px;
+  line-height: 1.6;
+}
+.fs14-preview {
+  max-height: 300px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--g-line);
+  background: var(--g-surface);
+}
+.fs14-preview.is-short {
+  max-height: 140px;
+  margin-top: 10px;
+}
+.fs14-preview pre {
+  margin: 0;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--g-dim);
+}

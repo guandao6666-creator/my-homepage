@@ -1,0 +1,63 @@
+/* ============================================================
+   Guandao OS 6.2 · terminal 样式（按需加载）
+   从 styles/desktop/applications.css 拆出：只在打开该应用时需要。
+   ============================================================ */
+
+      /* ---------------- 终端 ---------------- */
+
+      .term {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: rgba(8, 10, 16, 0.82);
+        font-family: ui-monospace, "SF Mono", Consolas, monospace;
+        font-size: 12.5px;
+      }
+
+      .term-out {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 14px 16px 6px;
+        line-height: 1.7;
+      }
+
+      .term-line {
+        margin: 0 0 2px;
+        color: rgba(232, 240, 255, 0.82);
+        white-space: pre-wrap;
+      }
+
+      .term-muted {
+        color: rgba(232, 240, 255, 0.42);
+      }
+
+      .term-echo {
+        color: #7ef0b0;
+      }
+
+      .term-error {
+        color: #ff8f8f;
+      }
+
+      .term-input-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 16px 14px;
+      }
+
+      .term-prompt {
+        color: #7ef0b0;
+      }
+
+      .term-input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: none;
+        color: #eef1f7;
+        font: inherit;
+        outline: none;
+        caret-color: #7ef0b0;
+      }

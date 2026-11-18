@@ -1,3 +1,6 @@
+// 6.2：游戏中心样式随 chunk 按需下载（七款游戏的界面规则只在打开游乐场时需要）
+import "../../styles/desktop/games.css";
+
 /**
  * Guandao OS 1.4 · 游乐场
  *

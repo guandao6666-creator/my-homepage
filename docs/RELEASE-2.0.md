@@ -997,6 +997,54 @@ GitHub Actions quality 全绿（run [43588486049](https://github.com/guandao6666
 
 **结论：6.3 `Verified`（本地 / CI 层）。**
 
+### 16.22 Phase 6.1 收尾 + 6.2 首屏 CSS（2026-11-18）
+
+**1. 目标与范围**
+
+6.1 达 450 KB：把应用中心界面移出入口，复用既有 `load()` 通道。
+6.2 达 200 KB：把「只在某个应用打开时才需要」的样式随该应用的 chunk 下发，不改任何选择器内容。
+
+**2. 交付**
+
+- `src/lib/os14/appcenter.ts` 只保留 `STATS_KEY/readStats/bumpOpen`（外壳开机时 `onOpen` 需要）；
+  商店界面迁到 `src/lib/os14/appcenter/app.ts`，注册项改 `load()`。
+- 6.2 样式搬迁（内容逐字未改，只换加载时机）：
+  - `styles/os14-apps.css` → `styles/apps/{notes,calendar,gallery,music,reader,files,tasks,datacenter}.css`，
+    由对应应用模块 `import`；控制中心与工作空间过渡仍留在首屏。
+  - `styles/desktop/games.css` → 由 `os14/playground.ts` 引入。
+  - `styles/os20.css` → `styles/os20/{settings,market,updatecenter}.css`，由 `os20/apps/*` 引入；
+    首次启动引导与安装弹窗仍留在首屏。
+  - `styles/os14.css` 的「应用中心」整段 → `styles/apps/appcenter.css`。
+  - `styles/desktop/applications.css` 的「关于 / 终端 / 音乐 / 成就」段 → 对应应用模块；
+    「设置 / 成就提示 / 通知中心 / Finder」仍留在首屏。
+- 修掉测试暴露的真实缺陷：应用中心在「发现」页输入搜索词时 `bodyView` 仍走 `discoverView()`，
+  关键词被忽略（看起来没反应）。改为「有关键词一律走列表视图」，并在列表头显示搜索结果与命中数。
+- 测试：`desktop.spec.ts` 新增「应用中心按需加载」用例（chunk 请求、已安装计数、搜索过滤、无崩溃卡片）。
+
+**3. 实测**
+
+| 项 | 改造前 | 改造后 |
+| --- | ---: | ---: |
+| 入口 JS | 482,939 B | **442,621 B**（−40,318 B） |
+| 首屏 CSS | 273,238 B | **196,151 B**（−77,087 B / −28.2%） |
+| 应用 CSS 文件数 | — | 28 个，按需下载 |
+
+| 门禁 | 结果 |
+| --- | --- |
+| `npm run verify` | exit 0：19 文件 / 359 单测；HTML 安全 292 处 / 未审查 0；build 29 页；CSP 12/30 |
+| 全量 E2E | **173 passed（4.2m）** |
+| 视觉抽查 | notes / terminal / achievements / appcenter 四个窗口截图正常（`.shots/css-split-*.png`） |
+| 分块真实性 | `app.*.js` 未被 `modulepreload`，首屏不下载 |
+
+**4. 风险与未完成**
+
+- 6.2 余量仅 **3.8 KB**：后续任何新增首屏样式都可能再次超标，需先判断归属。
+- 样式搬迁只验证了四个窗口与全量 E2E，未逐页比对像素；`npm run shots:compare` 可作为补充手段。
+- 移动的样式集中在懒加载应用，若某类名在首屏被间接使用，会出现「打开前短暂无样式」，需继续观察。
+- 6.4 生产性能基线仍 `Blocked`（需生产授权）。
+
+**结论：6.1 / 6.2 `Verified`（本地 / CI 层）。Phase 6 整体仍为 `Partially Verified`（6.4 未执行）。**
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash

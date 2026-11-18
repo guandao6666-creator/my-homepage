@@ -30,6 +30,7 @@
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 291 处全审查、0 未审查） |
 | `npm run build` | exit 0，29 页；CSP 12 哈希 / 30 HTML 一致；HTML 安全 292 处全审查、0 未审查 |
+| 产物体积 | 入口 JS **442,621 B**（≤450 KB）；首屏 CSS **196,151 B**（≤200 KB） |
 | `npx playwright test`（`E2E_ADMIN_PORT=18789`） | 见 §4（本轮全量结果） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
@@ -39,8 +40,8 @@
 
 | 任务 | 状态 | 证据 |
 | --- | --- | --- |
-| 6.1 入口 JS ≤ 450 KB | **部分完成**：525,102 B → 482,939 B（−42 KB）；剩余 +33 KB | `docs/architecture/LEGACY-APPLICATIONS.md` §9.1 |
-| 6.2 首屏 CSS ≤ 200 KB | `Not Started`：273,238 B | 需要「非首屏样式延迟加载」审计 |
+| 6.1 入口 JS ≤ 450 KB | **`Verified`（本地）**：525,102 B → **442,621 B**（−82,481 B / −15.7%），应用中心改 `load()` 后达标 | `manifest.ts`、`os14/appcenter/app.ts`；`LEGACY-APPLICATIONS.md` §9.1 |
+| 6.2 首屏 CSS ≤ 200 KB | **`Verified`（本地）**：273,238 → **196,151 B**（−77,087 B / −28.2%），应用样式随 chunk 下发 | `src/styles/apps/*`、`src/styles/os20/*`；截图抽查通过 |
 | 6.3 诊断中心接入真实 LCP/CLS/INP | **`Verified`（本地）**：新增「指标」分区，`observeVitals`（buffered）在本机采集，无数据显示「未采集」、不支持显示「不支持」 | `src/lib/quality/diagnostics.ts`、`tests/e2e/desktop.spec.ts` |
 | 6.4 生产性能基线进发布报告 | `Not Started` | `scripts/prod-e2e.mjs` |
 
@@ -66,7 +67,7 @@
 | 项 | 结果 |
 | --- | --- |
 | 目标 spec（`legacy-apps` + `lifecycle`） | **27 passed**（2.4m），含「连续开关 20 次监听器不增长」 |
-| 全量 E2E | **172 passed（5.1m），exit 0**（新增诊断中心「指标」用例） |
+| 全量 E2E | **173 passed（4.2m），exit 0**（新增应用中心懒加载用例） |
 
 ## 5. 重大风险（未关闭）
 

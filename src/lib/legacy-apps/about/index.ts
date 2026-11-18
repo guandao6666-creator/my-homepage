@@ -1,3 +1,6 @@
+// 6.2：本应用样式随 chunk 按需下载
+import "../../../styles/apps/about.css";
+
 /**
  * 关于（about）· 对应 index.astro 原 `renderAbout`。
  *

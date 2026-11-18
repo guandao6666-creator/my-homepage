@@ -1,0 +1,292 @@
+/* ============================================================
+   Guandao OS 6.2 · gallery 应用样式（按需加载）
+   从 styles/os14-apps.css 拆出：只有打开该应用时才会随 chunk 一起下载。
+   ============================================================ */
+
+/* ---------------- Guandao Gallery ---------------- */
+
+.ga14 {
+  display: grid;
+  grid-template-columns: 172px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  color: var(--g-text);
+}
+.ga14-side {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--g-line);
+  background: var(--g-surface);
+  overflow-y: auto;
+}
+.ga14-import {
+  height: 30px;
+  border: 1px solid var(--os-accent-line);
+  border-radius: 8px;
+  background: var(--os-accent-soft);
+  color: var(--g-text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.ga14-import:hover {
+  background: var(--os-accent);
+  color: #0b1020;
+}
+.ga14-albums {
+  display: grid;
+  gap: 2px;
+}
+.ga14-album {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--g-dim);
+  font: inherit;
+  font-size: 10.5px;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+.ga14-album span {
+  font-size: 9px;
+  opacity: 0.6;
+}
+.ga14-album b {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 9px;
+  color: var(--g-faint);
+}
+.ga14-album i {
+  display: none;
+  position: absolute;
+  right: 3px;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--g-faint);
+}
+.ga14-album:hover {
+  background: var(--g-surface-2);
+  color: var(--g-text);
+}
+.ga14-album:hover i {
+  display: block;
+}
+.ga14-album.is-active {
+  background: var(--os-accent-soft);
+  color: var(--g-text);
+}
+.ga14-album.is-add {
+  color: var(--g-faint);
+}
+.ga14-tip {
+  margin: auto 0 0;
+  font-size: 8.5px;
+  line-height: 1.6;
+  color: var(--g-faint);
+}
+.ga14-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.ga14-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--g-line);
+}
+.ga14-search {
+  flex: 1;
+  max-width: 240px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--g-line);
+  border-radius: 7px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  font: inherit;
+  font-size: 10.5px;
+  outline: none;
+}
+.ga14-count {
+  font-size: 10px;
+  color: var(--g-faint);
+}
+.ga14-bar .g14-btn {
+  margin-left: auto;
+  min-height: 27px;
+  font-size: 10.5px;
+}
+.ga14-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 9px;
+  align-content: start;
+}
+.ga14-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border: 1px solid var(--g-line);
+  border-radius: 10px;
+  background: var(--g-card);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  color: var(--g-text);
+  font: inherit;
+}
+.ga14-card:hover {
+  border-color: var(--os-accent-line);
+}
+.ga14-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  background: var(--g-surface-2);
+}
+.ga14-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ga14-thumb i {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  color: var(--g-faint);
+  font-size: 18px;
+}
+.ga14-meta {
+  display: grid;
+  gap: 1px;
+  padding: 5px 7px 7px;
+}
+.ga14-meta b {
+  font-size: 10px;
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ga14-meta i {
+  font-style: normal;
+  font-size: 8.5px;
+  color: var(--g-faint);
+}
+.ga14-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 50px 20px;
+  text-align: center;
+  color: var(--g-faint);
+}
+.ga14-empty span {
+  font-size: 28px;
+  opacity: 0.4;
+}
+.ga14-empty p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--g-dim);
+}
+.ga14-empty-sub {
+  font-size: 10.5px !important;
+  max-width: 280px;
+  line-height: 1.7;
+}
+.ga14-lightbox {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: rgba(6, 8, 14, 0.92);
+  backdrop-filter: blur(6px);
+  animation: g14-fade 0.18s var(--os-ease);
+}
+.ga14-lb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+}
+.ga14-lb-bar > div {
+  display: flex;
+  gap: 4px;
+}
+.ga14-lb-bar button {
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  font: inherit;
+  font-size: 10px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.ga14-lb-bar button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.ga14-lb-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 6px 18px;
+}
+.ga14-lb-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 30px 60px -30px #000;
+}
+.ga14-lb-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 9.5px;
+}
+.ga14-lb-foot button {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.ga14-lb-foot button:hover {
+  color: #fff;
+}

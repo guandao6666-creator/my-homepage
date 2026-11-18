@@ -1,3 +1,6 @@
+// 6.2：本应用的样式随 chunk 按需下载，不再进入首屏 CSS
+import "../../styles/apps/files.css";
+
 /**
  * Guandao OS 1.4 · 虚拟文件系统
  *

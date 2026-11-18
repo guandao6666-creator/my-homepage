@@ -13,7 +13,7 @@ import { escapeHtml, ls, uid, type Ctx } from "./core";
 import { createSystem } from "./system";
 import { readInstall, META_BY_ID } from "./catalog";
 import { initThemes, initThemeApp, renderThemeApp } from "./themes";
-import { bumpOpen, initAppCenter, renderAppCenter } from "./appcenter";
+import { bumpOpen } from "./appcenter";
 import { initWidgetGallery, registerNewWidgets, renderWidgetGallery } from "./widgetstore";
 import { initWorkspaceShortcuts, initWorkspaces, renderWorkspaces } from "./workspaces";
 import { initDesktop, terminalCommand } from "./desktop";
@@ -59,7 +59,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
   /* 桌面外壳必需、必须同步可用：主题、组件、工作空间、应用中心、桌面交互。
      其余应用全部改成 load()，第一次打开时才下载。 */
   const specs: Spec[] = [
-    { id: "appcenter", title: "应用中心", width: 960, height: 660, glyph: "di-appcenter", render: renderAppCenter, init: (w) => initAppCenter(w, ctx, sys) },
+    { id: "appcenter", title: "应用中心", width: 960, height: 660, glyph: "di-appcenter", load: () => import("./appcenter/app").then((m) => ({ body: m.renderAppCenter, init: (w) => m.initAppCenter(w, ctx, sys) })) },
 
     /* ---------- 2.0 平台应用 ---------- */
     {

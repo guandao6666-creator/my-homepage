@@ -1,0 +1,380 @@
+/* ============================================================
+   Guandao OS 6.2 · calendar 应用样式（按需加载）
+   从 styles/os14-apps.css 拆出：只有打开该应用时才会随 chunk 一起下载。
+   ============================================================ */
+
+/* ---------------- Guandao Calendar ---------------- */
+
+.c14-host {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--g-text);
+}
+.c14 {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.c14-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--g-line);
+  flex-wrap: wrap;
+}
+.c14-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.c14-nav b {
+  font-size: 13.5px;
+  font-weight: 650;
+  min-width: 108px;
+  text-align: center;
+}
+.c14-nav button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--g-line);
+  border-radius: 7px;
+  background: var(--g-surface);
+  color: var(--g-dim);
+  cursor: pointer;
+  font-size: 13px;
+}
+.c14-nav button:hover {
+  color: var(--g-text);
+  background: var(--g-surface-2);
+}
+.c14-today {
+  width: auto !important;
+  padding: 0 9px;
+  font-size: 11px !important;
+}
+.c14-tools {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.c14-seg {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--g-surface);
+  border: 1px solid var(--g-line);
+}
+.c14-seg button {
+  height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--g-faint);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+.c14-seg button.is-active {
+  background: var(--g-surface-3);
+  color: var(--g-text);
+}
+.c14-search {
+  width: 130px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--g-line);
+  border-radius: 7px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  font: inherit;
+  font-size: 10.5px;
+  outline: none;
+}
+.c14-search:focus {
+  border-color: var(--os-accent-line);
+}
+.c14-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 232px;
+}
+.c14-body.is-list {
+  grid-template-columns: minmax(0, 1fr) 232px;
+}
+.c14-cal {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px 12px 14px;
+}
+.c14-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  margin-bottom: 4px;
+}
+.c14-week span {
+  text-align: center;
+  font-size: 9.5px;
+  color: var(--g-faint);
+}
+.c14-days {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 3px;
+}
+.c14-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 4px 5px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  min-height: 42px;
+}
+.c14-day:hover {
+  background: var(--g-surface-2);
+}
+.c14-day.is-out {
+  opacity: 0.32;
+}
+.c14-day.is-sel {
+  border-color: var(--os-accent-line);
+  background: var(--os-accent-soft);
+}
+.c14-num {
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.c14-day.is-today .c14-num {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--os-accent);
+  color: #0b1020;
+  font-weight: 700;
+}
+.c14-dots {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.c14-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+.c14-more {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 7.5px;
+  color: var(--g-faint);
+}
+.c14-month-list {
+  padding: 12px 14px;
+  overflow-y: auto;
+  font-size: 10px;
+  color: var(--g-faint);
+}
+.c14-lrow {
+  display: grid;
+  grid-template-columns: 54px 3px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--g-line);
+  cursor: pointer;
+}
+.c14-lrow:hover {
+  background: var(--g-surface);
+}
+.c14-ldate {
+  font-size: 10.5px;
+  color: var(--g-dim);
+  font-variant-numeric: tabular-nums;
+}
+.c14-ldate i {
+  display: block;
+  font-style: normal;
+  font-size: 8.5px;
+  color: var(--g-faint);
+}
+.c14-lbar {
+  width: 3px;
+  height: 22px;
+  border-radius: 2px;
+}
+.c14-ltitle {
+  font-size: 11.5px;
+  color: var(--g-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.c14-ltag {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--g-surface-2);
+}
+.c14-empty {
+  margin: 6px 0;
+  font-size: 10px;
+  color: var(--g-faint);
+}
+.c14-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 11px 12px;
+  border-left: 1px solid var(--g-line);
+  background: var(--g-surface);
+  overflow-y: auto;
+}
+.c14-side-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.c14-side-head b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+.c14-side-head span {
+  display: block;
+  font-size: 9.5px;
+  color: var(--g-faint);
+}
+.c14-add {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--os-accent);
+  color: #0b1020;
+  font-size: 13px;
+  cursor: pointer;
+}
+.c14-side-sec {
+  display: grid;
+  gap: 5px;
+}
+.c14-sec-title {
+  margin: 0;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  color: var(--g-faint);
+}
+.c14-sec-title span {
+  color: var(--os-accent);
+}
+.c14-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border: 1px solid var(--g-line);
+  border-radius: 8px;
+  background: var(--g-card);
+  color: var(--g-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-left: 3px solid var(--ev);
+}
+.c14-chip:hover {
+  background: var(--g-surface-2);
+}
+.c14-chip b {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--g-faint);
+  font-variant-numeric: tabular-nums;
+}
+.c14-chip span {
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.c14-chip i {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 8px;
+  color: var(--g-faint);
+}
+.c14-task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--g-dim);
+  cursor: pointer;
+}
+.c14-task input {
+  accent-color: var(--os-accent);
+}
+.c14-link {
+  border: 0;
+  background: transparent;
+  color: var(--os-accent);
+  font: inherit;
+  font-size: 9.5px;
+  text-align: left;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.c14-legend {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--g-line);
+  font-size: 8.5px;
+  color: var(--g-faint);
+}
+.c14-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.c14-legend i {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+}
+
+@media (max-width: 760px) {
+  .c14-body,
+  .c14-body.is-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .c14-side {
+    border-left: 0;
+    border-top: 1px solid var(--g-line);
+    max-height: 42%;
+  }
+}
