@@ -167,6 +167,9 @@ const TOKENS = {
   outsider: randomBytes(32).toString("base64url"),
   // 已占满 MAX_DEVICES=10 的账号：验证 DEVICE_LIMIT 分支。
   crowded: randomBytes(32).toString("base64url"),
+  // P1-7：社区 follow 要求目标创作者是 UUID（API 正则 /^[0-9a-f-]{36}$/），
+  // qa-p3-* 这种短 id 会被 400 拒绝，所以单列一个固定 UUID 账号。
+  creator: randomBytes(32).toString("base64url"),
 };
 
 const USER_IDS = {
@@ -175,6 +178,7 @@ const USER_IDS = {
   admin: "qa-p3-admin",
   outsider: "qa-p3-outsider",
   crowded: "qa-p3-crowded",
+  creator: "3f6f2a1c-8d4b-4f2e-9a77-6c1d5b8e0a01",
 };
 
 /**
@@ -260,6 +264,8 @@ function seedAccounts() {
 
   // 同一账号（qa-p3-installer）的第二台已登录设备：验证只有发起配对的设备能批准（WRONG_DEVICE）。
   d1(`${rows}
+      INSERT OR REPLACE INTO community_profiles (user_id, display_name, bio, created_at, updated_at)
+      VALUES ('${USER_IDS.creator}', 'QA 创作者', 'P1-7 follow 正向链路专用账号', ${now}, ${now});
       INSERT OR REPLACE INTO devices (id, user_id, name, device_type, browser_name, os_name, user_agent,
         trusted_at, status, revoked_at, created_at, last_seen_at, last_active_at, last_sync_at)
       VALUES ('qa-p3-installer-device-2', 'qa-p3-installer', 'QA installer 第二设备', 'desktop', 'Chrome', 'Windows', 'e2e-fixtures',
@@ -386,6 +392,11 @@ function resetFixtureRows() {
       DELETE FROM sync_entities WHERE user_id LIKE 'qa-p3-%';
       DELETE FROM sync_tombstone_ledger WHERE user_id LIKE 'qa-p3-%';
       DELETE FROM sync_cleanup_log;
+      DELETE FROM community_follows WHERE follower_id = '${USER_IDS.creator}' OR following_id = '${USER_IDS.creator}';
+      DELETE FROM community_profiles WHERE user_id = '${USER_IDS.creator}';
+      DELETE FROM sessions WHERE user_id = '${USER_IDS.creator}';
+      DELETE FROM devices WHERE user_id = '${USER_IDS.creator}';
+      DELETE FROM users WHERE id = '${USER_IDS.creator}';
       DELETE FROM sessions WHERE user_id LIKE 'qa-p3-%';
       DELETE FROM devices WHERE user_id LIKE 'qa-p3-%';
       DELETE FROM users WHERE id LIKE 'qa-p3-%';

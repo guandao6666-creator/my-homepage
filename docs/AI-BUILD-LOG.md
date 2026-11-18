@@ -253,3 +253,15 @@
   平板分支断言菜单栏 46px 与 `--dock-size: 58px`（adaptive.css 的真实规则）。
 - 证据：desktop + tablet 15 passed；verify exit 0。
 - 未做：E2 follow 正向（需 UUID 创作者夹具）、F 教程页面断言、G–I 生产与文档。
+
+---
+
+## 2026-11-18 · Round 15 · E2 follow 正向（F 发现一个问题）
+
+- 夹具新增固定 UUID 创作者 `3f6f2a1c-…`（follow 接口要求 UUID，qa-p3-* 会被 400），
+  资料行与用户同批插入（外键顺序），清理按显式 id。
+- `community-follow.spec.ts`：关注 → 创作者详情 `isFollowing:true` → following feed 200 → 取关 → false。
+  1 passed（0.4s）。注意字段名是 `isFollowing` 而不是 `following`。
+- F 教程页面级尝试失败：详情能打开，但「教程正文」面板不出现，
+  说明 `fetchVerifiedPackage` 客户端校验未过（manifest 被置 null）。
+  这可能是真实产品问题（checksum 口径），先移除半成品，记 Blocked 待查。
