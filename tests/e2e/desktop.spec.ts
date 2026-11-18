@@ -245,5 +245,15 @@ test.describe("桌面外壳", () => {
     for (const state of states) {
       expect(state.trim()).toMatch(/^(\d+(\.\d+)? ms|\d\.\d{3}|未采集|不支持|良好|待改善|较差|未定级)$/);
     }
+
+    // P2-2：关窗重开后，高亮必须跟内容一致（此前固定在第一项「系统状态」）
+    await win.locator(".dot-close").click();
+    await expect(win).toHaveCount(0);
+    await page.locator('[data-menu-btn="apps"]').click();
+    await page.locator('[data-menu-panel="apps"] [data-menu-action="diagnostics"]').click();
+    const reopened = page.locator('.window[data-app="diagnostics"]');
+    await expect(reopened).toBeVisible();
+    await expect(reopened.locator(".g14-nav.is-active")).toHaveAttribute("data-tab", "vitals");
+    await expect(reopened).toContainText("Web Vitals");
   });
 });

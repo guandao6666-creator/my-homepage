@@ -211,3 +211,14 @@
 - 外壳 5 处自有 fetch 已在 A 批随统一实现生效。
 - 门禁：verify exit 0（20 文件 / 366 单测、293 处安全全审查、CSP 12-30）；legacy E2E 26 passed。
 - P1-3 记 `Verified（本地）`。剩余：批次 C–I。
+
+---
+
+## 2026-11-18 · Round 11 · 批次 C（P2-2 / P2-3 / P2-1）
+
+- P2-2：`os14/core.ts` 的 `shell()`/`bindTabs()` 增加可选 `active`；诊断中心传入模块级 `tab`，
+  重开窗口按当前分区高亮。E2E 扩展：切「指标」→ 关闭 → 重开 → 断言 `data-tab="vitals"`。
+- P2-3：`sandbox-origin.spec.ts` 改为按 iframe `name` 定位目标帧，并等 URL 导航到 runner +
+  `load` 后再 probe；未放宽任何断言。`--repeat-each=3` 3 passed，全量 175 passed。
+- P2-1：决定不做跨会话持久化（D-008），诊断中心保持「本次加载」口径，INP 刷新后显示「未采集」。
+- 门禁：verify exit 0；全量 E2E 175 passed（4.2m）。

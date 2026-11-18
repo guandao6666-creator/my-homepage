@@ -699,15 +699,22 @@ export const emptyState = (title: string, sub = "", icon = "◌") => `
 export const badge = (text: string, tone: "accent" | "ok" | "warn" | "danger" | "mute" = "mute") =>
   `<span class="g14-badge is-${tone}">${escapeHtml(text)}</span>`;
 
-/** 统一的应用外壳：左侧导航 + 右侧内容 */
-export const shell = (id: string, nav: Array<[string, string, string]>, body: string, title: string) => `
+/**
+ * 统一的应用外壳：左侧导航 + 右侧内容。
+ *
+ * `active` 用于「重开窗口时高亮当前分区」：不传则仍高亮第一项（既有行为）。
+ */
+export const shell = (id: string, nav: Array<[string, string, string]>, body: string, title: string, active?: string) => `
   <div class="g14-shell" data-g14="${escapeHtml(id)}">
     <aside class="g14-side">
       <p class="g14-side-title">${escapeHtml(title)}</p>
       ${nav
         .map(
-          ([key, label, ico], i) =>
-            `<button class="g14-nav${i === 0 ? " is-active" : ""}" type="button" data-tab="${escapeHtml(key)}"><span>${ico}</span>${escapeHtml(label)}</button>`,
+          ([key, label, ico], i) => {
+            // 有 active 时按它高亮；否则保持「第一项高亮」的历史行为
+            const isActive = active ? key === active : i === 0;
+            return `<button class="g14-nav${isActive ? " is-active" : ""}" type="button" data-tab="${escapeHtml(key)}"><span>${ico}</span>${escapeHtml(label)}</button>`;
+          },
         )
         .join("")}
     </aside>
@@ -715,8 +722,14 @@ export const shell = (id: string, nav: Array<[string, string, string]>, body: st
   </div>`;
 
 /** 侧栏切换：返回当前 tab，并在点击时回调 */
-export const bindTabs = (win: HTMLElement, onChange: (tab: string) => void) => {
+export const bindTabs = (win: HTMLElement, onChange: (tab: string) => void, active?: string) => {
   const root = win.querySelector<HTMLElement>(".g14-shell") ?? win;
+  // 初始化校正一次：模块级 tab 会跨窗口保留，重开时高亮必须跟内容一致
+  if (active) {
+    root.querySelectorAll<HTMLElement>(".g14-nav[data-tab]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.tab === active);
+    });
+  }
   root.addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>(".g14-nav[data-tab]");
     if (!btn) return;

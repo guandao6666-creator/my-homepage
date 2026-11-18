@@ -160,6 +160,8 @@ test.describe("沙箱独立 Origin 隔离（本地两源真实浏览器实测）
         const add = (id: string, src: string, sandboxAttr: string | null) => {
           const frame = document.createElement("iframe");
           frame.id = id;
+          // 用 name 精确定位：三个 iframe 可能同源，按 URL 取 .at(-1) 会拿到尚未导航的帧
+          frame.name = id;
           frame.src = src;
           if (sandboxAttr) frame.setAttribute("sandbox", sandboxAttr);
           frame.style.width = "360px";
@@ -175,11 +177,17 @@ test.describe("沙箱独立 Origin 隔离（本地两源真实浏览器实测）
 
     const hostFrame = await waitForFrame(page, `${HOST_ORIGIN}${RUNNER_PATH}`);
     const plainFrame = await waitForFrame(page, `${SANDBOX_ORIGIN}${RUNNER_PATH}`);
-    const sandboxedFrame = page
-      .frames()
-      .filter((frame) => frame.url().startsWith(`${SANDBOX_ORIGIN}${RUNNER_PATH}`))
-      .at(-1);
-    if (!sandboxedFrame) throw new Error("第二个沙箱源 iframe 未出现");
+    // 按 name 找目标帧，并等它真正导航到 runner 再探测；
+    // 否则会在 about:blank 阶段读到 origin === ""（全量并发下的历史抖动来源）
+    const sandboxedFrame = page.frame({ name: "sandbox-sandboxed" });
+    if (!sandboxedFrame) throw new Error("sandbox-sandboxed iframe 未出现");
+    await expect
+      .poll(() => sandboxedFrame.url().startsWith(`${SANDBOX_ORIGIN}${RUNNER_PATH}`), {
+        timeout: 20_000,
+        message: "等待 sandbox-sandboxed 导航到 runner",
+      })
+      .toBe(true);
+    await sandboxedFrame.waitForLoadState("load");
 
     // ---- 1) 当前生产模型：同源 iframe + sandbox="allow-scripts"（不透明 Origin）----
     const hostProbe = await probeFrame(hostFrame);

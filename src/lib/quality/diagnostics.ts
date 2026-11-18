@@ -670,6 +670,7 @@ export const renderDiagnostics = (): string =>
     ],
     currentView(),
     "System Diagnostics",
+    tab,
   );
 
 function currentView(): string {
@@ -704,13 +705,17 @@ export const initDiagnostics = (win: HTMLElement, ctx: Ctx): (() => void) => {
     if (main) main.innerHTML = currentView();
   };
 
-  bindTabs(win, (next) => {
-    tab = next || "health";
-    rerender();
-    if (tab === "health" && !health) void refreshHealth();
-    // 首次进入「指标」才启动观察器（页面级，只启动一次）
-    if (tab === "vitals") ensureVitals();
-  });
+  bindTabs(
+    win,
+    (next) => {
+      tab = next || "health";
+      rerender();
+      if (tab === "health" && !health) void refreshHealth();
+      // 首次进入「指标」才启动观察器（页面级，只启动一次）
+      if (tab === "vitals") ensureVitals();
+    },
+    tab,
+  );
 
   const refreshHealth = async () => {
     if (healthBusy) return;
