@@ -15,7 +15,7 @@
 | # | 任务 | 状态 | 依赖 | 验收 |
 | --- | --- | --- | --- | --- |
 | P1-1 | 页面级插件安装并入 Playwright | **`Verified`（本地）**：发布链用例内新增真实桌面安装步骤（市场卡片 → 安装 → 权限确认 → 按钮变「打开」→ 卸载还原） | 已完成 | 不再依赖 `.shots/_p5-page-install-evidence2.mjs` 手工脚本 |
-| P1-2 | `initRank` 的 `void load()` 随窗口取消 | `Not Started` | 需要 fetch 取消 port | 关窗后不再向脱离文档的节点写入 |
+| P1-2 | `initRank` 关窗后仍写 DOM | **`Verified`（本地）**：请求返回后先判 `win.isConnected`，关窗即停止写入；单测覆盖 | 已完成 | 新增单测「窗口已关闭时请求返回后不再写 DOM」 |
 | P1-3 | legacy 网络请求取消 port | `Not Started` | 同上 | `AbortController` 随 `lifecycle.dispose` 触发 |
 
 ## P2 · 性能与可观测（当前阶段）

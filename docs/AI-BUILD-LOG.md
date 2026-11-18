@@ -178,3 +178,12 @@
 - 目的：把只在本机 `.shots` 脚本里的页面级证据搬进 CI，回归时会真的跑到。
 - 结果：该用例 1 passed（5.1s），`pageerror` 为空。
 - 仍缺：P1-2/P1-3（请求取消 port）；生产 `qa:prod` 仍 Blocked。
+
+---
+
+## 2026-11-18 · Round 8 · P1-2 关窗后不再写 DOM
+
+- `legacy-apps/leaderboard`：请求返回后先判 `win.isConnected`，再写 `#rank-status` / `#rank-list`；
+  catch 分支同样判，关窗即停。
+- 新增单测：窗口 `isConnected=false` + 请求成功返回，断言 list/status 无任何写入（17 passed）。
+- 未做：真正的请求取消（需要 AbortSignal port），仍记 P1-3。

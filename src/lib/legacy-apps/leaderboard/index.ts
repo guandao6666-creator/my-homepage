@@ -3,10 +3,10 @@
  *
  * 依赖：`data.supabase`、`escapeHtml`、`fetchWithTimeout`。
  *
- * 已知技术债（本次不修，避免顺带改行为）：
- * `initRank` 末尾的 `void load()` 是异步的，窗口在请求返回前被关掉时，
- * 回调仍会写一个已脱离文档的 `status` / `list` 节点。不会抛错，也不会泄漏处理器，
- * 但严格的生命周期应在 `init` 里返回 cleanup 取消请求——留待 Phase 2.4 处理。
+ * 异步加载的生命周期（2026-11-18 修复）：
+ * `void load()` 的请求可能在窗口关闭后才返回。回调里所有 DOM 写入前都检查
+ * `win.isConnected`，避免往已脱离文档的节点写内容；请求本身仍会跑完
+ * （fetch 取消需要独立的 AbortSignal port，见 BACKLOG P1-3）。
  */
 import type { LegacyAppModule } from "../types";
 import { createRankReporter, RANK_NAME_KEY } from "./report";
@@ -65,6 +65,9 @@ export const leaderboardApp: LegacyAppModule = {
           visits: number;
         }>;
 
+        // 窗口可能在请求返回前被关掉：此时不再碰 DOM
+        if (!win.isConnected) return;
+
         if (!rows.length) {
           status.textContent = "还没有人上榜";
           list.innerHTML = '<p class="rank-empty">榜还是空的，做第一个。</p>';
@@ -83,6 +86,7 @@ export const leaderboardApp: LegacyAppModule = {
           )
           .join("");
       } catch {
+        if (!win.isConnected) return;
         status.textContent = "连不上";
         list.innerHTML = '<p class="rank-empty">数据库连不上，可能是网络到不了 supabase.co。</p>';
       }

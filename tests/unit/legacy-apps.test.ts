@@ -347,3 +347,51 @@ describe("排行榜上报适配器", () => {
     await expect(report("管道", 60)).resolves.toBeUndefined();
   });
 });
+
+describe("排行榜异步加载的生命周期", () => {
+  afterEach(() => {
+    delete (globalThis as unknown as { localStorage?: unknown }).localStorage;
+  });
+
+  it("窗口已关闭时，请求返回后不再写 DOM", async () => {
+    const writes: string[] = [];
+    const node = (tag: string) => ({
+      set textContent(value: string) {
+        writes.push(`${tag}.text=${value}`);
+      },
+      set innerHTML(value: string) {
+        writes.push(`${tag}.html=${value}`);
+      },
+      addEventListener: () => undefined,
+      disabled: false,
+    });
+    const list = node("list");
+    const status = node("status");
+    const join = node("join");
+    // 窗口已脱离文档：init 仍会跑一次，但请求返回后不得再碰 DOM
+    const win = {
+      ...fakeWin(),
+      isConnected: false,
+      querySelector: (selector: string) =>
+        selector === "#rank-list" ? list : selector === "#rank-status" ? status : selector === "#rank-join" ? join : null,
+    } as unknown as HTMLElement;
+
+    // 排行榜会读 localStorage 里的昵称，node 环境需要最小桩
+    (globalThis as unknown as { localStorage: unknown }).localStorage = {
+      getItem: () => null,
+      setItem: () => undefined,
+    };
+
+    const ctx = makeCtx({
+      fetchWithTimeout: vi.fn(async () =>
+        new Response(JSON.stringify([{ name: "管道", seconds: 60, visits: 3 }]), { status: 200 }),
+      ),
+    });
+    const rank = (await import("../../src/lib/legacy-apps/leaderboard")).leaderboardApp;
+    rank.init?.(win, ctx);
+    // 等请求与回调走完
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(writes.filter((entry) => entry.startsWith("list.") || entry.startsWith("status."))).toEqual([]);
+  });
+});

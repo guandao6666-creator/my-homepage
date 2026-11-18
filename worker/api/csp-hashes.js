@@ -10,10 +10,10 @@ export const SCRIPT_HASHES = [
   "sha256-90qh2lJnAsjQcKHlT5r5rrLtwQaIY0/cUrooyVc6AXg=",
   "sha256-Mpbj/No8LMLTo79/vHOw5Mld0ptkyLcKii0FII8CPB8=",
   "sha256-R+cNOyONRQ2V+UUON882UfkM1s+9XibXiYAGAQxpJhE=",
+  "sha256-TjZ0ydS6ciMDVU/WelEh3TIKCOmwooNkivCN3n18FzY=",
   "sha256-VKKeJ4mM+KOPLPaTPKOBSo1qMtSa5kVKVCBbXkMTkCk=",
   "sha256-fgtUQFb5jaN1g6kZYwKBYFSvZtn+57iJokW9hbuxx5M=",
   "sha256-fpe2tqEpOuYD1HAN6jABHvPboOMdUdn03nha7Lj8ci4=",
   "sha256-i3Qr+nsSa72XHT0mffN9Y/Yy70C8g/7so4mPI29bH2o=",
-  "sha256-nR6q3+ochS8TSbkKDBDZe9u2wkX9Gr3aV7lcWknGxCo=",
   "sha256-yZBdC4B5OtLAPq4R4DAVPStA6Pj9b3lMklRP7sbbdhs="
 ];
