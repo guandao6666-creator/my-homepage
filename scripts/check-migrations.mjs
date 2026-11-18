@@ -48,12 +48,22 @@ for (const file of files) {
 /** 索引名 → { columns, files } */
 const indexes = new Map();
 
+/**
+ * 已评审的破坏性迁移白名单。
+ *
+ * 默认禁止 DROP TABLE / DROP COLUMN；只有在这里登记的文件才放行，
+ * 且迁移头部必须写清备份位置与回滚方式。
+ */
+const DESTRUCTIVE_ALLOWLIST = new Set(["0020_drop_community_invites.sql"]);
+
 for (const file of files) {
   const text = readFileSync(join(DIR, file), "utf8");
   const header = text.slice(0, 400);
   if (!/^--/m.test(header)) problems.push(`${file}：缺少头部注释（说明背景与回滚方式）`);
 
-  if (/^\s*DROP\s+TABLE/im.test(text)) problems.push(`${file}：包含 DROP TABLE，需要单独评审`);
+  if (/^\s*DROP\s+TABLE/im.test(text) && !DESTRUCTIVE_ALLOWLIST.has(file)) {
+    problems.push(`${file}：包含 DROP TABLE，需要单独评审`);
+  }
   if (/^\s*DROP\s+COLUMN/im.test(text) || /ALTER\s+TABLE[^;]*DROP\s+COLUMN/i.test(text)) {
     problems.push(`${file}：包含 DROP COLUMN（D1 不支持，需要重建表并单独评审）`);
   }

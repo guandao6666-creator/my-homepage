@@ -26,6 +26,7 @@ migrations/
   0017_plugin_signatures.sql 发布者密钥、插件版本签名
   0018_sync_cloud_expansion.sql  5 数据域 + 墓碑台账 + 清理日志
   0019_last_admin_guard.sql  库级触发器：最后一名管理员不可删除 / 降级 / 禁用
+  0020_drop_community_invites.sql  移除邀请制收尾：删除 community_invites（已评审）
 ```
 
 ### 管理员账号换绑
