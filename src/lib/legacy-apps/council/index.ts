@@ -6,6 +6,7 @@
  * `guandao.council.mine[.uid|.anon]`，投票人 key `guandao.council.voter`。
  */
 import type { LegacyAppModule } from "../types";
+import { isAbortError } from "../net";
 
 const COUNCIL_MINE_KEY = "guandao.council.mine";
 
@@ -254,7 +255,8 @@ export const councilApp: LegacyAppModule = {
 
         render();
         status.textContent = "已更新到最新";
-      } catch {
+      } catch (error) {
+        if (isAbortError(error)) return;
         status.textContent = "还是连不上，先看页面里的结果";
         retryBtn.hidden = false;
       }

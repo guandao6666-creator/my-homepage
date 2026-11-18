@@ -5,6 +5,7 @@
  * `lifecycle`（auth-change 监听随窗口关闭一起摘掉）。匿名昵称本地生成，不落库身份。
  */
 import type { LegacyAppModule } from "../types";
+import { isAbortError } from "../net";
 
 const HOLE_ADJ = ["安静的", "路过的", "深夜的", "迷路的", "加班的", "刚睡醒的", "在骑车的", "写代码的", "晒太阳的"];
 const HOLE_NOUN = ["鲸鱼", "海豚", "猫", "海鸥", "风", "路灯", "路人", "大肥鱼", "土豆"];
@@ -48,6 +49,8 @@ export const treeholeApp: LegacyAppModule = {
             <p class="hole-status" id="hole-status"></p>
           </div>`,
   init: (win, { data, escapeHtml, fetchWithTimeout, auth, lifecycle }) => {
+    // P1-3：窗口关闭时取消在途请求
+    const ac = lifecycle.abortController(win);
     const list = win.querySelector("#hole-list");
     const form = win.querySelector<HTMLFormElement>("#hole-form");
     const input = win.querySelector<HTMLTextAreaElement>("#hole-input");
@@ -158,17 +161,17 @@ export const treeholeApp: LegacyAppModule = {
         const [tRes, hRes, rRes] = await Promise.all([
           fetchWithTimeout(
             `${sb!.url}/rest/v1/hole_topics?select=day,topic&order=day.desc&limit=1`,
-            { headers },
+            { headers, signal: ac.signal },
             8000,
           ),
           fetchWithTimeout(
             `${sb!.url}/rest/v1/holes?select=id,content,nick,featured,created_at&order=featured.desc,created_at.desc&limit=40`,
-            { headers },
+            { headers, signal: ac.signal },
             10000,
           ),
           fetchWithTimeout(
             `${sb!.url}/rest/v1/hole_replies?select=id,hole_id,content,nick,created_at&order=created_at.asc&limit=300`,
-            { headers },
+            { headers, signal: ac.signal },
             10000,
           ),
         ]);
@@ -185,7 +188,8 @@ export const treeholeApp: LegacyAppModule = {
 
         status.textContent = holes.length ? `共 ${holes.length} 条` : "";
         render();
-      } catch {
+      } catch (error) {
+        if (isAbortError(error)) return;
         status.textContent = "连不上，可能是网络问题，关掉重开试试";
       }
     };

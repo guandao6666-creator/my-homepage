@@ -430,3 +430,21 @@ test.describe("Phase 2.2 · 第二批迁移（外壳能力接口化）", () => {
     expect(errors, `控制台报错：${errors.join("\n")}`).toEqual([]);
   });
 });
+
+test.describe("P1-3 · 关窗取消语义（回归）", () => {
+  test("快速开关依赖远端数据的应用：不产生页面错误", async ({ page }) => {
+    await bootDesktop(page);
+    const errors = watchErrors(page);
+
+    // 本地构建没有 Supabase 端点，无法制造「在途请求」；
+    // 取消语义由单测证明（dispose -> signal.aborted、net 尊重 signal）。
+    // 这里只保证：窗口在请求尚未完成时被关闭，不会抛未捕获错误。
+    for (const id of ["visitors", "social", "treehole", "council", "rank"]) {
+      await openApp(page, id);
+      await page.waitForTimeout(200);
+      await closeApp(page, id);
+    }
+
+    expect(errors, "控制台报错：" + errors.join(" | ")).toEqual([]);
+  });
+});

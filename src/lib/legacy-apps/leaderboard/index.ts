@@ -34,17 +34,20 @@ export const leaderboardApp: LegacyAppModule = {
             <div class="rank-list" id="rank-list"></div>
             <p class="rank-note">按累计停留时长排序，每 60 秒上报一次</p>
           </div>`,
-  init: (win, { data, escapeHtml, fetchWithTimeout }) => {
+  init: (win, { data, escapeHtml, fetchWithTimeout, lifecycle }) => {
     const list = win.querySelector("#rank-list");
     const status = win.querySelector("#rank-status");
     const joinBtn = win.querySelector("#rank-join") as HTMLButtonElement | null;
     if (!list || !status || !joinBtn) return;
 
+    // P1-3：窗口关闭时取消在途请求
+    const ac = lifecycle.abortController(win);
+
     const sb = data.supabase as { url?: string; key?: string } | undefined;
     const ready = Boolean(sb?.url && sb?.key);
 
     // 与外壳的 60 秒计时器共用同一份实现（见 ./report.ts）
-    const reportTime = createRankReporter(data.supabase, fetchWithTimeout);
+    const reportTime = createRankReporter(data.supabase, fetchWithTimeout, ac.signal);
 
     const load = async () => {
       if (!ready) {
@@ -56,7 +59,7 @@ export const leaderboardApp: LegacyAppModule = {
       try {
         const res = await fetchWithTimeout(
           `${sb!.url}/rest/v1/visitor_rank?select=name,seconds,visits&order=seconds.desc&limit=20`,
-          { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` } },
+          { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` }, signal: ac.signal },
         );
         if (!res.ok) throw new Error(String(res.status));
         const rows = (await res.json()) as Array<{

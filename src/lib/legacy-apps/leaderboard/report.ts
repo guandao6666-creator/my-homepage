@@ -19,7 +19,12 @@ export type RankFetch = (url: string, init?: RequestInit, ms?: number) => Promis
  * 生成上报函数。
  * 未配置 Supabase 时返回一个安静的空操作，由调用方决定是否展示「未连接」。
  */
-export function createRankReporter(supabase: OsData["supabase"], fetchWithTimeout: RankFetch) {
+export function createRankReporter(
+  supabase: OsData["supabase"],
+  fetchWithTimeout: RankFetch,
+  /** P1-3：窗口级取消信号；外壳的 60 秒计时器不传（不属任何窗口） */
+  signal?: AbortSignal,
+) {
   const sb = supabase as { url?: string; key?: string } | undefined;
 
   return async (name: string, seconds: number): Promise<void> => {
@@ -34,6 +39,7 @@ export function createRankReporter(supabase: OsData["supabase"], fetchWithTimeou
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ p_name: name, p_seconds: seconds }),
+        ...(signal ? { signal } : {}),
       });
     } catch {
       /* 报不上去就等下一轮 */

@@ -119,6 +119,11 @@ export type LegacyLifecyclePort = {
    */
   onGlobal(win: HTMLElement, type: string, handler: EventListener): void;
   /**
+   * 登记一个随窗口关闭自动 abort 的控制器（P1-3）。
+   * 用法：`const ac = lifecycle.abortController(win);` 然后请求里传 `signal: ac.signal`。
+   */
+  abortController(win: HTMLElement): AbortController;
+  /**
    * 只在注册适配器（`registerLegacyApps` 的 init 包装）关窗时调用。
    * 应用模块不要主动调用它——提前 dispose 会顺手清掉本窗口的计时器。
    */

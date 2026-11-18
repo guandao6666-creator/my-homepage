@@ -32,6 +32,7 @@ function makeCtx(overrides: Partial<LegacyAppContext> = {}): LegacyAppContext {
       interval: vi.fn(() => 1),
       timeout: vi.fn(() => 2),
       onGlobal: vi.fn(),
+      abortController: () => new AbortController(),
       dispose: vi.fn(),
     },
     shell: {
@@ -274,6 +275,20 @@ describe("lifecycle port", () => {
     expect(listeners.size).toBe(0);
   });
 
+  it("abortController 随 dispose 一起 abort，重复 dispose 不抛错", () => {
+    installWindowStub();
+    const win = fakeWin();
+    const first = legacyWindowLifecycle.abortController(win);
+    const second = legacyWindowLifecycle.abortController(win);
+    expect(first.signal.aborted).toBe(false);
+
+    legacyWindowLifecycle.dispose(win);
+    expect(first.signal.aborted).toBe(true);
+    expect(second.signal.aborted).toBe(true);
+    // 第二次 dispose 找不到 scope，应安静退出
+    expect(() => legacyWindowLifecycle.dispose(win)).not.toThrow();
+  });
+
   it("timeout 触发后自动从登记表移除，dispose 不会重复 clear", () => {
     const { stub, timeouts } = installWindowStub();
     const win = fakeWin();
@@ -292,7 +307,7 @@ describe("lifecycle port", () => {
     const win = fakeWin();
     const dispose = vi.fn();
     const specs: LegacyAppSpec[] = [];
-    const ctx = makeCtx({ lifecycle: { interval: vi.fn(), timeout: vi.fn(), onGlobal: vi.fn(), dispose }, register: (spec) => specs.push(spec) });
+    const ctx = makeCtx({ lifecycle: { interval: vi.fn(), timeout: vi.fn(), onGlobal: vi.fn(), abortController: () => new AbortController(), dispose }, register: (spec) => specs.push(spec) });
     registerLegacyApps(ctx);
     const initSpec = specs.find((spec) => spec.id === "terminal");
     // 6.1：init 随模块一起按需加载，先 load 再取

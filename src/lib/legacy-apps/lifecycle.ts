@@ -18,6 +18,8 @@ type WindowScope = {
   timeouts: Set<number>;
   /** [事件名, 处理器]，窗口关闭时从 window 上解绑 */
   listeners: Array<[string, EventListener]>;
+  /** 进行中的网络请求；关窗时先 abort 它们，再清计时器 */
+  controllers: Set<AbortController>;
 };
 
 const scopes = new WeakMap<HTMLElement, WindowScope>();
@@ -25,7 +27,7 @@ const scopes = new WeakMap<HTMLElement, WindowScope>();
 function scopeFor(win: HTMLElement): WindowScope {
   let scope = scopes.get(win);
   if (!scope) {
-    scope = { intervals: new Set(), timeouts: new Set(), listeners: [] };
+    scope = { intervals: new Set(), timeouts: new Set(), listeners: [], controllers: new Set() };
     scopes.set(win, scope);
   }
   return scope;
@@ -54,6 +56,19 @@ export const legacyWindowLifecycle = {
     return id;
   },
 
+  /**
+   * 登记一个随窗口关闭自动 abort 的控制器。
+   *
+   * 应用把它交给 fetch 的 signal，`dispose(win)` 时统一取消在途请求。
+   * 同一窗口可以登记多个（并发的三个请求各一个，或共用一个）。
+   */
+  abortController(win: HTMLElement): AbortController {
+    const scope = scopeFor(win);
+    const controller = new AbortController();
+    scope.controllers.add(controller);
+    return controller;
+  },
+
   onGlobal(win: HTMLElement, type: string, handler: EventListener): void {
     const scope = scopeFor(win);
     window.addEventListener(type, handler);
@@ -63,6 +78,8 @@ export const legacyWindowLifecycle = {
   dispose(win: HTMLElement): void {
     const scope = scopes.get(win);
     if (!scope) return;
+    // 先取消在途请求：abort 会同步触发 reject，若计时器还在，可能又发一轮
+    for (const controller of scope.controllers) controller.abort();
     for (const id of scope.intervals) window.clearInterval(id);
     for (const id of scope.timeouts) window.clearTimeout(id);
     for (const [type, handler] of scope.listeners) window.removeEventListener(type, handler);

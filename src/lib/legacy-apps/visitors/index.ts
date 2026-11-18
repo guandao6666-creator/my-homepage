@@ -5,6 +5,7 @@
  * 无计时器 / 全局监听；`loadWall()` 的请求复用原逻辑。
  */
 import type { LegacyAppModule } from "../types";
+import { isAbortError } from "../net";
 
 export const visitorsApp: LegacyAppModule = {
   id: "visitors",
@@ -29,7 +30,9 @@ export const visitorsApp: LegacyAppModule = {
             </form>
             <p class="wall-note" id="wall-note"></p>
           </div>`,
-  init: (win, { data, escapeHtml, fetchWithTimeout, shell }) => {
+  init: (win, { data, escapeHtml, fetchWithTimeout, lifecycle, shell }) => {
+    // P1-3：窗口关闭时取消在途请求
+    const ac = lifecycle.abortController(win);
     const grid = win.querySelector("#wall-grid");
     const countEl = win.querySelector("#wall-count");
     const addBtn = win.querySelector("#wall-add");
@@ -78,11 +81,12 @@ export const visitorsApp: LegacyAppModule = {
       try {
         const res = await fetchWithTimeout(
           `${sb!.url}/rest/v1/visitor_avatars?select=name,avatar_url&order=created_at.desc&limit=60`,
-          { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` } },
+          { headers: { apikey: sb!.key!, Authorization: `Bearer ${sb!.key}` }, signal: ac.signal },
         );
         if (!res.ok) throw new Error(String(res.status));
         renderList(await res.json());
-      } catch {
+      } catch (error) {
+        if (isAbortError(error)) return;
         countEl.textContent = "连不上";
         grid.innerHTML = '<p class="wall-empty">数据库连不上，可能是网络到不了 supabase.co。</p>';
       }

@@ -187,3 +187,16 @@
   catch 分支同样判，关窗即停。
 - 新增单测：窗口 `isConnected=false` + 请求成功返回，断言 list/status 无任何写入（17 passed）。
 - 未做：真正的请求取消（需要 AbortSignal port），仍记 P1-3。
+
+---
+
+## 2026-11-18 · Round 9 · P1-3/a 窗口级取消骨架与只读请求
+
+- 新增 `src/lib/legacy-apps/net.ts`：合并外部 signal 与超时，区分 AbortError / TimeoutError；预取消的请求直接不发。
+- `lifecycle.ts`：WindowScope 增加 `controllers`，新增 `abortController(win)`，`dispose` 先 abort 再清计时器。
+- `types.ts`：`LegacyLifecyclePort` 增加 `abortController`。
+- 外壳 `fetchWithTimeout` 换用同一实现（原来会覆盖调用方 signal，取消不生效）。
+- 迁移只读 8 处：visitors、treehole×3、social×3、council、leaderboard、rank reporter（可选 signal）。
+- 单测：`legacy-net.test.ts` 5 项 + lifecycle abort 1 项，合计 23 passed。
+- E2E：快速开关 visitors/social/treehole/council/rank，无页面错误（1 passed）。
+- 未做：写请求 6 处、外壳自有 5 处、token 刷新单飞（B 批）。

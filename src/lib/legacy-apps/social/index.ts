@@ -6,6 +6,7 @@
  * 关注关系写 follows 表，资料写 profiles 表（on_conflict=id），全部复用原请求逻辑。
  */
 import type { LegacyAppModule, LegacyAuthState } from "../types";
+import { isAbortError } from "../net";
 import { safeUrl } from "../../html";
 
 const SOCIAL_AVATARS: Record<string, string> = {
@@ -43,6 +44,8 @@ export const socialApp: LegacyAppModule = {
             <div class="social-list" id="social-list"></div>
           </div>`,
   init: (win, { data, escapeHtml, fetchWithTimeout, auth, lifecycle }) => {
+    // P1-3：窗口关闭时取消在途请求
+    const ac = lifecycle.abortController(win);
     const meEl = win.querySelector("#social-me");
     const listEl = win.querySelector("#social-list");
     const countEl = win.querySelector("#social-count");
@@ -176,7 +179,7 @@ export const socialApp: LegacyAppModule = {
         // 我的资料
         const meRes = await fetchWithTimeout(
           `${sb!.url}/rest/v1/profiles?id=eq.${encodeURIComponent(session ? session.uid : "")}&select=*`,
-          { headers: headers() },
+          { headers: headers(), signal: ac.signal },
           8000,
         );
         if (meRes.ok) {
@@ -187,7 +190,7 @@ export const socialApp: LegacyAppModule = {
         // 所有人
         const pRes = await fetchWithTimeout(
           `${sb!.url}/rest/v1/profiles?select=*&order=last_seen.desc&limit=50`,
-          { headers: headers() },
+          { headers: headers(), signal: ac.signal },
           10000,
         );
         if (pRes.ok) people = (await pRes.json()) as Person[];
@@ -195,7 +198,7 @@ export const socialApp: LegacyAppModule = {
         // 我关注了谁
         const fRes = await fetchWithTimeout(
           `${sb!.url}/rest/v1/follows?select=to_id&from_id=eq.${encodeURIComponent(session ? session.uid : "")}`,
-          { headers: headers() },
+          { headers: headers(), signal: ac.signal },
           8000,
         );
         if (fRes.ok) {
@@ -205,7 +208,8 @@ export const socialApp: LegacyAppModule = {
 
         renderMe();
         renderList();
-      } catch {
+      } catch (error) {
+        if (isAbortError(error)) return;
         countEl.textContent = "连不上，关掉重开试试";
       }
     };

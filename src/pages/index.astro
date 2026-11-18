@@ -699,6 +699,7 @@ const data = {
       import { releaseWindowScope, trackWindowScope } from "../lib/quality/resources";
       // 2.2：已迁移的旧版应用（通过现有 registerApp 接入，不新建注册中心）
       import { createRankReporter, legacyWindowLifecycle, RANK_NAME_KEY, registerLegacyApps } from "../lib/legacy-apps";
+      import { fetchWithTimeout as legacyFetchWithTimeout } from "../lib/legacy-apps/net";
 import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
       // 2.3：HTML 转义统一入口
       import { escapeHtml, safeUrl } from "../lib/html";
@@ -913,15 +914,9 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
          * 国内访问 supabase.co 经常是「连接挂住」而不是报错，
          * 不设超时的话界面会永远停在「正在加载」。
          */
-        const fetchWithTimeout = async (url: string, options: RequestInit = {}, ms = 7000) => {
-          const controller = new AbortController();
-          const timer = window.setTimeout(() => controller.abort(), ms);
-          try {
-            return await fetch(url, { ...options, signal: controller.signal });
-          } finally {
-            window.clearTimeout(timer);
-          }
-        };
+        // P1-3：统一用 legacy-apps/net.ts 的实现——它尊重调用方传入的 signal，
+        // 窗口关闭时能真正取消在途请求；超时与主动取消也会区分开。
+        const fetchWithTimeout = legacyFetchWithTimeout;
 
         /* ---------------- 通知中心 ---------------- */
 
