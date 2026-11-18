@@ -130,8 +130,10 @@ export function tagHue(tag: string): number {
 }
 
 export function coverGradient(post: Post): string {
-  const hue = tagHue(post.tags[0] ?? "随笔");
-  return `linear-gradient(135deg, hsl(${hue} 34% 88%) 0%, hsl(${(hue + 42) % 360} 30% 74%) 55%, hsl(${(hue + 80) % 360} 26% 42%) 100%)`;
+  // 全站改成蓝色系后，无封面的占位图也从「浅色纸感」换成深海蓝，
+  // 色相仍取标签色，但压到 200–236 的蓝区间，避免出现暖色块。
+  const hue = 200 + (tagHue(post.tags[0] ?? "随笔") % 36);
+  return `linear-gradient(135deg, hsl(${hue} 48% 30%) 0%, hsl(${(hue + 6) % 360} 52% 20%) 55%, hsl(${(hue + 12) % 360} 56% 12%) 100%)`;
 }
 
 /* ---------------- 系列 / 专栏 ---------------- */
