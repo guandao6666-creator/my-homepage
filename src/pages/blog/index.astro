@@ -1,13 +1,15 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import PostCard from "../../components/PostCard.astro";
+import PixelFish from "../../components/PixelFish.astro";
 import Icon from "../../components/Icon.astro";
 import { getAllPosts, collectTags } from "../../lib/posts";
-import { SITE } from "../../lib/site";
+import { SITE, formatShortDate } from "../../lib/site";
+import "../../styles/blog-pixel.css";
 
 const posts = await getAllPosts();
 const tags = collectTags(posts);
 const years = [...new Set(posts.map((p) => new Date(p.pubDate).getUTCFullYear()))].sort((a, b) => b - a);
+const latestYear = years[0] ?? new Date().getFullYear();
 
 const jsonLd = {
   "@type": "Blog",
@@ -28,79 +30,121 @@ const jsonLd = {
   canonical="/blog/"
   jsonLd={jsonLd}
 >
-  <section class="page-head">
-    <div class="wrap">
-      <span class="eyebrow">Archive · {posts.length} 篇</span>
-      <h1>全部文章</h1>
-      <p class="page-lede">
-        按时间倒序排列。关键词会同时匹配标题、摘要、标签和正文，也可以用标签快速缩小范围。
+  <div class="blog-pixel">
+    <section class="px-sea">
+      <div class="wrap px-hero">
+        <div>
+          <p class="px-kick">
+            <span class="px-tag">ARCHIVE</span>
+            <span>共 {posts.length} 篇 · {tags.length} 个标签</span>
+          </p>
+          <h1>全部文章</h1>
+          <p class="px-hero-lede">
+            按时间倒序排列。关键词会同时匹配标题、摘要、标签和正文，也可以用标签快速缩小范围。
+          </p>
+          <div class="px-hero-stats">
+            <span class="px-stat"><b>{posts.length}</b> 篇文章</span>
+            <span class="px-stat"><b>{tags.length}</b> 个标签</span>
+            <span class="px-stat"><b>{latestYear}</b> 写到今天</span>
+          </div>
+        </div>
+
+        <div class="px-tank" aria-hidden="true">
+          <div class="px-tank-water">
+            <PixelFish class="px-tank-fish" />
+            <PixelFish class="px-tank-fish px-tank-fish--small" body="#7fe6ff" edge="#0b1d4a" />
+            <span class="px-bubble"></span>
+            <span class="px-bubble"></span>
+            <span class="px-bubble"></span>
+            <div class="px-tank-sand"></div>
+          </div>
+          <p class="px-tank-cap">TANK · {posts.length} POSTS</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="px-seabed" aria-hidden="true"></div>
+
+    <div class="wrap px-main">
+      <div class="px-toolbar">
+        <label class="px-search">
+          <Icon name="search" size={16} />
+          <input
+            type="search"
+            id="post-search"
+            placeholder="搜索标题、正文或标签…"
+            autocomplete="off"
+            aria-label="搜索文章"
+          />
+          <kbd>/</kbd>
+        </label>
+
+        <div class="px-filters" id="tag-filters" role="group" aria-label="按标签筛选">
+          <button class="px-filter is-active" data-tag="" type="button">全部</button>
+          {tags.map((tag) => (
+            <button class="px-filter" data-tag={tag.tag} type="button">
+              {tag.tag}
+              <em>{tag.count}</em>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p class="px-result">
+        <span id="result-count">{posts.length}</span> 篇文章
+        <span class="px-hint" id="filter-hint"></span>
       </p>
-    </div>
-  </section>
 
-  <div class="wrap">
-    <div class="toolbar">
-      <label class="search">
-        <Icon name="search" size={16} />
-        <input
-          type="search"
-          id="post-search"
-          placeholder="搜索标题、正文或标签…"
-          autocomplete="off"
-          aria-label="搜索文章"
-        />
-        <kbd>/</kbd>
-      </label>
-
-      <div class="filters" id="tag-filters" role="group" aria-label="按标签筛选">
-        <button class="filter is-active" data-tag="" type="button">全部</button>
-        {tags.map((tag) => (
-          <button class="filter" data-tag={tag.tag} type="button">
-            {tag.tag}
-            <em>{tag.count}</em>
-          </button>
+      <div class="px-list" id="post-list">
+        {posts.map((post, i) => (
+          <div
+            class="post-item"
+            data-slug={post.slug}
+            data-search={`${post.title} ${post.description} ${post.tags.join(" ")}`.toLowerCase()}
+            data-tags={post.tags.join("|")}
+          >
+            <a class="px-post" href={`/blog/${post.slug}/`}>
+              <span class="px-post-no">{String(i + 1).padStart(2, "0")}</span>
+              <div class="px-post-meta">
+                <time datetime={post.pubDate.toISOString()}>{formatShortDate(post.pubDate)}</time>
+                <span class="px-post-dot" />
+                <span>{post.minutes} 分钟</span>
+                <span class="cmt" data-cmt={post.slug} hidden />
+                <span class="lks" data-likes={post.slug} hidden />
+                {post.featured && <span class="px-post-pin">推荐</span>}
+              </div>
+              <h3>{post.title}</h3>
+              <p>{post.description}</p>
+              <div class="px-post-tags">
+                {post.tags.slice(0, 3).map((tag) => <span class="px-chip">{tag}</span>)}
+              </div>
+              <span class="px-post-more">阅读全文 →</span>
+            </a>
+            <p class="hit-snippet px-hit" hidden></p>
+          </div>
         ))}
       </div>
-    </div>
 
-    <p class="result-line">
-      <span id="result-count">{posts.length}</span> 篇文章
-      <span class="hint" id="filter-hint"></span>
-    </p>
+      <div class="px-empty" id="empty-state" hidden>
+        {posts.length === 0 ? (
+          <>
+            <p>这条鱼还没吐出一个字。第一篇正在路上，可以先看看 <a href="/about/">关于我</a>。</p>
+          </>
+        ) : (
+          <>
+            <p>没有匹配的文章。</p>
+            <button class="btn" id="clear-filters" type="button">清除筛选条件</button>
+          </>
+        )}
+      </div>
 
-    <div class="post-list" id="post-list">
-      {posts.map((post, i) => (
-        <div
-          class="post-item"
-          data-slug={post.slug}
-          data-search={`${post.title} ${post.description} ${post.tags.join(" ")}`.toLowerCase()}
-          data-tags={post.tags.join("|")}
-        >
-          <PostCard post={post} index={i} />
-          <p class="hit-snippet" hidden></p>
+      {years.length > 0 && (
+        <div class="px-years">
+          <span>ARCHIVE YEARS</span>
+          {years.map((year) => <em>{year}</em>)}
         </div>
-      ))}
-    </div>
-
-    <div class="empty-state" id="empty-state" hidden>
-      {posts.length === 0 ? (
-        <>
-          <p>这里还没有文章。第一篇正在路上，可以先看看 <a href="/about/">关于我</a>。</p>
-        </>
-      ) : (
-        <>
-          <p>没有匹配的文章。</p>
-          <button class="btn" id="clear-filters" type="button">清除筛选条件</button>
-        </>
       )}
     </div>
-
-    {years.length > 0 && (
-      <div class="year-note">
-        <span>归档年份</span>
-        {years.map((year) => <em>{year}</em>)}
-      </div>
-    )}
   </div>
 
 
@@ -247,10 +291,10 @@ const jsonLd = {
     });
 
     filters.addEventListener("click", (event) => {
-      const button = event.target.closest(".filter");
+      const button = event.target.closest(".px-filter");
       if (!button) return;
       activeTag = button.dataset.tag || "";
-      for (const chip of filters.querySelectorAll(".filter")) {
+      for (const chip of filters.querySelectorAll(".px-filter")) {
         chip.classList.toggle("is-active", chip === button);
       }
       apply();
@@ -260,7 +304,7 @@ const jsonLd = {
       input.value = "";
       query = "";
       activeTag = "";
-      for (const chip of filters.querySelectorAll(".filter")) {
+      for (const chip of filters.querySelectorAll(".px-filter")) {
         chip.classList.toggle("is-active", chip.dataset.tag === "");
       }
       apply();
@@ -288,211 +332,4 @@ const jsonLd = {
     apply();
   })();
 </script>
-
-<style>
-  .page-head {
-    padding: 58px 0 34px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .page-head h1 {
-    margin: 14px 0 12px;
-    font-size: clamp(34px, 5vw, 46px);
-    letter-spacing: -0.03em;
-  }
-
-  .page-lede {
-    margin: 0;
-    max-width: 40em;
-    color: var(--muted);
-    font-size: 14.5px;
-    line-height: 1.9;
-  }
-
-  .toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 16px;
-    padding: 26px 0 4px;
-  }
-
-  .search {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    flex: 1 1 260px;
-    max-width: 340px;
-    padding: 0 12px;
-    height: 40px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: var(--surface);
-    color: var(--muted);
-    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
-  }
-
-  .search:focus-within {
-    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
-  }
-
-  .search input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    font-size: 13.5px;
-    color: var(--ink);
-    outline: none;
-    padding: 0;
-  }
-
-  .search input::placeholder {
-    color: var(--muted);
-  }
-
-  .search kbd {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    padding: 1px 5px;
-    color: var(--muted);
-    background: var(--surface-sunk);
-  }
-
-  .filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
-    flex: 1 1 auto;
-  }
-
-  .filter {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    border: 1px solid transparent;
-    background: transparent;
-    color: var(--muted);
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s var(--ease);
-  }
-
-  .filter em {
-    font-style: normal;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    line-height: 1;
-    padding: 3px 5px;
-    border-radius: 999px;
-    background: color-mix(in srgb, currentColor 9%, transparent);
-    opacity: 0.8;
-  }
-
-  .filter:hover {
-    color: var(--ink);
-    background: var(--surface-sunk);
-  }
-
-  .filter.is-active {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--paper);
-  }
-
-  [data-theme="dark"] .filter.is-active {
-    background: var(--accent-wash);
-    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-    color: var(--accent-ink);
-  }
-
-  .result-line {
-    margin: 18px 0 0;
-    font-size: 12.5px;
-    color: var(--muted);
-    letter-spacing: 0.02em;
-  }
-
-  .result-line .hint {
-    margin-left: 6px;
-    color: var(--accent-ink);
-  }
-
-  /* flex 列 + order：搜索命中时按相关度重排，不改 DOM 顺序 */
-  .post-list {
-    display: flex;
-    flex-direction: column;
-    margin-top: 6px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .hit-snippet {
-    margin: -12px 0 20px 52px;
-    padding: 2px 0 2px 12px;
-    border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-    font-size: 13px;
-    line-height: 1.8;
-    color: var(--muted);
-  }
-
-  .hit-snippet mark {
-    padding: 0 2px;
-    border-radius: 3px;
-    background: color-mix(in srgb, var(--accent) 20%, transparent);
-    color: var(--ink);
-  }
-
-  .empty-state {
-    padding: 48px 0;
-    text-align: center;
-    color: var(--muted);
-  }
-
-  .empty-state p {
-    margin: 0 0 16px;
-  }
-
-  .year-note {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-top: 34px;
-    font-size: 12px;
-    color: var(--muted);
-    letter-spacing: 0.06em;
-  }
-
-  .year-note span {
-    text-transform: uppercase;
-    font-size: 10.5px;
-    letter-spacing: 0.16em;
-  }
-
-  .year-note em {
-    font-style: normal;
-    font-family: var(--font-mono);
-    padding: 2px 8px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-  }
-
-  @media (max-width: 640px) {
-    .page-head {
-      padding-top: 40px;
-    }
-    .search {
-      max-width: none;
-      flex-basis: 100%;
-    }
-    .hit-snippet {
-      margin-left: 0;
-    }
-  }
-</style>
 </BaseLayout>
