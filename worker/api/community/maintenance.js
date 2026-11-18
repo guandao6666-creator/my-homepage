@@ -5,7 +5,7 @@
  *   - R2 图片删除失败重试（community_assets.status='deleting'）
  *   - 作品删除后的内容包对象清理（community_packages.status='deleted'）
  *   - 48 小时未被作品引用的孤儿上传（草稿上传后放弃）
- *   - 过期邀请 / 过期注册意图 / 过期通知
+ *   - 过期注册意图 / 过期通知
  *
  * 所有操作都带重试计数，失败不会阻塞下一次 Cron。
  */
@@ -108,12 +108,9 @@ export async function runCommunityMaintenance(env) {
     console.error("[community] orphan sweep failed:", error?.message ?? error);
   }
 
-  // 4) 过期邀请 / 注册意图 / 旧通知
+  // 4) 注册意图 / 旧通知
   try {
     await env.DB.batch([
-      env.DB.prepare(
-        "UPDATE community_invites SET revoked_at = ? WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at < ?",
-      ).bind(now, now),
       env.DB.prepare("DELETE FROM community_join_intents WHERE expires_at < ?").bind(now - 7 * 86400000),
       env.DB.prepare("DELETE FROM community_notifications WHERE created_at < ? AND read_at IS NOT NULL").bind(
         now - 180 * 86400000,

@@ -80,7 +80,7 @@ export type CommunityMeta = {
   communityName: string;
   announcement: string;
   osVersion: string;
-  registrationMode: "closed" | "invite" | "open";
+  registrationMode: "closed" | "open";
   requireReview: boolean;
   memberLogin: boolean;
   allowPublishing: boolean;
@@ -600,13 +600,6 @@ export const adminGetSettings = () =>
   );
 export const adminSaveSettings = (body: Record<string, unknown>) =>
   patch<{ settings: Record<string, unknown>; message: string }>("/api/community/admin/settings", body);
-
-export const adminGetInvites = () =>
-  get<{ items: Array<Record<string, unknown>>; registrationMode: string }>("/api/community/admin/invites");
-export const adminCreateInvite = (body: { label?: string; maxUses?: number; expiresInDays?: number }) =>
-  post<{ code: string; maxUses: number; message: string }>("/api/community/admin/invites", body);
-export const adminRevokeInvite = (id: string) =>
-  del<{ revoked: boolean; message: string }>(`/api/community/admin/invites/${encodeURIComponent(id)}`);
 
 export const adminGetAudit = (page = 1) =>
   get<{ items: Array<Record<string, unknown>>; page: number; limit: number }>(

@@ -55,9 +55,6 @@ import {
   adminUsersHandler,
   adminSettingsGet,
   adminSettingsPatch,
-  adminInvitesGet,
-  adminInvitesPost,
-  adminInvitesDelete,
   adminReviewPost,
   adminFeaturePost,
   adminReviewReport,
@@ -228,9 +225,6 @@ export async function handleCommunityRequest({ request, env, url, path }) {
     if (parts.length === 2 && parts[1] === "users" && method === "GET") return adminUsersHandler(view);
     if (parts.length === 2 && parts[1] === "settings" && method === "GET") return adminSettingsGet(view);
     if (parts.length === 2 && parts[1] === "settings" && method === "PATCH") return adminSettingsPatch(view);
-    if (parts.length === 2 && parts[1] === "invites" && method === "GET") return adminInvitesGet(view);
-    if (parts.length === 2 && parts[1] === "invites" && method === "POST") return adminInvitesPost(view);
-    if (parts.length === 3 && parts[1] === "invites" && method === "DELETE") return adminInvitesDelete({ ...view, id: parts[2] });
     if (parts.length === 4 && parts[1] === "posts" && parts[3] === "review" && method === "POST") {
       return adminReviewPost({ ...view, id: parts[2] });
     }

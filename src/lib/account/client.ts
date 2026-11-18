@@ -43,10 +43,9 @@ interface AuthStatus {
   initialized: boolean;
   setupAvailable: boolean;
   community?: {
-    mode: "closed" | "invite" | "open";
+    mode: "closed" | "open";
     memberLogin: boolean;
     joinAvailable: boolean;
-    invitationRequired: boolean;
   };
 }
 
@@ -66,7 +65,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   server_error: "服务暂时不可用，请稍后重试。",
   not_member: "这个 GitHub 账号还不是社区成员。点下方「加入 Guandao Community」即可用 GitHub 身份加入。",
   registration_closed: "社区当前未开放注册，请联系管理员。",
-  invalid_invite: "邀请码无效、已过期或名额已用完。",
   member_login_disabled: "社区成员登录已由管理员暂停。",
   account_disabled: "这个账号已被停用，请联系社区管理员。",
   pending_deletion: "这个账号正在注销流程中，暂时无法登录。",
@@ -165,7 +163,6 @@ export function initAccount(): void {
     joinBlock: el<HTMLDivElement>("gauth-community"),
     joinBadge: el<HTMLElement>("gauth-community-badge"),
     joinDesc: el<HTMLParagraphElement>("gauth-community-desc"),
-    invite: el<HTMLInputElement>("gauth-invite"),
     joinBtn: el<HTMLButtonElement>("gauth-join"),
 
     avatarImg: el<HTMLImageElement>("mb-account-img"),
@@ -422,8 +419,7 @@ export function initAccount(): void {
     }
 
     const community = status.community;
-    const modeLabel =
-      community?.mode === "invite" ? "邀请制" : community?.mode === "open" ? "开放注册" : "未开放";
+    const modeLabel = community?.mode === "open" ? "开放注册" : "未开放";
     if (refs.joinBlock) {
       refs.joinBlock.hidden = Boolean(user) || !status.initialized || community?.mode === "closed";
     }
@@ -431,15 +427,9 @@ export function initAccount(): void {
     if (refs.joinDesc) {
       refs.joinDesc.textContent = !status.initialized
         ? "Guandao 管理员初始化后，社区注册会自动开放。"
-        : community?.mode === "invite"
-          ? "社区采用邀请制。输入管理员给你的邀请码，通过 GitHub 身份加入。"
-          : community?.mode === "open"
-            ? "社区当前开放注册。使用 GitHub 公开身份即可加入。"
-            : "社区当前未开放注册，请联系管理员。";
-    }
-    if (refs.invite) {
-      refs.invite.hidden = !community?.invitationRequired;
-      refs.invite.value = "";
+        : community?.mode === "open"
+          ? "社区当前开放注册。使用 GitHub 公开身份即可加入。"
+          : "社区当前未开放注册，请联系管理员。";
     }
     if (refs.joinBtn) {
       refs.joinBtn.disabled = !community?.joinAvailable;
@@ -621,20 +611,10 @@ export function initAccount(): void {
       showError(ERROR_MESSAGES.not_configured);
       return;
     }
-    let invite = "";
-    if (community.invitationRequired) {
-      invite = (refs.invite?.value || "").trim().toUpperCase();
-      if (!/^GD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(invite)) {
-        showError("请输入完整的邀请码，例如 GD-ABCD-EFGH-JKLM。");
-        refs.invite?.focus();
-        return;
-      }
-    }
     showError(null);
     setStatus("正在前往 GitHub 验证身份…", true);
     if (refs.joinBtn) refs.joinBtn.disabled = true;
     const query = new URLSearchParams({ mode: "join" });
-    if (invite) query.set("invite", invite);
     location.assign(`/api/auth/github?${query.toString()}`);
   });
 
@@ -774,8 +754,7 @@ export function initAccount(): void {
     openLogin();
     if (refs.joinBlock) refs.joinBlock.hidden = false;
     window.setTimeout(() => {
-      if (status.community?.invitationRequired) refs.invite?.focus();
-      else refs.joinBtn?.focus();
+      refs.joinBtn?.focus();
     }, 120);
   });
 

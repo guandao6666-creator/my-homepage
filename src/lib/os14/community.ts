@@ -824,19 +824,6 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
           })();
         }
         break;
-      case "revoke-invite":
-        if (actionEl?.dataset.id) {
-          void (async () => {
-            try {
-              await api.adminRevokeInvite(actionEl.dataset.id!);
-              toast("邀请码已作废");
-              await loadModeration();
-            } catch (error) {
-              toast(error instanceof Error ? error.message : "操作失败");
-            }
-          })();
-        }
-        break;
       case "upload-cover":
         win.querySelector<HTMLInputElement>("[data-file-cover]")?.click();
         break;
@@ -1205,30 +1192,7 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
       })();
       return;
     }
-    if (form.matches("[data-invite-form]")) {
-      event.preventDefault();
-      const data = new FormData(form);
-      void (async () => {
-        try {
-          const result = await api.adminCreateInvite({
-            label: String(data.get("label") || ""),
-            maxUses: Number(data.get("maxUses") || 1),
-            expiresInDays: Number(data.get("expiresInDays") || 0),
-          });
-          await modal(win, {
-            title: "邀请码已生成",
-            body: `<div class="cx-invite-code"><code>${esc(result.code)}</code><p>只显示这一次。请复制后发给对方，在登录窗口选择「加入社区」时填写。</p></div>`,
-            actions: [{ label: "我已复制", value: "ok", primary: true }],
-            wide: true,
-          });
-          await loadModeration();
-        } catch (error) {
-          toast(error instanceof Error ? error.message : "生成失败");
-        }
-      })();
-    }
   });
-
 
   root.addEventListener("keydown", (event) => {
     const target = event.target as HTMLElement;

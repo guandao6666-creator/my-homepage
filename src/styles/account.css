@@ -892,24 +892,6 @@ body[data-os-theme="light"] .acc-toast {
   font-size: 10.5px;
   line-height: 1.65;
 }
-.gauth-invite {
-  width: 100%;
-  height: 38px;
-  margin-bottom: 8px;
-  padding: 0 11px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 9px;
-  background: rgba(0, 0, 0, 0.2);
-  color: #eef1f7;
-  font: inherit;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  box-sizing: border-box;
-  outline: none;
-}
-.gauth-invite:focus {
-  border-color: rgba(255, 138, 92, 0.5);
-}
 .gauth-join {
   width: 100%;
   height: 38px;

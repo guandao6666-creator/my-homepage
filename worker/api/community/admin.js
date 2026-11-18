@@ -3,7 +3,7 @@
  *
  * 权限模型：
  *   moderator → 审核作品、处理举报、隐藏评论与违规内容
- *   admin     → 管理用户、社区设置、邀请、删除作品、角色与封禁
+ *   admin     → 管理用户、社区设置、删除作品、角色与封禁
  * 所有操作都写 community_audit_logs；所有权限都在服务端校验。
  */
 
@@ -555,7 +555,7 @@ export async function adminSettingsPatch({ env, request, viewer }) {
   const binds = [];
 
   if (body.registrationMode !== undefined) {
-    if (!["closed", "invite", "open"].includes(body.registrationMode)) bad("注册模式不合法");
+    if (!["closed", "open"].includes(body.registrationMode)) bad("注册模式不合法");
     updates.push("registration_mode = ?");
     binds.push(body.registrationMode);
   }
@@ -604,102 +604,6 @@ export async function adminSettingsPatch({ env, request, viewer }) {
     detail: { fields: updates.map((item) => item.split(" = ")[0]) },
   });
   return ok({ settings: publicSettings(await getSettings(env)), message: "社区设置已保存" });
-}
-
-/* ============================================================
-   邀请注册
-   ============================================================ */
-
-const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function inviteCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(12));
-  const chars = Array.from(bytes, (byte) => INVITE_ALPHABET[byte % INVITE_ALPHABET.length]);
-  return `GD-${chars.slice(0, 4).join("")}-${chars.slice(4, 8).join("")}-${chars.slice(8, 12).join("")}`;
-}
-
-export async function adminInvitesGet({ env, viewer }) {
-  requireAdminRole(viewer);
-  const rows = await env.DB.prepare(
-    `SELECT i.*, COALESCE(pr.display_name, u.display_name, u.github_username) AS creator_name
-       FROM community_invites i
-       LEFT JOIN users u ON u.id = i.created_by
-       LEFT JOIN community_profiles pr ON pr.user_id = i.created_by
-      ORDER BY i.created_at DESC
-      LIMIT 50`,
-  ).all();
-  return ok({
-    items: (rows.results || []).map((row) => ({
-      id: row.id,
-      prefix: row.code_prefix,
-      label: row.label,
-      maxUses: Number(row.max_uses),
-      usedCount: Number(row.used_count),
-      expiresAt: row.expires_at ? Number(row.expires_at) : null,
-      revokedAt: row.revoked_at ? Number(row.revoked_at) : null,
-      createdAt: Number(row.created_at),
-      creatorName: row.creator_name || "管理员",
-      exhausted: Number(row.used_count) >= Number(row.max_uses),
-    })),
-    registrationMode: (await getSettings(env)).registration_mode,
-  });
-}
-
-export async function adminInvitesPost({ env, request, viewer }) {
-  requireAdminRole(viewer);
-  const body = await readJson(request, 8 * 1024);
-  const label = cleanText(body?.label ?? "", 60, { allowNewline: false });
-  const maxUses = Math.max(1, Math.min(500, Number(body?.maxUses) || 1));
-  const expiresInDays = Math.max(0, Math.min(365, Number(body?.expiresInDays) || 0));
-  const code = inviteCode();
-  const hash = await sha256Hex(code);
-  const now = Date.now();
-  await env.DB.prepare(
-    `INSERT INTO community_invites (id, code_hash, code_prefix, label, created_by, max_uses, used_count, expires_at, revoked_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?, NULL, ?)`,
-  )
-    .bind(
-      crypto.randomUUID(),
-      hash,
-      code.slice(0, 8),
-      label,
-      viewer.id,
-      maxUses,
-      expiresInDays ? now + expiresInDays * 86400000 : null,
-      now,
-    )
-    .run();
-  await audit(env, {
-    actorId: viewer.id,
-    action: "invite.create",
-    targetType: "invite",
-    targetId: code.slice(0, 8),
-    detail: { maxUses, expiresInDays, label },
-  });
-  return ok(
-    {
-      code,
-      maxUses,
-      expiresInDays,
-      message: "邀请码只显示这一次，请立即复制发给对方",
-    },
-    { status: 201 },
-  );
-}
-
-export async function adminInvitesDelete({ env, viewer, id }) {
-  requireAdminRole(viewer);
-  const invite = await env.DB.prepare("SELECT * FROM community_invites WHERE id = ?").bind(id).first();
-  if (!invite) throw new ApiError("NOT_FOUND", "邀请码不存在", 404);
-  await env.DB.prepare("UPDATE community_invites SET revoked_at = ? WHERE id = ?").bind(Date.now(), id).run();
-  await audit(env, {
-    actorId: viewer.id,
-    action: "invite.revoke",
-    targetType: "invite",
-    targetId: id,
-    detail: { prefix: invite.code_prefix },
-  });
-  return ok({ revoked: true, message: "邀请码已作废" });
 }
 
 /* ============================================================

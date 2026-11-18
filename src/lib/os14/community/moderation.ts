@@ -31,10 +31,6 @@ export const loadModerationImpl = async (ctx: CommunityContext) => {
         ["settings", "社区设置"],
         ["audit", "审计日志"],
       ];
-      // 邀请注册只在邀请制下出现；开放注册不需要邀请码，直接隐藏整个入口。
-      if (ctx.getMeta()?.registrationMode === "invite") {
-        tabItems.splice(4, 0, ["invites", "邀请注册"]);
-      }
       const tabs = `<div class="cx-tabs">
         ${tabItems
           .map(([id, label]) => `<button type="button" class="${moderationTab === id ? "is-active" : ""}" data-mod-tab="${id}">${label}</button>`)
@@ -154,7 +150,6 @@ export const loadModerationImpl = async (ctx: CommunityContext) => {
                 <label>社区名称<input class="cx-input" name="communityName" maxlength="60" value="${esc(String(raw.communityName || ""))}" ${ctx.isAdmin() ? "" : "disabled"}/></label>
                 <label>注册模式<select class="cx-input" name="registrationMode" ${ctx.isAdmin() ? "" : "disabled"}>
                   <option value="closed" ${raw.registrationMode === "closed" ? "selected" : ""}>关闭注册</option>
-                  ${raw.registrationMode === "invite" ? `<option value="invite" selected>邀请制（旧）</option>` : ""}
                   <option value="open" ${raw.registrationMode === "open" ? "selected" : ""}>开放注册（GitHub 直接加入）</option>
                 </select></label>
                 <label class="is-wide">社区公告<textarea class="cx-input" name="announcement" rows="3" maxlength="600" ${ctx.isAdmin() ? "" : "disabled"}>${esc(String(raw.announcement || ""))}</textarea></label>
@@ -178,44 +173,12 @@ export const loadModerationImpl = async (ctx: CommunityContext) => {
             </section>
           </form>
         `);
-      } else if (moderationTab === "invites") {
-        if (ctx.getMeta()?.registrationMode !== "invite") {
-          ctx.setBody(`
-            <section class="cx-page-head"><div><p class="cx-eyebrow">Invites</p><h1>审核中心</h1><p>当前为开放注册，任何 GitHub 账号都可以直接加入，不需要邀请码。</p></div></section>
-            ${tabs}
-          `);
-          return;
-        }
-        const result = await api.adminGetInvites();
-        if (ctx.isStale(token)) return;
-        ctx.setBody(`
-          <section class="cx-page-head"><div><p class="cx-eyebrow">Invites</p><h1>审核中心</h1><p>邀请码只保存哈希，明文只在创建时显示一次。注册时服务端会再次校验名额与有效期。</p></div></section>
-          ${tabs}
-          ${ctx.isAdmin() ? `<form class="cx-invite-form" data-invite-form>
-            <label>用途备注<input class="cx-input" name="label" maxlength="60" placeholder="例如：给设计群的朋友"/></label>
-            <label>可用次数<input class="cx-input" type="number" name="maxUses" min="1" max="500" value="1"/></label>
-            <label>有效天数（0 为永久）<input class="cx-input" type="number" name="expiresInDays" min="0" max="365" value="7"/></label>
-            <button class="cx-btn is-primary" type="submit">生成邀请码</button>
-          </form>` : `<p class="cx-hint">只有管理员可以创建邀请码。</p>`}
-          <div class="cx-invite-list">
-            ${(result.items as Array<Record<string, unknown>>).length
-              ? (result.items as Array<Record<string, unknown>>).map(
-                  (invite) => `<article class="cx-invite-row">
-                    <code>${esc(String(invite.prefix || ""))}••••</code>
-                    <div><b>${esc(String(invite.label || "未命名邀请"))}</b><span>已用 ${Number(invite.usedCount || 0)} / ${Number(invite.maxUses || 0)} · ${invite.expiresAt ? `到期 ${fmtDate(Number(invite.expiresAt))}` : "永久有效"} · ${invite.revokedAt ? "已作废" : "有效"}</span></div>
-                    ${!invite.revokedAt && ctx.isAdmin() ? `<button class="cx-btn is-small is-danger is-ghost" type="button" data-action="revoke-invite" data-id="${esc(String(invite.id))}">作废</button>` : ""}
-                  </article>`,
-                ).join("")
-              : ctx.emptyState("还没有邀请码", "生成第一个邀请码，发给想加入社区的朋友。", "✉")
-            }
-          </div>
-        `);
       } else {
         const [result, statsResult] = await Promise.all([api.adminGetAudit(1), api.adminGetStats()]);
         if (ctx.isStale(token)) return;
         const stats = statsResult.stats;
         ctx.setBody(`
-          <section class="cx-page-head"><div><p class="cx-eyebrow">Audit</p><h1>审核中心</h1><p>所有重要操作都会写入审计日志：审核、举报处理、角色、设置、邀请。</p></div></section>
+          <section class="cx-page-head"><div><p class="cx-eyebrow">Audit</p><h1>审核中心</h1><p>所有重要操作都会写入审计日志：审核、举报处理、角色、设置。</p></div></section>
           ${tabs}
           <section class="cx-panel">
             <div class="cx-section-head"><div><p class="cx-eyebrow">Overview</p><h2>社区概览</h2></div></div>

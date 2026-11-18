@@ -31,12 +31,9 @@ import { effectiveRole, ensureProfile } from "../community/common.js";
 import {
   consumeJoinIntent,
   createJoinIntent,
-  findValidInvite,
   getJoinIntent,
   registrationSettings,
   registrationSummary,
-  releaseInvite,
-  useInvite,
 } from "../community/registration.js";
 import {
   consumeOAuthState,
@@ -114,7 +111,7 @@ export async function authStart({ env, request, url }) {
   // 请求头或查询参数直接指定 github_id。
   const testLogin = config.testMode ? url?.searchParams.get("test_login") : null;
   if (testLogin !== null) {
-    // 加入社区 / 注销重新验证依赖真实 GitHub 身份与邀请流程，测试模式明确不支持。
+    // 加入社区 / 注销重新验证依赖真实 GitHub 身份，测试模式明确不支持。
     if (join || reauth) return redirect(authError(config.origin, "test_login_unsupported"));
     if (!isKnownTestLogin(testLogin)) {
       return redirect(authError(config.origin, "test_login_invalid"));
@@ -168,17 +165,12 @@ export async function authStart({ env, request, url }) {
   // 社区注册：必须在进入 GitHub 授权前就通过服务端策略检查，
   // 不能靠前端隐藏按钮。回调时还会再校验一次，防止期间策略变更。
   let joinMode = null;
-  let invite = null;
   if (join) {
     const settings = await registrationSettings(env);
     if (!settings || settings.mode === "closed") {
       return redirect(authError(config.origin, "registration_closed"));
     }
-    if (settings.mode === "invite") {
-      invite = await findValidInvite(env, url?.searchParams.get("invite"));
-      if (!invite) return redirect(authError(config.origin, "invalid_invite"));
-    }
-    joinMode = settings.mode;
+    joinMode = "open";
   }
 
   const verifier = randomToken(32);
@@ -193,7 +185,6 @@ export async function authStart({ env, request, url }) {
     await createJoinIntent(env, {
       stateHash: await sha256Hex(state),
       mode: joinMode,
-      inviteId: invite?.id ?? null,
     });
   }
 
@@ -373,22 +364,6 @@ export async function authCallback({ env, request }) {
     return redirect(authError(config.origin, "registration_closed"), [clearState]);
   }
 
-  // 回调时重新校验邀请码，防止发起后邀请被作废或名额耗尽。
-  let inviteId = null;
-  if (settings.mode === "invite") {
-    const valid = intent.invite_id
-      ? await env.DB.prepare(
-          `SELECT id FROM community_invites
-            WHERE id = ? AND revoked_at IS NULL AND used_count < max_uses
-              AND (expires_at IS NULL OR expires_at > ?)`,
-        )
-          .bind(intent.invite_id, Date.now())
-          .first()
-      : null;
-    if (!valid) return redirect(authError(config.origin, "invalid_invite"), [clearState]);
-    inviteId = valid.id;
-  }
-
   const displayName = String(profile.name || profile.login || "创作者").slice(0, 60);
   let created;
   try {
@@ -409,12 +384,6 @@ export async function authCallback({ env, request }) {
     return redirect(authError(config.origin, "server_error"), [clearState]);
   }
 
-  const inviteUsed = await useInvite(env, inviteId);
-  if (!inviteUsed) {
-    // 并发下名额被抢完：回滚刚创建的用户（profile 由外键级联删除），不留半成品。
-    await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(created.id).run();
-    return redirect(authError(config.origin, "invalid_invite"), [clearState]);
-  }
   await consumeJoinIntent(env, stateHash);
 
   try {
@@ -428,14 +397,13 @@ export async function authCallback({ env, request }) {
       userId: created.id,
       eventType: "successful_login",
       deviceId: issued.deviceId,
-      metadata: { reason: "community_signup", invite: Boolean(inviteId) },
+      metadata: { reason: "community_signup" },
     });
     purgeExpired(env).catch(() => undefined);
 
     return redirect(`${config.origin}/?joined=1&community=1`, [...issued.cookies, clearState]);
   } catch (error) {
     console.error("[auth] community session issue failed:", error?.message ?? error);
-    await releaseInvite(env, inviteId);
     return redirect(authError(config.origin, "server_error"), [clearState]);
   }
 }

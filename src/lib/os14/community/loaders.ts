@@ -350,7 +350,7 @@ export const loadCreators = async (ctx: CommunityContext) => {
                   </article>`,
                 )
                 .join("")}</div>`
-            : ctx.emptyState("还没有公开创作者", "发布第一个作品，或者邀请朋友加入。", "◎")
+            : ctx.emptyState("还没有公开创作者", "发布第一个作品，让朋友也来看看。", "◎")
         }
       `);
     } catch (error) {

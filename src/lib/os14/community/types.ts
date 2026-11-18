@@ -45,4 +45,4 @@ export type DetailCache = {
 export type VersionState = { post: Post; manifest: Manifest | null; baseVersion: string };
 
 /** 审核中心的标签页（闭包内 `moderationTab`） */
-export type ModerationTab = "queue" | "reports" | "users" | "settings" | "invites" | "audit";
+export type ModerationTab = "queue" | "reports" | "users" | "settings" | "audit";
