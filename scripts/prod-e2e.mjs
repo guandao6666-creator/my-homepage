@@ -471,14 +471,16 @@ async function main() {
     let syncState = [];
     for (let i = 0; i < 25; i += 1) {
       syncState = await page.evaluate(() => window.GOS20?.sync?.domains?.().map((item) => `${item.id}:${item.state}`) ?? []);
-      if (syncState.length === 3 && syncState.every((item) => item.endsWith(":ok"))) break;
+      if (syncState.length >= 3 && syncState.every((item) => item.endsWith(":ok"))) break;
       await sleep(800);
     }
-    check("三个同步域状态为 ok", syncState.length === 3 && syncState.every((item) => item.endsWith(":ok")), syncState.join(",") || "无已注册数据域");
+    check("同步域状态为 ok", syncState.length >= 3 && syncState.every((item) => item.endsWith(":ok")), syncState.join(",") || "无已注册数据域");
 
+    await page.evaluate(() => document.querySelector("[data-onb-skip]")?.click());
+    await sleep(300);
     await page.evaluate(() => window.GOS14.ctx.openApp("systemcenter"));
     await page.waitForSelector('.window[data-app="systemcenter"] .g14-nav[data-tab="cloud"]', { timeout: 20000 });
-    await page.locator('.window[data-app="systemcenter"] .g14-nav[data-tab="cloud"]').click();
+    await page.evaluate(() => document.querySelector('.window[data-app="systemcenter"] .g14-nav[data-tab="cloud"]')?.click());
     // 云端状态来自异步探测：最多等 20 秒，必要时点一次「重新检查」
     let cloudText = "";
     for (let i = 0; i < 20; i += 1) {

@@ -1,0 +1,66 @@
+{
+  "measuredAt": "2026-11-18T13:53:24.806Z",
+  "environment": {
+    "browser": "Google Chrome (channel=chrome, Playwright)",
+    "viewport": "1440x900",
+    "throttle": "无（本机直连，非真实移动网络）",
+    "build": "生产站点（--remote）",
+    "runs": 3
+  },
+  "runs": [
+    {
+      "label": "冷启动 #1（新上下文，无缓存）",
+      "ttfb": 597,
+      "domContentLoaded": 1641,
+      "load": 3002,
+      "fcp": 1624,
+      "lcp": 1624,
+      "cls": 0.003,
+      "transferTotal": 491248,
+      "byType": {
+        "link": 43862,
+        "img": 243256,
+        "script": 199880,
+        "fetch": 3719,
+        "other": 531
+      },
+      "resourceCount": 26
+    },
+    {
+      "label": "冷启动 #2（新上下文，无缓存）",
+      "ttfb": 284,
+      "domContentLoaded": 402,
+      "load": 941,
+      "fcp": 388,
+      "lcp": 688,
+      "cls": 0.003,
+      "transferTotal": 3717,
+      "byType": {
+        "link": 0,
+        "img": 0,
+        "script": 0,
+        "fetch": 3717,
+        "other": 0
+      },
+      "resourceCount": 25
+    },
+    {
+      "label": "冷启动 #3（新上下文，无缓存）",
+      "ttfb": 252,
+      "domContentLoaded": 327,
+      "load": 337,
+      "fcp": 300,
+      "lcp": 332,
+      "cls": 0.003,
+      "transferTotal": 3719,
+      "byType": {
+        "link": 0,
+        "img": 0,
+        "script": 0,
+        "fetch": 3719,
+        "other": 0
+      },
+      "resourceCount": 25
+    }
+  ]
+}
