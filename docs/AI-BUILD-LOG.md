@@ -265,3 +265,15 @@
 - F 教程页面级尝试失败：详情能打开，但「教程正文」面板不出现，
   说明 `fetchVerifiedPackage` 客户端校验未过（manifest 被置 null）。
   这可能是真实产品问题（checksum 口径），先移除半成品，记 Blocked 待查。
+
+---
+
+## 2026-11-18 · Round 16 · checksum 排除，发现搜索结果点击缺陷
+
+- 探针结论：服务端 `checksum` 与 `sha256(packageJson)` **完全一致**（MATCH true），
+  之前怀疑的校验口径问题不成立。
+- 真正现象：真实 Worker 页面里，搜索结果卡片点击后**仍停在结果列表**（`.cx-panel` 为 0）。
+  DOM click 与 Playwright 真实 click（含 force）都无效，不是等待或遮罩问题。
+- `openPostFromEventImpl`（interactions.ts:414）先做 `closest("button,a,input,textarea,select,[data-action]")`
+  守卫，再找 `closest("[data-post]")`；卡片是 `<article data-post>`，理论上应命中，需断点确认。
+- 记为 BACKLOG P1-8（Open）。影响「从搜索打开作品」主路径，优先级高于继续铺测试。
