@@ -63,7 +63,9 @@
     "test:e2e": "playwright test",
     "test": "npm run check:version && npm run check:migrations && npm run typecheck && npm run test:unit && npm run security:test",
     "verify": "npm run test && npm run check:unused && npm run check:astro && npm run check:html-security && npm run lint && npm run build && npm run check:csp",
-    "perf:baseline": "node scripts/perf-baseline.mjs --write"
+    "perf:baseline": "node scripts/perf-baseline.mjs --write",
+    "perf:prod": "node scripts/measure-perf.mjs https://guandao.xin/ --remote --runs 3 --json docs/perf-measurements-prod.json",
+    "check:docs": "node scripts/check-docs.mjs"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "^7.3.6",

@@ -19,9 +19,18 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { writeFile, mkdir } from "node:fs/promises";
 
+// 6.4：支持对生产站点采集（--remote 跳过内置静态服务器）、自定义输出与多次取样
+const cli = process.argv.slice(2);
+const remote = cli.includes("--remote");
+const jsonFlag = cli.indexOf("--json");
+const jsonPath = jsonFlag >= 0 ? cli[jsonFlag + 1] : "docs/perf-measurements.json";
+const runsFlag = cli.indexOf("--runs");
+const runCount = runsFlag >= 0 ? Math.max(1, Number(cli[runsFlag + 1]) || 1) : 2;
+const urlArg = cli.find((item) => item.startsWith("http"));
+
 const root = path.resolve(process.cwd(), "dist");
 const port = Number(process.env.PERF_PORT || 4517);
-const target = process.argv[2] || `http://127.0.0.1:${port}/`;
+const target = urlArg || `http://127.0.0.1:${port}/`;
 
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -52,7 +61,9 @@ async function resolveFile(urlPath) {
   }
 }
 
-const server = createServer(async (req, res) => {
+const server = remote
+  ? null
+  : createServer(async (req, res) => {
   const file = await resolveFile(req.url || "/");
   if (!file) {
     res.writeHead(404).end("not found");
@@ -63,7 +74,7 @@ const server = createServer(async (req, res) => {
   res.end(body);
 });
 
-await new Promise((resolve) => server.listen(port, resolve));
+if (server) await new Promise((resolve) => server.listen(port, resolve));
 
 const browser = await chromium.launch({ channel: "chrome" });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -121,8 +132,10 @@ await page.addInitScript(() => {
   }
 });
 
-async function measure(label, options = {}) {
-  await page.goto(target, { waitUntil: "load" });
+async function measure(label, index = 0) {
+  // 生产采集时加唯一查询串，避免 CDN/浏览器缓存把第一次访问变成「二次访问」
+  const url = remote ? `${target}${target.includes("?") ? "&" : "?"}perfRun=${index}-${Date.now()}` : target;
+  await page.goto(url, { waitUntil: "load" });
   // 等待桌面外壳真正可用（开机遮罩移除）
   await page.waitForFunction(() => !document.getElementById("boot"), null, { timeout: 15000 });
   await page.waitForTimeout(1500); // 让 LCP / CLS 稳定
@@ -151,12 +164,17 @@ async function measure(label, options = {}) {
   return { label, ...data };
 }
 
-const cold = await measure("冷启动（新上下文，无缓存）");
-// 同一上下文再访问一次，观察缓存效果
-const warm = await measure("二次访问（同一上下文，已缓存）");
+const runs = [];
+for (let i = 0; i < runCount; i += 1) {
+  runs.push(await measure(`冷启动 #${i + 1}（新上下文，无缓存）`, i));
+}
+if (!remote) {
+  // 同一上下文再访问一次，观察缓存效果（仅本地有意义）
+  runs.push(await measure("二次访问（同一上下文，已缓存）", runCount));
+}
 
 await browser.close();
-server.close();
+server?.close();
 
 const report = {
   measuredAt: new Date().toISOString(),
@@ -164,13 +182,14 @@ const report = {
     browser: "Google Chrome (channel=chrome, Playwright)",
     viewport: "1440x900",
     throttle: "无（本机直连，非真实移动网络）",
-    build: "dist（astro build 产物）",
+    build: remote ? "生产站点（--remote）" : "dist（astro build 产物）",
+    runs: runCount,
   },
-  runs: [cold, warm],
+  runs,
 };
 
-await mkdir("docs", { recursive: true });
-await writeFile("docs/perf-measurements.json", JSON.stringify(report, null, 2), "utf8");
+await mkdir(path.dirname(jsonPath), { recursive: true });
+await writeFile(jsonPath, JSON.stringify(report, null, 2), "utf8");
 
 const kb = (bytes) => `${Math.round(bytes / 1024)} KB`;
 console.log("Guandao OS 1.9 · 实测性能（本机，无节流）\n");
@@ -182,4 +201,4 @@ for (const run of report.runs) {
   console.log(`  按类型：${Object.entries(run.byType).map(([k, v]) => `${k}=${kb(v)}`).join(" · ")}`);
   console.log("");
 }
-console.log("已写入 docs/perf-measurements.json");
+console.log(`已写入 ${jsonPath}`);

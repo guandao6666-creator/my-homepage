@@ -171,7 +171,7 @@ Worker + 静态资源部署、`/api/health`、`/api/auth/status`、未登录 401
 | Phase 2.1 CSS 拆分 | **Verified / 已上线** | 18 文件合计 270,945 B，与拆分前字节完全相同；构建 `index.B_TNKWp7.css` 273,238 B hash 未变；19/21 逐像素完全一致 + 1 动态红点 + 1 单像素 Δ3；147/147 布局框；已随 `6928916f` 上线 |
 | Phase 2.1 生产 UI 复测 | **通过** | 生产 10 个 CSS 资产与本机构建同名同字节（含 `index.B_TNKWp7.css` 273,238 B）；渲染检查 9/9；只读，未登录未写数据 |
 | Phase 2.1 验收口径 | **已修订（2026-11-07 所有者决定）** | 2.1 收敛为「结构 / 语义 / 视觉」；首屏 ≤ 200 KB 移交 Phase 6.2，起点基线 476,749 B |
-| Phase 6.2 首屏 CSS | **未达标（待 Phase 6 处理）** | 当前 476,749 B；仅桌面样式包本身 273,238 B，需先做非首屏样式延迟加载 |
+| Phase 6.2 首屏 CSS | **未达标（待 Phase 6 处理）** | 当前 476,749 B；仅桌面样式包本身 273,238 B，需先做非首屏样式延迟加载 |（历史，已被 Phase 6 的结论取代）
 | Phase 2.1 取证缺口 | **已关闭** | `1440x900-dialog` 已恢复复采且 diff=0；截图脚本已入库 `a712d96` |
 | Phase 2.2 旧应用迁移 | **Verified（本地 / CI）** | 16/17 应用迁至 `src/lib/legacy-apps/`（21 文件 / 2,639 行）；新增 5 类显式 port（shell/auth/lifecycle/achievements/desktopFacilities）；`index.astro` 6,605 → **4,832 行**；运行时 APPS 17 键序有 E2E 断言 |
 | Phase 2.2 未迁移应用 | **1 个：`settings`（按判断标准保留）** | 依赖壁纸/主题/程序坞/小组件/备份等 12+ 项外壳状态；迁出仍需十余次闭包透传 ≠ 解耦，逐项理由见 LEGACY-APPLICATIONS.md §6 |

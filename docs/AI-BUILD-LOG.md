@@ -289,3 +289,15 @@
   或 click 分支提前 return）。
 - 结论修正：P1-8 由「产品缺陷」降为「测试未关引导 + 一个待查的窄问题」，BACKLOG 已更新。
 - 探针已删除，配置已还原。
+
+---
+
+## 2026-11-18 · Round 18 · G1 生产性能采集 + I 文档一致性
+
+- `scripts/measure-perf.mjs` 支持 `--remote`（跳过内置静态服务器）、`--json <path>`、`--runs N`；
+  生产采集时给每次访问加唯一查询串，避免 CDN 缓存把首次访问变成二次访问。
+- npm 新增 `perf:prod`（https://guandao.xin/ --remote --runs 3）与 `check:docs`。
+- 新增 `scripts/check-docs.mjs`：任务 ID 唯一、状态不自相矛盾、历史结论已标注、脚本引用有效。
+  首次运行即命中两处真实问题：BACKLOG P2-6 重复、ACCEPTANCE:174 未标历史。
+- 两处已修；`npm run check:docs` 通过；`npm run verify` exit 0。
+- 未做：G2 社区生产发布链脚本；H 生产 runbook。
