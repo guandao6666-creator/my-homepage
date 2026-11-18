@@ -3,6 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import Icon from "../components/Icon.astro";
 import { PROJECTS } from "../lib/projects";
 import { SITE } from "../lib/site";
+import "../styles/blog-pixel.css";
 
 const total = PROJECTS.length;
 const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
@@ -13,6 +14,7 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
   description={`${SITE.author}做过的项目：${PROJECTS.map((item) => item.title).join("、")}。`}
   canonical="/projects/"
 >
+  <div class="blog-pixel">
   <section class="page-head">
     <div class="wrap">
       <span class="eyebrow">Projects · {total} 个</span>
@@ -69,66 +71,46 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
       更多尝试还在本地跑着，等稳定了再放上来。想聊其中某一个，<a href="/about/">写信给我</a>。
     </p>
   </div>
+  </div>
 </BaseLayout>
 
 <style>
-  .page-head {
-    padding: 58px 0 34px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .page-head h1 {
-    margin: 14px 0 12px;
-    font-size: clamp(34px, 5vw, 46px);
-    letter-spacing: -0.03em;
-  }
-
-  .page-lede {
-    margin: 0;
-    max-width: 40em;
-    color: var(--muted);
-    font-size: 14.5px;
-    line-height: 1.9;
-  }
-
   .filters {
     display: flex;
     flex-wrap: wrap;
     gap: 7px;
-    padding: 26px 0 30px;
+    padding: 26px 0 28px;
   }
 
   .chip {
-    padding: 4px 11px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    background: var(--surface-sunk);
-    font-family: var(--font-mono);
+    padding: 5px 9px 4px;
+    font-family: var(--px-pix);
     font-size: 11px;
-    color: var(--muted);
+    letter-spacing: 0.04em;
+    color: var(--px-cyan);
+    background: var(--px-panel-2);
+    box-shadow: inset 2px 2px 0 0 var(--px-slot-lo);
   }
 
   .grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 20px;
+    gap: 26px;
   }
 
   .card {
     display: flex;
     flex-direction: column;
-    padding: 26px 26px 22px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface);
-    transition: transform 0.3s var(--ease), border-color 0.3s var(--ease),
-      box-shadow 0.3s var(--ease);
+    padding: 24px 26px 22px;
+    background: var(--px-paper);
+    color: var(--px-paper-text);
+    box-shadow: var(--px-paper-frame);
+    transition: transform 0.16s steps(2, end), background-color 0.16s linear;
   }
 
   .card--link:hover {
     transform: translateY(-3px);
-    border-color: var(--line-strong);
-    box-shadow: var(--shadow-md);
+    background: var(--px-paper-2);
   }
 
   .card-top {
@@ -138,30 +120,41 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
   }
 
   .year {
-    font-family: var(--font-mono);
+    font-family: var(--px-pix);
     font-size: 11.5px;
-    color: var(--muted);
+    letter-spacing: 0.06em;
+    color: #7a5c1c;
   }
 
   .status {
-    padding: 1px 8px;
-    border-radius: 999px;
-    background: var(--accent-wash);
-    color: var(--accent-ink);
-    font-size: 10.5px;
+    padding: 2px 7px 1px;
+    font-family: var(--px-pix);
+    font-size: 10px;
+    color: #2a1d02;
+    background: var(--px-gold);
+    box-shadow: inset 0 -2px 0 0 var(--px-gold-dark);
   }
 
   .card h2 {
     margin: 12px 0 10px;
-    font-size: 21px;
-    line-height: 1.45;
+    font-family: var(--px-hand);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.42;
+    letter-spacing: 0.02em;
+    color: var(--px-paper-ink);
+    transition: color 0.16s linear;
+  }
+
+  .card--link:hover h2 {
+    color: #7a4d13;
   }
 
   .card p {
     margin: 0;
     font-size: 13.5px;
     line-height: 1.85;
-    color: var(--muted);
+    color: #5b4f36;
   }
 
   .card-foot {
@@ -180,41 +173,44 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
   }
 
   .tag {
-    padding: 2px 9px;
-    border-radius: 6px;
-    background: var(--surface-sunk);
-    font-family: var(--font-mono);
+    padding: 3px 8px 2px;
+    font-family: var(--px-pix);
     font-size: 10.5px;
-    color: var(--ink-2);
+    color: #7a5c1c;
+    background: #e4d5ae;
+    box-shadow: inset 2px 2px 0 0 #c9b483;
   }
 
   .go {
     flex: none;
-    color: var(--muted);
+    color: #8a5a1c;
     opacity: 0;
     transform: translate(-3px, 3px);
-    transition: opacity 0.25s var(--ease), transform 0.25s var(--ease), color 0.25s var(--ease);
+    transition: opacity 0.16s linear, transform 0.16s steps(2, end);
   }
 
   .card--link:hover .go {
     opacity: 1;
     transform: none;
-    color: var(--accent);
   }
 
   .more-note {
     margin: 40px 0 0;
     padding-top: 22px;
-    border-top: 1px solid var(--line);
+    border-top: 4px dashed #142a5c;
     font-size: 13.5px;
-    line-height: 1.9;
-    color: var(--muted);
+    line-height: 1.95;
+    color: var(--px-faint);
   }
 
   .more-note a {
-    color: var(--accent-ink);
-    border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    color: var(--px-cyan);
+    border-bottom: 1px dashed rgba(127, 230, 255, 0.45);
     padding-bottom: 1px;
+  }
+
+  .more-note a:hover {
+    color: #fff;
   }
 
   @media (max-width: 720px) {

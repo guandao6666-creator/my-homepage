@@ -2060,3 +2060,38 @@ body:has(.blog-pixel) .lightbox img {
   font-size: 10px;
   opacity: 0.65;
 }
+
+/* ---------- 像素按钮：首页、关于、联系区共用 ---------- */
+.blog-pixel .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px 10px;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--px-pix);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--px-ink);
+  background: #16316f;
+  box-shadow: 0 0 0 3px var(--px-edge), inset 0 3px 0 0 #2f56a6, inset 0 -4px 0 0 #0b1d4a;
+  transition: background-color 0.15s linear, color 0.15s linear;
+}
+
+.blog-pixel .btn:hover {
+  color: #fff;
+  background: #1e3f88;
+  border: 0;
+  transform: none;
+}
+
+.blog-pixel .btn--solid {
+  color: #fff;
+  background: #2f63d6;
+  box-shadow: 0 0 0 3px var(--px-edge), inset 0 3px 0 0 #6f9bff, inset 0 -4px 0 0 #1c3f99;
+}
+
+.blog-pixel .btn--solid:hover {
+  color: #fff;
+  background: #3c74ee;
+}

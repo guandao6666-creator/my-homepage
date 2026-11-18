@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import "../styles/blog-pixel.css";
 import {
   OS_VERSION,
   SDK_VERSION,
@@ -216,6 +217,7 @@ const riskLabel = { low: "低", medium: "中", high: "高" };
   description="Guandao OS 1.7 插件开发文档：Manifest 规范、SDK 接口、沙箱模型、权限系统、测试与发布流程。"
   canonical="/developers/"
 >
+  <div class="blog-pixel">
   <section class="dev-hero">
     <div class="wrap dev-hero-inner">
       <div>
@@ -623,6 +625,7 @@ const riskLabel = { low: "低", medium: "中", high: "高" };
         </p>
       </footer>
     </main>
+  </div>
   </div>
 </BaseLayout>
 
@@ -1302,4 +1305,343 @@ const riskLabel = { low: "低", medium: "中", high: "高" };
       padding-top: 44px;
     }
   }
+  /* ============================================================
+     深海像素风覆盖层
+     这页原有的排版与栅格全部保留，只把配色与字体换掉
+     ============================================================ */
+  .blog-pixel {
+    --paper: #06112e;
+    --surface: #0a1a42;
+    --surface-sunk: #071433;
+    --ink: #eaf2ff;
+    --ink-2: #c3d4f2;
+    --muted: #8ea6d4;
+    --line: #142a5c;
+    --line-strong: #1b3a7a;
+    --accent: #7fe6ff;
+    --accent-ink: #a9e8ff;
+    --accent-wash: #0e2252;
+    --shadow-sm: none;
+  }
+
+  .dev-hero {
+    padding: 54px 0 42px;
+    border-bottom: 4px dashed #142a5c;
+    background: radial-gradient(80% 120% at 12% 0%, rgba(127, 230, 255, 0.07), transparent 62%),
+      transparent;
+  }
+
+  .dev-hero h1 {
+    font-family: var(--px-hand);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #fff;
+    text-shadow: 3px 3px 0 #1f4cb3, 6px 6px 0 var(--px-edge);
+  }
+
+  .dev-hero h1 em {
+    color: var(--px-gold);
+  }
+
+  .dev-lede {
+    color: var(--px-soft);
+  }
+
+  .dev-facts {
+    border: 0;
+    border-radius: 0;
+    background: rgba(7, 22, 54, 0.55);
+    box-shadow: var(--px-frame-2);
+  }
+
+  .dev-facts > div {
+    border-bottom: 1px dashed #142a5c;
+  }
+
+  .dev-facts dt {
+    font-family: var(--px-pix);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--px-faint);
+  }
+
+  .dev-facts dd {
+    color: var(--px-ink);
+  }
+
+  /* ---------- 目录 ---------- */
+  .dev-toc-title {
+    font-family: var(--px-pix);
+    letter-spacing: 0.16em;
+    color: var(--px-gold);
+  }
+
+  .dev-toc ol {
+    border-left: 2px solid #142a5c;
+  }
+
+  .dev-toc li a {
+    color: var(--px-soft);
+    border-left: 2px solid transparent;
+  }
+
+  .dev-toc li a:hover {
+    color: var(--px-gold);
+    border-left-color: var(--px-gold);
+  }
+
+  .dev-toc li span {
+    color: var(--px-faint);
+  }
+
+  .dev-toc-note {
+    border-radius: 0;
+    background: var(--px-panel-2);
+    box-shadow: inset 2px 2px 0 0 var(--px-slot-lo);
+    color: var(--px-faint);
+  }
+
+  .dev-toc-note b {
+    color: var(--px-ink);
+  }
+
+  /* ---------- 正文 ---------- */
+  .dev-section {
+    border-bottom: 4px dashed #142a5c;
+  }
+
+  .dev-section h2 {
+    font-family: var(--px-hand);
+    font-size: 27px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #fff;
+  }
+
+  .dev-section h3 {
+    font-family: var(--px-hand);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--px-cyan);
+  }
+
+  .dev-section p,
+  .dev-list li,
+  .dev-steps span {
+    color: var(--px-soft);
+  }
+
+  .dev-section code {
+    border-radius: 0;
+    background: #0a1a42;
+    color: #b9e6ff;
+    font-size: 11.5px;
+  }
+
+  .dev-section pre {
+    border: 0;
+    border-radius: 0;
+    background: #071433;
+    box-shadow: 0 0 0 3px var(--px-edge), inset 3px 3px 0 0 #1b3a7a;
+  }
+
+  .dev-section pre code {
+    background: none;
+    color: #cfe3ff;
+  }
+
+  .dev-section kbd {
+    border-radius: 0;
+    background: var(--px-panel-2);
+    border-color: #1b3a7a;
+    color: var(--px-cyan);
+  }
+
+  /* ---------- 插件类型卡 ---------- */
+  .dev-types article {
+    border: 0;
+    border-radius: 0;
+    background: rgba(7, 22, 54, 0.5);
+    box-shadow: inset 0 0 0 2px #1b3a7a;
+  }
+
+  .dev-type-ico {
+    border-radius: 0;
+    background: var(--px-panel-2);
+    color: var(--px-cyan);
+    box-shadow: inset 2px 2px 0 0 var(--px-slot-lo);
+  }
+
+  .dev-types h3 {
+    color: #fff;
+  }
+
+  .dev-types p,
+  .dev-types code {
+    color: var(--px-faint);
+  }
+
+  /* ---------- 提示块 ---------- */
+  .dev-callout {
+    border-left: 4px solid var(--px-cyan);
+    border-radius: 0;
+    background: rgba(127, 230, 255, 0.06);
+  }
+
+  .dev-callout.is-warn {
+    border-left-color: var(--px-gold);
+    background: rgba(255, 211, 77, 0.07);
+  }
+
+  .dev-callout b {
+    color: #fff;
+  }
+
+  .dev-callout li,
+  .dev-callout p {
+    color: var(--px-soft);
+  }
+
+  /* ---------- 表格 ---------- */
+  .dev-table {
+    border: 0;
+    border-radius: 0;
+    background: rgba(7, 22, 54, 0.45);
+    box-shadow: inset 0 0 0 2px #1b3a7a;
+  }
+
+  .dev-table th {
+    background: var(--px-panel-2);
+    color: var(--px-faint);
+    font-family: var(--px-pix);
+    letter-spacing: 0.08em;
+  }
+
+  .dev-table th,
+  .dev-table td {
+    border-bottom: 1px solid #142a5c;
+  }
+
+  .dev-table tr.is-sensitive {
+    background: rgba(255, 211, 77, 0.05);
+  }
+
+  .dev-table td em {
+    border-radius: 0;
+    background: rgba(255, 211, 77, 0.14);
+    color: var(--px-gold);
+  }
+
+  .dev-risk {
+    border-radius: 0;
+    border-color: #1b3a7a;
+    color: var(--px-faint);
+  }
+
+  .dev-risk.is-high {
+    border-color: #7a3a30;
+    color: #ff9d8a;
+  }
+
+  .dev-risk.is-medium {
+    border-color: #7a6532;
+    color: var(--px-gold);
+  }
+
+  .dev-risk.is-low {
+    border-color: #2f6f4a;
+    color: #7ee0a6;
+  }
+
+  /* ---------- 沙箱示意图 ---------- */
+  .dev-diagram {
+    border: 0;
+    border-radius: 0;
+    background: rgba(7, 22, 54, 0.45);
+    box-shadow: inset 0 0 0 2px #1b3a7a;
+  }
+
+  .dev-node {
+    border-radius: 0;
+    border-color: #1b3a7a;
+    background: var(--px-panel-2);
+  }
+
+  .dev-node b {
+    color: #fff;
+  }
+
+  .dev-node span {
+    color: var(--px-faint);
+  }
+
+  .dev-node.is-host {
+    border-color: var(--px-cyan);
+    background: rgba(127, 230, 255, 0.08);
+  }
+
+  .dev-arrow span {
+    color: var(--px-faint);
+  }
+
+  .dev-arrow span::before {
+    color: var(--px-gold);
+  }
+
+  /* ---------- 步骤 / 报错 / 限额 ---------- */
+  .dev-steps li {
+    border-bottom: 1px dashed #142a5c;
+  }
+
+  .dev-steps b {
+    color: var(--px-ink);
+  }
+
+  .dev-errors > div {
+    border: 0;
+    border-radius: 0;
+    background: rgba(7, 22, 54, 0.5);
+    box-shadow: inset 0 0 0 2px #1b3a7a;
+  }
+
+  .dev-errors code {
+    border-radius: 0;
+    color: #ff9d8a;
+    background: rgba(255, 120, 100, 0.1);
+  }
+
+  .dev-errors p {
+    color: var(--px-soft);
+  }
+
+  .dev-limits {
+    border-top: 4px dashed #142a5c;
+  }
+
+  .dev-limits > div {
+    border-bottom: 1px dashed #142a5c;
+  }
+
+  .dev-limits dt {
+    color: var(--px-faint);
+  }
+
+  .dev-limits dd {
+    color: var(--px-cyan);
+  }
+
+  .dev-sub {
+    color: var(--px-faint);
+  }
+
+  .dev-foot {
+    border-top: 4px dashed #142a5c;
+    color: var(--px-faint);
+  }
+
+  .dev-foot a {
+    color: var(--px-cyan);
+  }
+
 </style>
