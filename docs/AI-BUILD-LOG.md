@@ -222,3 +222,12 @@
   `load` 后再 probe；未放宽任何断言。`--repeat-each=3` 3 passed，全量 175 passed。
 - P2-1：决定不做跨会话持久化（D-008），诊断中心保持「本次加载」口径，INP 刷新后显示「未采集」。
 - 门禁：verify exit 0；全量 E2E 175 passed（4.2m）。
+
+---
+
+## 2026-11-18 · Round 12 · P1-2 配额 409（D 批可交付部分）
+
+- `scripts/e2e-server.mjs` 新增 `POST /__e2e/fill-sync`：用 `d1 execute --file` 批量写入（避开 Windows 32KB 命令行上限）。
+- 关键口径：墓碑数取自 `sync_entities.deleted = 1`，不是 `sync_tombstone_ledger`——第一次造数失败正是踩了这个。
+- `sync.spec.ts` 新增：实体填满 5000 后 push 1 条 → 409 `details.limit=5000`；建实体 → 填 2000 墓碑 → 删除 → 409 `details.scope=tombstones`；`finally` 清理。9 passed（含新用例 17.7s）。
+- P1-1 页面级冲突用例两次尝试未通过：静态 dist 走「尚未就绪」；worker 下 `openApp("systemcenter")` 后窗口 90s 未出现。已删掉半成品文件，BACKLOG 记 Blocked 并写明现象。

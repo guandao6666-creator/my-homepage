@@ -73,6 +73,72 @@ function d1(sql) {
   });
 }
 
+function d1File(sql) {
+  // 大批量写入走 --file：Windows 命令行上限约 32KB，5000 行 VALUES 放不进参数
+  const file = join(".wrangler", `fill-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.sql`);
+  fs.writeFileSync(file, sql, "utf8");
+  try {
+    execFileSync(process.execPath, [WRANGLER, "d1", "execute", DB, "--local", "--file", file], {
+      stdio: "ignore",
+      env: WRANGLER_ENV,
+    });
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+}
+
+/**
+ * P1-2：把 qa-p3-installer 的配额填到指定数量，用来触发真实 409。
+ *
+ * 注意口径：`userQuotaStats` 的墓碑数取自 `sync_entities.deleted = 1`，
+ * 不是 `sync_tombstone_ledger`（那张表只是清理用的台账）。
+ * 所以「墓碑模式」写的是 deleted=1 的实体行。
+ */
+function fillSyncRows(kind, count) {
+  const type = kind === "tombstones" ? "tombstones" : "entities";
+  const total = Math.max(0, Math.min(Math.floor(Number(count) || 0), 5000));
+  if (!total) return 0;
+
+  const now = Date.now();
+  const statements = [];
+  const batch = 1000;
+  for (let start = 1; start <= total; start += batch) {
+    const end = Math.min(start + batch - 1, total);
+    const rows = [];
+    for (let i = start; i <= end; i += 1) {
+      rows.push(
+        type === "tombstones"
+          ? `('qa-p3-installer','notes','fill-${i}',1,1,NULL,${now},${now})`
+          : `('qa-p3-installer','notes','fill-${i}',1,0,'{}',${now},NULL)`,
+      );
+    }
+    statements.push(
+      type === "tombstones"
+        ? `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at) VALUES ${rows.join(",")} ON CONFLICT(user_id,domain,entity_id) DO NOTHING;`
+        : `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at) VALUES ${rows.join(",")} ON CONFLICT(user_id,domain,entity_id) DO NOTHING;`,
+    );
+  }
+  d1File(statements.join("\n"));
+  return total;
+}
+
+function readBody(request) {
+  return new Promise((resolve) => {
+    let raw = "";
+    request.on("data", (chunk) => {
+      raw += chunk;
+      if (raw.length > 1_000_000) request.destroy();
+    });
+    request.on("end", () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch {
+        resolve({});
+      }
+    });
+  });
+}
+
 function d1Json(sql) {
   const out = execFileSync(
     process.execPath,
@@ -270,6 +336,18 @@ function startAdminServer() {
       } catch (error) {
         send(500, { ok: false, error: error?.message ?? String(error) });
       }
+      return;
+    }
+    if (request.method === "POST" && request.url === "/__e2e/fill-sync") {
+      void (async () => {
+        try {
+          const body = await readBody(request);
+          const filled = fillSyncRows(String(body.kind || "entities"), Number(body.count || 0));
+          send(200, { ok: true, filled, kind: body.kind === "tombstones" ? "tombstones" : "entities" });
+        } catch (error) {
+          send(500, { ok: false, error: error?.message ?? String(error) });
+        }
+      })();
       return;
     }
     if (request.method === "POST" && request.url === "/__e2e/reset-sync") {

@@ -564,3 +564,40 @@ test.describe("Phase 4 云同步：双设备同步 / 冲突 / 墓碑", () => {
     });
   });
 });
+
+test.describe("P1-2 · 配额 409（真实造数）", () => {
+  test("实体 5000 / 墓碑 2000 触发 QUOTA_EXCEEDED，并在 finally 清理", async ({ browser }) => {
+    const fx = await waitForFixtures("complete");
+    const actor = await newSyncDevice(browser, fx, "installer");
+    const admin = (path: string, data?: unknown) =>
+      actor.context.request.post(new URL(path, fx.adminUrl).toString(), data ? { data } : {});
+
+    try {
+      await admin("/__e2e/reset-sync");
+      expect((await admin("/__e2e/fill-sync", { kind: "entities", count: 5000 })).status()).toBe(200);
+
+      const over = await syncPush(actor, "notes", [
+        { id: "quota-e2e-entity", baseRevision: 0, updatedAt: Date.now(), payload: { title: "x" } },
+      ]);
+      expectError(over, 409, "QUOTA_EXCEEDED", "实体配额");
+      expect(over.body?.error?.details?.limit).toBe(5000);
+
+      await admin("/__e2e/reset-sync");
+      // 墓碑数取自 sync_entities.deleted = 1；先建一条真实实体，再删它才有增量
+      const created = await syncPush(actor, "notes", [
+        { id: "quota-e2e-tomb", baseRevision: 0, updatedAt: Date.now(), payload: { title: "tomb" } },
+      ]);
+      expect(created.status, "创建待删实体失败").toBe(200);
+      expect((await admin("/__e2e/fill-sync", { kind: "tombstones", count: 2000 })).status()).toBe(200);
+
+      const del = await syncPush(actor, "notes", [
+        { id: "quota-e2e-tomb", baseRevision: 1, updatedAt: Date.now(), deleted: true },
+      ]);
+      expectError(del, 409, "QUOTA_EXCEEDED", "墓碑配额");
+      expect(del.body?.error?.details?.scope).toBe("tombstones");
+    } finally {
+      await admin("/__e2e/reset-sync");
+      await actor.context.close();
+    }
+  });
+});
