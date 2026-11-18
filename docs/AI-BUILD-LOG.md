@@ -277,3 +277,15 @@
 - `openPostFromEventImpl`（interactions.ts:414）先做 `closest("button,a,input,textarea,select,[data-action]")`
   守卫，再找 `closest("[data-post]")`；卡片是 `<article data-post>`，理论上应命中，需断点确认。
 - 记为 BACKLOG P1-8（Open）。影响「从搜索打开作品」主路径，优先级高于继续铺测试。
+
+---
+
+## 2026-11-18 · Round 17 · P1-8 定位到第一层原因（引导浮层）
+
+- 探针（document 捕获）记录到点击真实落点是 `aside.os20-onb-rail`——首次引导浮层覆盖全屏，
+  不是产品逻辑问题。此前「搜索卡片点不开」实为引导遮挡。
+- 关掉引导后，点击能落到卡片 `h3`（`data-post` 命中、守卫未拦截），说明事件链前半段正常；
+  但详情仍未渲染、`[data-cx-body]` 内容不变，剩余问题更窄（怀疑 init 捕获的 body/root 引用失效，
+  或 click 分支提前 return）。
+- 结论修正：P1-8 由「产品缺陷」降为「测试未关引导 + 一个待查的窄问题」，BACKLOG 已更新。
+- 探针已删除，配置已还原。

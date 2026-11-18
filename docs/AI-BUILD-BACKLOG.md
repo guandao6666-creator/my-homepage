@@ -61,4 +61,4 @@
 
 | ID | 事项 | 状态 | 依据 | 修复方向 |
 | --- | --- | --- | --- | --- |
-| P1-8 | 社区搜索结果卡片点击无效 | **`Open`（待修）** | 真实 Worker 页面：搜索命中后点卡片，页面仍停在结果列表（`.cx-panel` 为 0）；DOM click 与真实 click（含 force）都无效。已排除 checksum（服务端 `checksum` 与 `sha256(packageJson)` 一致） | 在浏览器断点确认 `openPostFromEventImpl`（interactions.ts:414）的 `closest("button,a,…")` 守卫是否误伤，或 click 委托未绑到搜索结果容器 |
+| P1-8 | 社区搜索结果卡片点击无效 | **`Partially Verified`（诊断推进）** | 已定位第一层原因：**首次引导浮层** `aside.os20-onb-rail` 覆盖全屏吃掉点击（探针记录 target 即该元素）。关掉引导后点击能落到卡片 `h3`（`data-post` 命中、守卫未拦截），但详情仍未渲染、`[data-cx-body]` 内容不变 | 剩余问题更窄：怀疑 init 时捕获的 `body`/`root` 引用在深度链接重挂后失效，或 click 分支提前 return；需一次专注调试 |
