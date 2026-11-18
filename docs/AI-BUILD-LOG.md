@@ -301,3 +301,14 @@
   首次运行即命中两处真实问题：BACKLOG P2-6 重复、ACCEPTANCE:174 未标历史。
 - 两处已修；`npm run check:docs` 通过；`npm run verify` exit 0。
 - 未做：G2 社区生产发布链脚本；H 生产 runbook。
+
+---
+
+## 2026-11-18 · Round 19 · G2 + 生产社区发布链（P0-2 已验证）
+
+- 新增 `scripts/prod-community-qa.mjs`：真实生产建号 → 草稿 → 发布 → 审核 → 检索 → 拉包校验 → 清理。
+- 实跑结果（https://guandao.xin）：9/9 通过，`{"users":0,"posts":0,"sessions":0}` 清理归零。
+- **事故记录**：第一次调用时脚本没有 `--help` 分支，我以 `--help` 试运行，脚本直接进入生产流程，
+  写入了 2 个 qa-prod 用户、1 条作品、2 个会话。已立即按 `qa-prod-%` 前缀删除，复核 users/posts/
+  sessions/profiles/packages 均为 0，未触碰任何非 qa 行。随后补了 `--help` 保护并重新实跑成功。
+- 结论：P0-2 记 Verified（生产）。P0-1（部署 + 迁移）仍未做。
