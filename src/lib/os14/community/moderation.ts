@@ -24,8 +24,19 @@ export const loadModerationImpl = async (ctx: CommunityContext) => {
     ctx.setBody(skeleton("正在读取审核数据…"));
     try {
       await ctx.ensureMeta();
+      const tabItems: Array<[string, string]> = [
+        ["queue", "作品审核"],
+        ["reports", "举报处理"],
+        ["users", "用户管理"],
+        ["settings", "社区设置"],
+        ["audit", "审计日志"],
+      ];
+      // 邀请注册只在邀请制下出现；开放注册不需要邀请码，直接隐藏整个入口。
+      if (ctx.getMeta()?.registrationMode === "invite") {
+        tabItems.splice(4, 0, ["invites", "邀请注册"]);
+      }
       const tabs = `<div class="cx-tabs">
-        ${([["queue", "作品审核"], ["reports", "举报处理"], ["users", "用户管理"], ["settings", "社区设置"], ["invites", "邀请注册"], ["audit", "审计日志"]] as const)
+        ${tabItems
           .map(([id, label]) => `<button type="button" class="${moderationTab === id ? "is-active" : ""}" data-mod-tab="${id}">${label}</button>`)
           .join("")}
       </div>`;
@@ -143,8 +154,8 @@ export const loadModerationImpl = async (ctx: CommunityContext) => {
                 <label>社区名称<input class="cx-input" name="communityName" maxlength="60" value="${esc(String(raw.communityName || ""))}" ${ctx.isAdmin() ? "" : "disabled"}/></label>
                 <label>注册模式<select class="cx-input" name="registrationMode" ${ctx.isAdmin() ? "" : "disabled"}>
                   <option value="closed" ${raw.registrationMode === "closed" ? "selected" : ""}>关闭注册</option>
-                  <option value="invite" ${raw.registrationMode === "invite" ? "selected" : ""}>邀请制</option>
-                  <option value="open" ${raw.registrationMode === "open" ? "selected" : ""}>开放注册</option>
+                  ${raw.registrationMode === "invite" ? `<option value="invite" selected>邀请制（旧）</option>` : ""}
+                  <option value="open" ${raw.registrationMode === "open" ? "selected" : ""}>开放注册（GitHub 直接加入）</option>
                 </select></label>
                 <label class="is-wide">社区公告<textarea class="cx-input" name="announcement" rows="3" maxlength="600" ${ctx.isAdmin() ? "" : "disabled"}>${esc(String(raw.announcement || ""))}</textarea></label>
                 <label class="cx-check"><input type="checkbox" name="requireReview" ${raw.requireReview ? "checked" : ""} ${ctx.isAdmin() ? "" : "disabled"}/> 发布需要人工审核</label>
@@ -168,6 +179,13 @@ export const loadModerationImpl = async (ctx: CommunityContext) => {
           </form>
         `);
       } else if (moderationTab === "invites") {
+        if (ctx.getMeta()?.registrationMode !== "invite") {
+          ctx.setBody(`
+            <section class="cx-page-head"><div><p class="cx-eyebrow">Invites</p><h1>审核中心</h1><p>当前为开放注册，任何 GitHub 账号都可以直接加入，不需要邀请码。</p></div></section>
+            ${tabs}
+          `);
+          return;
+        }
         const result = await api.adminGetInvites();
         if (ctx.isStale(token)) return;
         ctx.setBody(`
