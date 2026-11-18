@@ -77,6 +77,11 @@
    是入口体积与可维护性的主要结构性债务，需 Core Settings API 才能干净拆分。
 4. **页面级插件安装**未并入 Playwright（仅本地证据脚本）。
 5. 本地并发跑 Playwright 与 verify 会共享 `.wrangler/state` 本地 D1，互相干扰。
+6. **CSP 哈希与 dist 必须一起更新**：改动内联脚本后 `wrangler/api/csp-hashes.js` 会变；
+   若只重建 dist 却回滚该文件，页面会被 CSP 拦掉、`window.GOS20` 不出现，E2E 大面积超时
+   （2026-11-18 复现两次）。
+7. 仓库中的 `src/**` 存在 CRLF/LF 抖动：构建/格式化后会显示为已修改，`git checkout` 即恢复，
+   不要误提交。
 6. `sandbox-origin.spec.ts` 在全量并发下有偶发失败（2 次全量中 1 次 `origin !== "null"`），
    单独复跑稳定通过；已记录为抖动，未修改断言。
 
