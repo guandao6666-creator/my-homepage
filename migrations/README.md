@@ -20,7 +20,27 @@ migrations/
   0011_continuity.sql        设备配对、接力内容、设备上下文与跨设备剪贴板
   0012_indexes.sql           1.9 热点查询索引
   0013_index_fixes.sql       2.0 索引名冲突修正 + 备份分页索引
+  0014_sync.sql              跨设备同步实体与变更流
+  0015_data_monitor.sql      数据用量监控
+  0016_d1_backup.sql         D1 备份运行记录
+  0017_plugin_signatures.sql 发布者密钥、插件版本签名
+  0018_sync_cloud_expansion.sql  5 数据域 + 墓碑台账 + 清理日志
+  0019_last_admin_guard.sql  库级触发器：最后一名管理员不可删除 / 降级 / 禁用
 ```
+
+### 管理员账号换绑
+
+`idx_users_single_admin` 是全库唯一的管理员约束，0019 的两个触发器又禁止删除或
+降级最后一名活跃管理员，所以管理员账号不能直接改。确实需要换绑时，按顺序执行：
+
+```sql
+DROP TRIGGER IF EXISTS trg_users_last_admin_delete;
+DROP TRIGGER IF EXISTS trg_users_last_admin_update;
+-- 此时再删除 / 降级旧管理员，并提升新账号
+```
+
+换绑完成后重新执行 `migrations/0019_last_admin_guard.sql` 里的两条 `CREATE TRIGGER`。
+操作前先 `wrangler d1 export` 一份快照。
 
 - 文件名必须符合 `^[0-9]{4}_[a-z0-9_]+\.sql$`，Wrangler 按编号顺序执行；
 - 已执行过的迁移**不可修改**，需要改结构就新增一条；
