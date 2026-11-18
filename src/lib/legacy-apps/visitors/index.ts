@@ -172,6 +172,7 @@ export const visitorsApp: LegacyAppModule = {
 
         const up = await fetchWithTimeout(`${sb!.url}/storage/v1/object/visitors/${key}`, {
           method: "POST",
+          signal: ac.signal,
           headers: {
             apikey: sb!.key!,
             Authorization: `Bearer ${sb!.key}`,
@@ -186,6 +187,7 @@ export const visitorsApp: LegacyAppModule = {
 
         const ins = await fetchWithTimeout(`${sb!.url}/rest/v1/visitor_avatars`, {
           method: "POST",
+          signal: ac.signal,
           headers: {
             apikey: sb!.key!,
             Authorization: `Bearer ${sb!.key}`,

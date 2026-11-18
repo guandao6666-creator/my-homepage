@@ -238,6 +238,7 @@ export const socialApp: LegacyAppModule = {
           `${sb!.url}/rest/v1/profiles?on_conflict=id`,
           {
             method: "POST",
+            signal: ac.signal,
             headers: headers({
               "Content-Type": "application/json",
               Prefer: "resolution=merge-duplicates,return=minimal",
@@ -283,7 +284,7 @@ export const socialApp: LegacyAppModule = {
         if (on) {
           await fetchWithTimeout(
             `${sb!.url}/rest/v1/follows?from_id=eq.${encodeURIComponent(session ? session.uid : "")}&to_id=eq.${encodeURIComponent(toId)}`,
-            { method: "DELETE", headers: headers({ Prefer: "return=minimal" }) },
+            { method: "DELETE", headers: headers({ Prefer: "return=minimal" }), signal: ac.signal },
             8000,
           );
         } else {
@@ -291,6 +292,7 @@ export const socialApp: LegacyAppModule = {
             `${sb!.url}/rest/v1/follows`,
             {
               method: "POST",
+            signal: ac.signal,
               headers: headers({ "Content-Type": "application/json", Prefer: "return=minimal" }),
               body: JSON.stringify({ from_id: session ? session.uid : "", to_id: toId }),
             },

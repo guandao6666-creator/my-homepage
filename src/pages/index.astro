@@ -1704,6 +1704,19 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
          * Supabase 的 access_token 默认 1 小时过期，过期后写操作会被 RLS 拒掉，
          * 表现就是「点了投票但没投上」。这里在快过期前用 refresh_token 换新的。
          */
+        /**
+         * P1-3：多个窗口同时发现 token 过期时，只发一次 refresh。
+         * 全局凭据不接窗口 signal——取消一个窗口不该取消共享刷新。
+         */
+        let refreshInFlight: Promise<string | null> | null = null;
+        const sharedRefresh = (fn: () => Promise<string | null>): Promise<string | null> => {
+          if (refreshInFlight) return refreshInFlight;
+          refreshInFlight = fn().finally(() => {
+            refreshInFlight = null;
+          });
+          return refreshInFlight;
+        };
+
         const ensureFreshToken = async (): Promise<string | null> => {
           const cur = readAuth();
           if (!cur) return null;
@@ -1849,7 +1862,7 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
           auth: {
             formHtml: () => authFormHtml(),
             read: () => readAuth(),
-            ensureFreshToken: () => ensureFreshToken(),
+            ensureFreshToken: () => sharedRefresh(ensureFreshToken),
             signOut: () => writeAuth(null),
             onChange: (win, handler) => legacyWindowLifecycle.onGlobal(win, "guandao:auth-change", handler),
           },

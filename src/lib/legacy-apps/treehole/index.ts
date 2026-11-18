@@ -259,6 +259,7 @@ export const treeholeApp: LegacyAppModule = {
           `${sb!.url}/rest/v1/holes`,
           {
             method: "POST",
+          signal: ac.signal,
             headers: {
               apikey: sb!.key!,
               Authorization: `Bearer ${token}`,
@@ -333,6 +334,7 @@ export const treeholeApp: LegacyAppModule = {
           `${sb!.url}/rest/v1/hole_replies`,
           {
             method: "POST",
+          signal: ac.signal,
             headers: {
               apikey: sb!.key!,
               Authorization: `Bearer ${token}`,

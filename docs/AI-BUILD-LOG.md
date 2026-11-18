@@ -200,3 +200,14 @@
 - 单测：`legacy-net.test.ts` 5 项 + lifecycle abort 1 项，合计 23 passed。
 - E2E：快速开关 visitors/social/treehole/council/rank，无页面错误（1 passed）。
 - 未做：写请求 6 处、外壳自有 5 处、token 刷新单飞（B 批）。
+
+---
+
+## 2026-11-18 · Round 10 · P1-3/b 写请求 + token 单飞
+
+- 写请求 6 处接入 `signal`：visitors×2、social×3、treehole×2、council（投票）；
+  council 的 `.catch` 先判 `isAbortError`，取消时既不回滚本地投票也不提示失败。
+- `ensureFreshToken` 外层加 `sharedRefresh` 单飞：并发窗口只发一次 refresh，全局凭据不接窗口 signal。
+- 外壳 5 处自有 fetch 已在 A 批随统一实现生效。
+- 门禁：verify exit 0（20 文件 / 366 单测、293 处安全全审查、CSP 12-30）；legacy E2E 26 passed。
+- P1-3 记 `Verified（本地）`。剩余：批次 C–I。

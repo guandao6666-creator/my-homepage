@@ -69,6 +69,9 @@ export const councilApp: LegacyAppModule = {
     const retryBtn = win.querySelector<HTMLButtonElement>("#council-retry");
     if (!list || !status) return;
 
+    // P1-3：窗口关闭时取消在途请求
+    const ac = lifecycle.abortController(win);
+
     const sb = data.supabase as { url?: string; key?: string } | undefined;
     const ready = Boolean(sb?.url && sb?.key);
 
@@ -195,6 +198,7 @@ export const councilApp: LegacyAppModule = {
         `${sb!.url}/rest/v1/votes`,
         {
           method: "POST",
+          signal: ac.signal,
           headers: {
             apikey: sb!.key!,
             Authorization: `Bearer ${token}`,
@@ -208,7 +212,9 @@ export const councilApp: LegacyAppModule = {
         .then((res) => {
           if (!res.ok && res.status !== 409) throw new Error(String(res.status));
         })
-        .catch(() => {
+        .catch((error) => {
+          // 关窗取消：既不改本地投票记录，也不提示失败
+          if (isAbortError(error)) return;
           // 没提交成功就撤销这票，让人还能重投
           delete mine[pollId];
           writeCouncilMine(current.uid, mine);

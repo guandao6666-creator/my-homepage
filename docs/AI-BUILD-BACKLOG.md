@@ -16,7 +16,7 @@
 | --- | --- | --- | --- | --- |
 | P1-1 | 页面级插件安装并入 Playwright | **`Verified`（本地）**：发布链用例内新增真实桌面安装步骤（市场卡片 → 安装 → 权限确认 → 按钮变「打开」→ 卸载还原） | 已完成 | 不再依赖 `.shots/_p5-page-install-evidence2.mjs` 手工脚本 |
 | P1-2 | `initRank` 关窗后仍写 DOM | **`Verified`（本地）**：请求返回后先判 `win.isConnected`，关窗即停止写入；单测覆盖 | 已完成 | 新增单测「窗口已关闭时请求返回后不再写 DOM」 |
-| P1-3 | legacy 网络请求取消 port | **`Partially Verified`**：port + 只读 8 处已接入（A 批）；写请求 6 处与 token 单飞待做（B 批） | 已完成 A | `AbortController` 随 `lifecycle.dispose` 触发；单测 23 项覆盖 |
+| P1-3 | legacy 网络请求取消 port | **`Verified`（本地）**：port + 只读 8 处 + 写请求 6 处全部接入；token 刷新单飞；外壳 fetch 统一实现 | 已完成 | 单测 23 项；E2E 26 passed（含关窗回归） |
 
 ## P2 · 性能与可观测（当前阶段）
 
