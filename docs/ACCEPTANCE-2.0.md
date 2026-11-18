@@ -313,13 +313,13 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | --- | --- | --- | --- |
 | 6.1 入口 JS | ≤ 450 KB | **482,939 B**（改造前 525,102 B） | **部分完成**：16 个旧版应用实现移出入口，应用分块 76,003 B / 18 文件按需下载；剩余 33 KB |
 | 6.2 首屏 CSS | ≤ 200 KB | 273,238 B | `Not Started` |
-| 6.3 诊断中心真实 LCP/CLS/INP | 真实数值；无数据显示「未采集」 | 采集器 `observeVitals` 已实现，仅性能实验室内部启动；诊断中心无该区块 | `Not Started` |
+| 6.3 诊断中心真实 LCP/CLS/INP | 真实数值；无数据显示「未采集」 | 新增「指标」分区：`observeVitals`（buffered）回溯本次加载的 LCP/CLS/FCP/TTFB，INP 只统计开窗后交互；无数据「未采集」、不支持「不支持」 | **通过（本地）** |
 | 6.4 生产性能基线进发布报告 | 每次发布记录 DCL/load/资源体积 | 未接入 | `Not Started`（需生产授权） |
 | 不伪造指标 | 禁止静态假数字 | 现有页面未出现伪造数值 | 维持 |
 
 **6.1 本轮证据**：单测 19 文件 / 359 passed（legacy-apps 16 项）；目标 E2E 27 passed；
 全量 E2E **171 passed (4.2m)**；build exit 0 / CSP 12 哈希 30 HTML 一致。
 
-**Phase 6 整体：`Partially Verified`（仅 6.1 的旧应用部分）。** 入口与首屏 CSS 均未达预算，
+**Phase 6 整体：`Partially Verified`（6.1 旧应用部分 + 6.3）。** 入口与首屏 CSS 均未达预算，
 不得在阶段结论里写 `Verified`。
 

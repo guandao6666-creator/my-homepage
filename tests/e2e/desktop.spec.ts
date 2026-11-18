@@ -173,4 +173,32 @@ test.describe("桌面外壳", () => {
     // 真实计数：应用数量与窗口数量都应该是数字
     await expect(win.locator(".g19-card").filter({ hasText: "应用 / 窗口" })).toContainText(/\d+ \/ \d+/);
   });
+
+  test("诊断中心「指标」只有真实 Web Vitals：无数据写未采集，不写占位值", async ({ page }) => {
+    await bootDesktop(page);
+    await page.locator('[data-menu-btn="apps"]').click();
+    await page.locator('[data-menu-panel="apps"] [data-menu-action="diagnostics"]').click();
+    const win = page.locator('.window[data-app="diagnostics"]');
+    await expect(win).toBeVisible();
+
+    await win.locator('.g14-nav[data-tab="vitals"]').click();
+    await expect(win).toContainText("Web Vitals");
+    await expect(win).toContainText("仅保存在本机");
+
+    // 五个指标行都在
+    for (const label of ["LCP", "CLS", "INP", "FCP", "TTFB"]) {
+      await expect(win.locator(".g19-health-name b").filter({ hasText: label })).toHaveCount(1);
+    }
+
+    // TTFB 在导航完成后必然存在，必须是真实毫秒数（这是「不是占位」的证据）
+    const ttfb = win.locator(".g19-health-row").filter({ hasText: "TTFB" }).locator(".g19-health-state");
+    await expect(ttfb).toHaveText(/\d+ ms/);
+
+    // 每个状态只能是：真实数值 / 真实评分 / 未采集 / 不支持，不允许出现破折号之类的占位
+    const states = await win.locator(".g19-health-state").allInnerTexts();
+    expect(states.length).toBe(5);
+    for (const state of states) {
+      expect(state.trim()).toMatch(/^(\d+(\.\d+)? ms|\d\.\d{3}|未采集|不支持|良好|待改善|较差|未定级)$/);
+    }
+  });
 });

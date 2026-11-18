@@ -964,6 +964,39 @@ GitHub Actions quality 全绿（run [43588486049](https://github.com/guandao6666
 
 **结论：6.1 `Partially Verified`（本地 / CI 层）。**
 
+### 16.21 Phase 6.3 · 诊断中心接入真实 Web Vitals（2026-11-18）
+
+**1. 目标与范围**
+
+诊断中心展示真实 LCP / CLS / INP（另含 FCP / TTFB），无数据显示「未采集」，浏览器不支持显示「不支持」；
+不新增第三方依赖、不接入任何上报端点、不改动采集算法。
+
+**2. 交付**
+
+- `src/lib/quality/diagnostics.ts`：新增第五个分区「指标」。`ensureVitals()` 首次进入该分区才启动
+  `observeVitals()`（页面级、只启动一次）；`buffered: true` 可回溯本次页面加载已产生的指标；
+  INP 只统计开窗后的交互；指标更新按 500ms 合帧重绘，窗口关闭断开引用但保留已采集数据。
+- 分区复用既有 `g19-health` / `toneBadge` 样式，未新增 CSS。
+- `scripts/html-security-allowlist.json`：登记新增的 1 处 `innerHTML`（合帧重绘），
+  诊断文件 sink 计数 1 → 2，理由写明输入只来自常量与实测数值。
+- `tests/e2e/desktop.spec.ts`：新增「诊断中心『指标』只有真实 Web Vitals」用例。
+
+**3. 实测**
+
+| 项 | 结果 |
+| --- | --- |
+| 新增用例 | 1 passed（TTFB 断言为真实毫秒数；状态只允许真实值/未采集/不支持/评分） |
+| `npm run verify` | **exit 0**：19 文件 / 359 单测；HTML 安全 **292 处 / 未审查 0**；build 29 页；CSP 12/30 |
+| 全量 E2E | **172 passed（5.1m）**，exit 0 |
+
+**4. 未完成**
+
+- 指标未持久化：当前仅存内存，刷新后 INP 重置（LCP/CLS/FCP/TTFB 可 buffered 回溯）。
+  是否落盘留给 6.4 与性能历史一起评估。
+- 诊断中心侧栏高亮仍固定第一项（既有问题，与本轮无关，已记入 BACKLOG）。
+
+**结论：6.3 `Verified`（本地 / CI 层）。**
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash

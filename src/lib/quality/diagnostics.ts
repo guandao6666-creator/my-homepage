@@ -17,7 +17,7 @@ import { badge, bindTabs, emptyState, escapeHtml, fmtAgo, fmtBytes, fmtDateTime,
 import { clearDiagnostics, diagnosticStats, exportDiagnostics, listDiagnostics, type DiagEntry } from "./errors";
 import { connectivitySnapshot, subscribeConnectivity } from "./connectivity";
 import { request, explainError, NetError } from "./net";
-import { readNavigation, readMemory } from "./perf";
+import { observeVitals, readNavigation, readMemory, supportedMetrics, type VitalsName, type VitalsObserver } from "./perf";
 import { resourceStats } from "./resources";
 
 const VERSION = "1.9.0";
@@ -235,6 +235,97 @@ function serviceRow(id: string, label: string, status: string | undefined, laten
 /* ============================================================
    视图
    ============================================================ */
+
+/* ============================================================
+   Web Vitals（真实采集，仅本机，不上报）
+   ============================================================ */
+
+/**
+ * 指标行的展示口径。
+ *
+ * 数值只来自 `observeVitals()` 的 PerformanceObserver 实测：
+ * 未产生该指标就显示「未采集」，浏览器不支持就显示「不支持」。
+ * 这里**不允许**出现任何静态默认值，否则就是伪造指标。
+ */
+const VITAL_ROWS: Array<{ name: VitalsName; label: string; budget: string }> = [
+  { name: "LCP", label: "LCP · 最大内容绘制", budget: "≤ 2.5 s" },
+  { name: "CLS", label: "CLS · 累积布局偏移", budget: "≤ 0.1" },
+  { name: "INP", label: "INP · 交互响应", budget: "≤ 200 ms" },
+  { name: "FCP", label: "FCP · 首次内容绘制", budget: "≤ 1.8 s" },
+  { name: "TTFB", label: "TTFB · 首字节", budget: "≤ 800 ms" },
+];
+
+const RATING_LABEL: Record<string, { text: string; tone: Tone }> = {
+  good: { text: "良好", tone: "ok" },
+  "needs-improvement": { text: "待改善", tone: "warn" },
+  poor: { text: "较差", tone: "danger" },
+  unknown: { text: "未定级", tone: "mute" },
+};
+
+let vitalsObserver: VitalsObserver | null = null;
+let vitalsWin: HTMLElement | null = null;
+let vitalsTimer = 0;
+
+/**
+ * 启动页面级观察器（只启动一次）。
+ *
+ * 放在这里而不是启动流程里：指标只在用户打开诊断中心时才需要，
+ * 不值得为每个访客常驻一个 observer。`buffered: true` 能回溯本次页面加载
+ * 已产生的 LCP / CLS / FCP / TTFB，因此晚开窗口也能拿到真实值。
+ * INP 只能观察开窗之后的交互——没有交互就显示「未采集」，不编造。
+ */
+const ensureVitals = (): VitalsObserver => {
+  if (vitalsObserver) return vitalsObserver;
+  vitalsObserver = observeVitals(() => {
+    if (tab !== "vitals" || !vitalsWin?.isConnected || vitalsTimer) return;
+    // 500ms 合帧：CLS 可能在短时间内连续上报多次
+    vitalsTimer = window.setTimeout(() => {
+      vitalsTimer = 0;
+      if (tab !== "vitals" || !vitalsWin?.isConnected) return;
+      const main = vitalsWin.querySelector<HTMLElement>(".g14-main");
+      if (main) main.innerHTML = vitalsView();
+    }, 500);
+  });
+  return vitalsObserver;
+};
+
+function vitalsView(): string {
+  const metrics = new Map(ensureVitals().metrics().map((metric) => [metric.name, metric]));
+  const supported = supportedMetrics();
+  const rows = VITAL_ROWS.map((row) => {
+    const metric = metrics.get(row.name);
+    if (!supported[row.name]) {
+      return { label: row.label, budget: row.budget, value: "不支持", detail: "当前浏览器没有该指标的 PerformanceEntry", tone: "mute" as Tone };
+    }
+    if (!metric) {
+      return { label: row.label, budget: row.budget, value: "未采集", detail: "本次页面加载还没有产生该指标", tone: "mute" as Tone };
+    }
+    const rating = RATING_LABEL[metric.rating] ?? RATING_LABEL.unknown;
+    const value = metric.unit === "score" ? metric.value.toFixed(3) : `${metric.value} ms`;
+    return { label: row.label, budget: row.budget, value, detail: `预算 ${row.budget} · ${rating.text}`, tone: rating.tone };
+  });
+
+  return `
+    <div class="g14-scroll">
+      <div class="g14-pane-head">
+        <h3>Web Vitals</h3>
+        <p>来自浏览器 <code>PerformanceObserver</code> 的真实测量，仅保存在本机，不上报任何服务器。</p>
+      </div>
+      <div class="g19-health">${rows
+        .map(
+          (row) => `
+        <div class="g19-health-row">
+          <div class="g19-health-name"><b>${escapeHtml(row.label)}</b><span>${escapeHtml(row.detail)}</span></div>
+          <div class="g19-health-state">${toneBadge(row.tone, row.value)}</div>
+        </div>`,
+        )
+        .join("")}</div>
+      <p class="g19-note">
+        说明：LCP / CLS / FCP / TTFB 在打开本窗口时回溯本次页面加载；INP 只统计打开之后的交互，
+        没有交互时显示「未采集」。数值不会因为刷新界面而被重置。
+      </p>
+    </div>`;
+}
 
 function healthView(): string {
   const rows = health ? [health.frontend, health.api, health.d1, health.r2, health.session, health.sync, health.backup, health.plugins] : [];
@@ -572,20 +663,31 @@ export const renderDiagnostics = (): string =>
     "diagnostics",
     [
       ["health", "系统状态", "◍"],
+      ["vitals", "指标", "◈"],
       ["diag", "诊断记录", "▤"],
       ["check", "自检", "✓"],
       ["logs", "日志与隐私", "⌘"],
     ],
-    tab === "diag" ? diagnosticsView() : tab === "check" ? selfCheckView() : tab === "logs" ? logsView() : healthView(),
+    currentView(),
     "System Diagnostics",
   );
 
 function currentView(): string {
-  return tab === "diag" ? diagnosticsView() : tab === "check" ? selfCheckView() : tab === "logs" ? logsView() : healthView();
+  return tab === "vitals"
+    ? vitalsView()
+    : tab === "diag"
+      ? diagnosticsView()
+      : tab === "check"
+        ? selfCheckView()
+        : tab === "logs"
+          ? logsView()
+          : healthView();
 }
 
 export const initDiagnostics = (win: HTMLElement, ctx: Ctx): (() => void) => {
   ctxRef = ctx;
+  vitalsWin = win;
+  if (tab === "vitals") ensureVitals();
 
   // 插件注册表按需加载：避免诊断应用把整个插件系统拉进主包
   void import("../plugins/registry")
@@ -606,6 +708,8 @@ export const initDiagnostics = (win: HTMLElement, ctx: Ctx): (() => void) => {
     tab = next || "health";
     rerender();
     if (tab === "health" && !health) void refreshHealth();
+    // 首次进入「指标」才启动观察器（页面级，只启动一次）
+    if (tab === "vitals") ensureVitals();
   });
 
   const refreshHealth = async () => {
@@ -667,6 +771,12 @@ export const initDiagnostics = (win: HTMLElement, ctx: Ctx): (() => void) => {
   return () => {
     unsubscribeSync?.();
     unsubscribeSync = null;
+    // 观察器是页面级的，保留已采集的数据；只断开窗口引用与待触发的重绘
+    if (vitalsTimer) {
+      window.clearTimeout(vitalsTimer);
+      vitalsTimer = 0;
+    }
+    vitalsWin = null;
   };
 };
 

@@ -29,7 +29,7 @@
 | `npm run test:unit` | **19 文件 / 359 单测通过** |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 291 处全审查、0 未审查） |
-| `npm run build` | exit 0，29 页；CSP 12 哈希 / 30 HTML 一致 |
+| `npm run build` | exit 0，29 页；CSP 12 哈希 / 30 HTML 一致；HTML 安全 292 处全审查、0 未审查 |
 | `npx playwright test`（`E2E_ADMIN_PORT=18789`） | 见 §4（本轮全量结果） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
@@ -41,7 +41,7 @@
 | --- | --- | --- |
 | 6.1 入口 JS ≤ 450 KB | **部分完成**：525,102 B → 482,939 B（−42 KB）；剩余 +33 KB | `docs/architecture/LEGACY-APPLICATIONS.md` §9.1 |
 | 6.2 首屏 CSS ≤ 200 KB | `Not Started`：273,238 B | 需要「非首屏样式延迟加载」审计 |
-| 6.3 诊断中心接入真实 LCP/CLS/INP | `Not Started`：`observeVitals` 已实现，但只在性能实验室（perflab）内启动，诊断中心无该区块 | `src/lib/quality/perf.ts:85`、`perflab.ts:445` |
+| 6.3 诊断中心接入真实 LCP/CLS/INP | **`Verified`（本地）**：新增「指标」分区，`observeVitals`（buffered）在本机采集，无数据显示「未采集」、不支持显示「不支持」 | `src/lib/quality/diagnostics.ts`、`tests/e2e/desktop.spec.ts` |
 | 6.4 生产性能基线进发布报告 | `Not Started` | `scripts/prod-e2e.mjs` |
 
 ### 3.1 入口包剩余体积归因（sourcemap 实测，2026-11-18）
@@ -66,7 +66,7 @@
 | 项 | 结果 |
 | --- | --- |
 | 目标 spec（`legacy-apps` + `lifecycle`） | **27 passed**（2.4m），含「连续开关 20 次监听器不增长」 |
-| 全量 E2E | **171 passed（4.2m），exit 0**：chromium 80 + worker 67 + firefox 12 + webkit 12 |
+| 全量 E2E | **172 passed（5.1m），exit 0**（新增诊断中心「指标」用例） |
 
 ## 5. 重大风险（未关闭）
 
