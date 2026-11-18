@@ -1,0 +1,208 @@
+/* ============================================================
+   桌面互动：像素桌宠「小管」、装饰物、点击涟漪与彩纸
+
+   这些元素在桌面初始化时就会出现，必须跟首屏样式一起加载。
+   6.2 把游戏样式改成按需加载时它们被留在 os14-games.css，
+   结果没打开游乐场时桌宠没有任何尺寸约束，SVG 被撑到整个视口。
+   ============================================================ */
+
+/* ---------------- 桌面互动 ---------------- */
+
+.pet14 {
+  position: absolute;
+  /* 低于组件与窗口：即使走到右栏也是从卡片后面经过，不会挡住点击 */
+  z-index: 1;
+  width: 64px;
+  height: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+  transform-origin: bottom center;
+  will-change: left, top;
+}
+.pet14[hidden] {
+  display: none;
+}
+.pet14.is-holding {
+  cursor: grabbing;
+}
+.pet14-sprite {
+  display: block;
+  width: 64px;
+  height: 64px;
+  transform: scale(var(--pet-scale, 1)) scaleX(var(--pet-flip, 1));
+  animation: pet14-bob 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+.pet14[data-dir="left"] .pet14-sprite {
+  --pet-flip: -1;
+}
+.pet14-sprite svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pet14[data-mood="happy"] .pet14-sprite {
+  animation: pet14-hop 0.5s var(--os-ease-spring) 2;
+}
+.pet14-name {
+  margin-top: -4px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(10, 12, 20, 0.45);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 8.5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pet14-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 4px);
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--g-card-2);
+  border: 1px solid var(--g-line-2);
+  color: var(--g-text);
+  font-size: 9.5px;
+  white-space: nowrap;
+  box-shadow: var(--g-shadow);
+  pointer-events: none;
+  animation: pet14-bubble 0.18s var(--os-ease);
+  z-index: 2;
+}
+.pet14-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  background: var(--g-card-2);
+  border-right: 1px solid var(--g-line-2);
+  border-bottom: 1px solid var(--g-line-2);
+  transform: rotate(45deg);
+}
+.pet14-heart {
+  position: absolute;
+  top: 8px;
+  color: #ff9ec2;
+  font-size: 11px;
+  pointer-events: none;
+  animation: pet14-heart 1.2s ease-out forwards;
+}
+.pet14-mini {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 72%, #6ee7c8 0 40%, transparent 42%),
+    radial-gradient(circle at 42% 46%, #123 0 4%, transparent 5%),
+    radial-gradient(circle at 58% 46%, #123 0 4%, transparent 5%);
+}
+@keyframes pet14-bob {
+  50% {
+    transform: scale(var(--pet-scale, 1)) scaleX(var(--pet-flip, 1)) translateY(-3px);
+  }
+}
+@keyframes pet14-hop {
+  40% {
+    transform: scale(var(--pet-scale, 1)) scaleX(var(--pet-flip, 1)) translateY(-12px) rotate(-4deg);
+  }
+}
+@keyframes pet14-bubble {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+}
+@keyframes pet14-heart {
+  to {
+    opacity: 0;
+    transform: translateY(-26px) scale(1.2);
+  }
+}
+
+.deco14 {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 22px;
+  cursor: grab;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.4));
+  transition: transform 0.2s var(--os-ease-spring);
+}
+.deco14:hover {
+  transform: translateY(-2px) scale(1.08);
+}
+.deco14.is-drag {
+  cursor: grabbing;
+  transform: scale(1.12);
+}
+
+.desk-ripple {
+  position: absolute;
+  z-index: 2;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  animation: desk-ripple 0.7s var(--os-ease) forwards;
+}
+body[data-os-theme="light"] .desk-ripple {
+  border-color: rgba(30, 38, 52, 0.45);
+}
+@keyframes desk-ripple {
+  to {
+    transform: scale(5.5);
+    opacity: 0;
+  }
+}
+.desk-confetti {
+  position: absolute;
+  top: -10px;
+  z-index: 30;
+  width: 6px;
+  height: 10px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: desk-confetti var(--dur, 1.6s) ease-in forwards;
+}
+@keyframes desk-confetti {
+  to {
+    transform: translateY(calc(100vh + 40px)) rotate(540deg);
+    opacity: 0.7;
+  }
+}
+
+/* 窄屏缩一档，避免桌宠盖住图标 */
+@media (max-width: 760px) {
+  .pet14 {
+    width: 56px;
+    height: 66px;
+  }
+  .pet14-sprite {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+body.os-reduce-motion .pet14-sprite,
+body.os-reduce-motion .desk-confetti {
+  animation: none !important;
+}
