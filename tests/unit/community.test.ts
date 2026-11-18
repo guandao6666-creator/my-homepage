@@ -17,8 +17,10 @@ describe("社区模块 · 公共导出兼容性", () => {
   });
 
   it("拆分后没有新增不必要的历史导出", () => {
-    // 记录当前导出面，防止以后悄悄扩大公共 API
-    expect(Object.keys(community).sort()).toEqual(["initCommunity", "renderCommunity"]);
+    // 记录当前导出面，防止以后悄悄扩大公共 API。
+    // 6.2 起多一个 `stylesReady`：它是懒加载器的契约（等应用 CSS 就绪后再渲染），
+    // 不是对外 API，但必须能在模块上被读到，因此显式列入断言而不是放宽为子集比较。
+    expect(Object.keys(community).sort()).toEqual(["initCommunity", "renderCommunity", "stylesReady"]);
   });
 });
 

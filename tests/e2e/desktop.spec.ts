@@ -202,6 +202,23 @@ test.describe("桌面外壳", () => {
     await expect(win.locator("[data-g19-crash]")).toHaveCount(0);
   });
 
+  test("主题中心按需加载：样式随 chunk 到达，主题卡片与切换可用", async ({ page }) => {
+    await bootDesktop(page);
+    await page.locator('.desk-icon[data-app="themes"]').click();
+    const win = page.locator('.window[data-app="themes"]');
+    await expect(win).toBeVisible();
+    await expect(win.locator(".g14-theme-host")).toBeVisible({ timeout: 15_000 });
+    await expect(win.locator(".g19-loading")).toHaveCount(0);
+
+    // 6.2：themes.css 不再进首屏，必须在打开后才插入
+    const cssLink = page.locator('link[data-gos-css*="themes"]');
+    await expect(cssLink).toHaveCount(1);
+
+    // 界面真的渲染出主题卡片，而不是空壳
+    await expect(win.locator(".g14-theme-card").first()).toBeVisible();
+    await expect(win.locator("[data-g19-crash]")).toHaveCount(0);
+  });
+
   test("诊断中心「指标」只有真实 Web Vitals：无数据写未采集，不写占位值", async ({ page }) => {
     await bootDesktop(page);
     await page.locator('[data-menu-btn="apps"]').click();

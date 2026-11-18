@@ -30,7 +30,7 @@
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 291 处全审查、0 未审查） |
 | `npm run build` | exit 0，29 页；CSP 12 哈希 / 30 HTML 一致；HTML 安全 292 处全审查、0 未审查 |
-| 产物体积 | 入口 JS **442,621 B**（≤450 KB，达标）；首屏 CSS **463,013 B**（>200 KB，未达标；最大单文件 196,151 B） |
+| 产物体积 | 入口 JS **442,491 B**（≤450 KB）；首屏 CSS **185,110 B**（≤200 KB）；两项预算均通过 |
 | `npx playwright test`（`E2E_ADMIN_PORT=18789`） | 见 §4（本轮全量结果） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
@@ -41,7 +41,7 @@
 | 任务 | 状态 | 证据 |
 | --- | --- | --- |
 | 6.1 入口 JS ≤ 450 KB | **`Verified`（本地）**：525,102 B → **442,621 B**（−82,481 B / −15.7%），应用中心改 `load()` 后达标 | `manifest.ts`、`os14/appcenter/app.ts`；`LEGACY-APPLICATIONS.md` §9.1 |
-| 6.2 首屏 CSS ≤ 200 KB | **`Partially Verified`**：全部 22 个应用样式改为运行时加载，首页只剩 2 个样式表 **204,269 B**（index 196,151 + global 8,118）。按 200 KiB(204,800) 算 99.8% 达标，按十进制 200,000 仍差 4,269 B | `lazy-css.ts`、`perf:baseline`、`docs/PERF-BASELINE.md` |
+| 6.2 首屏 CSS ≤ 200 KB | **`Verified`（本地）**：首页 **185,110 B / 2 个样式表**（自 476,749 B 降 61.2%）。主题中心改懒加载后 `themes.css` 也移出首屏 | `lazy-css.ts`、`themes/app.ts`、`docs/PERF-BASELINE.md` |
 | 6.3 诊断中心接入真实 LCP/CLS/INP | **`Verified`（本地）**：新增「指标」分区，`observeVitals`（buffered）在本机采集，无数据显示「未采集」、不支持显示「不支持」 | `src/lib/quality/diagnostics.ts`、`tests/e2e/desktop.spec.ts` |
 | 6.4 生产性能基线进发布报告 | `Not Started` | `scripts/prod-e2e.mjs` |
 

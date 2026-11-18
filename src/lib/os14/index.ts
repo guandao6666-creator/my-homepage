@@ -12,7 +12,7 @@
 import { escapeHtml, ls, uid, type Ctx } from "./core";
 import { createSystem } from "./system";
 import { readInstall, META_BY_ID } from "./catalog";
-import { initThemes, initThemeApp, renderThemeApp } from "./themes";
+import { initThemes } from "./themes";
 import { bumpOpen } from "./appcenter";
 import { initWidgetGallery, registerNewWidgets, renderWidgetGallery } from "./widgetstore";
 import { initWorkspaceShortcuts, initWorkspaces, renderWorkspaces } from "./workspaces";
@@ -112,7 +112,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
           },
         })),
     },
-    { id: "themes", title: "主题中心", width: 940, height: 640, glyph: "di-themes", render: renderThemeApp, init: initThemeApp },
+    { id: "themes", title: "主题中心", width: 940, height: 640, glyph: "di-themes", load: lazy(() => import("./themes/app"), (m) => ({ body: m.renderThemeApp, init: (w) => m.initThemeApp(w, ctx) })) },
     { id: "widgetstore", title: "组件中心", width: 920, height: 620, glyph: "di-widgets", render: renderWidgetGallery, init: initWidgetGallery },
     { id: "workspaces", title: "工作空间", width: 900, height: 620, glyph: "di-space", render: renderWorkspaces, init: (w) => initWorkspaces(w, ctx) },
 

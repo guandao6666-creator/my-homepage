@@ -214,9 +214,9 @@
     },
     {
       "kind": "sink",
-      "file": "src/lib/os14/themes.ts",
+      "file": "src/lib/os14/themes/app.ts",
       "count": 5,
-      "reason": "人工复核 8 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+      "reason": "人工复核 8 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）。6.2 拆分后界面代码迁到 themes/app.ts，插值来源未变"
     },
     {
       "kind": "sink",
@@ -469,6 +469,12 @@
       "file": "src/lib/os14/community/publish.ts",
       "count": 5,
       "reason": "Phase 2.5 批次 3/4 从 src/lib/os14/community.ts 逐字搬迁的评论/发布面板；renderComments/manifestSummary 内部插值全部经 esc；原 13 处拆为 community.ts 7 + detail.ts 1 + publish.ts 5，总数守恒"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/ui/lazy-css.ts",
+      "count": 1,
+      "reason": "href 来自 Vite 构建产物路径（import \"x.css?url\" 的返回值），不是用户输入；link 只能指向本站打包资源"
     }
   ]
 }

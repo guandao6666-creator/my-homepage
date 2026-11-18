@@ -156,3 +156,15 @@
   但它**没有**带来预期的 200 KB 结果。
 - 下一轮的真实路径：CSS 改 `?url` 资源导入 + 打开窗口时插入 `<link>` 并在 `load()` 等待加载完成。
 - 教训：预算类指标必须先写测量脚本，再动代码；否则容易用「看起来相关」的数字自我确认。
+
+---
+
+## 2026-11-18 · Round 6 · 6.2 达标（主题中心懒加载 + 全量运行时 CSS）
+
+- 主题中心界面拆到 `os14/themes/app.ts`（运行期留在 themes.ts），注册项改 `load()`；
+  `themes.css` 随 chunk 走，首屏只剩 index + global。
+- 首屏 CSS：463,013 → **185,110 B**（2 个样式表）；入口 442,491 B。
+  `perf:baseline` 两项 PASS，6.2 由 Partially 升为 **Verified（本地）**。
+- 新增 E2E：主题中心按需加载（验证 `link[data-gos-css*=themes]` 打开后才插入、卡片渲染）。
+- 踩坑：拆 themes 时把 `ctxRef` 一并删掉，运行期 10 处引用报错；补回声明与 `initThemes` 赋值。
+  另 `?'url'` 路径少了一层 `../`，构建报 UNRESOLVED_IMPORT，按实际目录修正。

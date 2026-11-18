@@ -1057,6 +1057,47 @@ GitHub Actions quality 全绿（run [43588486049](https://github.com/guandao6666
 **结论：6.1 `Verified`（本地 / CI 层）；6.2 `Partially Verified`（未达标，根因已定位）；6.3 `Verified`（本地）。**
 Phase 6 整体仍为 `Partially Verified`（6.2 未达标 + 6.4 未执行）。
 
+### 16.23 Phase 6.2 · 首屏 CSS 达标（2026-11-18）
+
+**1. 目标与范围**
+
+首屏 CSS ≤ 200 KB（口径：首页全部 `<link rel="stylesheet">` 之和）。
+不改任何选择器内容，只改变「什么时候加载」。
+
+**2. 做法**
+
+- 新增 `src/lib/ui/lazy-css.ts`：`ensureCss(url)` 插 `<link>` 并返回 Promise，同 URL 只插一次，
+  失败也 resolve（宁少样式、不卡骨架屏）。
+- 22 个应用模块的 CSS 改为 `?url` 资源导入 + `stylesReady = ensureCss(url)`；
+  `os14/index.ts` 的注册项统一用 `lazy()` 包裹，`await stylesReady` 后再渲染，避免无样式闪烁；
+  legacy 适配器同步等待，`LegacyAppModule` 增加可选字段。
+- 主题中心从同步应用改为 `load()`：界面迁到 `os14/themes/app.ts`（运行期仍在 `themes.ts`，
+  开机 `applyStoredTheme` 不受影响），`themes.css` 随之移出首屏。
+- 新增 E2E：主题中心按需加载（样式 link 在打开后才出现、卡片渲染、无崩溃卡片）。
+
+**3. 实测**
+
+| 项 | 改造前 | 现在 |
+| --- | ---: | ---: |
+| 首页样式表数量 | 17 个 | **2 个**（index + global） |
+| 首屏 CSS | 476,749 B（2.0 基线）/ 463,013 B（本轮中段） | **185,110 B**（−61.2%） |
+| 入口 JS | 525,102 B（2.0 基线） | **442,491 B**（≤450 KB） |
+
+| 门禁 | 结果 |
+| --- | --- |
+| `npm run perf:baseline` | **两项 PASS**：入口 432.1 KB / 439.5 KB、首屏 180.8 KB / 195.3 KB |
+| `desktop.spec.ts` | 11 passed（含主题中心、应用中心、诊断中心） |
+| 构建 / CSP | 29 页；12 哈希 / 30 HTML 一致 |
+
+**4. 风险**
+
+- `load()` 现在多等一次 CSS 请求：首开应用会比之前慢一个 RTT（有骨架屏兜底，无布局抖动）。
+- 新增应用必须同时导出 `stylesReady` 并由 `lazy()` 包裹，否则样式会退回首屏或缺失；
+  该约束写在 `lazy-css.ts` 与 BACKLOG 中。
+- 预算门禁会在超标时 exit 1；`npm run perf:baseline` 需要先 build。
+
+**结论：6.2 `Verified`（本地 / CI 层），Phase 6 预算项全部达标。**
+
 ### 16.4 回滚预案（已确认可用，未实际执行）
 
 ```bash
