@@ -700,6 +700,8 @@ const data = {
       import { createRankReporter, legacyWindowLifecycle, RANK_NAME_KEY, registerLegacyApps } from "../lib/legacy-apps";
       import { fetchWithTimeout as legacyFetchWithTimeout } from "../lib/legacy-apps/net";
 import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
+      import gamesCssUrl from "../styles/desktop/games.css?url";
+      import { ensureCss } from "../lib/ui/lazy-css";
       // 2.3：HTML 转义统一入口
       import { escapeHtml, safeUrl } from "../lib/html";
 
@@ -2315,6 +2317,22 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
         /* ---------------- 应用挂载（1.9：按需加载 + 错误隔离） ---------------- */
 
         /**
+         * 这 8 个桌面应用共用 desktop/games.css。6.2 把它改成「打开游乐场才注入」后，
+         * 直接点桌面图标会完全没有样式：议会投票条变成白块、水族箱没有背景。
+         * 打开这些应用时先把样式等回来，再渲染，避免无样式闪烁。
+         */
+        const APP_CSS: Record<string, string> = {
+          aquarium: gamesCssUrl,
+          visitors: gamesCssUrl,
+          rank: gamesCssUrl,
+          draw: gamesCssUrl,
+          council: gamesCssUrl,
+          treehole: gamesCssUrl,
+          news: gamesCssUrl,
+          social: gamesCssUrl,
+        };
+
+        /**
          * 把应用内容挂进已经创建好的窗口。
          * - 有 load()：先渲染骨架，模块到齐后替换并初始化；
          * - 无 load()：同步渲染 + 初始化；
@@ -2391,9 +2409,9 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
             }
           }, 12000);
 
-          void app
-            .load()
-            .then((mod) => {
+          const cssReady = APP_CSS[id] ? ensureCss(APP_CSS[id]) : Promise.resolve();
+          void Promise.all([app.load(), cssReady])
+            .then(([mod]) => {
               delete win.dataset.mounting;
               delete win.dataset.crashKind;
               if (!win.isConnected) return; // 加载期间窗口已被关闭，不再渲染
