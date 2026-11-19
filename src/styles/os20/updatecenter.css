@@ -5,6 +5,13 @@
 
 /* ---------- 更新中心 ---------- */
 
+/* 宿主必须有确定高度，.g14-scroll 的 height:100% 才有参照；
+   否则它会按内容长到 1800px+，被窗口裁掉且无法滚动。 */
+[data-uc-host] {
+  height: 100%;
+  min-height: 0;
+}
+
 .os20-update-state {
   display: flex;
   flex-direction: column;

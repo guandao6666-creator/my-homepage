@@ -22,7 +22,7 @@ export const stylesReady = ensureCss(cssUrl1);
  *   - 服务端版本：GET /api/health 的 `version` 字段（真实请求，失败就是未知）。
  */
 
-import { badge, escapeHtml, fmtDateTime, shell, type Ctx } from "../../os14/core";
+import { badge, bindTabs, escapeHtml, fmtDateTime, shell, type Ctx } from "../../os14/core";
 import type { Kernel } from "../../core/kernel";
 import type { Sys } from "../../os14/system";
 import { OS_VERSION, RELEASE_NAME, RELEASE_NAME_ZH, BUILD_INFO, RELEASES } from "../../version";
@@ -50,6 +50,9 @@ type State = {
 };
 
 const state: State = { phase: "idle", server: null, error: "", snapshots: [], busy: false };
+
+/** 侧栏两个标签：更新 / 关于 */
+let tab: "main" | "about" = "main";
 
 let ctxRef: Ctx | null = null;
 let kernelRef: Kernel | null = null;
@@ -161,7 +164,40 @@ const history = () =>
     </div>`,
   ).join("");
 
+const aboutView = () =>
+  pane(
+    "关于",
+    `Guandao OS ${OS_VERSION} · ${RELEASE_NAME_ZH}。这个桌面是博客的另一种打开方式。`,
+    group(
+      "作者",
+      `<div class="os20-about">
+        <div class="os20-about-logo">管</div>
+        <div>
+          <h4>管道</h4>
+          <p>大连理工大学智能制造专业在读。喜欢骑车、写代码，以及把学到的东西记下来。</p>
+        </div>
+      </div>`,
+    ) +
+      group(
+        "这个桌面",
+        `<div class="os20-note">
+          <p>文章、终端、设置、社区都在窗口里；主题、组件、笔记与文件等数据都保存在你自己的浏览器里。</p>
+          <p>想看普通版博客：<a class="g14-link" href="/">首页</a> · <a class="g14-link" href="/blog/">全部文章</a> · <a class="g14-link" href="/about/">关于页</a> · <a class="g14-link" href="/uses/">我用什么</a></p>
+        </div>`,
+      ) +
+      group(
+        "版本",
+        `<div class="os20-check">
+          <div class="os20-check-row"><span>版本</span><b>${esc(OS_VERSION)} · ${esc(RELEASE_NAME)}</b></div>
+          <div class="os20-check-row"><span>构建</span><b>${esc(BUILD_INFO.build)}</b></div>
+          <div class="os20-check-row"><span>构建时间</span><b>${esc(BUILD_INFO.builtAt)}</b></div>
+          <div class="os20-check-row"><span>通道</span><b>${esc(BUILD_INFO.channel)}</b></div>
+        </div>`,
+      ),
+  );
+
 const view = () => {
+  if (tab === "about") return aboutView();
   const server = state.server;
   return pane(
     "更新中心",
@@ -227,6 +263,17 @@ export const initUpdateCenter = (win: HTMLElement, ctx: Ctx, _sys: Sys, kernel: 
   const paint = () => {
     if (host) host.innerHTML = view();
   };
+
+  // 侧栏「更新 / 关于」此前没有绑定，点上去毫无反应
+  bindTabs(
+    win,
+    (next) => {
+      if (next !== "main" && next !== "about") return;
+      tab = next;
+      paint();
+    },
+    tab,
+  );
 
   const loadSnapshots = async () => {
     try {
