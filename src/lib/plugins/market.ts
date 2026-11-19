@@ -8,6 +8,9 @@
  *   - 官方示例单独一栏，标注「官方内置」，不与市场数据混淆。
  */
 
+// 插件市场与开发者中心共用 plugins.css，同样走按需加载
+export { stylesReady } from "./styles";
+
 import { safeUrl } from "../html";
 import { trustDetail, trustLabel } from "./signature";
 import { escapeHtml, shell, type Ctx } from "../os14/core";

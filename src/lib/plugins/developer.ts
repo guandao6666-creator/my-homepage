@@ -7,6 +7,9 @@
  * 客户端也会先跑一遍 Manifest 校验，但服务端才是权威；这里不伪造「上传成功」。
  */
 
+// 插件体系共用 plugins.css：开发者中心也渲染 gp-* 结构，不加载就会是一排白块
+export { stylesReady } from "./styles";
+
 import { shell, type Ctx } from "../os14/core";
 import { validateBundle, LICENSES, PLUGIN_CATEGORIES, PLUGIN_TYPE_META } from "../../../shared/plugin-spec.js";
 import * as api from "./api";

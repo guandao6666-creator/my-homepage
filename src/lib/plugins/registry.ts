@@ -12,6 +12,8 @@
  *   - 卸载会停止运行上下文、注销应用、清理缓存与数据（可选保留）。
  */
 
+import cssUrl from "../../styles/plugins.css?url";
+import { ensureCss } from "../ui/lazy-css";
 import { escapeHtml, type Ctx } from "../os14/core";
 import { compareSemver, PLUGIN_LIMITS, type Manifest } from "../../../shared/plugin-spec.js";
 import * as api from "./api";
@@ -672,6 +674,9 @@ function registerApp(ctx: Ctx, record: InstallRecord) {
         <div class="gp-app-state" data-gp-state>正在启动插件…</div>
       </div>`,
     init: (win) => {
+      // 插件应用窗口可能在任何插件应用里被打开，未必经过插件管理器：
+      // 这里补一次 plugins.css，避免 .gp-app / .gp-blocked 无样式
+      void ensureCss(cssUrl);
       const body = win.querySelector<HTMLElement>("[data-gp-app]");
       if (!body) return;
       let cancelled = false;

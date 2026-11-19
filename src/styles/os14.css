@@ -640,6 +640,50 @@ select.g14-input {
   font-weight: 550;
 }
 
+/* 原生 range 在深色窗口里默认是一条纯白轨道（控制中心音量、音乐音量、
+   设置里的数字项都用它），统一成细轨 + 圆形滑块，避免出现白条。 */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+}
+[data-os-theme="light"] input[type="range"] {
+  background: rgba(16, 20, 32, 0.16);
+}
+[data-os-theme="light"] input[type="range"]::-webkit-slider-thumb {
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+
 @keyframes g14-fade {
   from {
     opacity: 0;
