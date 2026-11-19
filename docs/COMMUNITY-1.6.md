@@ -11,14 +11,14 @@
 
 Guandao OS 从个人桌面升级为带真实内容、真实用户与真实审核的创意社区：
 
-- 多用户注册（GitHub OAuth + 关闭 / 邀请制 / 开放注册三种服务端策略）
+- 多用户注册（GitHub OAuth + 关闭 / 开放注册两种服务端策略）
 - 社区首页：精选、最新、真实热度、关注动态、创作者推荐、分类发现
 - 主题 / 组件 / 工作空间 / 壁纸 / 教程五类作品发布
 - 真实点赞、收藏（含收藏夹分类）、两层评论、关注、通知
 - 创作者主页、公开 / 私密资料、作品集、关注 / 粉丝
 - 统一发布中心、草稿、审核、撤回、删除、版本历史、回退
 - 举报 → 人工审核 → 处理 → 审计
-- 审核中心：作品审核、举报、用户、社区设置、邀请码、审计日志、社区总存储
+- 审核中心：作品审核、举报、用户、社区设置、审计日志、社区总存储
 - 社区资源安装到 **原有** 主题中心 / 组件系统 / 工作空间 / 壁纸引擎，没有第二套安装器
 
 **未包含（明确说明）**：AI 助手 / AI Agent / AI 聊天 / AI 自动审核、私信、实时聊天、任意代码插件市场、星级评分。社区短动态（纯文字/图片动态流）未实现；Following 动态由关注创作者的作品发布产生。
@@ -44,10 +44,10 @@ Cloudflare Worker
   └─ worker/api/community/
        ├─ handlers.js    路由、公开读取、媒体访问、R2 私有读取
        ├─ write.js       上传、发布、版本、点赞、收藏、评论、关注、举报、通知
-       ├─ admin.js       审核、举报处理、用户、设置、邀请、审计、统计
+       ├─ admin.js       审核、举报处理、用户、设置、审计、统计
        ├─ store.js       D1 查询与映射
        ├─ validate.js    Manifest / 图片 / 兼容性 / 执行字段校验
-       ├─ registration.js 注册策略、邀请码、OAuth 注册意图
+       ├─ registration.js 注册策略、OAuth 注册意图
        ├─ common.js      会话、来源校验、角色、配额、审计、通知
        └─ maintenance.js Cron 清理与重试
 
@@ -68,7 +68,7 @@ D1 (guandao-db) · R2 (guandao-files)
 
 | 有效角色 | 来源 | 权限 |
 |---|---|---|
-| Admin | `users.role='admin'` | 用户、设置、邀请、角色、删除作品、精选、审计 |
+| Admin | `users.role='admin'` | 用户、设置、角色、删除作品、精选、审计 |
 | Moderator | `community_roles.role='moderator'` | 审核作品、处理举报、隐藏作品/评论；不能改设置、不能删除作品、不能审核自己的作品 |
 | Member | 普通用户 | 发布、编辑、删除自己的作品、评论、点赞、收藏、关注、举报 |
 | Visitor | 未登录 | 浏览公开内容、搜索、查看创作者 |
@@ -79,16 +79,15 @@ D1 (guandao-db) · R2 (guandao-files)
 
 - 管理员在 **Community → 审核中心 → 社区设置** 中设置：
   - `closed`：关闭注册（代码默认，最安全）
-  - `invite`：邀请制，邀请码只保存 SHA-256，明文只在创建时显示一次
-  - `open`：开放注册
-- **当前生产环境已设置为 `invite`（邀请制）**，并向访客显示加入社区入口；邀请码需由管理员生成
-- 注册必须走 GitHub OAuth：`/api/auth/github?mode=join[&invite=...]`
-- 发起时服务端校验策略，回调时再次校验（防止 OAuth 期间策略变更 / 邀请被抢完）
+  - `open`：开放注册，任何 GitHub 账号授权后直接成为 member
+- **当前生产环境为 `open`（开放注册）**，访客可直接点「加入 Guandao Community」
+- 注册必须走 GitHub OAuth：`/api/auth/github?mode=join`
+- 发起时服务端校验策略，回调时再次校验（防止 OAuth 期间策略变更）
 - 新用户永远以 `member` 创建，不能通过注册获得管理员
 - 已存在的成员可直接登录；`member_login` 可暂停成员登录，但管理员与审核员不受影响
 - 关闭注册不会影响已有成员登录和社区浏览
 
-**生产环境当前为邀请制（`invite`）。** 首次邀请请由管理员登录后打开 Community → 审核中心 → 邀请注册，生成邀请码。
+**邀请制已在 2.0 移除**（服务端代码、管理接口与 `community_invites` 表均已删除，见迁移 0020）。
 
 ---
 
@@ -101,7 +100,6 @@ D1 (guandao-db) · R2 (guandao-files)
 | `community_settings` | 单行社区设置（注册模式、审核、配额、公告） |
 | `community_profiles` | 公开创作者资料、可见性、限制 |
 | `community_roles` | 审核员角色（admin 仍在 users.role） |
-| `community_invites` | 邀请码（仅哈希）、名额、过期、作废 |
 | `community_join_intents` | OAuth state 哈希关联的一次性注册意图 |
 | `community_assets` | R2 资源索引、尺寸、mime、删除状态与重试 |
 | `community_posts` | 作品、状态、分类、标签、计数、精选、审核备注 |
@@ -186,7 +184,6 @@ users/{userId}/community/packages/{postId}/{version}/manifest.json
 - `GET /admin/reports`、`POST /admin/reports/:id/review`
 - `GET /admin/users`、`PATCH /admin/users/:id/role|status|restriction`
 - `GET/PATCH /admin/settings`
-- `GET/POST /admin/invites`、`DELETE /admin/invites/:id`
 - `GET /admin/audit`、`GET /admin/stats`
 
 ---
@@ -241,7 +238,7 @@ users/{userId}/community/packages/{postId}/{version}/manifest.json
 - 审核员不能审核自己的作品；不能删除作品；不能修改社区设置
 - 举报不自动隐藏内容，必须人工确认，避免举报轰炸
 - 举报处理动作：驳回、隐藏作品、删除作品（admin）、隐藏评论、限制用户（admin）
-- 所有审核、举报、角色、设置、邀请操作写入 `community_audit_logs`
+- 所有审核、举报、角色、设置操作写入 `community_audit_logs`
 - 处理结果通过站内通知推送给作者 / 评论者 / 被限制用户
 
 ---
@@ -270,7 +267,7 @@ users/{userId}/community/packages/{postId}/{version}/manifest.json
 | 远程 D1 0009 迁移 | ✅ 通过（46 条命令） |
 | Astro 构建 | ✅ 通过 |
 | Community API 端到端 QA | ✅ 51/51 通过（`node scripts/community-qa.mjs`） |
-| 注册策略服务端校验 | ✅ 关闭 → registration_closed；邀请制无码 → invalid_invite；有效邀请 → 创建 join intent 且不提前消耗；开放 → 进入 OAuth |
+| 注册策略服务端校验 | ✅ 关闭 → registration_closed；开放 → 创建 join intent 并进入 OAuth；`invite` 已不再受理 |
 | 媒体越权 | ✅ 待审核作品封面：访客 404、作者/审核员 200 |
 | 组件安装 | ✅ 安装后桌面出现声明式组件 |
 | 主题安装 | ✅ 写入主题中心并应用 |
@@ -289,12 +286,11 @@ users/{userId}/community/packages/{postId}/{version}/manifest.json
 1. 使用原管理员 GitHub 账号登录 <https://guandao.xin>。
 2. 顶部菜单 → **Guandao Community**（或应用中心安装）。
 3. 侧栏 **审核中心 → 社区设置**：
-   - 当前已设置为「邀请制」，可改为「开放注册」或「关闭注册」；
+   - 当前已设置为「开放注册」，可改为「关闭注册」；
    - 设置是否人工审核（建议保持开启）；
    - 设置每日发布 / 评论 / 存储配额。
-4. **审核中心 → 邀请注册** → 生成邀请码（只显示一次）。
-5. 把邀请码发给朋友；对方在登录窗口使用「加入 Guandao Community」。
-6. 在 **审核中心 → 作品审核** 处理首批内容。
+4. 把 <https://guandao.xin> 发给朋友；对方在登录窗口点「加入 Guandao Community」，用 GitHub 授权即可加入。
+5. 在 **审核中心 → 作品审核** 处理首批内容。
 
 其余 Cloudflare 配置：沿用现有 `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `APP_ORIGIN` / `INITIAL_ADMIN_SETUP_TOKEN`，无需新增密钥。R2 bucket 与 D1 绑定不变。
 
@@ -327,12 +323,12 @@ users/{userId}/community/packages/{postId}/{version}/manifest.json
 
 ## 13. 已知限制
 
-1. 生产社区当前为「邀请制」且尚无邀请码，需要管理员生成首批邀请码并邀请创作者。
+1. 生产社区当前为「开放注册」，任何 GitHub 账号都可直接加入；如需收紧，可在社区设置里改为「关闭注册」。
 2. 社区短动态（纯文字/图片 Moment）未实现；Following 动态来自关注创作者的作品发布。
 3. 星级评分未实现；当前使用点赞 + 评论。
 4. 搜索使用 D1 `LIKE` + 索引，数据量大后再考虑 FTS。
 5. 缩略图在浏览器端生成（主图 + 640px WebP），服务端只验证真实格式与尺寸，不做二次转码。
 6. 主题更新会保留用户本地外观调整；工作空间更新以新副本导入，不覆盖旧场景。
 7. 注销账号删除社区 R2 前缀，但账号数据导出暂不包含社区作品正文。
-8. 生产社区目前为空，需要管理员开启注册并邀请首批创作者。
+8. 生产社区目前为空，注册已开放，把链接发出去即可积累首批创作者。
 9. 所有内容审核为人工，不存在自动 AI 审核。
