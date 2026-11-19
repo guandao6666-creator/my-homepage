@@ -1051,10 +1051,14 @@ async function runTests() {
     "tutorial: renderMarkdown 先整体转义",
     coreSource.includes("export const renderMarkdown") && coreSource.includes("let s = escapeHtml(text)"),
   );
-  const communitySource = readFileSync(join(ROOT, "src", "lib", "os14", "community.ts"), "utf8");
+  // 批次 3 之后详情渲染在 community/detail.ts，守卫要跟着文件走，否则会假失败。
+  const communityDetailSource = readFileSync(
+    join(ROOT, "src", "lib", "os14", "community", "detail.ts"),
+    "utf8",
+  );
   check(
     "tutorial: 详情正文经 renderMarkdown 渲染",
-    /renderMarkdown\(String\(\(manifest\.configuration as Record<string, unknown>\)\?\.content/.test(communitySource),
+    /renderMarkdown\(String\(\(manifest\.configuration as Record<string, unknown>\)\?\.content/.test(communityDetailSource),
   );
 
   /* ---------------------- 10) 版本链 --------------------------------------- */

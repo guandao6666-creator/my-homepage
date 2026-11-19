@@ -124,7 +124,8 @@ async function main() {
   const logFd = openSync(LOG_FILE, "w");
   console.log(`[qa-local] 启动 wrangler dev --local（${base}）…`);
   // community 需要 --test-scheduled 才能用 POST /__scheduled 触发维护任务清理 R2 孤儿。
-  const devArgs = ["dev", "--local", "--port", String(port)];
+  // APP_ORIGIN 显式钉到本次端口：.dev.vars 里可能写着 8787，否则同源校验会全部 403。
+  const devArgs = ["dev", "--local", "--port", String(port), "--var", `APP_ORIGIN:${base}`];
   if (targetName === "community") devArgs.push("--test-scheduled");
   const server = spawn(process.execPath, [WRANGLER, ...devArgs], {
     cwd: ROOT,
