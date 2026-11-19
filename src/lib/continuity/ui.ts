@@ -288,7 +288,6 @@ export function startContinuity(ctx: Ctx) {
       const payload = (await response.json()) as { authenticated?: boolean };
       authenticated = Boolean(payload.authenticated);
       contextAuth = authenticated;
-      contextAuth = authenticated;
     } catch {
       authenticated = false;
     }

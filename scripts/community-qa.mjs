@@ -309,7 +309,6 @@ const state = {
   assets: {}, // key -> assetId
   comments: {},
   reports: {}, // key -> {id, targetId}
-  invite: null, // {id, prefix}
   counter: { download0: 0, view0: 0 },
   baseline: { assetCount: 0, postCount: 0 },
   cleanup: { r2Verified: false, identityVerified: false, residueVerified: false },
@@ -1335,8 +1334,8 @@ async function runTests() {
   });
   expectError("report: 成员处理举报 403", memberProcess, 403, "FORBIDDEN");
 
-  /* ---------------------- 13) 审计 / 设置 / 统计 / 邀请码 ------------------ */
-  console.log("[qa-community] 13) 审计、设置、统计与邀请码");
+  /* ---------------------- 13) 审计 / 设置 / 统计 -------------------------- */
+  console.log("[qa-community] 13) 审计、设置与统计");
 
   const settings = await request("/api/community/admin/settings", { cookie: ADMIN_COOKIE });
   mustStatus("settings: 管理员读取 200", settings, 200);
@@ -1352,21 +1351,6 @@ async function runTests() {
   const userList = await request("/api/community/admin/users", { cookie: ADMIN_COOKIE });
   mustStatus("admin/users: 200", userList, 200);
   check("admin/users: 列表为数组", Array.isArray(dataOf(userList)?.items));
-
-  const inviteCreate = await request("/api/community/admin/invites", {
-    method: "POST",
-    cookie: ADMIN_COOKIE,
-    body: { label: `${RUN_TAG} 邀请`, maxUses: 1 },
-  });
-  mustStatus("invite: 创建 201", inviteCreate, 201);
-  const inviteCode = String(dataOf(inviteCreate)?.code || "");
-  check("invite: 邀请码 GD- 前缀", /^GD-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(inviteCode), inviteCode.slice(0, 16));
-  const inviteList = await request("/api/community/admin/invites", { cookie: ADMIN_COOKIE });
-  mustStatus("invite: 列表 200", inviteList, 200);
-  const inviteItem = (dataOf(inviteList)?.items || []).find((item) => item.label === `${RUN_TAG} 邀请`);
-  check("invite: 列表按前缀显示且不回传明文", Boolean(inviteItem) && !JSON.stringify(inviteItem).includes(inviteCode));
-  if (inviteItem?.id) state.invite = { id: inviteItem.id, prefix: String(inviteItem.prefix || inviteCode.slice(0, 8)) };
-  else state.invite = { id: null, prefix: inviteCode.slice(0, 8) };
 
   /* ---------------------- 14) 管理员删除 + 404 ---------------------------- */
   console.log("[qa-community] 14) 管理员删除与幂等");
@@ -1387,7 +1371,7 @@ async function runTests() {
   });
   expectStatus("admin-delete: 重复删除 404", deleteAgain, 404);
 
-  // 审计断言放在所有审核/举报/精选/邀请动作完成之后拉取，避免顺序依赖。
+  // 审计断言放在所有审核/举报/精选动作完成之后拉取，避免顺序依赖。
   const audit = await request("/api/community/admin/audit?limit=80", { cookie: ADMIN_COOKIE });
   mustStatus("audit: 审计列表 200", audit, 200);
   const auditItems = dataOf(audit)?.items || [];
@@ -1401,11 +1385,6 @@ async function runTests() {
   check("audit: report.delete_post 记录", auditHas("report.delete_post", r3.id));
   check("audit: post.feature 记录", auditHas("post.feature", state.posts.admin));
   check("audit: post.delete_moderator 记录", auditHas("post.delete_moderator", state.posts.admin));
-  check(
-    "audit: invite.create 记录（prefix）",
-    state.invite ? auditHas("invite.create", state.invite.prefix) : false,
-    JSON.stringify(state.invite),
-  );
   const guestAudit = await request("/api/community/admin/audit");
   expectError("audit: 访客 401", guestAudit, 401, "UNAUTHENTICATED");
   const memberAudit = await request("/api/community/admin/audit", { cookie: CREATOR_COOKIE });
@@ -1620,8 +1599,7 @@ async function cleanupRun() {
   statements.push(
     `DELETE FROM community_audit_logs
       WHERE (target_type = 'post' AND target_id IN (${postsIn}))
-         OR (target_type = 'user' AND target_id IN (${usersIn}))
-         OR (target_type = 'invite' AND target_id IN (${state.invite?.prefix ? sqlQuote(state.invite.prefix) : "NULL"}))`,
+         OR (target_type = 'user' AND target_id IN (${usersIn}))`,
     `DELETE FROM community_audit_logs WHERE actor_id IN (${usersIn})`,
   );
   if (packageIds.length) {
@@ -1636,17 +1614,6 @@ async function cleanupRun() {
     `DELETE FROM community_posts WHERE author_id IN (${inList([...users, state.adminId])}) AND title LIKE ${sqlQuote(`%${RUN_ID}%`)}`,
     `DELETE FROM community_follows WHERE follower_id IN (${usersIn}) OR following_id IN (${usersIn})`,
   );
-  const inviteIds = state.invite?.id ? [state.invite.id] : [];
-  if (inviteIds.length) {
-    statements.push(
-      `DELETE FROM community_join_intents WHERE invite_id IN (${inList(inviteIds)})`,
-      `DELETE FROM community_invites WHERE id IN (${inList(inviteIds)})`,
-    );
-  } else if (state.invite?.prefix) {
-    statements.push(
-      `DELETE FROM community_invites WHERE created_by = ${sqlQuote(state.adminId)} AND code_prefix = ${sqlQuote(state.invite.prefix)}`,
-    );
-  }
   if (statements.length) d1Write(statements);
 
   // 5) SQL 残留复核（全部必须为 0；账号夹具保留）
@@ -1689,18 +1656,8 @@ async function cleanupRun() {
         WHERE (target_type = 'post' AND target_id IN (${postsIn}))
            OR (target_type = 'report' AND target_id IN (${inList(reportIds)}))
            OR (target_type = 'user' AND target_id IN (${usersIn}))
-           OR (target_type = 'invite' AND target_id IN (${state.invite?.prefix ? sqlQuote(state.invite.prefix) : "NULL"}))
            OR actor_id IN (${usersIn})`,
     ),
-    invites: inviteIds.length ? d1Count(`SELECT COUNT(*) AS n FROM community_invites WHERE id IN (${inList(inviteIds)})`) : 0,
-    joinIntents: inviteIds.length
-      ? d1Count(`SELECT COUNT(*) AS n FROM community_join_intents WHERE invite_id IN (${inList(inviteIds)})`)
-      : 0,
-    inviteAuditByPrefix: state.invite?.prefix
-      ? d1Count(
-          `SELECT COUNT(*) AS n FROM community_audit_logs WHERE target_type = 'invite' AND target_id = ${sqlQuote(state.invite.prefix)}`,
-        )
-      : 0,
   };
   let residueFailures = 0;
   for (const [label, count] of Object.entries(residue)) {
