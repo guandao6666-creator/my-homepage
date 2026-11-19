@@ -14,7 +14,7 @@ export const stylesReady = Promise.all([ensureCss(cssUrl1), ensureCss(cssUrl2)])
  */
 
 // 1.9：应用样式跟着应用代码一起按需加载，不再压进首屏 CSS
-import { badge, emptyState, escapeHtml, fmtAgo, ls, shell, type Ctx } from "./core";
+import { badge, bindTabs, emptyState, escapeHtml, fmtAgo, ls, shell, type Ctx } from "./core";
 import { GAMES, gameById, gameCover, type GameHandle } from "./games";
 import {
   addDecoration,
@@ -208,6 +208,23 @@ export const initPlayground = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
   const root = win.querySelector<HTMLElement>("[data-pg-root]");
   if (!root) return () => undefined;
+
+  // 侧栏三个标签（游戏中心 / 桌面互动 / 彩蛋）此前没有任何点击绑定，
+  // 点上去毫无反应。统一走 bindTabs，和设置、数据中心等应用保持一致。
+  bindTabs(
+    win,
+    (next) => {
+      if (next !== "games" && next !== "interact" && next !== "eggs") return;
+      if (next !== "games") {
+        destroyGame();
+        paused = false;
+        activeGame = "";
+      }
+      tab = next;
+      paint();
+    },
+    tab,
+  );
 
   const paint = () => {
     root.innerHTML = view();
