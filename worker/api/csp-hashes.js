@@ -6,7 +6,6 @@
 export const SCRIPT_HASHES = [
   "sha256-0oWvdksca52SjS9rOO8k9LIiHiuWHv/iCG36IC+ClI8=",
   "sha256-86CoYVSeaNqLNz4S+8kC1vt5ttEoxUBoKnKcV58IfAM=",
-  "sha256-8HWcf/lWZpLuVydjxufRvkK4kLHA8jczgV5HDcg9NL8=",
   "sha256-8bbQyoisP3rHCytFyg9EplEssH2X96bMDr7dSc8CBh4=",
   "sha256-90qh2lJnAsjQcKHlT5r5rrLtwQaIY0/cUrooyVc6AXg=",
   "sha256-Mpbj/No8LMLTo79/vHOw5Mld0ptkyLcKii0FII8CPB8=",
@@ -15,5 +14,6 @@ export const SCRIPT_HASHES = [
   "sha256-fgtUQFb5jaN1g6kZYwKBYFSvZtn+57iJokW9hbuxx5M=",
   "sha256-fpe2tqEpOuYD1HAN6jABHvPboOMdUdn03nha7Lj8ci4=",
   "sha256-i3Qr+nsSa72XHT0mffN9Y/Yy70C8g/7so4mPI29bH2o=",
+  "sha256-o/Nnbrkj2GHnXLWtb0xWTag4x7vQVzNjQ0xbjpZcagQ=",
   "sha256-yZBdC4B5OtLAPq4R4DAVPStA6Pj9b3lMklRP7sbbdhs="
 ];

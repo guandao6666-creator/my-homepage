@@ -21,7 +21,7 @@ export const drawApp: LegacyAppModule = {
             <div class="draw-card" id="draw-card">
               <span class="draw-mark" id="draw-mark">?</span>
             </div>
-            <p class="draw-text" id="draw-text">每天可以抽一张，明天再来</p>
+            <p class="draw-text" id="draw-text">每天可以抽一张</p>
             <button class="draw-btn" id="draw-btn" type="button">抽一张</button>
           </div>`,
   init: (win, { achievements, lifecycle }) => {
