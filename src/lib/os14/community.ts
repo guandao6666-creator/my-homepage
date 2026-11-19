@@ -97,7 +97,6 @@ export const renderCommunity = () => {
     ["creations", "我的作品", "✎"],
     ["favorites", "我的收藏", "★"],
     ["plugins", "插件市场", "⧉"],
-    ["plugins", "插件市场", "⧉"],
     ["notifications", "通知", "◔"],
     ["moderation", "审核中心", "⚑"],
   ];
@@ -185,10 +184,6 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
   const openTab = (tab: string) => {
     if (tab === "moderation" && !isStaff()) return;
-    if (tab === "plugins") {
-      ctx.openApp("pmarket");
-      return;
-    }
     if (tab === "plugins") {
       ctx.openApp("pmarket");
       return;
@@ -493,7 +488,9 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
       return;
     }
 
-    const page = target.closest<HTMLElement>("[data-page]");
+    // 只认分页按钮。OS 外壳会在 <html> 上写 data-page="desktop"，用裸
+    // [data-page] 会把「点卡片 / 点空白」全部当成翻页，直接跳去发现页。
+    const page = target.closest<HTMLButtonElement>("button[data-page]");
     if (page) {
       event.preventDefault();
       const next = Number(page.dataset.page) || 1;
