@@ -136,6 +136,7 @@ const interactView = () => {
           <label class="pf-field">名字<input class="g14-input" data-pet-name maxlength="8" value="${escapeHtml(pet.name)}" /></label>
           <label class="g14-range-row"><span>大小</span><input type="range" min="70" max="160" value="${Math.round(pet.size * 100)}" data-pet-size /><b>${Math.round(pet.size * 100)}%</b></label>
         </div>
+        <p class="g14-hint" data-pet-status>小管 · ${pet.on ? "显示中" : "已隐藏"} · ${Math.round(pet.size * 100)}% · ${escapeHtml(pet.name)}</p>
       </section>
       <section class="pg14-block">
         <h4>可拖动装饰物</h4>
@@ -229,6 +230,14 @@ export const initPlayground = (win: HTMLElement, ctx: Ctx): (() => void) => {
   const paint = () => {
     root.innerHTML = view();
     if (activeGame && tab === "games") mountGame();
+  };
+
+  /** 小管的改动要当场可见：窗口通常比小管大，改完看不见会以为按钮没反应 */
+  const refreshPetStatus = () => {
+    const el = root.querySelector<HTMLElement>("[data-pet-status]");
+    if (!el) return;
+    const p = petState();
+    el.textContent = `小管 · ${p.on ? "显示中" : "已隐藏"} · ${Math.round(p.size * 100)}% · ${p.name}`;
   };
 
   const destroyGame = () => {
@@ -331,17 +340,24 @@ export const initPlayground = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
   win.addEventListener("input", (e) => {
     const t = e.target as HTMLElement;
-    if (t.matches("[data-pet-name]")) setPetName((t as HTMLInputElement).value);
+    if (t.matches("[data-pet-name]")) {
+      setPetName((t as HTMLInputElement).value);
+      refreshPetStatus();
+    }
     if (t.matches("[data-pet-size]")) {
       setPetSize(Number((t as HTMLInputElement).value) / 100);
       const label = t.parentElement?.querySelector("b");
       if (label) label.textContent = `${(t as HTMLInputElement).value}%`;
+      refreshPetStatus();
     }
   });
 
   win.addEventListener("change", (e) => {
     const t = e.target as HTMLElement;
-    if (t.matches("[data-pet-on]")) setPetVisible((t as HTMLInputElement).checked);
+    if (t.matches("[data-pet-on]")) {
+      setPetVisible((t as HTMLInputElement).checked);
+      refreshPetStatus();
+    }
   });
 
   // 隐藏游戏入口（终端 `play` 或桌宠彩蛋）
