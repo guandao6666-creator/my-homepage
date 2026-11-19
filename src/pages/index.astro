@@ -2395,6 +2395,7 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
             .load()
             .then((mod) => {
               delete win.dataset.mounting;
+              delete win.dataset.crashKind;
               if (!win.isConnected) return; // 加载期间窗口已被关闭，不再渲染
               app.body = mod.body;
               if (mod.init) APP_INIT[id] = mod.init;
@@ -2415,6 +2416,13 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
                 message: `应用「${app.title}」的代码加载失败`,
                 error: err,
               });
+              // 部署更新导致的 chunk 404：自动整页刷新一次，用户不用自己硬刷新
+              if (isChunkLoadError(err)) {
+                win.dataset.crashKind = "chunk";
+                if (reloadForFreshAssets()) return;
+              } else {
+                delete win.dataset.crashKind;
+              }
               showAppCrash(
                 win,
                 id,
@@ -2423,6 +2431,28 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
               );
               recordAppMetric(id, "open", performance.now() - started, false);
             });
+        };
+
+        /**
+         * 部署更新后，旧页面里的 chunk 文件名已经被新版本替换，动态 import 会 404。
+         * 这种错误重试同一个 URL 永远不会成功，只能整页刷新去拿新的入口文件。
+         * 用 sessionStorage 做 60 秒节流，避免网络真断时陷入刷新循环。
+         */
+        const isChunkLoadError = (err: unknown) => {
+          const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+          return /dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(message);
+        };
+        const reloadForFreshAssets = () => {
+          try {
+            const key = "guandao:chunk-reload-at";
+            const last = Number(sessionStorage.getItem(key) || 0);
+            if (Date.now() - last < 60_000) return false;
+            sessionStorage.setItem(key, String(Date.now()));
+          } catch {
+            return false;
+          }
+          location.reload();
+          return true;
         };
 
         /** 崩溃占位：说明发生了什么、数据在哪、可以点哪里恢复 */
@@ -2438,6 +2468,11 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
           host.querySelector("[data-g19-retry]")?.addEventListener("click", (event) => {
             event.stopPropagation();
             if (win.dataset.mounting === "1") return;
+            // 旧 chunk 已经不在服务器上，重新挂载只会再失败一次：直接刷新拿新入口
+            if (win.dataset.crashKind === "chunk") {
+              location.reload();
+              return;
+            }
             host.innerHTML = loadingSkeleton(app?.title ?? id);
             mountApp(win, id);
           });
