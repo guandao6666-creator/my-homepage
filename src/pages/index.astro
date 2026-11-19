@@ -2562,8 +2562,12 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
             } else if (phoneDesktopMode()) {
               placePhoneDesktopWin(win, app, step, saved);
             } else if (saved) {
-              // 沿用上次的位置，越界就拉回可视范围
-              win.style.left = `${Math.max(-40, Math.min(window.innerWidth - 140, saved.left))}px`;
+              // 沿用上次的位置，但必须保证整窗可见：
+              // 屏幕变小或窗口被拖到边上时，旧坐标会让窗口只剩一条边露在视口里，
+              // 看起来就像「点了没反应」，右侧内容与滚动条也永远够不到。
+              const wNow = Number.parseFloat(win.style.width) || app.width;
+              const maxLeft = Math.max(8, window.innerWidth - wNow - 8);
+              win.style.left = `${Math.max(8, Math.min(maxLeft, saved.left))}px`;
               win.style.top = `${Math.max(32, Math.min(window.innerHeight - 110, saved.top))}px`;
             } else {
               win.style.left = `${Math.max(16, (window.innerWidth - app.width) / 2 + offset - 60)}px`;
