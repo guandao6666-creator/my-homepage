@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.0";
+export const OS_VERSION = "2.0.1";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -46,6 +46,18 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.0.1",
+    name: "Steady Clicks",
+    date: "2026-11-20",
+    notes: [
+      "修复社区搜索结果页点作品卡片打不开详情（分页代理误吞点击）",
+      "分页只认带数字 data-page 的按钮，外壳写入的 data-page=\"desktop\" 不再参与判定",
+      "详情页增加视图目标校验：旧请求返回后不会覆盖已经打开的新视图",
+      "社区 App 重复挂载时先卸载旧实例，一次点击不再触发两套监听",
+      "新增社区「搜索 → 点卡片 → 详情」端到端回归用例",
+    ],
+  },
   {
     version: "2.0.0",
     name: "The Platform Era",

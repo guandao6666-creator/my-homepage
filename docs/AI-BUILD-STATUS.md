@@ -4,9 +4,9 @@
 > 历史细节见 `GUANDAO_2_0_AUDIT.md`（附录 A–P）、`GUANDAO_2_0_ROADMAP.md`、`docs/RELEASE-2.0.md`。
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
-- **更新时间**：2026-11-18
-- **版本**：2.0.0
-- **分支**：`feat/5.0-community-publishing-pipeline`
+- **更新时间**：2026-11-20
+- **版本**：2.0.1（Steady Clicks，补丁版本；发布说明 `docs/RELEASE-2.0.1.md`）
+- **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
 
@@ -21,16 +21,17 @@
 | Phase 5 · 社区与市场发布链 | `Partially Verified` | 本地 260/260；生产发布链 `Blocked` |
 | Phase 6 · 性能与可观测 | **进行中（6.1 部分完成）** | 见 §3 |
 
-## 2. 当前质量基线（2026-11-18 本机实跑）
+## 2. 当前质量基线（2026-11-20 本机实跑）
 
 | 门禁 | 结果 |
 | --- | --- |
-| `npm run typecheck` | 0 error |
-| `npm run test:unit` | **19 文件 / 359 单测通过** |
+| `npm run typecheck` | 0 error（362 文件） |
+| `npx vitest run` | **21 文件 / 375 单测通过**（2.0.1 新增 3 项分页判定） |
 | `npm run security:test` | 六组自检全过 |
-| `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 291 处全审查、0 未审查） |
-| `npm run build` | exit 0，29 页；CSP 12 哈希 / 30 HTML 一致；HTML 安全 292 处全审查、0 未审查 |
-| 产物体积 | 入口 JS **442,491 B**（≤450 KB）；首屏 CSS **185,110 B**（≤200 KB）；两项预算均通过 |
+| `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
+| `npm run build` | exit 0，29 页；CSP 12 哈希 / 30 HTML 一致；HTML 安全 294 处全审查、0 未审查 |
+| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **433.4 KB / 439.5 KB**；首屏 CSS **184.7 KB / 195.3 KB**；两项预算均通过 |
+| `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
 | `npx playwright test`（`E2E_ADMIN_PORT=18789`） | 见 §4（本轮全量结果） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
@@ -66,8 +67,10 @@
 
 | 项 | 结果 |
 | --- | --- |
-| 目标 spec（`legacy-apps` + `lifecycle`） | **27 passed**（2.4m），含「连续开关 20 次监听器不增长」 |
-| 全量 E2E | **173 passed（4.2m），exit 0**（新增应用中心懒加载用例） |
+| 目标 spec（`community-search-open`，worker project） | **2 passed（17.1s）**；把 `pickPageButton` 改回裸选择器后 `1 failed / 1 passed`（负向对照，见 RELEASE-2.0.1 §3.1） |
+| 目标 spec（`legacy-apps` 抽奖/议会/社交 + `mobile` 笔记） | 逐条复跑 **4 passed**（修掉 2.0.0 遗留的旧断言，见 RELEASE-2.0.1 §3.3） |
+| 全量 E2E | **184 passed（4.4m），exit 0**——chromium 88 + worker 72 + firefox-worker 12 + webkit-worker 12 |
+| 单测 | **21 文件 / 375 通过**（新增 `pickPageButton` 3 项） |
 
 ## 5. 重大风险（未关闭）
 
@@ -82,7 +85,13 @@
    （2026-11-18 复现两次）。
 7. 仓库中的 `src/**` 存在 CRLF/LF 抖动：构建/格式化后会显示为已修改，`git checkout` 即恢复，
    不要误提交。
-6. `sandbox-origin.spec.ts` 在全量并发下有偶发失败（2 次全量中 1 次 `origin !== "null"`），
+8. **本地 E2E 会被自己的限流卡住**（2.0.1 期间反复踩到）：`plugin-upload` 规则 20 次/小时，
+   e2e-server 造夹具每轮就要上传约 20 个签名包，同一小时内连跑两三遍全量就会
+   `429 RATE_LIMITED`，且 `wrangler d1 execute --local` 在本机因
+   `miniflare-email-store` 目录权限起不来，只能用 Node 26 的 `node:sqlite` 直连
+   `.wrangler/state/v3/d1/**/*.sqlite` 清 `rate_limits`。连跑前先清计数器，否则报错会被
+   误读成产品回归。
+9. `sandbox-origin.spec.ts` 在全量并发下有偶发失败（2 次全量中 1 次 `origin !== "null"`），
    单独复跑稳定通过；已记录为抖动，未修改断言。
 
 ## 6. 下一步（按优先级）

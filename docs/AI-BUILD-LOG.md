@@ -329,3 +329,49 @@
 - `wrangler d1 export guandao-db --remote` 成功：`.wrangler/backups/prod-20261118-2149.sql`（438 KB，63 张 CREATE TABLE，含 users / community_posts / sync_entities）。
 - 生产密钥仍缺 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`，H3 门禁不通过 → **未迁移、未部署**。
 - 待应用迁移仍为 0017、0018。补齐 webhook 后可直接从 H5 继续。
+
+---
+
+## 2026-11-20 · Round 23 · 2.0.1 收口：P1-8 从「改过」变成「有证据」
+
+- **推翻 Round 21 的结论**：不是 `isStale` 竞态——`loadDetail` 从未被调用。真因是分页分支的裸选择器
+  `target.closest("[data-page]")` 命中了外壳写在 `<html data-page="desktop">` 上的标记
+  （`src/lib/shell/adaptive.ts:141`），在 `openPostFromEvent` 之前就 `return`，把点击当成翻页重画第 1 页。
+  修复原本已在主线提交 `bc44b75`，缺的是把它锁进测试。
+- 代码：`pickPageButton()` 抽成纯函数（`button[data-page]` + 数字校验）并接入点击代理；
+  `loadDetailImpl` 先占 token 再切视图、返回时校验视图目标；`initCommunity` 幂等化
+  （`WeakMap` 存 disposer + `disposed` 抑制旧实例写 DOM）。
+- 测试：`tests/unit/community.test.ts` 新增 3 项分页判定单测；
+  `tests/e2e/community-search-open.spec.ts` 两条真实 Worker 用例（搜索 → 点卡片 → 详情；点空白不跳走）。
+  **负向对照**：把选择器改回裸 `[data-page]` 重建后同一用例 1 failed，恢复后 2 passed——用例能区分修没修。
+- 版本 8 处版本源升到 2.0.1（含 `RELEASES` 首条 Steady Clicks），`check:version` 通过。
+- 顺带修门禁：`check:html-security` 因 `src/lib/mobile/app.ts` 新增「回博客」footer 出现第 3 个 sink
+  而变红（allowlist 记的还是 2 处）。复核后登记 count=3 并写明第 3 处是静态模板，294 处全审查。
+- 文档：`docs/RELEASE-2.0.1.md`、`docs/PROMPT-2.0.1.md`；BACKLOG 的 P1-8 由 `Partially Verified` 改 `Fixed`。
+- 教训：BACKLOG 里「根因收窄到 X」不等于 X，只表示当时没跑通的最短解释；中间态必须用会红/会绿的测试终结。
+
+---
+
+## 2026-11-20 · Round 24 · 本地 D1 限流把 E2E 卡住（环境记录）
+
+- 反复跑 `community-search-open` 后，夹具构建报 `429 RATE_LIMITED（请 2492 秒后再试）`——发布签名版本的
+  固定窗口计数器（`rate_limits` 表，migration 0008）在本地 D1 里累积到了上限。
+- `wrangler d1 execute --local` 起不来（`miniflare-email-store` 目录拒绝访问），改用 Node 26 自带的
+  `node:sqlite` 直接清表：`DELETE FROM rate_limits` + `PRAGMA wal_checkpoint(TRUNCATE)`，清掉 13 条后 E2E 恢复。
+- 另外两个用例最初共用 `packageId`，第二个发布必然 `409 PACKAGE_ID_TAKEN`（服务端 `assertPackageIdAvailable`
+  不看状态，删除只标 `deleted`）。已改为每用例独立后缀。
+
+---
+
+## 2026-11-20 · Round 25 · 全量 E2E 归零：184 passed / 0 failed
+
+- 全量首跑 `180 passed / 4 failed`，四条红全是**旧断言**（产品改了、测试没跟），与 2.0.1 改动无关：
+  抽奖正文 vs 按钮文案、议会无议题时提前 return 不出登录框、社交名片读的是 Supabase 而非本站 API、
+  手机底栏早就把笔记入口挪进首页「最近笔记」。逐条按产品当前契约重写断言（含源码位置注释），
+  没有放宽约束——每条都断言「当前承诺的全部合法终态」。
+- 复跑：`legacy-apps` 三条 + `mobile` 一条 = **4 passed**；全量 **184 passed（4.4m），exit 0**
+  （chromium 88 / worker 72 / firefox-worker 12 / webkit-worker 12）。
+- 另修一处测试基建坑：`community-search-open` 返回后断言 `.cx-page-head`，而首页容器是 `.cx-hero`
+  （`.cx-page-head` 只用于列表视图）；改为 `.cx-hero, .cx-page-head` 二选一，不把「返回落到哪个 tab」写成契约。
+- 本地 E2E 的新增注意事项：`plugin-upload` 限流 20 次/小时，而每轮夹具构建就要传约 20 个签名包，
+  同小时连跑第二遍必 `429`。连跑前用 `node:sqlite` 清 `rate_limits`；这条已写进 STATUS §5 风险 8。

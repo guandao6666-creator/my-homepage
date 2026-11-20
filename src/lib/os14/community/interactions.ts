@@ -36,6 +36,21 @@ import { modal, type Ctx } from "../core";
 import type { CommunityContext } from "./context";
 import type { Post } from "./types";
 
+/**
+ * 只认真正的分页按钮。
+ *
+ * 历史缺陷（2.0.0 · P1-8）：OS 外壳会在 `<html>` 上写 `data-page="desktop"`，
+ * 分页代理当时用裸 `[data-page]` 取最近祖先，任何没被前面分支接住的点击
+ * （卡片封面、标题、空白）都会命中 `<html>` 被当成「翻页」，于是详情请求
+ * 根本发不出去，body 被 `loadSearch` / `loadExplore` 重画成列表第 1 页。
+ * 2.0.1 起：选择器必须是 `button[data-page]`，且 `data-page` 必须是数字。
+ */
+export const pickPageButton = (target: HTMLElement): HTMLButtonElement | null => {
+  const button = target.closest<HTMLButtonElement>("button[data-page]");
+  if (!button) return null;
+  return /^\d+$/.test(button.dataset.page ?? "") ? button : null;
+};
+
 export const backToListImpl = (ctx: CommunityContext) => {
     const view = ctx.getView();
     const lastTab = ctx.getLastTab();

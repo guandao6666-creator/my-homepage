@@ -60,11 +60,11 @@
 
 | ID | 事项 | 状态 | 依据 | 修复方向 |
 | --- | --- | --- | --- | --- |
-| P1-8 | 社区搜索结果卡片点击无效 | **`Partially Verified`（根因收窄到竞态）** | 已定位第一层原因：**首次引导浮层** `aside.os20-onb-rail` 覆盖全屏吃掉点击（探针记录 target 即该元素）。关掉引导后点击能落到卡片 `h3`（`data-post` 命中、守卫未拦截），但详情仍未渲染、`[data-cx-body]` 内容不变 | 插桩结果：`setBody` 全部写入连接中的节点，但一次点击出现 6 次写入，最后回到搜索结果——说明 `loadDetail` 被并发的重新渲染判定为 stale 而中止（`ctx.isStale`），视图被回滚。需查触发重渲染的来源（通知轮询 / community-change 事件） |
+| P1-8 | 社区搜索结果卡片点击无效 | **`Fixed`（2.0.1 · 有回归测试）** | 根因是 click 代理的分页分支用裸选择器 `target.closest("[data-page]")`，命中外壳写在 `<html data-page="desktop">` 上的标记（src/lib/shell/adaptive.ts:141），在 `openPostFromEvent` 之前 `return`，`Number("desktop") ‖ 1` → 重画第 1 页。修复随主线提交 `bc44b75` 进入，2.0.1 把它收敛成纯函数 `pickPageButton()`（`button[data-page]` + 数字校验）。证据：`tests/unit/community.test.ts`（3 项）+ `tests/e2e/community-search-open.spec.ts`（真实 Worker 上「搜索 → 点卡片 → 详情」「点空白不跳走」） | 已完成。**旧结论作废**：2.0.0 记的「`isStale` 竞态」不成立——`loadDetail` 压根没被调用；「一次点击 6 次 `setBody`」是 init 起累计（loadHome 2 + loadSearch 2 + 误触 loadSearch 2），不是单次点击 |
 
 ---
 
-## 2026-11-18 · Round 21 · P1-8 根因收窄到竞态
+## 2026-11-18 · Round 21 · P1-8 根因收窄到竞态（**已被 2.0.1 推翻，见下节**）
 
 - 在 `setBody` 插桩后观察到：一次卡片点击产生了 6 次 `setBody`，全部写入连接中的节点，
   最终内容又回到搜索结果页 —— 说明详情加载被后续渲染判定为 stale 而中止，视图回滚。

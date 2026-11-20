@@ -64,10 +64,11 @@ test.describe("手机伴侣", () => {
     await expect(page.locator("#mobile-root")).toBeVisible();
     await page.waitForTimeout(1200);
 
-    // 底部标签栏里找笔记入口
-    const notesTab = page.locator('.m-tab[data-tab="notes"]');
-    await expect(notesTab).toBeVisible();
-    await notesTab.click();
+    // 笔记从 2.0 起不再占底栏位置（底栏让给「博客」「桌面」两个出口），
+    // 入口在首页的「最近笔记」区块里——2.0.1 同步这处断言，否则测的是已经被移除的 UI。
+    const notesEntry = page.locator('.m-sec-head button[data-tab="notes"]').first();
+    await expect(notesEntry).toBeVisible();
+    await notesEntry.click();
     await page.waitForTimeout(600);
     // 进入笔记后，本地存储里应该出现笔记数据结构（或保持为空数组）
     const notesOk = await page.evaluate(() => {

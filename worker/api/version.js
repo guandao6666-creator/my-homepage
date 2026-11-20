@@ -6,7 +6,7 @@
  * 构建前跑一次就能发现漂移。
  */
 
-export const WORKER_VERSION = "2.0.0";
+export const WORKER_VERSION = "2.0.1";
 export const RELEASE_NAME = "The Platform Era";
 
 /** 供响应头使用：让任何一次线上响应都能对应到具体版本 */
