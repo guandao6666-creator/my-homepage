@@ -276,20 +276,25 @@ function topBar() {
 function tabBar() {
   const items: Array<[Tab, string, string]> = [
     ["home", "首页", ICONS.home],
-    ["notes", "笔记", ICONS.note],
     ["tasks", "任务", ICONS.task],
     ["calendar", "日历", ICONS.calendar],
     ["more", "更多", ICONS.more],
   ];
-  // 2.0：底栏直接给一个「桌面」出口。手机访问 / 会落到 /m/，
-  // 没有这个入口就看不到博客与全部桌面应用；?desktop=1 会持久化选择。
+  // 笔记不再是底栏 tab，从首页进入：停留在笔记时把「首页」标为当前分区，
+  // 避免整条底栏没有任何高亮。
+  const activeId: Tab = state.tab === "notes" ? "home" : state.tab;
+  const tab = ([id, label, icon]: [Tab, string, string]) =>
+    `<button type="button" class="m-tab ${activeId === id && !state.sub ? "is-on" : ""}" data-m-act="tab" data-tab="${id}">${icon}<span>${label}</span></button>`;
+  // 2.0：底栏给两个站外出口——
+  //   博客：手机访问 / 会落到 /m/，博客首页在 /home/，没有它就得先进桌面再找；
+  //   桌面：?desktop=1 会持久化选择，进入完整窗口系统。
+  // 「笔记」不再占底栏位置，从首页的「打开笔记」进入。
   return `<nav class="m-tabbar" aria-label="主导航">
-    ${items
-      .map(
-        ([id, label, icon]) =>
-          `<button type="button" class="m-tab ${state.tab === id && !state.sub ? "is-on" : ""}" data-m-act="tab" data-tab="${id}">${icon}<span>${label}</span></button>`,
-      )
-      .join("")}
+    ${tab(items[0])}
+    <a class="m-tab m-tab-blog" href="/home/" aria-label="回博客">
+      ${ICONS.blog}<span>博客</span>
+    </a>
+    ${items.slice(1).map(tab).join("")}
     <a class="m-tab m-tab-desktop" href="/?desktop=1" aria-label="进入桌面版">
       ${ICONS.desktop}<span>桌面</span>
     </a>

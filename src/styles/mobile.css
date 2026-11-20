@@ -405,8 +405,8 @@ button {
   background: color-mix(in srgb, var(--m-text) 5%, transparent);
 }
 
-/* 2.0：手机伴侣底栏的「桌面」出口见 .m-tab-desktop。
-   移动端默认落在 /m/，底栏入口负责回到博客、全部应用与窗口系统。 */
+/* 2.0：手机伴侣底栏的站外出口见 .m-tab-blog / .m-tab-desktop。
+   移动端默认落在 /m/，两个入口分别负责回到博客、进入完整窗口系统。 */
 a.m-row {
   text-decoration: none;
   color: inherit;
@@ -798,12 +798,14 @@ textarea.m-input {
   filter: drop-shadow(0 0 10px color-mix(in srgb, var(--m-accent) 55%, transparent));
 }
 
-/* 2.0：底栏的「桌面」出口（链接，不是路由 tab） */
+/* 2.0：底栏的站外出口（链接，不是路由 tab）：博客 / 桌面 */
+.m-tab-blog,
 .m-tab-desktop {
   text-decoration: none;
   color: var(--m-faint);
 }
 
+.m-tab-blog:active,
 .m-tab-desktop:active {
   color: var(--m-accent);
 }
