@@ -222,6 +222,10 @@ function paint() {
 
   const showTabs = !state.noteId;
   root.innerHTML = `${topBar()}${tabContent}${showTabs ? tabBar() : ""}`;
+  // 每个视图的滚动区末尾都带一个回博客的出口：
+  // 手机访问 / 会落到 /m/，没有它就只能先进桌面版再找博客。
+  const scroll = root.querySelector<HTMLElement>(".m-scroll");
+  if (showTabs && scroll) scroll.insertAdjacentHTML("beforeend", footerExit());
   if (state.sub === null && !state.noteId) {
     const fab = fabFor();
     if (fab) root.insertAdjacentHTML("beforeend", fab);
@@ -290,6 +294,14 @@ function tabBar() {
       ${ICONS.desktop}<span>桌面</span>
     </a>
   </nav>`;
+}
+
+/** 移动伴侣底部的出口：回到博客首页（/home/，移动端访问 / 会被带回 /m/） */
+function footerExit() {
+  return `<footer class="m-foot">
+    <a class="m-foot-link" href="/home/"><span aria-hidden="true">←</span>回博客</a>
+    <p>Guandao OS 2.0 · Faster. Safer. Smoother.</p>
+  </footer>`;
 }
 
 function fabFor(): string | null {
@@ -860,7 +872,6 @@ function viewMore() {
       </div>
     </section>
 
-    <p style="text-align:center;margin:26px 0 8px;font-size:10px;color:var(--m-faint)">Guandao OS 2.0 · Faster. Safer. Smoother.</p>
   </main>`;
 }
 

@@ -14,6 +14,6 @@ export const SCRIPT_HASHES = [
   "sha256-fgtUQFb5jaN1g6kZYwKBYFSvZtn+57iJokW9hbuxx5M=",
   "sha256-fpe2tqEpOuYD1HAN6jABHvPboOMdUdn03nha7Lj8ci4=",
   "sha256-i3Qr+nsSa72XHT0mffN9Y/Yy70C8g/7so4mPI29bH2o=",
-  "sha256-yM5Y8jUXL8c4a5pchmlY58Yn/pR9HeANnrScDvaF0lQ=",
+  "sha256-xw/SBZLecgHXisq3nw+RKAEOgdF+bDD2YFslm8b1vz0=",
   "sha256-yZBdC4B5OtLAPq4R4DAVPStA6Pj9b3lMklRP7sbbdhs="
 ];
