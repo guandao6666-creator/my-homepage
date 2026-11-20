@@ -390,6 +390,10 @@
 - 生产端到端：`npm run qa:prod` **35/35 通过**，覆盖登录态、云盘、备份、隐私、社区/插件公开接口、
   真实 Chrome 客户端与 PWA 离线；测试账号清理后 `{"users":0}`。stderr 有清理 SQL 的
   `event_type` CHECK 约束报错，但脚本退出码 0 且清理核对通过，属既有清理脚本瑕疵，另记。
+- 生产 UI 冒烟（真实 Chrome + Playwright，只读）：社区首页卡片 → 详情打开（`用工作空间整理一天`）；
+  返回后搜索「用工作空」→ 1 条结果 → 点卡片 → 详情打开；`pageerror` 为 0。
+  第一次冒烟点不动卡片，原因是探针在引导浮层挂载前就 `isVisible()` 判空、随后浮层盖住全屏——
+  改为等 `[data-onb-skip]` 可见再点并等 `.os20-onb` 卸载后即通过，不是产品缺陷。
 - 顺带发现并修：`.github/workflows/quality.yml` 的 API smoke 断言写死 `2.0.0`
   （health 与 `x-guandao-version` 各一处），2.0.1 推送后 CI 必红，已同步为 `2.0.1`。
 - 文档订正：RELEASE-2.0.1 §6 原写「服务端版本来自 `/api/version`」——该项目没有该路由，

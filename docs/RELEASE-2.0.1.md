@@ -233,4 +233,5 @@ E2E 数据的来源与清理：全部使用本地夹具账号（`qa-p3-*`）在�
 | 生产 D1 迁移 | 部署前 `d1 migrations list --remote` → `No migrations to apply!` |
 | 部署前备份 | `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261120-220521.sql`（587,383 B） |
 | 生产端到端 | `npm run qa:prod` **35/35 通过**，测试账号与数据清理归零 |
+| 生产 UI 冒烟（真实 Chrome + Playwright） | 跳过引导 → 社区首页卡片点击 → 详情打开（`用工作空间整理一天`）；返回后搜索 `用工作空` → 1 条结果 → 点卡片 → 详情打开；`pageerror` 为 0——即本次修复的 P1-8 路径在生产可用 |
 | 回滚 | `npx wrangler versions deploy <上一 Version ID>`；数据侧用上述 D1 备份恢复 |

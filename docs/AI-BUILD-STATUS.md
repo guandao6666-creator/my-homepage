@@ -73,6 +73,7 @@
 | 单测 | **21 文件 / 375 通过**（新增 `pickPageButton` 3 项） |
 | 生产部署（2026-11-20） | `npm run cf:deploy` → Worker Version `7258a2a3-5ed6-479e-946e-3c0f74e71267`；`/api/health` 报 `"version":"2.0.1"`，响应头 `x-guandao-version: 2.0.1`；首页入口包内含 `2.0.1` |
 | 生产端到端（`npm run qa:prod`） | **35/35 通过**：登录态、云盘上传/下载/回收站、备份创建/校验/下载/恢复、隐私、社区/插件公开接口、真实 Chrome 客户端、PWA 离线；测试数据清理归零 |
+| 生产 UI 冒烟（真实 Chrome） | 社区首页卡片 → 详情 PASS；搜索 `用工作空` → 点结果卡片 → 详情 PASS；`pageerror` 0（P1-8 修复在生产可用） |
 
 ## 5. 重大风险（未关闭）
 
