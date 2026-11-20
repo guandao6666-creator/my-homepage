@@ -809,13 +809,15 @@
         width: var(--wg-w, 184px);
         border-radius: var(--os-r-lg);
         border: 1px solid rgba(255, 255, 255, 0.13);
-        background: rgba(22, 26, 38, calc(0.66 * var(--wg-alpha, 1)));
-        backdrop-filter: blur(24px) saturate(1.6);
+        /* 与窗口共用同一套材质：glass 透、frost 半透、solid 不透明；
+           --wg-alpha 仍是用户在组件中心单独调的不透明度 */
+        background: rgba(20, 24, 36, calc(var(--os-panel-alpha, 0.66) * 1.02 * var(--wg-alpha, 1)));
+        backdrop-filter: blur(var(--os-blur, 24px)) saturate(1.6);
         box-shadow: 0 20px 44px -22px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.1);
         transition: box-shadow 0.22s ease, border-color 0.22s ease, opacity 0.2s ease, width 0.25s var(--os-ease);
       }
       [data-os-theme="light"] .widget {
-        background: rgba(255, 255, 255, calc(0.74 * var(--wg-alpha, 1)));
+        background: rgba(252, 252, 255, calc(var(--os-panel-alpha, 0.74) * var(--wg-alpha, 1)));
         border-color: rgba(16, 20, 32, 0.1);
         box-shadow: 0 20px 44px -24px rgba(24, 30, 48, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.8);
       }
