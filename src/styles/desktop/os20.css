@@ -47,10 +47,14 @@
         --os-shadow-menu: 0 20px 44px -18px rgba(24, 30, 48, 0.26), 0 0 0 1px rgba(16, 20, 32, 0.06);
       }
 
-      /* 材质三级 */
+      /* 材质三级：glass 更透，靠更大的背景模糊保住可读性；frost 介于两者；solid 不透明 */
       .os[data-material="glass"] {
-        --os-panel-alpha: 0.68;
-        --os-blur: 28px;
+        --os-panel-alpha: 0.48;
+        --os-blur: 34px;
+      }
+      [data-os-theme="light"] .os[data-material="glass"] {
+        --os-panel-alpha: 0.58;
+        --os-blur: 30px;
       }
       .os[data-material="frost"] {
         --os-panel-alpha: 0.82;
