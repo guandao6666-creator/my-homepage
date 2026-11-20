@@ -7,7 +7,7 @@
 
 | # | 任务 | 状态 | 备注 |
 | --- | --- | --- | --- |
-| P0-1 | 生产部署 / 生产迁移 / `qa:prod` | `Blocked` | 需所有者授权（纲领 §4.2） |
+| P0-1 | 生产部署 / 生产迁移 / `qa:prod` | **`Verified`（生产，2026-11-20 · 2.0.1）**：`npm run cf:deploy` 部署 Version `7258a2a3-5ed6-479e-946e-3c0f74e71267`，`/api/health` 报 `"version":"2.0.1"`、响应头 `x-guandao-version: 2.0.1`；生产 D1 无待应用迁移（`d1 migrations list --remote` → No migrations to apply）；`npm run qa:prod` **35/35 通过** | 部署前已导出生产 D1 全量备份（587,383 B） |
 | P0-2 | 社区发布链生产验证 | **`Verified`（生产，2026-11-18）**：`prod-community-qa.mjs` 实跑 9/9 通过，qa-prod 清理归零 | 本地 260/260 已过 |
 
 ## P1 · 核心功能与一致性

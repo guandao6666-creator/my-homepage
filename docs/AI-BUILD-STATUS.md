@@ -14,11 +14,11 @@
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
-| Phase 1 · 安全与数据基线 | `Verified`（本地/CI） | 生产门禁按 1.6 规则 `Blocked` |
+| Phase 1 · 安全与数据基线 | `Verified`（本地/CI + 生产部署） | 2.0.1 已上生产、生产 D1 无待应用迁移、`qa:prod` 35/35；1.6 的备份/数据告警 webhook 仍未配置（见 §5 风险 1） |
 | Phase 2 · Shell 拆分与工程护栏 | `Verified`（本地/CI） | 2.1–2.5 全部完成（附录 P / RELEASE §16.19） |
 | Phase 3 · 插件供应链与多设备 | `Verified`（本地/CI） | 签名 / 沙箱 / OAuth / 设备 |
 | Phase 4 · 同步与冲突策略 | `Verified`（本地/CI） | `qa:sync` 45/45 |
-| Phase 5 · 社区与市场发布链 | `Partially Verified` | 本地 260/260；生产发布链 `Blocked` |
+| Phase 5 · 社区与市场发布链 | `Verified`（本地 + 生产） | 本地 260/260；生产发布链 9/9（`prod-community-qa.mjs`，2026-11-18）；`qa:prod` 复核公开接口可读 |
 | Phase 6 · 性能与可观测 | **进行中（6.1 部分完成）** | 见 §3 |
 
 ## 2. 当前质量基线（2026-11-20 本机实跑）
@@ -71,11 +71,17 @@
 | 目标 spec（`legacy-apps` 抽奖/议会/社交 + `mobile` 笔记） | 逐条复跑 **4 passed**（修掉 2.0.0 遗留的旧断言，见 RELEASE-2.0.1 §3.3） |
 | 全量 E2E | **184 passed（4.4m），exit 0**——chromium 88 + worker 72 + firefox-worker 12 + webkit-worker 12 |
 | 单测 | **21 文件 / 375 通过**（新增 `pickPageButton` 3 项） |
+| 生产部署（2026-11-20） | `npm run cf:deploy` → Worker Version `7258a2a3-5ed6-479e-946e-3c0f74e71267`；`/api/health` 报 `"version":"2.0.1"`，响应头 `x-guandao-version: 2.0.1`；首页入口包内含 `2.0.1` |
+| 生产端到端（`npm run qa:prod`） | **35/35 通过**：登录态、云盘上传/下载/回收站、备份创建/校验/下载/恢复、隐私、社区/插件公开接口、真实 Chrome 客户端、PWA 离线；测试数据清理归零 |
 
 ## 5. 重大风险（未关闭）
 
-1. **生产层全部 `Blocked`**：未部署、未应用生产迁移、未跑 `qa:prod`（Phase 1.6 门禁，需所有者授权）。
-2. **社区发布链仅本地验证**：生产 D1/R2 未执行，管理员审核链未在生产验证。
+1. **生产已上线 2.0.1，但 1.6 的两条告警 webhook 仍未配置**（`BACKUP_ALERT_WEBHOOK`、
+   `DATA_ALERT_WEBHOOK`）：备份/数据监控的**告警投递**没有在生产验证，只能依赖
+   `qa:prod` 与 `verify:d1-backup` 的主动检查。部署前已导出生产 D1 全量备份
+   （`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261120-220521.sql`，587,383 B）。
+2. **社区发布链已在生产验证 9/9**（2026-11-18），但管理员审核链的异常分支（拒绝/撤回/超时）
+   仍只有本地证据。
 3. **`os13.ts` 巨型闭包**（2,397 行）：壁纸/图标/Dock/控制中心/设置面板共用一份 cfg，
    是入口体积与可维护性的主要结构性债务，需 Core Settings API 才能干净拆分。
 4. **页面级插件安装**未并入 Playwright（仅本地证据脚本）。
@@ -96,7 +102,9 @@
 
 ## 6. 下一步（按优先级）
 
-1. **P2 · 6.3**：诊断中心接入真实 LCP/CLS/INP（页面级采集一次、写入本地快照、无数据显示「未采集」）——独立性最好、可验收。
-2. **P2 · 6.1 收尾**：appcenter / workspaces 的 app UI 改 `load()`；widgetstore 画廊拆分；目标再降 12–20 KB。
-3. **P2 · 6.2**：首屏 CSS 审计（273 KB → 200 KB），先产出「规则 → 出现时机」清单再动手。
-4. **P3 · 6.4**：发布报告记录真实 DCL/load/资源体积。
+1. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`，跑
+   `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
+2. **P2 · 6.3**：诊断中心接入真实 LCP/CLS/INP（页面级采集一次、写入本地快照、无数据显示「未采集」）——独立性最好、可验收。
+3. **P2 · 6.1 收尾**：appcenter / workspaces 的 app UI 改 `load()`；widgetstore 画廊拆分；目标再降 12–20 KB。
+4. **P2 · 6.2**：首屏 CSS 审计（273 KB → 200 KB），先产出「规则 → 出现时机」清单再动手。
+5. **P3 · 6.4**：发布报告记录真实 DCL/load/资源体积。

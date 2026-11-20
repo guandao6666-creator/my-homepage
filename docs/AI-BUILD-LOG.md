@@ -375,3 +375,24 @@
   （`.cx-page-head` 只用于列表视图）；改为 `.cx-hero, .cx-page-head` 二选一，不把「返回落到哪个 tab」写成契约。
 - 本地 E2E 的新增注意事项：`plugin-upload` 限流 20 次/小时，而每轮夹具构建就要传约 20 个签名包，
   同小时连跑第二遍必 `429`。连跑前用 `node:sqlite` 清 `rate_limits`；这条已写进 STATUS §5 风险 8。
+
+---
+
+## 2026-11-20 · Round 26 · 2.0.1 上线生产（guandao.xin）
+
+- 授权：所有者说「继续做，完成后上线」，即此前 Round 20 停下的 P0-1 得到放行。
+- 上线前置：`d1 migrations list --remote` → `No migrations to apply!`（0017/0018 早已在生产应用，
+  Round 20 的「待应用」记录已过期）；`wrangler d1 export guandao-db --remote` 先导出全量备份
+  `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261120-220521.sql`（587,383 B）。
+- 部署：`npm run cf:deploy` → Worker Version `7258a2a3-5ed6-479e-946e-3c0f74e71267`，
+  上传 63 个静态资源。`/api/health` 返回 `"version":"2.0.1"`、D1 connected、R2 available；
+  响应头 `x-guandao-version: 2.0.1`；首页入口包内含 `2.0.1`。
+- 生产端到端：`npm run qa:prod` **35/35 通过**，覆盖登录态、云盘、备份、隐私、社区/插件公开接口、
+  真实 Chrome 客户端与 PWA 离线；测试账号清理后 `{"users":0}`。stderr 有清理 SQL 的
+  `event_type` CHECK 约束报错，但脚本退出码 0 且清理核对通过，属既有清理脚本瑕疵，另记。
+- 顺带发现并修：`.github/workflows/quality.yml` 的 API smoke 断言写死 `2.0.0`
+  （health 与 `x-guandao-version` 各一处），2.0.1 推送后 CI 必红，已同步为 `2.0.1`。
+- 文档订正：RELEASE-2.0.1 §6 原写「服务端版本来自 `/api/version`」——该项目没有该路由，
+  更新中心实际读 `/api/health`；已改正并新增 §7 部署结果表（含回滚方式）。
+- 提交：`b713170 feat(os): 发布 2.0.1 Steady Clicks…` + `5df9a56` 合并 origin/main 的两个自动同步提交；
+  合并后重建使 `worker/api/csp-hashes.js` 再变一次（新博客页内联脚本），需随发布一起提交。

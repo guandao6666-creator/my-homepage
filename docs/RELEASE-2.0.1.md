@@ -5,6 +5,7 @@
 **日期**：2026-11-20
 **类型**：补丁版本（无 schema 变更、无数据迁移）
 **上游**：2.0.0 · The Platform Era
+**状态**：**已部署到生产（https://guandao.xin，2026-11-20 22:07 +08:00）**，`qa:prod` 35/35 通过
 
 > 2.0.1 只做一件事的收尾：把 2.0.0 时期「社区搜索结果里点作品卡片打不开详情」的
 > 缺陷定性、修复并用自动化测试锁住，同时补上三处同一链路上的并发/重复挂载加固。
@@ -214,5 +215,22 @@ E2E 数据的来源与清理：全部使用本地夹具账号（`qa-p3-*`）在�
 
 1. `npm run build` 与 `check:csp` 必须同批：`worker/api/csp-hashes.js` 由构建重写，
    改动内联脚本后不同步会触发 CSP 拒绝。
-2. Worker 版本以 `worker/api/version.js` 为准；前端更新中心显示的「服务端版本」来自 `/api/version`。
-3. 生产部署仍受 2.0.0 的门禁约束（所有者授权后跑 `qa:prod`），本文件不声称生产已验证。
+2. Worker 版本以 `worker/api/version.js` 为准；前端更新中心显示的「服务端版本」来自
+   `/api/health` 的 `version` 字段（`/api/version` 在本项目里没有对应路由，不要照旧文档引用）。
+3. 生产部署仍受 2.0.0 的门禁约束（所有者授权后跑 `qa:prod`）；本文件的部署结果见 §7。
+
+---
+
+## 7. 部署结果（2026-11-20）
+
+| 项 | 结果 |
+| --- | --- |
+| 部署命令 | `npm run cf:deploy`（build → `wrangler deploy`） |
+| Worker Version | `7258a2a3-5ed6-479e-946e-3c0f74e71267` |
+| `/api/health` | `"version":"2.0.1"`、`d1:"connected"`、`r2:"available"` |
+| 响应头 | `x-guandao-version: 2.0.1`；CSP/HSTS/COOP 等安全头齐全 |
+| 静态资源 | 部署 63 个资源；首页入口包 `index.astro_...DJ_tz0bB.js` 内含 `2.0.1` |
+| 生产 D1 迁移 | 部署前 `d1 migrations list --remote` → `No migrations to apply!` |
+| 部署前备份 | `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261120-220521.sql`（587,383 B） |
+| 生产端到端 | `npm run qa:prod` **35/35 通过**，测试账号与数据清理归零 |
+| 回滚 | `npx wrangler versions deploy <上一 Version ID>`；数据侧用上述 D1 备份恢复 |
