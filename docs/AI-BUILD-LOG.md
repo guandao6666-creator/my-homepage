@@ -463,3 +463,8 @@
 - 本次生产内容与 2.0.1 行为等价：只多出新的审核链 E2E/文档与版本号；Worker 逻辑未变。
 - 待办：推送 `main` 后确认 GitHub Actions 与该次 push 触发的 Cloudflare 自动构建；
   自动构建会产生新的 Version ID，发布文档里以 deployments list 与 `/api/health` 为准。
+- 推送与复核：`git push origin HEAD:main`（`9e3387a..de3cb7c`）→ GitHub Actions `quality`
+  run **44857906680 success**；Cloudflare 自动构建 Version
+  `8dd5e807-20b8-418c-b1bb-b80972e789b7`（2026-11-21T02:49:40Z），入口包哈希变为
+  `/_astro/index.astro_astro_type_script_index_0_lang.VhC_h3-F.js`；复核 `/api/health` 仍报
+  `2.0.2`、响应头 `x-guandao-version: 2.0.2`、首页 200。

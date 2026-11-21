@@ -76,6 +76,7 @@
 | 生产部署（2026-11-21） | `npm run cf:deploy` → Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`（30 页、32 个新资源、Total Upload 734.46 KiB / gzip 161.46 KiB）；`/api/health` 报 `"version":"2.0.2"`、响应头 `x-guandao-version: 2.0.2`；首页入口包 `Tr0vnTIr.js`（444,311 B）内含 2.0.2 |
 | 生产端到端（`npm run qa:prod`） | **35/35 通过**：登录态、云盘、备份创建/校验/下载/恢复、隐私、社区/插件公开接口、真实 Chrome 客户端、PWA 离线；清理后 `{"users":0}`（清理 SQL 的 `event_type` CHECK 警告属既有瑕疵） |
 | 生产 D1 | `d1 migrations list --remote` → `No migrations to apply!`；部署前已导出备份 `.backups/guandao-db-prod-20261121-104235.sql`（625,640 B） |
+| CI（GitHub Actions） | push `main`（`9e3387a..de3cb7c`）→ `quality` run **44857906680 success**；Cloudflare 自动构建 Version `8dd5e807-20b8-418c-b1bb-b80972e789b7`（02:49:40Z），`/api/health` 仍 2.0.2 |
 
 ## 5. 重大风险（未关闭）
 

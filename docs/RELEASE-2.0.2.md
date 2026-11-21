@@ -203,6 +203,9 @@ await frame.waitForLoadState("load");
 5. 注意：Cloudflare 对每次 push `main` 都会触发一次自动构建部署，Version ID 会变；
    以 `wrangler deployments list` 与 `/api/health` 为准，不要只认手部署那一次。
    清理脚本仍会在 `event_type` CHECK 约束上报既有警告（脚本 exit 0、清理核对通过）。
+6. 推送 `main`（`9e3387a..de3cb7c`）后的证据：GitHub Actions `quality` run
+   **44857906680 success**；Cloudflare 自动构建 Version `8dd5e807-20b8-418c-b1bb-b80972e789b7`
+   （2026-11-21T02:49:40Z），入口包哈希随之变为 `VhC_h3-F.js`，`/api/health` 仍报 `2.0.2`。
 
 ---
 
