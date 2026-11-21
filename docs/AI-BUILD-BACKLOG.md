@@ -127,3 +127,7 @@ Supabase 的 RLS 用 `auth.uid()::text = voter` 认人，头被删后 PostgREST 
 - **环境教训（新）**：为绕开 `plugin-upload` 限流而在后台每 20 秒清 `rate_limits` 并
   `wal_checkpoint(TRUNCATE)`，会与 Worker 的 D1 写入抢锁，偶发 `SQLITE_BUSY` 被包装成
   500（本轮 `community-follow` 因此红了一次）。做法改为「上跑前清一次」，复跑 191 passed。
+- **生产**：`npm run cf:deploy` → Version `f7af6eda-f904-4e99-b7a4-051653e8819a`；
+  `/api/health` 报 2.0.3、`x-guandao-version: 2.0.3`；生产 `/sb` + 假 JWT → 401 `PGRST301`
+  （修复前同一请求 42501）；`/sb/auth/v1/token` 返回 `invalid_credentials`，证明 body 也透传；
+  `npm run qa:prod` **35/35**，清理后 `{"users":0}`。

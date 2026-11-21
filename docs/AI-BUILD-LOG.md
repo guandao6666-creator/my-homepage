@@ -492,3 +492,5 @@
 - 全量 E2E：**191 passed（4.8m）**，exit 0。首跑 190 passed / 1 failed
   （`community-follow` 500）：不是产品缺陷，而是我为绕限流在后台轮询清 `rate_limits` 并
   `wal_checkpoint(TRUNCATE)`，与 Worker 的 D1 写抢锁 → 偶发 `SQLITE_BUSY`。改为上跑前清一次即全绿。
+- 生产部署：Version `f7af6eda-f904-4e99-b7a4-051653e8819a`（30 页、734.42 KiB / gzip 161.45 KiB）；
+  health 2.0.3、header 2.0.3；生产判别性复测 401 `PGRST301`；`qa:prod` 35/35，清理 `users=0`。

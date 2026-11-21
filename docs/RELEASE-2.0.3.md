@@ -145,8 +145,16 @@ create policy "votes insertable" on public.votes for insert
 
 ## §5 部署记录
 
-（部署后填：备份、迁移检查、`npm run cf:deploy` 的 Version ID、`/api/health`、
-生产 `/sb` 判别性复测、`qa:prod`、推送与 CI。）
+| 步骤 | 结果 |
+|---|---|
+| 生产 D1 迁移检查 | `npx wrangler d1 migrations list guandao-db --remote` → `No migrations to apply!`（本版无 schema 变更，未做备份） |
+| 部署 | `npm run cf:deploy` → build 30 页、`Uploaded 32 of 32 assets`、Total Upload **734.42 KiB / gzip 161.45 KiB**、Worker Startup 2 ms，**Version `f7af6eda-f904-4e99-b7a4-051653e8819a`** |
+| 版本核对 | `GET /api/health` → `"version":"2.0.3"`；响应头 `x-guandao-version: 2.0.3` |
+| 生产 `/sb` 判别性复测 | `POST /sb/rest/v1/votes` + `apikey` + 结构合法但签名无效的 JWT → **401 `{"code":"PGRST301","message":"JWT cryptographic operation failed"}`**（修复前同一请求是 `42501`，说明身份头已到上游） |
+| 请求体透传复核 | `POST /sb/auth/v1/token?grant_type=password` + 真实 JSON → **400 `invalid_credentials`**（上游确实解析到了 body，排除「只修了头、body 仍丢」的假绿） |
+| 读路径 | `GET /sb/rest/v1/polls?select=id,title&limit=1` → 200 |
+| `npm run qa:prod` | **35/35 通过**（生产环境）；清理后 `{"users":0}` |
+| 推送与 CI | 提交推送到 `main` 后 GitHub Actions `quality` 与 Cloudflare 自动构建见 LOG Round 29 尾条 |
 
 ---
 

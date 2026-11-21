@@ -6,7 +6,7 @@
 
 - **更新时间**：2026-11-21
 - **版本**：2.0.3（Silent Ballot，补丁版本；发布说明 `docs/RELEASE-2.0.3.md`）
-- **生产状态**：**2.0.3 待部署**（2.0.2 于 2026-11-21 10:43 +08:00 上线，Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`；2.0.3 本地/CI 已验证）
+- **生产状态**：**2.0.3 已部署**（2026-11-21 11:56 +08:00，Worker Version `f7af6eda-f904-4e99-b7a4-051653e8819a`；`/api/health` 报 2.0.3、`x-guandao-version: 2.0.3`；生产 `/sb` 判别性复测为 `PGRST301`；`qa:prod` 35/35）
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -75,7 +75,7 @@
 | 门禁 | `node scripts/check-version.mjs` → 2.0.3；`npm run verify` **exit 0**；`npm run check:docs` 通过 |
 | 单测 / 体积 | 21 文件 / 375 通过（974ms）；入口 JS **434.3 / 439.5 KB（98.8%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
 | 全量 E2E | **191 passed（4.8m），exit 0**（191 条全部通过，含新增代理用例） |
-| 生产状态 | **2.0.3 未部署**（修的是 Worker 代理，需重新 `npm run cf:deploy` 才在生产生效） |
+| 生产状态 | **2.0.3 已部署**：`npm run cf:deploy` → Version `f7af6eda-f904-4e99-b7a4-051653e8819a`（30 页、32 资源、734.42 KiB / gzip 161.45 KiB）；`/api/health` 2.0.3、响应头 2.0.3；生产 `/sb` + 假 JWT → **401 `PGRST301`**（修复前 `42501`）；请求体透传复核 `/sb/auth/v1/token` → `invalid_credentials`；`qa:prod` 35/35 |
 
 ## 4.1 上一版验证结果（2.0.2，归档）
 
@@ -124,8 +124,9 @@
 
 ## 6. 下一步（按优先级）
 
-1. **P0 · 发布 2.0.3 到生产**：`npm run cf:deploy` → `/api/health` 应为 `2.0.3` →
-   用 §4 的判别性请求复测生产 `/sb`（应得 PGRST301 而不是 42501）→ `npm run qa:prod`。
+1. **已完成（2026-11-21）· 2.0.3 生产发布**：Version `f7af6eda…`，`/api/health` 2.0.3，
+   生产 `/sb` 判别性复测 401 `PGRST301`（修复前 42501），`qa:prod` 35/35。证据见 §4 与
+   `docs/RELEASE-2.0.3.md §5`。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`，跑
    `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
 3. **P2 · P3-2 教程页面级 E2E**：`community-tutorial.spec.ts` 已覆盖草稿→审核→公开→隐藏，
