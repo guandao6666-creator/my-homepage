@@ -654,6 +654,11 @@ async function failBackup(env, userId, backupRow, code, message) {
       errorMessage: String(message).slice(0, 300),
     });
   }
+
+  // 2.0.4：失败备份不在 R2 里留半成品。旧实现只改状态，而失败备份的 size_bytes 是 NULL，
+  // storageStats 统计不到这些对象，用户反复重试时孤儿对象会悄悄放大占用。这里按备份前缀
+  // 分页清理；清理失败不改写「备份失败」这个语义，所以吞掉异常。
+  await deleteBackupPrefix(env, `users/${userId}/backups/${backupRow.id}`).catch(() => undefined);
 }
 
 /* ------------------------------------------------------------------ */

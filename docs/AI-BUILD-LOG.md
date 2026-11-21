@@ -517,7 +517,16 @@
    新增 `tests/e2e/files-folders-deep.spec.ts`（120 层，真实 Worker + 真实 D1）：409 → 递归 200 →
    永久 200 → 再删 404，1 passed（16.3s）；还原旧 handler → 1 failed（实际 500）。
 4. 查证「分页 NaN → 500」不成立（store 层 clamp），不做无意义改动。
-5. 记录但未修：同步/文件配额 TOCTOU、配对 claim 非竞态、备份失败不清理 R2（见 BACKLOG Round 25）。
+5. 记录但未修：同步/文件配额 TOCTOU（见 BACKLOG Round 25）。
+6. 续做（用户「继续」）：
+   - 配对领取 `confirmed → completed` 改为条件更新 + `meta.changes` 判定：落败请求回
+     `alreadyDelivered`，不写 Session；写 Session 失败把状态退回 `confirmed`。
+     确定性单测 `tests/unit/pairing-claim.test.ts` 2 passed；还原旧 handler → 1 failed。
+     真实 Worker `tests/e2e/pairing-claim-race.spec.ts` 1 passed（12.9s）——本机并发撞不进
+     「两个都读 confirmed」的窗口，旧代码也能通过，判别责任在单测，文档已如实写。
+   - `failBackup` 追加 `deleteBackupPrefix(users/<uid>/backups/<id>)`：失败备份不再留下
+     `size_bytes = NULL` 的孤儿对象。`tests/unit/backup-cleanup.test.ts` 2 passed；
+     还原旧 handler → 1 failed。
 
 **版本与门禁**：升 2.0.4（9 处 + 断言族）；`npm run verify` exit 0（typecheck 0 error、
 22 files / 383 tests、html-security 294/0、build 30 页、CSP 12/31）；全量 E2E **192 passed（4.6m）**；

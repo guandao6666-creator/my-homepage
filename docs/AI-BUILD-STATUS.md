@@ -27,13 +27,13 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（362 文件） |
-| `npx vitest run` | **22 文件 / 383 单测通过**（1.01s；2.0.4 新增同步并发 2 条、抽奖本地日 6 条） |
+| `npx vitest run` | **24 文件 / 387 单测通过**（1.10s；2.0.4 新增同步并发 2 条、抽奖本地日 6 条、配对领取 2 条、备份清理 2 条） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
 | 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；两项预算均通过 |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **192 passed（4.6m），exit 0**（2.0.4 全量；含新增 `files-folders-deep`） |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **193 passed（4.6m），exit 0**（2.0.4 全量；含新增 `files-folders-deep`、`pairing-claim-race`） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -72,9 +72,12 @@
 | 抽奖本地日单测（`tests/unit/draw-day.test.ts`） | **6 passed**（本地 00:05 / 07:59 / 23:55、跨月跨年补零、东八区与 UTC 日不同、源码断言写入用 `drawDateKey()`） |
 | 深目录删除 E2E（`files-folders-deep`，worker project） | **1 passed（16.3s）**：120 层 → 非递归 409（含 119 个子文件夹）→ 递归 200 → 永久 200 → 再删 404 |
 | 深目录负向对照 | 还原旧 `worker/api/files/handlers.js` 后同命令 → **1 failed**（实际 500 INTERNAL_ERROR），判别成立 |
+| 配对领取单测（`tests/unit/pairing-claim.test.ts`） | **2 passed**：假 D1 交错下只有一个请求拿到 `changes=1`，落败方回 `alreadyDelivered` 且不写 Session；负向对照还原旧 handler → **1 failed** |
+| 配对领取 E2E（`pairing-claim-race`，worker project） | **1 passed（12.9s）**：create → claim → confirm → 并发两次领取，恰好一个响应带 `gauth_sid` |
+| 备份清理单测（`tests/unit/backup-cleanup.test.ts`） | **2 passed**：跨两页前缀全部删除；源码约束 `failBackup` 在状态更新后调用 `deleteBackupPrefix`；负向对照 → **1 failed** |
 | 全量门禁 | `npm run verify` **exit 0**：typecheck 0 error；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全合计 294 处、未审查 0 |
-| 单测 / 体积 | **22 文件 / 383 通过**（1.01s）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
-| 全量 E2E | **192 passed（4.6m），exit 0**（workers=1、retries=0） |
+| 单测 / 体积 | **24 文件 / 387 通过**（1.10s）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
+| 全量 E2E | **193 passed（4.6m），exit 0**（workers=1、retries=0） |
 | 生产状态 | **2.0.4 未部署**：本轮未获上线指令，生产仍为 2.0.3（Version `f7af6eda…`、health 2.0.3） |
 
 ## 4.1 上一版验证结果（2.0.3，归档）
@@ -124,13 +127,15 @@
     - 抽奖与「存储告警每天一次」用 UTC 日：东八区本地 00:00–08:00 仍算昨天。已改本地日。
     - 目录树递归删除/永久删除把整棵树展开进 `IN (?,…)`：≥ 99 节点直接 500。已按 40 个
       一批分块；真实 Worker E2E 120 层通过，旧实现负向对照 500。
+    - 配对领取 `confirmed → completed` 无条件更新：并发轮询会各签发一枚 Session。改为
+      条件更新 + `meta.changes` 判定；确定性单测 2 passed、负向对照 1 failed，真实 Worker
+      并发 E2E 1 passed（本机难撞窗，判别旧实现靠单测）。
+    - 失败备份不清理 R2：`failBackup` 只改状态，孤儿对象 `storageStats` 看不见。改为按前缀
+      分页清理；单测 2 passed、负向对照 1 failed。
 11. **已定位、未修（2.0.4 扫描结论，下一轮优先）**：
     - 同步 push 配额 TOCTOU（`worker/api/sync/handlers.js:112-147`）；
-    - 文件上传配额 TOCTOU（`worker/api/files/handlers.js:294-298`，可突破 5 GiB）；
-    - 配对 claim 非原子（`worker/api/pairing/handlers.js:157-167`，并发可换出多个 Session）；
-    - 备份失败不清理 R2（`worker/api/backups/handlers.js:643-657`，失败备份对象成为
-      `storageStats` 看不见的孤儿）。
-    这四条都需要事务语义或更大范围改动，本轮按「有失败证据才修」的标准只定位、不硬改。
+    - 文件上传配额 TOCTOU（`worker/api/files/handlers.js:294-298`，可突破 5 GiB）。
+    这两条都需要真正的条件写入或事务语义，本轮按「有失败证据才修」的标准只定位、不硬改。
 
 ## 6. 下一步（按优先级）
 
@@ -139,8 +144,8 @@
    `qa:prod` → 推送与 CI 复核）。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`，跑
    `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
-3. **P1 · 修 §5 风险 11 的四条竞态**：先挑影响面最大的同步/文件配额 TOCTOU，
-   配合并发单测或真实 Worker E2E；配对 claim 与备份孤儿对象随后。
+3. **P1 · 修 §5 风险 11 的两条配额 TOCTOU**：同步 push（5000 实体 / 2000 墓碑）与
+   文件上传（5 GiB）；配对 claim 与备份孤儿对象已在 2.0.4 修掉。
 4. **P2 · P3-2 教程页面级 E2E**：`community-tutorial.spec.ts` 已覆盖草稿→审核→公开→隐藏，
    缺正文渲染的浏览器断言——这是最小可验证的下一步。
 5. **P2 · ACCEPTANCE 全表核对**：把 `ACCEPTANCE-2.0.md` 每行「结论 ↔ 证据」对齐，

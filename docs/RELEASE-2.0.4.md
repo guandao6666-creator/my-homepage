@@ -22,9 +22,11 @@
 | F2 | 抽奖用 UTC 日判断「今天」 | 东八区本地 00:00–08:00 仍算昨天，可以再抽一次；08:00 才重置 | 已修，单测 |
 | F3 | 「存储告警每天一次」同样用 UTC 日 | 与 F2 同源：本地早上 8 点才允许再次提醒 | 已修（复用 `todayKey`） |
 | F4 | 目录树递归删除把整棵树展开进 `IN (?,…)` | D1 单条语句上限 100 个参数；≥ 99 个节点的目录删除/永久删除直接 500 | 已修，真实 Worker E2E + 负向对照 |
+| F5 | 配对领取 `confirmed → completed` 无条件更新 | 两个并发轮询都调用 `createSessionRow`，同一配对码换出两枚 Session，其中一枚永远沉默在会话表里 | 已修，确定性单测 + 负向对照 + 真实 Worker E2E |
+| F6 | 失败备份不清理 R2 对象 | `failBackup` 只改状态；失败备份 `size_bytes` 为 NULL，`storageStats` 统计不到，重试会累积孤儿对象 | 已修，单测 + 负向对照 |
 | — | 分页 `?limit=abc` → NaN → 500 | 复核后**不成立**：store 层有 clamp 与 `\|\|` 默认值 | 未改（避免无意义改动） |
 
-另有 4 条已定位但**未在本轮修**（需要事务语义或更大改动，见 §6）：同步/文件配额 TOCTOU、配对 claim 非原子、备份失败不清理 R2。
+另有 2 条已定位但**未在本轮修**（需要事务语义，见 §6）：同步 push 配额 TOCTOU、文件上传配额 TOCTOU。
 
 ---
 
@@ -100,7 +102,41 @@ export const drawDateKey = (now: Date = new Date()): string =>
 - 新增 `tests/e2e/files-folders-deep.spec.ts`（真实 Worker + 真实 D1）：建 120 层目录 → 非递归删除 **409** 且消息含 `119 个子文件夹` → `?recursive=1` **200** → `permanent` **200** → 再删 **404**。`npx playwright test --project=worker tests/e2e/files-folders-deep.spec.ts` → **1 passed（16.3s）**。
 - 负向对照：把 `worker/api/files/handlers.js` 临时还原为 HEAD 版本后重跑 → **1 failed**，失败断言正是 `非递归删除应 409，实际 500：{"code":"INTERNAL_ERROR"}`；恢复后通过。
 
-### 2.5 版本号 9 处
+### 2.5 F5 · 配对领取把状态转换当唯一闸门
+
+`GET /api/pairing/claim/:id?secret=` 在状态为 `confirmed` 时先 `createSessionRow`，最后才把配对置为 `completed`，而且不检查 `meta.changes`。两个并发轮询都能通过前面的状态判断，于是各签发一枚 Session。
+
+修法（`worker/api/pairing/handlers.js`）：
+
+1. 先做条件更新：`UPDATE device_pairings SET status='completed', completed_at=? WHERE id=? AND status='confirmed'`；
+2. `Number(claimed?.meta?.changes ?? 0) === 0` → 直接 `ok({ status:"completed", paired:true, alreadyDelivered:true })`，不写 Session；
+3. 抢到占位的请求再 `createSessionRow`；写入失败则把状态退回 `confirmed`，避免「已完成却永远拿不到 Session」的死状态。
+
+**证据**
+
+- 新增 `tests/unit/pairing-claim.test.ts`：假 D1 把交错摆出来——两个请求都读到 `confirmed`，只有一个拿到 `changes=1`；落败方必须返回 `alreadyDelivered` 且会话插入次数为 0。`npx vitest run tests/unit/pairing-claim.test.ts` → **2 passed**。
+- 负向对照：还原旧 `worker/api/pairing/handlers.js` 后重跑 → **1 failed**（`落败的领取请求不应创建 Session`）；恢复后 2 passed。
+- 新增 `tests/e2e/pairing-claim-race.spec.ts`（真实 Worker + 真实 D1）：create → claim → confirm → 并发两次领取，断言**恰好一个响应带 `gauth_sid`**、另一个 `alreadyDelivered: true`。`npx playwright test --project=worker tests/e2e/pairing-claim-race.spec.ts` → **1 passed（12.9s）**。
+- 如实说明：本机并发请求很难稳定撞进「两个都读到 confirmed」的窗口，E2E 在旧代码上也能通过（12.9s）；判别旧实现的责任由上面的确定性单测承担。
+
+### 2.6 F6 · 失败备份清理 R2 半成品
+
+`failBackup` 原来只更新备份/任务状态，注释却写着「超限时直接失败并清理」。失败备份的 `size_bytes` 是 NULL，`storageStats` 统计不到，用户反复重试会累积孤儿对象。
+
+修法：在状态更新之后追加
+
+```js
+await deleteBackupPrefix(env, `users/${userId}/backups/${backupRow.id}`).catch(() => undefined);
+```
+
+清理失败不改写「备份失败」的语义，所以吞掉异常；`deleteBackupPrefix` 本身按前缀分页，超过单页 500 条也不会漏删。
+
+**证据**
+
+- 新增 `tests/unit/backup-cleanup.test.ts`：跨两页的对象全部删除；源码约束 `failBackup` 含清理调用且位于状态更新之后。`npx vitest run tests/unit/backup-cleanup.test.ts` → **2 passed**。
+- 负向对照：还原旧 `worker/api/backups/handlers.js` 后重跑 → **1 failed**（缺少 `deleteBackupPrefix` 调用）；恢复后 2 passed。
+
+### 2.7 版本号 9 处
 
 `package.json` / `package-lock.json`（根两行）/ `src/lib/version.ts`（`OS_VERSION` + `RELEASES` 首条 2.0.4）/ `worker/api/version.js` / `public/sw.js`（`guandao-2.0.4`）/ `shared/plugin-spec.js` / `worker/api/community/validate.js` / `cli/guandao.mjs` / `src/lib/core/registry.ts`。
 
@@ -117,10 +153,13 @@ export const drawDateKey = (now: Date = new Date()): string =>
 | 版本一致性 | `node scripts/check-version.mjs` | `2.0.4`，exit 0 |
 | 同步并发单测 | `npx vitest run tests/unit/sync-store.test.ts` | 18 passed |
 | 抽奖日界单测 | `npx vitest run tests/unit/draw-day.test.ts` | 6 passed |
-| 全部单测 | `npm run test:unit` | **22 files / 383 tests passed**（1.01s） |
+| 配对领取单测 | `npx vitest run tests/unit/pairing-claim.test.ts` | 2 passed；负向对照 1 failed |
+| 备份清单测 | `npx vitest run tests/unit/backup-cleanup.test.ts` | 2 passed；负向对照 1 failed |
+| 全部单测 | `npx vitest run` | **24 files / 387 tests passed**（1.10s） |
 | 深目录删除 E2E | `npx playwright test --project=worker tests/e2e/files-folders-deep.spec.ts` | 1 passed（16.3s） |
 | 深目录负向对照 | 还原旧 `files/handlers.js` 后同命令 | 1 failed（500，判别成立） |
-| 全量 E2E | `$env:E2E_ADMIN_PORT='18789'; npx playwright test` | **192 passed（4.6m）**，exit 0 |
+| 配对并发 E2E | `npx playwright test --project=worker tests/e2e/pairing-claim-race.spec.ts` | 1 passed（12.9s；旧代码也能通过，判别靠单测） |
+| 全量 E2E | `$env:E2E_ADMIN_PORT='18789'; npx playwright test` | **193 passed（4.6m）**，exit 0 |
 | 全量门禁 | `npm run verify` | **exit 0**（typecheck 0 errors；build 30 页；CSP 12 哈希 / 31 HTML 一致；HTML 安全审查合计 294 处、未审查 0） |
 | 体积基线 | `node scripts/perf-baseline.mjs --json` | 入口 JS 434.8 / 439.5 KB（98.9%）；首屏 CSS 184.7 / 195.3 KB（94.6%） |
 
@@ -157,8 +196,6 @@ export const drawDateKey = (now: Date = new Date()): string =>
 
 1. **同步 push 配额 TOCTOU**（`worker/api/sync/handlers.js:112-147`）：先 `userQuotaStats + estimateQuotaDelta` 再逐条写，并发可突破 5000 实体 / 2000 墓碑上限。
 2. **文件上传配额 TOCTOU**（`worker/api/files/handlers.js:294-298`）：`usage()` 检查后再 `insertPendingFile` + R2 put，并发可突破 5 GiB。
-3. **配对 claim 非原子**（`worker/api/pairing/handlers.js:157-167`）：先查 `status === 'completed'`、再无条件 `createSessionRow`、最后才 UPDATE 且不查 `meta.changes`，并发可换出多个 Session。
-4. **备份失败不清理 R2**（`worker/api/backups/handlers.js:643-657`）：`failBackup` 只改状态；注释（:540-545）写「超限时直接失败并清理」，实现没有清理；失败备份 `size_bytes` 为 NULL，`storageStats` 看不见这些孤儿对象。
 
 其他环境事实：
 
