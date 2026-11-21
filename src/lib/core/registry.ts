@@ -93,7 +93,7 @@ export class AppRegistry {
   constructor(options: RegistryOptions) {
     this.storage = options.storage;
     this.emitFn = options.emit ?? (() => undefined);
-    this.osVersion = options.osVersion ?? "2.0.1";
+    this.osVersion = options.osVersion ?? "2.0.2";
     this.hasAppFn = options.hasApp ?? ((appId) => this.records.has(appId));
 
     const stored = this.storage.read<Persisted | null>(KEY, null);

@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.1";
+export const OS_VERSION = "2.0.2";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -46,6 +46,17 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.0.2",
+    name: "Hard Evidence",
+    date: "2026-11-21",
+    notes: [
+      "社区审核链补上真实浏览器证据：拒绝、重新提交、通过、隐藏、恢复、撤回都能在界面上走完",
+      "审核接口的权限与未知动作分支加了真实 Worker 断言（403 / 400 / 404）",
+      "sandbox-origin 用例改为按 iframe name 等待导航，消除 CI 偶发「iframe 未出现」",
+      "撤掉「页面级插件安装未入 Playwright」的过期结论（该链路已有实跑用例）",
+    ],
+  },
   {
     version: "2.0.1",
     name: "Steady Clicks",

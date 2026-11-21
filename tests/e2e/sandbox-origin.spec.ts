@@ -81,19 +81,43 @@ async function probeFrame(frame: Frame): Promise<Probe> {
   }, HOST_ORIGIN);
 }
 
-async function waitForFrame(page: import("@playwright/test").Page, prefix: string): Promise<Frame> {
+/**
+ * 按 name 等一个跨源 iframe 变得可寻址并完成导航。
+ *
+ * 跨源 iframe 只有在浏览器提交导航之后才会进入 `page.frames()` 的 name 索引，
+ * 刚 append 就 `page.frame({ name })` 会拿到 null。2.0.1 的 CI 里出现过
+ * 「sandbox-sandboxed iframe 未出现」（同代码另一次全量 184 全过），就是一次性
+ * 取帧后立刻使用、在高负载下抢跑。这里只改等待方式，不改任何断言语义。
+ *
+ * 用 name 而不是 URL 前缀定位：plain 与 sandboxed 两个帧导航到同一个 runner URL，
+ * 按 URL `.find()` 拿到的可能是另一个帧，那样后面「未沙箱帧 Origin 正常」的断言
+ * 会随机落到沙箱帧上。
+ */
+async function waitForNamedFrame(
+  page: import("@playwright/test").Page,
+  name: string,
+  prefix: string,
+): Promise<Frame> {
   let found: Frame | undefined;
   await expect
     .poll(
       () => {
-        found = page.frames().find((frame) => frame.url().startsWith(prefix));
+        found = page.frame({ name }) ?? undefined;
         return Boolean(found);
       },
-      { timeout: 20_000, message: `等待 frame：${prefix}` },
+      { timeout: 20_000, message: `等待 iframe：${name}` },
     )
     .toBe(true);
-  if (!found) throw new Error(`frame 未出现：${prefix}`);
-  return found;
+  if (!found) throw new Error(`iframe 未出现：${name}`);
+  const frame: Frame = found;
+  await expect
+    .poll(() => frame.url().startsWith(prefix), {
+      timeout: 20_000,
+      message: `等待 ${name} 导航到 ${prefix}`,
+    })
+    .toBe(true);
+  await frame.waitForLoadState("load");
+  return frame;
 }
 
 test.describe("沙箱独立 Origin 隔离（本地两源真实浏览器实测）", () => {
@@ -175,19 +199,13 @@ test.describe("沙箱独立 Origin 隔离（本地两源真实浏览器实测）
       { host: HOST_ORIGIN, sandbox: SANDBOX_ORIGIN, path: RUNNER_PATH },
     );
 
-    const hostFrame = await waitForFrame(page, `${HOST_ORIGIN}${RUNNER_PATH}`);
-    const plainFrame = await waitForFrame(page, `${SANDBOX_ORIGIN}${RUNNER_PATH}`);
-    // 按 name 找目标帧，并等它真正导航到 runner 再探测；
-    // 否则会在 about:blank 阶段读到 origin === ""（全量并发下的历史抖动来源）
-    const sandboxedFrame = page.frame({ name: "sandbox-sandboxed" });
-    if (!sandboxedFrame) throw new Error("sandbox-sandboxed iframe 未出现");
-    await expect
-      .poll(() => sandboxedFrame.url().startsWith(`${SANDBOX_ORIGIN}${RUNNER_PATH}`), {
-        timeout: 20_000,
-        message: "等待 sandbox-sandboxed 导航到 runner",
-      })
-      .toBe(true);
-    await sandboxedFrame.waitForLoadState("load");
+    const hostFrame = await waitForNamedFrame(page, "host-sandboxed", `${HOST_ORIGIN}${RUNNER_PATH}`);
+    const plainFrame = await waitForNamedFrame(page, "sandbox-plain", `${SANDBOX_ORIGIN}${RUNNER_PATH}`);
+    const sandboxedFrame = await waitForNamedFrame(
+      page,
+      "sandbox-sandboxed",
+      `${SANDBOX_ORIGIN}${RUNNER_PATH}`,
+    );
 
     // ---- 1) 当前生产模型：同源 iframe + sandbox="allow-scripts"（不透明 Origin）----
     const hostProbe = await probeFrame(hostFrame);

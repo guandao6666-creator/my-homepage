@@ -290,7 +290,7 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | 5.1 安装与计数 | **通过** | 下载包 SHA-256 校验；`download_count` 仅 `package?count=1` 增加；`view_count` 独立；失败不增计数；重复安装按既有规则 |
 | 5.2 Tutorials 教程 | **通过（本地）** | 复用 `community_posts`（`post_type='tutorial'` 已存在），**不新增表/迁移**；单测 20、E2E 2 passed；修复教程正文不渲染缺陷；旧帖子与 Feed 无回归 |
 | 5.3 举报 / 审核 / 下架 / 审计 | **通过（本地）** | 举报 201/重复 409；dismiss/hide_post/delete_post；approve/reject/hide/restore/delete；审计 action + targetId；普通用户 403、未登录 401；下架后公开 404；R2 未物理删除 |
-| 插件发布闭环 | **API 级通过；页面级 Partially Verified** | `qa:plugins` **107/107 ×2**（签名→审核→市场→下载→安装→下架→审计）；`plugin-publishing.spec.ts` 1 passed ×2；页面级本地证据 20/20，未入 Playwright |
+| 插件发布闭环 | **通过（API + 页面级 Playwright，2026-11-21 复核）** | `qa:plugins` **107/107 ×2**（签名→审核→市场→下载→安装→下架→审计）；`plugin-publishing.spec.ts` 的页面级用例在真实桌面页里打开市场 → 点卡片 → 安装 → 确认权限 → 按钮变「打开」，随后 API 卸载还原（`tests/e2e/plugin-publishing.spec.ts:375-431`）；2.0.2 重新实跑确认，旧「页面级未入 Playwright」结论作废 |
 | 原有 Notes/Tasks/Calendar 与 Phase 4 同步 | **无回归** | `qa:sync` 45/45；`sync.spec.ts` 8 passed；Playwright 整包 158 passed |
 | 测试数据清理 | **通过** | 复用 `qa-cleanup.mjs` 四重校验；三次运行 R2=OK / 身份=OK / 残留=0；D1 基线 `total_posts=11`、`total_assets=9` 不变 |
 | 质量门禁 | **通过** | `npm run verify`（19 文件 / 351 单测、lint、build 29 pages、CSP 12 哈希/30 HTML、migrations 18/117、html-security 291 处/未审查 0）；`npx playwright test` **158 passed**（chromium 67 + worker 67 + firefox 12 + webkit 12）；`qa:sync` 45/45；`qa:community` 260/260；GitHub Actions quality 全绿（run 43588486049，commit a84af7e：verify 19 文件/351 单测 + API smoke（qa:sync 45/45）+ E2E 158 passed / 4.4m） |

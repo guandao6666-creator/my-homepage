@@ -404,3 +404,43 @@
   `bd2b82b7-7593-41e1-8586-0c9838404d99`；GitHub Actions `quality` 全流程 **success**
   （run 44753655638，typecheck/单测/E2E/CSP 全绿）。`de2621f` 的 quality 首跑为 183 passed / 1 failed
   （`sandbox-origin.spec.ts` 抖动），重跑 attempt 2 通过；每次推送还会触发新的自动构建，版本 ID 以部署列表为准。
+
+---
+
+## 2026-11-21 · Round 27 · 2.0.2 Hard Evidence（把中间态变成证据）
+
+- 起因：所有者要求做 2.0.2 补丁版本，范围优先级是「BACKLOG 里所有 Partially Verified / Implemented /
+  疑为竞态 → 真修或关掉」「补能成立的自动化测试」「有余力才碰性能」。开始前工作区干净，
+  HEAD `9e3387a` = origin/main。
+- 侦察结论：BACKLOG 已无中间态条目，但 STATUS/ACCEPTANCE/COMMUNITY-PUBLISHING 里仍有三条过期结论，
+  且 `sandbox-origin` 的「偶发」从未被定性。三条都不是功能缺陷，是**证据缺口**。
+- 关闭「页面级插件安装未入 Playwright」：`tests/e2e/plugin-publishing.spec.ts:375-431` 早已在
+  真实桌面跑安装链路；2.0.2 全量 E2E 复核后改写 `ACCEPTANCE-2.0.md:293`、
+  `architecture/COMMUNITY-PUBLISHING.md:191/198`、STATUS 风险 4。旧结论错在「两份文档互相抄，
+  没人回头搜 tests/」——ACCEPTANCE 304 行早已写「已并入」，293 行没跟着改。
+- 新增 `tests/e2e/community-admin-review.spec.ts`（真实 Worker + 真实桌面 UI，4 用例，
+  `4 passed / 30.4s`）：拒绝→备注→重提→通过→详情；举报→隐藏→搜不到→恢复；撤回→草稿；
+  403/400/404。过程中先撞了两次「测试自己写错」：
+  1. 第一版用例在审核队列里找 `[data-queue-status="published"]` 芯片——不存在（`moderation.ts:46`、
+     `admin.js:52` 都只有四种状态）；Playwright 对不存在的 locator 点击会一直等，180 s 后超时，
+     堆栈却落在 `finally` 的清理 DELETE 上，看起来像 DELETE 挂了。读 trace 才看到真正的最后一个动作。
+     已发布作品的下架入口是「举报处理 → 隐藏作品」（`community.ts:782` → `[data-report-resolution]`），
+     用例改为第三方举报链路。
+  2. 审核卡里有两个 `.cx-status-chip`（strict mode violation）；作品卡在「已发布」时**没有**芯片
+     （`ui.ts:58` 只在非 published 渲染）。断言分别收窄到 `.cx-mod-head .cx-status-chip` 与先断言
+     `toHaveCount(0)`。
+- 关闭「sandbox-origin 偶发」：真因是 append iframe 后立刻 `page.frame({ name })` 抢跑——跨源帧
+  只有导航提交后才进 name 索引。改为 `waitForNamedFrame`（`expect.poll` 等 name → 等 URL 前缀 →
+  `waitForLoadState("load")`）；`--repeat-each=3` → **3 passed（17.6s）**。测试编排上用 name
+  而不是 URL，因为 plain 与 sandboxed 两帧导航到同一个 runner URL。
+- 版本 2.0.2（Hard Evidence）同步 9 个落点 + 测试/脚本/CI 断言，`check-version` 通过。
+- 门禁：`npm run verify` **exit 0**（typecheck 0 error 362 文件、单测 **21/375**、html-security
+  294 全审、build **30 页**、CSP **12 哈希/31 HTML**）；全量 E2E **188 passed（5.1m），exit 0**；
+  体积 入口 JS **433.9 KB / 439.5 KB**、首屏 CSS **184.7 KB / 195.3 KB**。
+- 环境事故：`plugin-upload` 20 次/小时 + 每轮夹具约 20 个签名包，同小时连跑全量必 429
+  （本次单独跑 plugin-publishing 时被 429 打断，次生 `version.checksum` 读空）。处置只能
+  `node:sqlite` 直连本地 D1 `DELETE FROM rate_limits`（`wrangler d1 execute --local` 因
+  `miniflare-email-store` 权限不可用）；全量跑期间用后台循环每 20 s 清一次计数器，188 passed。
+  `node .tmp-clear-rate.mjs "$db"` 必须带引号，否则 PowerShell 把 `(path)` 当命令。
+- 生产：**未部署（Blocked）**。本版只改测试与版本号，Worker 行为与 2.0.1 相同；是否推 2.0.2
+  到 guandao.xin 待所有者授权。

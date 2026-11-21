@@ -188,14 +188,14 @@ Developer Center            Worker API                        Unified Market / C
 | 安装计数与浏览计数 | **通过** | `download_count` 仅 `package?count=1` 且 published 时 +1；`view_count` 独立；失败响应不增计数 |
 | Tutorials 复用模型 + 安全渲染 | **通过（本地）** | 复用 `community_posts`（`post_type='tutorial'` 已存在），**未新增表/迁移**；`tests/unit/community-tutorial.test.ts` 20 passed ×2；`tests/e2e/community-tutorial.spec.ts` 2 passed ×2；修复教程详情正文不渲染的真实缺陷 |
 | 插件发布链（API 级） | **通过（本地）** | `npm run qa:plugins` **107/107 ×2**（新增 37 项）；`tests/e2e/plugin-publishing.spec.ts` 1 passed ×2；含签名 verified → submit → 审核 → 市场列表/详情 → 下载复算 SHA-256 → 安装 → takedown → 审计 |
-| 插件客户端安装（页面级） | **Partially Verified** | 本地证据脚本走真实桌面页 + 现有 UnifiedInstaller：`GOS20.wm.open("pmarket")` → 详情安装 → 确认 → 打开，20/20 + 截图；**未并入 Playwright 套件**，未新增生产调试接口 |
+| 插件客户端安装（页面级） | **Verified（Playwright，2026-11-21 复核）** | `tests/e2e/plugin-publishing.spec.ts:375-431`：真实桌面页打开市场 → 点卡片 → 安装 → 权限确认 → 按钮变「打开」→ API 卸载还原；旧「未并入 Playwright」记录作废 |
 | 测试数据清理 | **通过** | 复用 `scripts/lib/qa-cleanup.mjs` 四重校验；三次运行均 R2=OK / 身份=OK / 残留=0；D1 基线 `total_posts=11`、`total_assets=9` 不变 |
 | 全量门禁 | **通过** | `npm run verify`：19 文件 / **351 单测**、lint、build 29 pages、CSP 12 哈希/30 HTML、migrations 18/117、html-security 291 处/未审查 0；`npx playwright test` **158 passed**（chromium 67 + worker 67 + firefox 12 + webkit 12；worker 67 含社区教程 2、插件发布链 1）；`npm run qa:sync` **45/45**；`npm run qa:community` **260/260** |
 
 ## 13. 已知限制
 
 - **生产发布链未验证**：Phase 1.6 备份告警未配置、2026-11-06 账号删除事故未 Closed → 未做生产写入/迁移/部署/`qa:prod`；本地与 CI 通过不等于生产发布链通过。
-- 插件客户端安装的**页面级**证据来自本地证据脚本（真实桌面页 + cookie），未纳入 Playwright 常规套件；Playwright 内为协议级 `plugin-publishing.spec.ts`。
+- 插件客户端安装的**页面级**证据已并入 Playwright：`tests/e2e/plugin-publishing.spec.ts:375-431` 在真实桌面页里走完「市场 → 安装 → 权限确认 → 打开 → 卸载还原」；2026-11-21 重新实跑确认，旧的本地脚本 `.shots/_p5-page-install-evidence2.mjs` 不再是证据来源。
 - 教程没有页面级浏览器 E2E：正文渲染由 `renderMarkdown` 源码守卫 + API 断言 + 单测覆盖；若后续改富文本必须单独做 Sanitizer 设计。
 - `scripts/seed-qa-local.mjs` 会复用本地唯一 admin 并删除其其它 session：与 e2e fixtures 共用 admin 时不能并发运行；`plugin-publishing.spec.ts` 已做 fixtures → seed 回退。
 - `follow` 正向链路在无 UUID 创作者的新库会 SKIP（API 强制 UUID 属生产设计），由旧库/CI 环境覆盖度不同。

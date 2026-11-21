@@ -14,7 +14,7 @@
 
 | # | 任务 | 状态 | 依赖 | 验收 |
 | --- | --- | --- | --- | --- |
-| P1-1 | 页面级插件安装并入 Playwright | **`Verified`（本地）**：发布链用例内新增真实桌面安装步骤（市场卡片 → 安装 → 权限确认 → 按钮变「打开」→ 卸载还原） | 已完成 | 不再依赖 `.shots/_p5-page-install-evidence2.mjs` 手工脚本 |
+| P1-1 | 页面级插件安装并入 Playwright | **`Verified`（本地）**：发布链用例内新增真实桌面安装步骤（市场卡片 → 安装 → 权限确认 → 按钮变「打开」 → 卸载还原）；2.0.2 全量 E2E 188 passed 复核 | 已完成 | 不再依赖 `.shots/_p5-page-install-evidence2.mjs` 手工脚本 |
 | P1-2 | `initRank` 关窗后仍写 DOM | **`Verified`（本地）**：请求返回后先判 `win.isConnected`，关窗即停止写入；单测覆盖 | 已完成 | 新增单测「窗口已关闭时请求返回后不再写 DOM」 |
 | P1-3 | legacy 网络请求取消 port | **`Verified`（本地）**：port + 只读 8 处 + 写请求 6 处全部接入；token 刷新单飞；外壳 fetch 统一实现 | 已完成 | 单测 23 项；E2E 26 passed（含关窗回归） |
 
@@ -71,3 +71,33 @@
 - 结论：不是点击丢失、不是引用失效，而是**并发重渲染与 loadDetail 的竞态**。
   下一步应查重渲染来源（通知轮询 / community-change 事件 / 搜索的二次触发）。
 - 插桩已撤销、构建已还原，工作区干净。
+
+---
+
+## 2026-11-21 · Round 23 · 2.0.2 收口（Hard Evidence）
+
+本版不开新功能，只把「结论过期」与「只有本地证据」两类中间态变成可复跑的自动化证据。
+发布说明见 `docs/RELEASE-2.0.2.md`。
+
+- **关闭「页面级插件安装未并入 Playwright」**：`tests/e2e/plugin-publishing.spec.ts:375-431`
+  一直在真实桌面页跑「市场 → 卡片 → 安装 → 权限确认 → 按钮变『打开』 → 卸载还原」。
+  2.0.2 在全量 E2E 里复核（188 passed），并改写 `docs/ACCEPTANCE-2.0.md:293` 与
+  `docs/architecture/COMMUNITY-PUBLISHING.md:191/198` 的过期结论。
+  **旧结论错在哪**：两份文档互相抄，没人回头搜 `tests/`；ACCEPTANCE 304 行早已写「已并入」，
+  293 行没跟着改。
+- **关闭「审核链只有本地证据」**：新增 `tests/e2e/community-admin-review.spec.ts`，四个用例在
+  真实 Worker + 真实桌面 UI 上跑通（4 passed / 30.4s）：拒绝→备注→重提→通过→详情；
+  举报→隐藏→搜不到→恢复；撤回→草稿；非审核员 403、未知动作 400、作品不存在 404。
+  过程中确认了两件事并写进注释：审核队列只有四种状态（`moderation.ts:46`、`admin.js:52`），
+  「已发布」不在队列里，下架已发布作品必须走「举报处理 → 隐藏作品」；作品卡状态芯片只在
+  非已发布时渲染（`ui.ts:58`），且审核卡里有两个芯片，断言必须收窄到 `.cx-mod-head`。
+- **关闭「sandbox-origin 偶发」**：真因不是环境抖动，而是测试在 iframe 导航提交前就按 name
+  取帧（跨源帧只有提交后才进 name 索引）。改为 `expect.poll` 等 name 出现、再等 URL 与 load；
+  `--repeat-each=3` → **3 passed（17.6s）**。
+- **版本号**：2.0.2 同步 9 处 + 测试/脚本/CI 断言；`node scripts/check-version.mjs` 通过。
+- **门禁**：`npm run verify` exit 0（typecheck 0 error、单测 21/375、html-security 294 全审、
+  build 30 页、CSP 12 哈希/31 HTML）；全量 E2E **188 passed（5.1m），exit 0**。
+- **生产**：**未部署（Blocked）**——本版只改测试与版本号，是否推 2.0.2 到 guandao.xin 待授权。
+- **环境教训**：`plugin-upload` 20 次/小时 + 每轮夹具约 20 个签名包，同小时连跑全量必 429；
+  只能用 Node 26 `node:sqlite` 直连本地 D1 清 `rate_limits`（`wrangler d1 execute --local` 不可用）。
+- **教训**：文档里的「未覆盖」本身就是一条需要证据的断言；下笔前先在 `tests/` 里搜同名链路。
