@@ -468,3 +468,27 @@
   `8dd5e807-20b8-418c-b1bb-b80972e789b7`（2026-11-21T02:49:40Z），入口包哈希变为
   `/_astro/index.astro_astro_type_script_index_0_lang.VhC_h3-F.js`；复核 `/api/health` 仍报
   `2.0.2`、响应头 `x-guandao-version: 2.0.2`、首页 200。
+
+---
+
+## 2026-11-21 · Round 29 · 2.0.3 Silent Ballot（议会投票修复）
+
+- 现象：用户报议会投票一直失败。前端表现「已记在本地 → 提示投票没提交上 → 记录被撤销」。
+- 定位：`worker/index.js` 的 `/sb` 代理在 1.9 加固时 `headers.delete("cookie")` 与
+  `headers.delete("authorization")` 同时存在。Supabase 的 RLS 插入策略是
+  `to authenticated with check (auth.uid()::text = voter)`，Authorization 被删后
+  PostgREST 只看到 anon，写入一律 `42501`。读取只靠 apikey，所以列表一直正常 —— 故障只在写路径。
+- 线上复现：`POST https://guandao.xin/sb/rest/v1/votes`，apikey + 结构合法但签名无效的 JWT，
+  返回 `401 {"code":"42501",...}`。如果头被透传，上游会先报 JWT 解析失败。
+- 修复：删掉 `headers.delete("authorization")`，保留 Cookie 剥离；注释写清理由。
+- 验证：本地 Worker 同一请求 → `401 {"code":"PGRST301"}`；新增
+  `tests/e2e/supabase-proxy-auth.spec.ts` 3 passed（12.8s）；负向对照（临时恢复删除行）
+  1 failed / 2 passed；恢复后 3 passed。
+- 版本 2.0.3（Silent Ballot）同步 9 处 + 断言族；`check-version` 通过；`npm run verify` exit 0；
+  单测 21/375；入口 434.3/439.5 KB、首屏 CSS 184.7/195.3 KB。
+- 环境：`wrangler dev` 在本机需要把 `TEMP`/`TMP` 指到 `.wrangler/tmpdir`，否则 workerd
+  创建 `miniflare-email-store` 会被拒（本机 ACL 问题）。
+- 影响面：树洞发帖/回复、社交名片写入共用该代理，修复一并生效；这两处尚未有 UI 级 E2E。
+- 全量 E2E：**191 passed（4.8m）**，exit 0。首跑 190 passed / 1 failed
+  （`community-follow` 500）：不是产品缺陷，而是我为绕限流在后台轮询清 `rate_limits` 并
+  `wal_checkpoint(TRUNCATE)`，与 Worker 的 D1 写抢锁 → 偶发 `SQLITE_BUSY`。改为上跑前清一次即全绿。

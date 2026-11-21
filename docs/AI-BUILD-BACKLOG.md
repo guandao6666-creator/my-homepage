@@ -102,3 +102,28 @@
 - **环境教训**：`plugin-upload` 20 次/小时 + 每轮夹具约 20 个签名包，同小时连跑全量必 429；
   只能用 Node 26 `node:sqlite` 直连本地 D1 清 `rate_limits`（`wrangler d1 execute --local` 不可用）。
 - **教训**：文档里的「未覆盖」本身就是一条需要证据的断言；下笔前先在 `tests/` 里搜同名链路。
+
+---
+
+## 2026-11-21 · Round 24 · 2.0.3 收口（Silent Ballot）
+
+用户报「议会投票一直不成功」。根因不在议会，而在 `/sb` 同源代理（`worker/index.js`）：
+1.9 安全加固时把 `cookie` 和 `authorization` 一起删了。Cookie 该删，Authorization 不该——
+Supabase 的 RLS 用 `auth.uid()::text = voter` 认人，头被删后 PostgREST 只能看到 anon，
+所有登录用户写入 42501。受影响的不止议会：树洞发帖/回复、社交名片写入共用同一条身份链。
+
+- **修复**：只剥离本站 Cookie，保留 `Authorization`；注释写明为什么（上游靠它认证）。
+- **线上复现**：`POST https://guandao.xin/sb/rest/v1/votes` + 结构合法但签名无效的 JWT
+  → **401 `42501`**（身份没到上游）；修复后本地同一请求 → **401 `PGRST301`**（JWT 被解码）。
+- **回归用例**：新增 `tests/e2e/supabase-proxy-auth.spec.ts`（真实 Worker + 真实 Supabase），
+  三条：带 JWT → PGRST301；不带 → 42501；读请求 200。**3 passed（12.8s）**。
+  负向对照：临时恢复删除行 → **1 failed / 2 passed**；恢复后 3 passed。
+- **版本**：2.0.3 同步 9 处 + 4 处断言族；`node scripts/check-version.mjs` → 一致。
+- **门禁**：`npm run verify` **exit 0**（typecheck 0 error、单测 21/375、html-security 294 全审、
+  build 30 页、CSP 12 哈希/31 HTML）；入口 JS 434.3/439.5 KB（98.8%）、首屏 CSS 184.7/195.3 KB（94.6%）。
+- **教训**：同源代理删头前先问「上游靠不靠它认证」；「读正常」会掩盖「写全挂」；
+  代理回归要用区分性错误码（PGRST301 vs 42501），不能只断言「非 200」。
+- **全量 E2E**：`npx playwright test` → **191 passed（4.8m），exit 0**。
+- **环境教训（新）**：为绕开 `plugin-upload` 限流而在后台每 20 秒清 `rate_limits` 并
+  `wal_checkpoint(TRUNCATE)`，会与 Worker 的 D1 写入抢锁，偶发 `SQLITE_BUSY` 被包装成
+  500（本轮 `community-follow` 因此红了一次）。做法改为「上跑前清一次」，复跑 191 passed。

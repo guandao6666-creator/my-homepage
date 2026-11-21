@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.2";
+export const OS_VERSION = "2.0.3";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -46,6 +46,16 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.0.3",
+    name: "Silent Ballot",
+    date: "2026-11-21",
+    notes: [
+      "修复 /sb 同源代理误删 Authorization：Supabase 只看到匿名请求，登录用户写入全部被 RLS 拒绝",
+      "议会投票、树洞发帖、社交名片共用这条身份链，代理现在只剥离本站 Cookie，保留 Bearer token",
+      "新增真实 Worker + 真实 Supabase 的代理回归用例：带 JWT 报 PGRST301，不带报 42501",
+    ],
+  },
   {
     version: "2.0.2",
     name: "Hard Evidence",

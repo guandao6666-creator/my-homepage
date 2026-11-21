@@ -5,8 +5,8 @@
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
 - **更新时间**：2026-11-21
-- **版本**：2.0.2（Hard Evidence，补丁版本；发布说明 `docs/RELEASE-2.0.2.md`）
-- **生产状态**：**2.0.2 已上线**（2026-11-21 10:43 +08:00，Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`，`qa:prod` 35/35）
+- **版本**：2.0.3（Silent Ballot，补丁版本；发布说明 `docs/RELEASE-2.0.3.md`）
+- **生产状态**：**2.0.3 待部署**（2.0.2 于 2026-11-21 10:43 +08:00 上线，Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`；2.0.3 本地/CI 已验证）
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -27,13 +27,13 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（362 文件） |
-| `npx vitest run` | **21 文件 / 375 单测通过**（2.0.2 未新增单测：本版改的是 E2E 与版本号） |
+| `npx vitest run` | **21 文件 / 375 单测通过**（2.0.3 未新增单测：修的是 Worker 代理，用真实 HTTP 回归） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
-| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **433.9 KB / 439.5 KB**（98.7%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；两项预算均通过 |
+| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.3 KB / 439.5 KB**（98.8%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；两项预算均通过 |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **188 passed（5.1m），exit 0**（含新增审核链 spec） |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **188 passed（5.1m），exit 0**（2.0.2 全量；2.0.3 新增代理 spec 单独 3 passed） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -64,7 +64,20 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.2）
+## 4. 本轮验证结果（2.0.3）
+
+| 项 | 结果 |
+| --- | --- |
+| 线上故障复现 | `POST https://guandao.xin/sb/rest/v1/votes` + 结构合法但签名无效的 JWT → **401 `42501`**（PostgREST 只看到 anon，证明 Authorization 被代理吞掉） |
+| 修复后本地代理 | 同一请求打本机 Worker → **401 `PGRST301`**（JWT 被上游解码，身份头已透传） |
+| 代理回归 E2E（`supabase-proxy-auth`） | **3 passed（12.8s）**：带 JWT → PGRST301；不带 → 42501；读请求 200 |
+| 负向对照 | 临时恢复 `headers.delete("authorization")` → **1 failed / 2 passed**（用例 1 收到 42501）；恢复修复后 3 passed |
+| 门禁 | `node scripts/check-version.mjs` → 2.0.3；`npm run verify` **exit 0**；`npm run check:docs` 通过 |
+| 单测 / 体积 | 21 文件 / 375 通过（974ms）；入口 JS **434.3 / 439.5 KB（98.8%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
+| 全量 E2E | **191 passed（4.8m），exit 0**（191 条全部通过，含新增代理用例） |
+| 生产状态 | **2.0.3 未部署**（修的是 Worker 代理，需重新 `npm run cf:deploy` 才在生产生效） |
+
+## 4.1 上一版验证结果（2.0.2，归档）
 
 | 项 | 结果 |
 | --- | --- |
@@ -105,12 +118,14 @@
      一直在跑真实桌面安装链路，2.0.2 实跑复核（全量 188 passed），结论作废。
    - 原风险 9「`sandbox-origin` 偶发」——真因是取帧抢跑，已改为按 name 轮询；
      `--repeat-each=3` 3 passed。
+9. **已关闭（2.0.3）**：`/sb` 同源代理把 `Authorization` 一起删掉，Supabase 只看到
+   anon，议会投票、树洞发帖、社交名片写入全部 42501。修复为「只剥离本站 Cookie、
+   保留 Bearer token」，并新增代理层回归用例（PGRST301 vs 42501 的区分性断言）。
 
 ## 6. 下一步（按优先级）
 
-1. **P1 · 发布 2.0.2 到生产（需授权）**：备份生产 D1 → `npm run cf:deploy` →
-   `/api/health` 应为 `2.0.2`、`x-guandao-version: 2.0.2` → `npm run qa:prod`。
-   本版只改测试与版本号，Worker 行为与 2.0.1 一致。
+1. **P0 · 发布 2.0.3 到生产**：`npm run cf:deploy` → `/api/health` 应为 `2.0.3` →
+   用 §4 的判别性请求复测生产 `/sb`（应得 PGRST301 而不是 42501）→ `npm run qa:prod`。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`，跑
    `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
 3. **P2 · P3-2 教程页面级 E2E**：`community-tutorial.spec.ts` 已覆盖草稿→审核→公开→隐藏，

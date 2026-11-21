@@ -143,7 +143,7 @@ jobs:
         run: |
           set -e
           health=$(curl -s http://127.0.0.1:8787/api/health)
-          echo "$health" | grep -q '"version":"2.0.2"'
+          echo "$health" | grep -q '"version":"2.0.3"'
           echo "$health" | grep -q '"services"'
           # 未登录访问用户数据必须是 401，不能是 200
           code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/api/files)
@@ -155,7 +155,7 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/sb/anything)
           test "$code" = "404"
           # 版本响应头
-          curl -sI http://127.0.0.1:8787/api/health | grep -qi 'x-guandao-version: 2.0.2'
+          curl -sI http://127.0.0.1:8787/api/health | grep -qi 'x-guandao-version: 2.0.3'
           echo "API smoke ok"
 
       - name: Worker log on failure

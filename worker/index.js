@@ -215,8 +215,10 @@ export default {
       headers.delete("cf-visitor");
       // 1.9 安全修复：/sb 是同源代理，浏览器会自动带上 guandao.xin 的 Cookie。
       // 这些 Cookie 属于本站会话，绝不能透传给 Supabase（第三方）。
+      // 注意：Authorization 必须保留。Supabase 用 `Authorization: Bearer <access_token>`
+      // 识别登录用户；此前一并删掉，PostgREST 只能看到 anon，RLS 的
+      // `auth.uid()::text = voter` 永远不成立，议会投票等写操作全部 42501。
       headers.delete("cookie");
-      headers.delete("authorization");
       headers.set("origin", `https://${SUPABASE_HOST}`);
       headers.set("referer", `https://${SUPABASE_HOST}/`);
 
