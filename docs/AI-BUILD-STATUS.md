@@ -5,8 +5,8 @@
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
 - **更新时间**：2026-11-21
-- **版本**：2.0.2（Hard Evidence，补丁版本；发布说明 `docs/RELEASE-2.0.2.md`）——**本地/CI 已验证，未部署生产（Blocked）**
-- **已上线版本**：2.0.1（Steady Clicks，2026-11-20 部署，`/api/health` 报 2.0.1）
+- **版本**：2.0.2（Hard Evidence，补丁版本；发布说明 `docs/RELEASE-2.0.2.md`）
+- **生产状态**：**2.0.2 已上线**（2026-11-21 10:43 +08:00，Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`，`qa:prod` 35/35）
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -15,7 +15,7 @@
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
-| Phase 1 · 安全与数据基线 | `Verified`（本地/CI + 生产部署） | 2.0.1 已上生产、生产 D1 无待应用迁移、`qa:prod` 35/35；2.0.2 只改测试与版本号、未部署；1.6 的备份/数据告警 webhook 仍未配置（见 §5 风险 1） |
+| Phase 1 · 安全与数据基线 | `Verified`（本地/CI + 生产部署） | 2.0.2 已上生产、生产 D1 无待应用迁移、`qa:prod` 35/35；1.6 的备份/数据告警 webhook 仍未配置（见 §5 风险 1） |
 | Phase 2 · Shell 拆分与工程护栏 | `Verified`（本地/CI） | 2.1–2.5 全部完成（附录 P / RELEASE §16.19） |
 | Phase 3 · 插件供应链与多设备 | `Verified`（本地/CI） | 签名 / 沙箱 / OAuth / 设备 |
 | Phase 4 · 同步与冲突策略 | `Verified`（本地/CI） | `qa:sync` 45/45 |
@@ -73,17 +73,19 @@
 | 全量 E2E | **188 passed（5.1m），exit 0**（workers=1、retries=0；含 `plugin-publishing` 的页面级安装链路） |
 | 单测 | **21 文件 / 375 通过**（1.54s，本版未新增单测） |
 | 过期结论复核 | `ACCEPTANCE-2.0.md:293`、`architecture/COMMUNITY-PUBLISHING.md:191/198`、本文件风险 4 全部按 `plugin-publishing.spec.ts:375-431` 改写 |
-| 生产状态 | **未部署（Blocked）**；生产仍是 2.0.1（Version `7258a2a3-5ed6-479e-946e-3c0f74e71267`，`/api/health` 报 2.0.1） |
+| 生产部署（2026-11-21） | `npm run cf:deploy` → Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`（30 页、32 个新资源、Total Upload 734.46 KiB / gzip 161.46 KiB）；`/api/health` 报 `"version":"2.0.2"`、响应头 `x-guandao-version: 2.0.2`；首页入口包 `Tr0vnTIr.js`（444,311 B）内含 2.0.2 |
+| 生产端到端（`npm run qa:prod`） | **35/35 通过**：登录态、云盘、备份创建/校验/下载/恢复、隐私、社区/插件公开接口、真实 Chrome 客户端、PWA 离线；清理后 `{"users":0}`（清理 SQL 的 `event_type` CHECK 警告属既有瑕疵） |
+| 生产 D1 | `d1 migrations list --remote` → `No migrations to apply!`；部署前已导出备份 `.backups/guandao-db-prod-20261121-104235.sql`（625,640 B） |
 
 ## 5. 重大风险（未关闭）
 
-1. **生产已上线 2.0.1，但 1.6 的两条告警 webhook 仍未配置**（`BACKUP_ALERT_WEBHOOK`、
+1. **生产已上线 2.0.2，但 1.6 的两条告警 webhook 仍未配置**（`BACKUP_ALERT_WEBHOOK`、
    `DATA_ALERT_WEBHOOK`）：备份/数据监控的**告警投递**没有在生产验证，只能依赖
-   `qa:prod` 与 `verify:d1-backup` 的主动检查。部署前已导出生产 D1 全量备份
-   （`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261120-220521.sql`，587,383 B）。
-2. **审核链的页面级证据已在本地补齐，但生产侧仍是 2.0.1**：2.0.2 未部署，生产上还没有
-   这四条审核链 E2E 对应的构建；且服务端本就没有「审核超时」分支（`admin.js:52` 只接受
-   四种操作），不是缺口，是契约如此。
+   `qa:prod` 与 `verify:d1-backup` 的主动检查。2.0.2 部署前已导出生产 D1 全量备份
+   （`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261121-104235.sql`，625,640 B）。
+2. **审核链的页面级证据已在本地补齐，但生产侧只有 2.0.2 这一份构建、还没有生产级审核 E2E**：
+   服务端本就没有「审核超时」分支（`admin.js:52` 只接受四种操作），不是缺口，是契约如此；
+   生产验证仍依赖 `qa:prod` 的公开接口检查，页面级审核链只在本地/CI 跑。
 3. **`os13.ts` 巨型闭包**（2,397 行）：壁纸/图标/Dock/控制中心/设置面板共用一份 cfg，
    是入口体积与可维护性的主要结构性债务，需 Core Settings API 才能干净拆分。
 4. 本地并发跑 Playwright 与 verify 会共享 `.wrangler/state` 本地 D1，互相干扰。

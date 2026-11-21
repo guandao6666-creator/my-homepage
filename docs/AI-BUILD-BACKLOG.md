@@ -7,7 +7,7 @@
 
 | # | 任务 | 状态 | 备注 |
 | --- | --- | --- | --- |
-| P0-1 | 生产部署 / 生产迁移 / `qa:prod` | **`Verified`（生产，2026-11-20 · 2.0.1）**：`npm run cf:deploy` 部署 Version `7258a2a3-5ed6-479e-946e-3c0f74e71267`，`/api/health` 报 `"version":"2.0.1"`、响应头 `x-guandao-version: 2.0.1`；生产 D1 无待应用迁移（`d1 migrations list --remote` → No migrations to apply）；`npm run qa:prod` **35/35 通过** | 部署前已导出生产 D1 全量备份（587,383 B） |
+| P0-1 | 生产部署 / 生产迁移 / `qa:prod` | **`Verified`（生产，2026-11-21 · 2.0.2）**：`npm run cf:deploy` 部署 Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`，`/api/health` 报 `"version":"2.0.2"`、响应头 `x-guandao-version: 2.0.2`；生产 D1 无待应用迁移（`d1 migrations list --remote` → No migrations to apply）；`npm run qa:prod` **35/35 通过**（2.0.1 的 2026-11-20 部署与 35/35 见历史记录） | 部署前已导出生产 D1 全量备份（625,640 B，2026-11-21） |
 | P0-2 | 社区发布链生产验证 | **`Verified`（生产，2026-11-18）**：`prod-community-qa.mjs` 实跑 9/9 通过，qa-prod 清理归零 | 本地 260/260 已过 |
 
 ## P1 · 核心功能与一致性
@@ -97,7 +97,8 @@
 - **版本号**：2.0.2 同步 9 处 + 测试/脚本/CI 断言；`node scripts/check-version.mjs` 通过。
 - **门禁**：`npm run verify` exit 0（typecheck 0 error、单测 21/375、html-security 294 全审、
   build 30 页、CSP 12 哈希/31 HTML）；全量 E2E **188 passed（5.1m），exit 0**。
-- **生产**：**未部署（Blocked）**——本版只改测试与版本号，是否推 2.0.2 到 guandao.xin 待授权。
+- **生产**：已部署 2.0.2（Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`）；`/api/health` 报 2.0.2、
+  响应头 `x-guandao-version: 2.0.2`；`npm run qa:prod` **35/35**。
 - **环境教训**：`plugin-upload` 20 次/小时 + 每轮夹具约 20 个签名包，同小时连跑全量必 429；
   只能用 Node 26 `node:sqlite` 直连本地 D1 清 `rate_limits`（`wrangler d1 execute --local` 不可用）。
 - **教训**：文档里的「未覆盖」本身就是一条需要证据的断言；下笔前先在 `tests/` 里搜同名链路。

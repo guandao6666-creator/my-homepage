@@ -5,8 +5,7 @@
 **日期**：2026-11-21
 **类型**：补丁版本（无 schema 变更、无数据迁移、无公开 API 契约变更）
 **上游**：2.0.1 · Steady Clicks
-**状态**：**本地/CI 已验证，未部署生产（Blocked）**——本版只改测试与版本号，Worker 行为未变；
-是否把这个版本号推到 guandao.xin 需要单独授权。
+**状态**：**已部署到生产（https://guandao.xin，2026-11-21 10:43 +08:00，Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`）**，`qa:prod` 35/35 通过。
 
 > 2.0.1 把 BACKLOG 里的中间态清零了，但还有三件事没有「能在 CI 里失败的证据」：
 > 「页面级插件安装未入 Playwright」「审核链异常分支只有本地证据」「sandbox-origin 偶发红」。
@@ -184,24 +183,31 @@ await frame.waitForLoadState("load");
 
 ---
 
-## 5. 部署注意（当前 **Blocked**）
+## 5. 部署记录（2026-11-21）
 
-本版没有部署到生产。若要发布：
-
-1. 先备份生产 D1（与 2.0.1 相同流程）：
-   `npx wrangler d1 export guandao-db --remote --output .backups/guandao-db-prod-<时间戳>.sql`
-2. `npx wrangler d1 migrations list guandao-db --remote` 应输出 `No migrations to apply!`（2.0.2 不加迁移）。
-3. `npm run cf:deploy`（= `npm run build && wrangler deploy`），确认 Version ID 与绑定。
-4. 部署后核对：`/api/health` 的 `version` 应为 `"2.0.2"`、响应头 `x-guandao-version: 2.0.2`；
-   首页 200；`npm run qa:prod` 全绿。
-5. 注意 Cloudflare 对每次 push 都会触发一次自动构建部署——版本 ID 以
-   `wrangler deployments list` 与 `/api/health` 为准，不要只认手部署那一次。
+1. 备份生产 D1：
+   `npx wrangler d1 export guandao-db --remote --output .backups/guandao-db-prod-20261121-104235.sql`
+   → **625,640 B**。
+2. `npx wrangler d1 migrations list guandao-db --remote` → `No migrations to apply!`（2.0.2 不加迁移）。
+3. `npm run cf:deploy`（exit 0）：build 30 页、上传 32 个新资源（195 个未变）、
+   Total Upload **734.46 KiB / gzip 161.46 KiB**、Worker Startup 4 ms，
+   绑定 `BACKUP_WORKFLOW / DB / FILES / DB_BACKUPS / ASSETS` 正常；
+   **Current Version ID `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`**（`deployments list` 显示
+   2026-11-21T02:43:03Z，100%）。
+4. 部署后核对：
+   - `/api/health` → `{"status":"ok","version":"2.0.2","releaseName":"The Platform Era","services":{"d1":"connected","r2":"available"}}`；
+   - 响应头 `x-guandao-version: 2.0.2`；
+   - 首页 200（27,812 B），入口包 `/_astro/index.astro_astro_type_script_index_0_lang.Tr0vnTIr.js`
+     （444,311 B）内含 `2.0.2`；
+   - `npm run qa:prod` → **35/35 通过**，测试数据清理后 `{"users":0}`。
+5. 注意：Cloudflare 对每次 push `main` 都会触发一次自动构建部署，Version ID 会变；
+   以 `wrangler deployments list` 与 `/api/health` 为准，不要只认手部署那一次。
+   清理脚本仍会在 `event_type` CHECK 约束上报既有警告（脚本 exit 0、清理核对通过）。
 
 ---
 
 ## 6. 未完成 / 未验证
 
-- **生产部署与 `qa:prod`：Blocked**（需要单独授权；本版未部署）。
 - **P3-2 教程页面级浏览器断言**：`community-tutorial.spec.ts` 覆盖草稿→审核→公开→隐藏，
   但正文渲染的浏览器断言仍缺（Not Started）。
 - **P3-3 真机冒烟**：需要物理设备，AI 无法替代（Not Started）。

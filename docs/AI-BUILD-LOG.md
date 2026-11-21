@@ -442,5 +442,24 @@
   `node:sqlite` 直连本地 D1 `DELETE FROM rate_limits`（`wrangler d1 execute --local` 因
   `miniflare-email-store` 权限不可用）；全量跑期间用后台循环每 20 s 清一次计数器，188 passed。
   `node .tmp-clear-rate.mjs "$db"` 必须带引号，否则 PowerShell 把 `(path)` 当命令。
-- 生产：**未部署（Blocked）**。本版只改测试与版本号，Worker 行为与 2.0.1 相同；是否推 2.0.2
-  到 guandao.xin 待所有者授权。
+- 生产：当轮未部署（等授权）；同日得到「推送并部署」答复后上线，见 Round 28。
+
+---
+
+## 2026-11-21 · Round 28 · 2.0.2 上线生产（guandao.xin）
+
+- 授权：所有者选择「推送并部署 2.0.2 到 guandao.xin」。
+- 上线前置：`git fetch` 后 origin/main 无新提交（HEAD 领先 1 个提交 `c5c8eda`）；
+  `d1 migrations list --remote` → `No migrations to apply!`；
+  `wrangler d1 export guandao-db --remote` → `.backups/guandao-db-prod-20261121-104235.sql`（625,640 B）。
+- 部署：`npm run cf:deploy` exit 0 → 30 页、上传 32 个新资源（195 个未变）、
+  Total Upload **734.46 KiB / gzip 161.46 KiB**、Worker Startup 4 ms、绑定全部正常；
+  **Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`**（2026-11-21T02:43:03Z，100%）。
+- 部署后核对：`/api/health` → `"version":"2.0.2"`、`"releaseName":"The Platform Era"`、
+  D1 connected、R2 available；响应头 `x-guandao-version: 2.0.2`；首页 200（27,812 B）；
+  入口包 `/_astro/index.astro_astro_type_script_index_0_lang.Tr0vnTIr.js`（444,311 B）含 `2.0.2`。
+- 生产端到端：`npm run qa:prod` **35/35 通过**，清理后 `{"users":0}`；
+  stderr 仍有清理 SQL 的 `event_type` CHECK 约束警告（脚本 exit 0、清理核对通过，既有瑕疵）。
+- 本次生产内容与 2.0.1 行为等价：只多出新的审核链 E2E/文档与版本号；Worker 逻辑未变。
+- 待办：推送 `main` 后确认 GitHub Actions 与该次 push 触发的 Cloudflare 自动构建；
+  自动构建会产生新的 Version ID，发布文档里以 deployments list 与 `/api/health` 为准。
