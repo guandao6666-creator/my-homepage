@@ -184,7 +184,7 @@ health/header 2.0.4、`qa:prod` 35/35、生产 D1 无待应用迁移、部署前
 
 ---
 
-## 2026-11-21 · Round 26 · 2.0.5 收口（Param Budget，未部署）
+## 2026-11-21 · Round 26 · 2.0.5 收口（Param Budget，已部署）
 
 | 编号 | 缺陷 | 证据 |
 | --- | --- | --- |
@@ -206,8 +206,9 @@ ow + user_id + N，N=99 即 101 个参数 → D1 500，客户端传 99+ 个通�
 html-security 294 处 / 未审查 0、build 30 页、CSP 12 哈希 / 31 HTML；全量 E2E **195 passed（4.7m）**）；体积不变
 （入口 JS 434.8/439.5 KB、首屏 CSS 184.7/195.3 KB，2.0.5 只改 Worker 端）。
 
-**状态**：**未部署（Blocked，等授权）**；生产仍是 2.0.4（Version `78e78621…`）。
-推送未做——本仓库 push 到 `main` 会触发 Cloudflare 自动构建并切流，需要明确授权。
+**状态**：**已部署生产（2026-11-21）**：Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`、
+health/header 2.0.5、`qa:prod` 35/35、部署前备份 650,184 B；推送 `08db11d..afa7222` 后
+Cloudflare 自动构建 `0cccf9e8-…`（13:39:58Z）。CI 状态因本机 GitHub 网络超时未复核。
 
 **教训（新增）**
 

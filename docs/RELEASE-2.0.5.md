@@ -4,7 +4,7 @@
 - **代号**：Param Budget（D1 绑定参数预算）
 - **日期**：2026-11-21
 - **上游**：2.0.4（Quiet Repairs）
-- **状态**：**本地完成，未部署**（生产仍是 2.0.4，见 §5）
+- **状态**：**已部署生产（2026-11-21）**；Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`，见 §5
 
 ## 1. 为什么有这一版
 
@@ -136,23 +136,29 @@ for (const chunk of chunkIds(ids)) {
 
 ## 4. 兼容性
 
-- **公开 API 契约不变**：`POST /api/community/notifications/read` 的成功信封仍是
+- **公开 API 契约不变**：`PATCH /api/community/me/notifications` 的成功信封仍是
   `{ success: true, data: { unread } }`；`ids` 超过 200 的行为仍是「处理前 200 个」，
   没有新增 4xx。
-- `GET /api/plugins/market?sort=trending` 的分页/排序/字段不变，只是内部聚合分块。
+- `GET /api/plugins?tab=trending`（或 `sort=trending`）的分页/排序/字段不变，只是内部聚合分块。
 - 无数据库迁移；无新增环境变量或 secret。
 - `worker/api/sql.js` 是 Worker 内部模块，不进客户端包（不增加入口体积）。
 
-## 5. 部署（待授权）
+## 5. 部署记录（已上线）
 
-生产仍是 2.0.4（Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`）。2.0.5 需要用户明确授权后才部署：
+生产已从 2.0.4 升到 2.0.5（2026-11-21，用户授权后执行）：
 
-1. `npx wrangler d1 migrations list guandao-db --remote`（预期无待应用迁移）；
-2. `npx wrangler d1 export guandao-db --remote --output <备份>`；
-3. `npm run cf:deploy`；
-4. `/api/health` 应为 `2.0.5`，`x-guandao-version: 2.0.5`；
-5. `npm run qa:prod`（预期 35/35）；
-6. 回滚目标：`78e78621-8f36-4585-87bd-a91e74ceaa3f`（2.0.4）。
+1. `npx wrangler d1 migrations list guandao-db --remote` → **`✅ No migrations to apply!`**；
+2. D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261121-213900.sql`（**650,184 B**）；
+3. `npm run cf:deploy` **exit 0** → build 30 页、`Uploaded 32 files`、
+   `Total Upload: 740.14 KiB / gzip: 162.69 KiB`、Worker Startup 2 ms、
+   **Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`**；
+4. 核对：`/api/health` → `"version":"2.0.5"`、D1 connected、R2 available；
+   `x-guandao-version: 2.0.5`；首页 200（27,812 B）；
+   入口 `/_astro/index.astro_astro_type_script_index_0_lang.9IE3LdKR.js`（446,165 B，含 `2.0.5`）；
+5. `npm run qa:prod` → **35/35 通过**，清理后 `{"users":0}`；
+6. 推送 `08db11d..afa7222` 后 Cloudflare 自动构建 Version
+   `0cccf9e8-e2d8-4845-877c-05f4694459eb`（2026-11-21T13:39:58Z，100%）；
+7. 回滚目标：`78e78621-8f36-4585-87bd-a91e74ceaa3f`（2.0.4），备份见第 2 步。
 
 ## 6. 边界与未做
 
@@ -164,5 +170,6 @@ for (const chunk of chunkIds(ids)) {
 - **未改前端**：客户端本来就不会传 99 个通知 id；这一版只修服务端边界。
 - **告警 webhook 仍未配置**（`BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`），需用户提供 URL；
   与 2.0.5 无关，但仍在 STATUS §5 风险 1 里。
-- CI 状态：本机 `api.github.com` 暂不可达（connect timeout），2.0.4 推送后的 Actions run 状态
-  尚未复核；2.0.5 推送后再一并确认。
+- **CI 状态未复核**：本机访问 `api.github.com` 与 Actions 页面均超时（github.com 同一时段也抖动），
+  2.0.4 与 2.0.5 推送后的 Actions run 结论都还没确认；能确认的是推送成功
+  （`08db11d..afa7222`）与 Cloudflare 自动构建切流（`0cccf9e8…`）。

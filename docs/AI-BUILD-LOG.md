@@ -1,4 +1,4 @@
-# AI-BUILD-LOG · 每轮开发记录
+﻿# AI-BUILD-LOG · 每轮开发记录
 
 > 追加式记录。每轮写：做了什么、改了哪些文件、测试结果、未完成、下一项。
 > 详细论证放 `docs/architecture/*` 与 `docs/RELEASE-2.0.md`，这里只留索引与结论。
@@ -622,9 +622,15 @@
 5. **版本**：9 处升 2.0.5（`Param Budget`），断言族同步（`os20.spec.ts` 4 处、
    `community-qa.mjs:338`、`plugins-qa.mjs:196`、`quality.yml:146/158`）；
    `node scripts/check-version.mjs` → 一致。
-6. **文档**：`docs/RELEASE-2.0.5.md`、`docs/PROMPT-2.0.5.md`、STATUS（2.0.5 未部署、
-   §2 26/399、§4 新增 F10/F11 行、§5 风险 12、§6 P0 发布待授权）、BACKLOG Round 26。
-7. **状态**：**未部署（Blocked，等授权）**。生产仍是 2.0.4；未 push —— 本仓库 push 到 main
-   会触发 Cloudflare 自动构建并切流。下一步：用户授权 → `npm run cf:deploy` → health/header
-   2.0.5 → `qa:prod`；trending 的「候选 ≥99 行」分支若要生产级证据，用 SQL seed 100 个插件行
-   （绕开上传限流）。
+6. **文档**：`docs/RELEASE-2.0.5.md`、`docs/PROMPT-2.0.5.md`、STATUS（§2 26/399、§4 新增
+   F10/F11 行、§5 风险 12）、BACKLOG Round 26。
+7. **真实 Worker E2E**：新增 `tests/e2e/d1-param-bounds.spec.ts`（2 passed / 12.1s：
+   `PATCH /api/community/me/notifications` 带 120 个 id → 200；`GET /api/plugins?tab=trending`
+   每条 `recentDownloads` 为数字）；旧实现负向对照 1 failed（真实 D1 500）。踩坑：真实路由是
+   `PATCH /api/community/me/notifications`（不是 `/api/community/notifications/read`）、
+   `GET /api/plugins?tab=trending`（不是 `/api/plugins/market`）、字段是 `recentDownloads`。
+8. **状态**：**已部署生产（2026-11-21）**。Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`
+   （30 页 / 32 资源 / 740.14 KiB gzip 162.69 KiB）；health/header 2.0.5；入口 `9IE3LdKR.js`
+   446,165 B；`qa:prod` 35/35；部署前备份 650,184 B；push `08db11d..afa7222` 后 Cloudflare
+   自动构建 `0cccf9e8-…`（13:39:58Z）。CI 状态**未复核**（本机 `api.github.com` 连接超时）。
+   剩余边界：trending「候选 ≥99 行」未用真实 E2E 造满；告警 webhook 仍需两个 URL。
