@@ -402,4 +402,5 @@
   合并后重建使 `worker/api/csp-hashes.js` 再变一次（新博客页内联脚本），需随发布一起提交。
 - 推送 `main`（`f3194d0`、`cb9c26e`）后：Cloudflare 自动构建并部署了同源码的 Version
   `bd2b82b7-7593-41e1-8586-0c9838404d99`；GitHub Actions `quality` 全流程 **success**
-  （run 44753655638，typecheck/单测/E2E/CSP 全绿）。
+  （run 44753655638，typecheck/单测/E2E/CSP 全绿）。`de2621f` 的 quality 首跑为 183 passed / 1 failed
+  （`sandbox-origin.spec.ts` 抖动），重跑 attempt 2 通过；每次推送还会触发新的自动构建，版本 ID 以部署列表为准。

@@ -235,4 +235,4 @@ E2E 数据的来源与清理：全部使用本地夹具账号（`qa-p3-*`）在�
 | 生产端到端 | `npm run qa:prod` **35/35 通过**，测试账号与数据清理归零 |
 | 生产 UI 冒烟（真实 Chrome + Playwright） | 跳过引导 → 社区首页卡片点击 → 详情打开（`用工作空间整理一天`）；返回后搜索 `用工作空` → 1 条结果 → 点卡片 → 详情打开；`pageerror` 为 0——即本次修复的 P1-8 路径在生产可用 |
 | 回滚 | `npx wrangler versions deploy <上一 Version ID>`；数据侧用上述 D1 备份恢复 |
-| 推送后自动构建 | 推送 `main`（`f3194d0`）后 Cloudflare 又自动构建部署了同源码的 Version `bd2b82b7-7593-41e1-8586-0c9838404d99`（14:24:39Z）；线上 `/api/health` 仍为 2.0.1，首页入口包内含 2.0.1 |
+| 推送后自动构建 | 之后每次推送 `main` 都会触发 Cloudflare 自动构建并部署同源码的新 Version：`f3194d0` → `bd2b82b7-7593-41e1-8586-0c9838404d99`（14:24:39Z），`de2621f` → `6f9f8cb1-3dab-48e9-9fea-cec0cef4e840`（14:38:39Z）。版本 ID 随每次构建变化，以 `wrangler deployments list` 与 `/api/health` 为准；线上版本号仍为 2.0.1，首页入口包内含 2.0.1 |
