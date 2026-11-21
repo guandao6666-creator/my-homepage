@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.3";
+export const OS_VERSION = "2.0.4";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -46,6 +46,17 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.0.4",
+    name: "Quiet Repairs",
+    date: "2026-11-21",
+    notes: [
+      "同步 applyChange 改为条件写：并发 push 不再各自算同一个 revision 后互相覆盖（丢失更新）",
+      "抽奖与「存储告警每天一次」改用本地日，UTC 日在东八区会让本地 00:00–08:00 仍算昨天",
+      "≥99 个节点的目录树递归删除/永久删除改为分块执行，不再撞 D1 100 参数上限而 500",
+      "新增并发冲突、本地日边界单测，并给深目录删除补真实 Worker E2E（120 层 → 409 → 递归 → 清空）",
+    ],
+  },
   {
     version: "2.0.3",
     name: "Silent Ballot",

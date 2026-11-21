@@ -1,12 +1,12 @@
-﻿# AI-BUILD-STATUS · Guandao OS 当前状态
+# AI-BUILD-STATUS · Guandao OS 当前状态
 
 > 本文件只记录**当前事实**，不复制历史细节。
 > 历史细节见 `GUANDAO_2_0_AUDIT.md`（附录 A–P）、`GUANDAO_2_0_ROADMAP.md`、`docs/RELEASE-2.0.md`。
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
 - **更新时间**：2026-11-21
-- **版本**：2.0.3（Silent Ballot，补丁版本；发布说明 `docs/RELEASE-2.0.3.md`）
-- **生产状态**：**2.0.3 已部署**（2026-11-21 11:56 +08:00，Worker Version `f7af6eda-f904-4e99-b7a4-051653e8819a`；`/api/health` 报 2.0.3、`x-guandao-version: 2.0.3`；生产 `/sb` 判别性复测为 `PGRST301`；`qa:prod` 35/35）
+- **版本**：2.0.4（Quiet Repairs，补丁版本；发布说明 `docs/RELEASE-2.0.4.md`）
+- **生产状态**：**2.0.4 未部署**（本轮是缺陷扫描与修复，未获上线指令；生产仍是 2.0.3，Worker Version `f7af6eda-f904-4e99-b7a4-051653e8819a`，`/api/health` 报 2.0.3）
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -27,13 +27,13 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（362 文件） |
-| `npx vitest run` | **21 文件 / 375 单测通过**（2.0.3 未新增单测：修的是 Worker 代理，用真实 HTTP 回归） |
+| `npx vitest run` | **22 文件 / 383 单测通过**（1.01s；2.0.4 新增同步并发 2 条、抽奖本地日 6 条） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
-| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.3 KB / 439.5 KB**（98.8%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；两项预算均通过 |
+| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；两项预算均通过 |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **188 passed（5.1m），exit 0**（2.0.2 全量；2.0.3 新增代理 spec 单独 3 passed） |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **192 passed（4.6m），exit 0**（2.0.4 全量；含新增 `files-folders-deep`） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -64,39 +64,35 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.3）
+## 4. 本轮验证结果（2.0.4）
 
 | 项 | 结果 |
 | --- | --- |
-| 线上故障复现 | `POST https://guandao.xin/sb/rest/v1/votes` + 结构合法但签名无效的 JWT → **401 `42501`**（PostgREST 只看到 anon，证明 Authorization 被代理吞掉） |
-| 修复后本地代理 | 同一请求打本机 Worker → **401 `PGRST301`**（JWT 被上游解码，身份头已透传） |
-| 代理回归 E2E（`supabase-proxy-auth`） | **3 passed（12.8s）**：带 JWT → PGRST301；不带 → 42501；读请求 200 |
-| 负向对照 | 临时恢复 `headers.delete("authorization")` → **1 failed / 2 passed**（用例 1 收到 42501）；恢复修复后 3 passed |
-| 门禁 | `node scripts/check-version.mjs` → 2.0.3；`npm run verify` **exit 0**；`npm run check:docs` 通过 |
-| 单测 / 体积 | 21 文件 / 375 通过（974ms）；入口 JS **434.3 / 439.5 KB（98.8%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
-| 全量 E2E | **191 passed（4.8m），exit 0**（191 条全部通过，含新增代理用例） |
-| 生产状态 | **2.0.3 已部署**：`npm run cf:deploy` → Version `f7af6eda-f904-4e99-b7a4-051653e8819a`（30 页、32 资源、734.42 KiB / gzip 161.45 KiB）；`/api/health` 2.0.3、响应头 2.0.3；生产 `/sb` + 假 JWT → **401 `PGRST301`**（修复前 `42501`）；请求体透传复核 `/sb/auth/v1/token` → `invalid_credentials`；`qa:prod` 35/35；推送 `1dfc50c` → CI run 44864220754 success、Cloudflare 自动构建 `1b8f50ac…` |
+| 同步并发单测（`tests/unit/sync-store.test.ts`） | **18 passed**（新增 2 条：并发更新同 revision、并发首次插入）；负向对照还原旧实现 → **2 failed / 16 passed** |
+| 抽奖本地日单测（`tests/unit/draw-day.test.ts`） | **6 passed**（本地 00:05 / 07:59 / 23:55、跨月跨年补零、东八区与 UTC 日不同、源码断言写入用 `drawDateKey()`） |
+| 深目录删除 E2E（`files-folders-deep`，worker project） | **1 passed（16.3s）**：120 层 → 非递归 409（含 119 个子文件夹）→ 递归 200 → 永久 200 → 再删 404 |
+| 深目录负向对照 | 还原旧 `worker/api/files/handlers.js` 后同命令 → **1 failed**（实际 500 INTERNAL_ERROR），判别成立 |
+| 全量门禁 | `npm run verify` **exit 0**：typecheck 0 error；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全合计 294 处、未审查 0 |
+| 单测 / 体积 | **22 文件 / 383 通过**（1.01s）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
+| 全量 E2E | **192 passed（4.6m），exit 0**（workers=1、retries=0） |
+| 生产状态 | **2.0.4 未部署**：本轮未获上线指令，生产仍为 2.0.3（Version `f7af6eda…`、health 2.0.3） |
 
-## 4.1 上一版验证结果（2.0.2，归档）
+## 4.1 上一版验证结果（2.0.3，归档）
 
 | 项 | 结果 |
 | --- | --- |
-| 审核链 E2E（`community-admin-review`，worker project） | **4 passed（30.4s）**：拒绝→备注→重提→通过→详情；举报→隐藏→空态→恢复；撤回→草稿；403/400/404 权限分支 |
-| sandbox 稳定性（`sandbox-origin --repeat-each=3`） | **3 passed（17.6s）**：按 iframe name 轮询取帧，替代原来的「append 后立刻取帧」 |
-| 全量 E2E | **188 passed（5.1m），exit 0**（workers=1、retries=0；含 `plugin-publishing` 的页面级安装链路） |
-| 单测 | **21 文件 / 375 通过**（1.54s，本版未新增单测） |
-| 过期结论复核 | `ACCEPTANCE-2.0.md:293`、`architecture/COMMUNITY-PUBLISHING.md:191/198`、本文件风险 4 全部按 `plugin-publishing.spec.ts:375-431` 改写 |
-| 生产部署（2026-11-21） | `npm run cf:deploy` → Worker Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`（30 页、32 个新资源、Total Upload 734.46 KiB / gzip 161.46 KiB）；`/api/health` 报 `"version":"2.0.2"`、响应头 `x-guandao-version: 2.0.2`；首页入口包 `Tr0vnTIr.js`（444,311 B）内含 2.0.2 |
-| 生产端到端（`npm run qa:prod`） | **35/35 通过**：登录态、云盘、备份创建/校验/下载/恢复、隐私、社区/插件公开接口、真实 Chrome 客户端、PWA 离线；清理后 `{"users":0}`（清理 SQL 的 `event_type` CHECK 警告属既有瑕疵） |
-| 生产 D1 | `d1 migrations list --remote` → `No migrations to apply!`；部署前已导出备份 `.backups/guandao-db-prod-20261121-104235.sql`（625,640 B） |
-| CI（GitHub Actions） | push `main`（`9e3387a..de3cb7c`）→ `quality` run **44857906680 success**；Cloudflare 自动构建 Version `8dd5e807-20b8-418c-b1bb-b80972e789b7`（02:49:40Z），`/api/health` 仍 2.0.2 |
+| 代理修复复现 | 生产 `POST /sb/rest/v1/votes` + 假 JWT → **401 `42501`**；修复后本机 → **401 `PGRST301`** |
+| 代理回归 E2E（`supabase-proxy-auth`） | **3 passed（12.8s）**；负向对照恢复删头 → **1 failed / 2 passed** |
+| 门禁 / 全量 E2E | `npm run verify` exit 0；**191 passed（4.8m）** |
+| 生产部署 | Version `f7af6eda-f904-4e99-b7a4-051653e8819a`；health 2.0.3；`qa:prod` 35/35；CI run 44864220754 success |
 
 ## 5. 重大风险（未关闭）
 
-1. **生产已上线 2.0.2，但 1.6 的两条告警 webhook 仍未配置**（`BACKUP_ALERT_WEBHOOK`、
-   `DATA_ALERT_WEBHOOK`）：备份/数据监控的**告警投递**没有在生产验证，只能依赖
-   `qa:prod` 与 `verify:d1-backup` 的主动检查。2.0.2 部署前已导出生产 D1 全量备份
-   （`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261121-104235.sql`，625,640 B）。
+1. **生产仍是 2.0.3，2.0.4 尚未部署**（本轮是缺陷扫描修复，未获上线指令）；1.6 的两条告警
+   webhook 仍未配置（`BACKUP_ALERT_WEBHOOK`、`DATA_ALERT_WEBHOOK`）：备份/数据监控的
+   **告警投递**没有在生产验证，只能依赖 `qa:prod` 与 `verify:d1-backup` 的主动检查。
+   2.0.2 部署前导出的生产 D1 全量备份仍在
+   `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261121-104235.sql`（625,640 B）。
 2. **审核链的页面级证据已在本地补齐，但生产侧只有 2.0.2 这一份构建、还没有生产级审核 E2E**：
    服务端本就没有「审核超时」分支（`admin.js:52` 只接受四种操作），不是缺口，是契约如此；
    生产验证仍依赖 `qa:prod` 的公开接口检查，页面级审核链只在本地/CI 跑。
@@ -121,17 +117,33 @@
 9. **已关闭（2.0.3）**：`/sb` 同源代理把 `Authorization` 一起删掉，Supabase 只看到
    anon，议会投票、树洞发帖、社交名片写入全部 42501。修复为「只剥离本站 Cookie、
    保留 Bearer token」，并新增代理层回归用例（PGRST301 vs 42501 的区分性断言）。
+10. **已修（2.0.4）**：
+    - 同步 `applyChange` 读—判—写竞态：并发 push 会拿到同一个 revision 后互相覆盖，
+      客户端永远不产生冲突记录。改为条件 `UPDATE/INSERT` + `meta.changes` 判定，
+      单测 18 passed、负向对照 2 failed。
+    - 抽奖与「存储告警每天一次」用 UTC 日：东八区本地 00:00–08:00 仍算昨天。已改本地日。
+    - 目录树递归删除/永久删除把整棵树展开进 `IN (?,…)`：≥ 99 节点直接 500。已按 40 个
+      一批分块；真实 Worker E2E 120 层通过，旧实现负向对照 500。
+11. **已定位、未修（2.0.4 扫描结论，下一轮优先）**：
+    - 同步 push 配额 TOCTOU（`worker/api/sync/handlers.js:112-147`）；
+    - 文件上传配额 TOCTOU（`worker/api/files/handlers.js:294-298`，可突破 5 GiB）；
+    - 配对 claim 非原子（`worker/api/pairing/handlers.js:157-167`，并发可换出多个 Session）；
+    - 备份失败不清理 R2（`worker/api/backups/handlers.js:643-657`，失败备份对象成为
+      `storageStats` 看不见的孤儿）。
+    这四条都需要事务语义或更大范围改动，本轮按「有失败证据才修」的标准只定位、不硬改。
 
 ## 6. 下一步（按优先级）
 
-1. **已完成（2026-11-21）· 2.0.3 生产发布**：Version `f7af6eda…`，`/api/health` 2.0.3，
-   生产 `/sb` 判别性复测 401 `PGRST301`（修复前 42501），`qa:prod` 35/35。证据见 §4 与
-   `docs/RELEASE-2.0.3.md §5`。
+1. **P0 · 2.0.4 生产发布（待授权）**：代码、单测、E2E、verify 已齐；上线路径见
+   `docs/RELEASE-2.0.4.md §5`（迁移确认 → D1 导出 → `npm run cf:deploy` → health 2.0.4 →
+   `qa:prod` → 推送与 CI 复核）。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`，跑
    `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
-3. **P2 · P3-2 教程页面级 E2E**：`community-tutorial.spec.ts` 已覆盖草稿→审核→公开→隐藏，
+3. **P1 · 修 §5 风险 11 的四条竞态**：先挑影响面最大的同步/文件配额 TOCTOU，
+   配合并发单测或真实 Worker E2E；配对 claim 与备份孤儿对象随后。
+4. **P2 · P3-2 教程页面级 E2E**：`community-tutorial.spec.ts` 已覆盖草稿→审核→公开→隐藏，
    缺正文渲染的浏览器断言——这是最小可验证的下一步。
-4. **P2 · ACCEPTANCE 全表核对**：把 `ACCEPTANCE-2.0.md` 每行「结论 ↔ 证据」对齐，
+5. **P2 · ACCEPTANCE 全表核对**：把 `ACCEPTANCE-2.0.md` 每行「结论 ↔ 证据」对齐，
    过期行标「历史」，避免再出现 293/304 这种自相矛盾。
-5. **P3 · 6.4 生产性能基线**：发布报告记录真实 DCL/load/资源体积（需生产授权）。
-6. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+6. **P3 · 6.4 生产性能基线**：发布报告记录真实 DCL/load/资源体积（需生产授权）。
+7. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。

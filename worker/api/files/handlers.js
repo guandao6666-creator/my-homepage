@@ -38,6 +38,23 @@ import {
 
 const PREFIX = "/api/files";
 
+/**
+ * D1 单条语句最多 100 个绑定参数（sync/store.js 的 ID_CHUNK_SIZE 注释里也有同一约束）。
+ *
+ * 递归删除会把整棵子树展开成 `IN (?, ?, …)`，参数数 = 节点数 + 其它条件参数；
+ * 超过 100 时 D1 直接报 SQL 错误 → 500，而且用户没有办法绕开（只能一个个删子目录）。
+ * 这里按 40 个 id 一块执行，给 userId / 时间戳等参数留足余量。
+ */
+const FOLDER_TREE_CHUNK = 40;
+
+const chunkIds = (ids, size = FOLDER_TREE_CHUNK) => {
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += size) chunks.push(ids.slice(i, i + size));
+  return chunks;
+};
+
+const placeholdersFor = (chunk) => chunk.map(() => "?").join(",");
+
 export async function handleFilesRequest({ request, env, url, path }) {
   if (path !== PREFIX && !path.startsWith(`${PREFIX}/`)) return null;
 
@@ -402,14 +419,17 @@ async function permanentDeleteHandler(env, userId, file) {
 async function deleteFolderHandler(env, userId, folder, url) {
   const recursive = url.searchParams.get("recursive") === "1";
   const tree = await folderTree(env, userId, folder.id);
-  const placeholders = tree.map(() => "?").join(",");
+  const chunks = chunkIds(tree);
 
-  const fileCountRow = await env.DB.prepare(
-    `SELECT COUNT(*) AS total FROM files WHERE user_id = ? AND parent_id IN (${placeholders}) AND status = 'ready'`,
-  )
-    .bind(userId, ...tree)
-    .first();
-  const fileCount = Number(fileCountRow?.total || 0);
+  let fileCount = 0;
+  for (const chunk of chunks) {
+    const fileCountRow = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM files WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)}) AND status = 'ready'`,
+    )
+      .bind(userId, ...chunk)
+      .first();
+    fileCount += Number(fileCountRow?.total || 0);
+  }
   const childFolders = tree.length - 1;
 
   if (!recursive && (fileCount > 0 || childFolders > 0)) {
@@ -421,18 +441,22 @@ async function deleteFolderHandler(env, userId, folder, url) {
   }
 
   const now = Date.now();
-  await env.DB.prepare(
-    `UPDATE folders SET deleted_at = ?, trash_group = ? WHERE user_id = ? AND id IN (${placeholders})`,
-  )
-    .bind(now, folder.id, userId, ...tree)
-    .run();
+  await env.DB.batch(
+    chunks.map((chunk) =>
+      env.DB.prepare(
+        `UPDATE folders SET deleted_at = ?, trash_group = ? WHERE user_id = ? AND id IN (${placeholdersFor(chunk)})`,
+      ).bind(now, folder.id, userId, ...chunk),
+    ),
+  );
 
-  await env.DB.prepare(
-    `UPDATE files SET status = 'trash', deleted_at = ?, trash_group = ?, updated_at = ?
-      WHERE user_id = ? AND parent_id IN (${placeholders}) AND status = 'ready'`,
-  )
-    .bind(now, folder.id, now, userId, ...tree)
-    .run();
+  await env.DB.batch(
+    chunks.map((chunk) =>
+      env.DB.prepare(
+        `UPDATE files SET status = 'trash', deleted_at = ?, trash_group = ?, updated_at = ?
+          WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)}) AND status = 'ready'`,
+      ).bind(now, folder.id, now, userId, ...chunk),
+    ),
+  );
 
   await logEvent(env, userId, "trash_folder", folder.id, { files: fileCount, folders: childFolders });
   return ok({ trashed: true, files: fileCount, folders: childFolders });
@@ -469,14 +493,18 @@ async function permanentFolderHandler(env, userId, folder) {
   if (!folder.deleted_at) throw new ApiError("NOT_TRASHED", "请先将文件夹移入回收站", 409);
 
   const tree = await folderTree(env, userId, folder.id);
-  const placeholders = tree.map(() => "?").join(",");
+  const chunks = chunkIds(tree);
 
-  const rows = await env.DB.prepare(
-    `SELECT id, r2_key FROM files WHERE user_id = ? AND parent_id IN (${placeholders})`,
-  )
-    .bind(userId, ...tree)
-    .all();
-  const files = rows.results || [];
+  // 分块查文件：整棵大目录同样会超过 D1 的 100 绑定参数上限
+  const files = [];
+  for (const chunk of chunks) {
+    const rows = await env.DB.prepare(
+      `SELECT id, r2_key FROM files WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)})`,
+    )
+      .bind(userId, ...chunk)
+      .all();
+    files.push(...(rows.results || []));
+  }
   const keys = files.map((row) => row.r2_key).filter(Boolean);
 
   for (let i = 0; i < keys.length; i += 500) {
@@ -484,19 +512,29 @@ async function permanentFolderHandler(env, userId, folder) {
       await env.FILES.delete(keys.slice(i, i + 500));
     } catch (error) {
       console.error("[files] folder delete r2 failed:", error?.message ?? error);
-      await env.DB.prepare(
-        `UPDATE files SET status = 'pending_delete' WHERE user_id = ? AND parent_id IN (${placeholders})`,
-      )
-        .bind(userId, ...tree)
-        .run();
+      await env.DB.batch(
+        chunks.map((chunk) =>
+          env.DB.prepare(
+            `UPDATE files SET status = 'pending_delete' WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)})`,
+          ).bind(userId, ...chunk),
+        ),
+      );
       throw new ApiError("DELETE_FAILED", "R2 删除失败，已保留重试状态", 502);
     }
   }
 
-  await env.DB.batch([
-    env.DB.prepare(`DELETE FROM files WHERE user_id = ? AND parent_id IN (${placeholders})`).bind(userId, ...tree),
-    env.DB.prepare(`DELETE FROM folders WHERE user_id = ? AND id IN (${placeholders})`).bind(userId, ...tree),
-  ]);
+  await env.DB.batch(
+    chunks.flatMap((chunk) => [
+      env.DB.prepare(`DELETE FROM files WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)})`).bind(
+        userId,
+        ...chunk,
+      ),
+      env.DB.prepare(`DELETE FROM folders WHERE user_id = ? AND id IN (${placeholdersFor(chunk)})`).bind(
+        userId,
+        ...chunk,
+      ),
+    ]),
+  );
 
   await logEvent(env, userId, "permanent_delete_folder", folder.id, { files: files.length });
   return ok({ deleted: true, files: files.length });

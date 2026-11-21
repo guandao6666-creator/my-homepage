@@ -134,18 +134,75 @@ export async function applyChange(env, userId, domain, change) {
   const nextUpdatedAt = Math.max(updatedAt, Number(current?.updated_at) || 0) + 1;
   const nextDeletedAt = deleted ? nextUpdatedAt : null;
 
-  await env.DB.prepare(
-    `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (user_id, domain, entity_id) DO UPDATE SET
-       revision = excluded.revision,
-       deleted = excluded.deleted,
-       payload_json = excluded.payload_json,
-       updated_at = excluded.updated_at,
-       deleted_at = excluded.deleted_at`,
-  )
-    .bind(userId, domain, id, nextRevision, deleted ? 1 : 0, payload, nextUpdatedAt, nextDeletedAt)
-    .run();
+  /*
+   * 乐观锁必须落在「写」这一条 SQL 上。
+   *
+   * 2.0.4 之前是「SELECT 读 revision → JS 判冲突 → INSERT ... ON CONFLICT DO UPDATE」：
+   * 两个并发 push 都读到同一个 revision，都判定不冲突，写入时后到者整条覆盖先到者，
+   * 且两边拿到同一个 revision 号 —— 客户端以为自己同步成功，编辑永久消失且不会被
+   * 后续 pull 判成冲突。D1 只保证单条语句原子，所以这里用带 `revision = ?` 条件的
+   * UPDATE（或带 NOT EXISTS 的 INSERT）把「判」和「写」合成一条语句，再按 changes 判胜负。
+   */
+  if (current) {
+    const updated = await env.DB.prepare(
+      `UPDATE sync_entities
+          SET revision = ?, deleted = ?, payload_json = ?, updated_at = ?, deleted_at = ?
+        WHERE user_id = ? AND domain = ? AND entity_id = ? AND revision = ?`,
+    )
+      .bind(nextRevision, deleted ? 1 : 0, payload, nextUpdatedAt, nextDeletedAt, userId, domain, id, currentRevision)
+      .run();
+
+    if (Number(updated?.meta?.changes ?? 0) === 0) {
+      // 读完之后被其它请求抢先写入：按冲突返回对方的最新版本，让客户端合并。
+      const fresh = await env.DB.prepare(
+        `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
+           FROM sync_entities WHERE user_id = ? AND domain = ? AND entity_id = ?`,
+      )
+        .bind(userId, domain, id)
+        .first();
+      if (fresh) return { outcome: "conflict", entity: mapRow(fresh) };
+      // 极端情况：并发清理把行删了。按「不存在」重新走一遍台账判断。
+      const ledger = await env.DB.prepare(
+        `SELECT revision, deleted_at FROM sync_tombstone_ledger
+          WHERE user_id = ? AND domain = ? AND entity_id = ?`,
+      )
+        .bind(userId, domain, id)
+        .first();
+      if (ledger && (Number(ledger.revision) || 0) > baseRevision) {
+        const ledgerRevision = Number(ledger?.revision) || 0;
+        const deletedAt = Number(ledger?.deleted_at) || 0;
+        return {
+          outcome: "conflict",
+          entity: { id, revision: ledgerRevision, deleted: true, updatedAt: deletedAt, deletedAt },
+        };
+      }
+      return {
+        outcome: "conflict",
+        entity: { id, revision: nextRevision, deleted: false, updatedAt: nextUpdatedAt, payload: change.payload ?? null },
+      };
+    }
+  } else {
+    // 插入同样要防并发：两个请求都读到「不存在」时，只允许一个插进去。
+    const inserted = await env.DB.prepare(
+      `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE NOT EXISTS (
+          SELECT 1 FROM sync_entities WHERE user_id = ? AND domain = ? AND entity_id = ?
+        )`,
+    )
+      .bind(userId, domain, id, nextRevision, deleted ? 1 : 0, payload, nextUpdatedAt, nextDeletedAt, userId, domain, id)
+      .run();
+
+    if (Number(inserted?.meta?.changes ?? 0) === 0) {
+      const fresh = await env.DB.prepare(
+        `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
+           FROM sync_entities WHERE user_id = ? AND domain = ? AND entity_id = ?`,
+      )
+        .bind(userId, domain, id)
+        .first();
+      if (fresh) return { outcome: "conflict", entity: mapRow(fresh) };
+    }
+  }
 
   if (deleted) {
     // 台账只增不减：即使墓碑之后被物理清理，也能拦住旧终端的「复活」推送。

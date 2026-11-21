@@ -496,3 +496,39 @@
   health 2.0.3、header 2.0.3；生产判别性复测 401 `PGRST301`；`qa:prod` 35/35，清理 `users=0`。
 - **推送与 CI**：`cc84892..1dfc50c` 推送 `main` → Actions `quality` run 44864220754 **success**；
   Cloudflare 自动构建 Version `1b8f50ac-96d2-4d50-b346-7362ccc5ba52`（04:04:35Z），health 仍 2.0.3。
+
+---
+
+## Round 30 · 2.0.4 Quiet Repairs（2026-11-21）
+
+**起点**：用户「寻找各部分 bug，修复，一个一个看」。并行审计 subagent 多次失败（全部「failed before it finished」），
+改为手工逐块读；只把能复现的缺陷落成修复。
+
+**审计顺序与实际结论**
+
+1. `worker/api/sync/store.js`：`applyChange` 是 SELECT → JS 判冲突 → ON CONFLICT，D1 只保证单条语句原子。
+   两个并发 push 可拿到同一个 revision、后写覆盖先写，客户端永不进入冲突流程。改为条件 UPDATE /
+   条件 INSERT（`WHERE revision = ?` / `WHERE NOT EXISTS`），用 `meta.changes === 0` 判冲突。
+   `tests/unit/sync-store.test.ts` 加 `RacingD1` 闸门 → 18 passed；还原旧实现 → 2 failed。
+2. `src/lib/legacy-apps/draw/index.ts`：UTC 日 → 本地日（`drawDateKey()`），6 条单测覆盖 00:05 / 07:59 /
+   23:55 / 跨月跨年 / 东八区差异 / 源码断言。`src/lib/os14/index.ts` 的「存储告警每天一次」同病同治。
+3. `worker/api/files/handlers.js`：递归删除把 120 个节点拼进一条 `IN`，撞 D1 100 参数上限 → 500。
+   新增 `FOLDER_TREE_CHUNK = 40` / `chunkIds` / `placeholdersFor`，回收站与永久删除都改为 batch 分块。
+   新增 `tests/e2e/files-folders-deep.spec.ts`（120 层，真实 Worker + 真实 D1）：409 → 递归 200 →
+   永久 200 → 再删 404，1 passed（16.3s）；还原旧 handler → 1 failed（实际 500）。
+4. 查证「分页 NaN → 500」不成立（store 层 clamp），不做无意义改动。
+5. 记录但未修：同步/文件配额 TOCTOU、配对 claim 非竞态、备份失败不清理 R2（见 BACKLOG Round 25）。
+
+**版本与门禁**：升 2.0.4（9 处 + 断言族）；`npm run verify` exit 0（typecheck 0 error、
+22 files / 383 tests、html-security 294/0、build 30 页、CSP 12/31）；全量 E2E **192 passed（4.6m）**；
+入口 JS 434.8/439.5 KB（98.9%）、首屏 CSS 184.7/195.3 KB（94.6%）。
+
+**事故与修正**
+
+- 批量替换 `2.0.3 → 2.0.4` 时把 `package-lock.json` 里 26 个依赖版本一起改了；`git checkout` 后只替换
+  前两处根版本（第 3、9 行）才恢复。以后批量替换必须限定根字段。
+- 编辑 `docs/AI-BUILD-STATUS.md` 时遇到两次 `ReplaceFileW EIO (Win32 1175)`，重试成功，属本机文件锁抖动。
+- 本地全量 E2E 仍受 `plugin-upload` 20 次/小时限流影响；用 `node:sqlite` 清 `rate_limits`，
+  本次跑中每 20s 清一次，192 passed 未出现 SQLITE_BUSY 抖动。
+
+**状态**：代码已提交，**未部署**（无上线指令）；上线清单见 `docs/RELEASE-2.0.4.md §5`。

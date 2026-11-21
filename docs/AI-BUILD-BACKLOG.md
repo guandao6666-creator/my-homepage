@@ -131,3 +131,44 @@ Supabase 的 RLS 用 `auth.uid()::text = voter` 认人，头被删后 PostgREST 
   `/api/health` 报 2.0.3、`x-guandao-version: 2.0.3`；生产 `/sb` + 假 JWT → 401 `PGRST301`
   （修复前同一请求 42501）；`/sb/auth/v1/token` 返回 `invalid_credentials`，证明 body 也透传；
   `npm run qa:prod` **35/35**，清理后 `{"users":0}`。
+
+---
+
+## 2026-11-21 · Round 25 · 2.0.4 Quiet Repairs（缺陷扫描第一轮）
+
+任务原文是「寻找各部分 bug，修复，一个一个看」。按模块拆开读，只采纳能复现或用条件写证明的缺陷；
+读起来可疑但没有失败证据的条目不动。
+
+**已修 5 项**
+
+| 编号 | 缺陷 | 证据 |
+| --- | --- | --- |
+| F1 | `worker/api/sync/store.js` `applyChange` 先 SELECT 再 JS 判冲突再写：两个并发 push 都判不冲突、都写同一个 revision，后写者覆盖先写者，客户端永远不产生冲突记录 | `tests/unit/sync-store.test.ts` 新增 RacingD1 + 2 用例 → 18 passed；负向对照还原旧实现 → 2 failed / 16 passed |
+| F2 | `src/lib/legacy-apps/draw/index.ts` 用 `toISOString().slice(0,10)` 判断今天：东八区本地 00:00–08:00 仍算昨天，能再抽一次 | 抽出 `drawDateKey()`，新增 `tests/unit/draw-day.test.ts` 6 用例 → 6 passed |
+| F3 | `src/lib/os14/index.ts` 存储告警「每天一次」同样用 UTC 日 | 改用 `todayKey()`（本地日） |
+| F4 | 递归删除目录树把整棵树展开进一条 `IN (?,…)`：D1 单条语句 100 参数上限，≥ 99 节点删除 500 | 按 40 个一批分块（`FOLDER_TREE_CHUNK`）；新增 `tests/e2e/files-folders-deep.spec.ts`（120 层 → 409 → 递归 200 → 永久 200 → 404）1 passed（16.3s）；负向对照还原旧 handler → 1 failed（实际 500） |
+| F5 | 版本 9 处 + 断言族升 2.0.4 | `node scripts/check-version.mjs` → 一致；`npm run verify` exit 0 |
+
+**查证不成立**：分页 `?limit=abc` → NaN → 500。复核 store 层已有 clamp + `||` 默认值，不成立，未改。
+
+**已定位未修（下一轮优先）**：同步 push 配额 TOCTOU（`worker/api/sync/handlers.js:112-147`）、
+文件上传配额 TOCTOU（`worker/api/files/handlers.js:294-298`）、配对 claim 非原子
+（`worker/api/pairing/handlers.js:157-167`）、备份失败不清理 R2
+（`worker/api/backups/handlers.js:643-657`）。这四条需要事务语义或更大改动，本轮只记录位置与理由。
+
+**门禁**：`npm run verify` **exit 0**（typecheck 0 error、`22 files / 383 tests passed`、
+html-security 合计 294 处未审查 0、build 30 页、CSP 12 哈希/31 HTML）；全量
+`npx playwright test` → **192 passed（4.6m），exit 0**；体积 入口 JS 434.8/439.5 KB（98.9%）、
+首屏 CSS 184.7/195.3 KB（94.6%）。
+
+**状态**：代码已提交、**未部署**（本轮没有上线指令），按规则写 Blocked，
+上线路径见 `docs/RELEASE-2.0.4.md §5`。
+
+**教训（新增）**
+
+- D1 只保证单条语句原子；任何「SELECT 判断 → 写」在 Worker 里都是竞态，除非判断写进 WHERE。
+- 「UTC 日 ≠ 用户日」不只影响抽奖：凡是「每天一次」的判定都要用本地日 helper。
+- D1 单条语句 100 参数；删除整棵树这类 `IN (...)` 一律要分块，仓库已有 40 的先例。
+- 批量替换版本号前先看 `package-lock.json`：这次直接 split/join 把 26 个依赖的 2.0.3
+  改成了 2.0.4，靠 `git checkout` + 只替换前两处根版本才修回来。
+- 负向对照不是形式主义：F1 与 F4 都是「新测试在旧代码上必须红」，否则测试只是描述实现。
