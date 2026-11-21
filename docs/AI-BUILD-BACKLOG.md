@@ -139,7 +139,7 @@ Supabase 的 RLS 用 `auth.uid()::text = voter` 认人，头被删后 PostgREST 
 任务原文是「寻找各部分 bug，修复，一个一个看」。按模块拆开读，只采纳能复现或用条件写证明的缺陷；
 读起来可疑但没有失败证据的条目不动。
 
-**已修 7 项**
+**已修 9 项**
 
 | 编号 | 缺陷 | 证据 |
 | --- | --- | --- |
@@ -150,16 +150,19 @@ Supabase 的 RLS 用 `auth.uid()::text = voter` 认人，头被删后 PostgREST 
 | F5 | 配对领取 `confirmed → completed` 无条件更新且不查 `meta.changes`：两个并发轮询各签发一枚 Session | `tests/unit/pairing-claim.test.ts` 假 D1 把交错摆出来 → 2 passed；负向对照还原旧 handler → 1 failed（落败方仍 INSERT sessions）；真实 Worker `tests/e2e/pairing-claim-race.spec.ts` → 1 passed（12.9s，本机难撞窗，判别靠单测） |
 | F6 | 失败备份不清理 R2：`failBackup` 只改状态，失败备份 `size_bytes` 为 NULL，孤儿对象 `storageStats` 看不见 | `failBackup` 追加按前缀分页清理；`tests/unit/backup-cleanup.test.ts` → 2 passed；负向对照还原旧 handler → 1 failed |
 | F7 | 版本 9 处 + 断言族升 2.0.4 | `node scripts/check-version.mjs` → 一致；`npm run verify` exit 0 |
+| F8 | 同步 push 配额 TOCTOU：`handlers.js` 预检（`userQuotaStats + estimateQuotaDelta`）与逐条 `applyChange` 之间隔着 await，两个并发 push 都能过预检，突破 5000 实体 / 2000 墓碑 | 闸门进写语句：`... AND (SELECT COUNT(*) FROM sync_entities WHERE user_id = ? AND deleted = ?) < ?`，`changes=0` 时先判 `countKind` 再判冲突，返回 `outcome:"quota"`；`tests/unit/sync-store.test.ts` 新增 2 条 → 20 passed；负向对照还原 703ef74 版 store → 2 failed |
+| F9 | 文件上传配额 TOCTOU：`usage()` 预检后再 `insertPendingFile` + R2 put，两个并发上传可一起越过 5 GiB | 占位后复核：`assertReservedFileQuota()` 在 `insertPendingFile` 之后 `usage()`（含 pending）超限则删占位 + 507，此时未写 R2 故无孤儿；`tests/unit/files-quota.test.ts`（真实 SQLite）3 条 → 3 passed；负向对照 `if (false)` → 2 failed |
 
 **查证不成立**：分页 `?limit=abc` → NaN → 500。复核 store 层已有 clamp + `||` 默认值，不成立，未改。
 
-**已定位未修（下一轮优先）**：同步 push 配额 TOCTOU（`worker/api/sync/handlers.js:112-147`）、
-文件上传配额 TOCTOU（`worker/api/files/handlers.js:294-298`）。这两条需要真正的条件写入或
-事务语义，只记录位置与理由，不做无判别测试的硬改。
+**已定位未修**：无。2.0.4 收口时把原先记在这里的两条配额 TOCTOU 也修了（F8/F9），证据见表；
+配额判别靠真实 SQLite 单测而不是本地 E2E——5000 条实体 / 5 GiB 的量级不适合在本地夹具里造，
+这是证据边界，不是缺测试。
 
-**门禁**：`npm run verify` **exit 0**（typecheck 0 error、`22 files / 383 tests passed`、
+**门禁**：`npm run verify` **exit 0**（typecheck 0 error、`25 files / 392 tests passed`、
 html-security 合计 294 处未审查 0、build 30 页、CSP 12 哈希/31 HTML）；全量
-`npx playwright test` → **192 passed（4.6m），exit 0**；体积 入口 JS 434.8/439.5 KB（98.9%）、
+`npx playwright test` → **193 passed（4.7m），exit 0**（F8/F9 落地后复跑；这两项的判别
+证据仍在单测与负向对照，E2E 只做真实栈回归）；体积 入口 JS 434.8/439.5 KB（98.9%）、
 首屏 CSS 184.7/195.3 KB（94.6%）。
 
 **状态**：代码已提交、**未部署**（本轮没有上线指令），按规则写 Blocked，
@@ -175,3 +178,6 @@ html-security 合计 294 处未审查 0、build 30 页、CSP 12 哈希/31 HTML�
 - 负向对照不是形式主义：F1/F4/F5/F6 都是「新测试在旧代码上必须红」，否则测试只是描述实现。
 - 并发 bug 的真实 E2E 可能不判别（本机撞不进窗口）：判别责任交给能控制交错的假 D1 单测，
   E2E 只证明真实栈上的行为不变量，文档里要如实分开写。
+- 负向对照后的「自动恢复」不可信：临时脚本打印 restored 也可能没写回，下一次门禁红就是证据。
+  改完生产代码必须用 `Select-String` 复核关键行；Windows 上连续重写同一文件还会偶发
+  `ReplaceFileW EIO`，重试即可，别急着怀疑测试。

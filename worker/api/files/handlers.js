@@ -342,6 +342,12 @@ async function uploadHandler(env, userId, request, url) {
     size,
   });
 
+  /*
+   * 占位之后再查一次实际占用（细节见 assertReservedFileQuota）。
+   * 超限时先删占位再返回 507 —— 此时还没写 R2，失败不会留下孤儿对象。
+   */
+  await assertReservedFileQuota(env, userId, id, limit);
+
   try {
     const object = await env.FILES.put(objectKey, body, {
       httpMetadata: { contentType: detected.mime },
@@ -356,6 +362,29 @@ async function uploadHandler(env, userId, request, url) {
 
   const file = await getFile(env, userId, id);
   return ok({ file: mapFile(file) }, { status: 201 });
+}
+
+/**
+ * 上传配额的最后一道闸门：pending 行已经写入，复核「合计占用是否超限」。
+ *
+ * 为什么不在预检处一次算完：预检（usage + size）与写入之间有等待，两个并发上传会同时
+ * 通过预检、一起越界。D1 没有事务，所以先把 pending 行占位（usage() 把 pending 计入），
+ * 再求和判定：后到的请求一定能看到先到的 pending 行 —— 并发时只可能「都保守拒绝」或
+ * 「排队通过」，不会一起越界。超限时删除自己的占位再抛 507，此时还没写 R2，不留孤儿对象。
+ *
+ * @param {any} env
+ * @param {string} userId
+ * @param {string} id 本次上传的 pending 文件 id
+ * @param {number} limit 配额字节数
+ * @returns {Promise<number>} 复核时的已用字节数
+ */
+export async function assertReservedFileQuota(env, userId, id, limit) {
+  const reserved = await usage(env, userId);
+  if (reserved.usedBytes > limit) {
+    await deleteFileRow(env, userId, id).catch(() => undefined);
+    throw new ApiError("QUOTA_EXCEEDED", "云端空间不足", 507);
+  }
+  return reserved.usedBytes;
 }
 
 /* ------------------------------------------------------------------ */

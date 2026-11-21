@@ -90,8 +90,25 @@ export async function listIndex(env, userId, domain) {
 }
 
 /**
+ * 统计用户的活实体数或墓碑数（配额闸门被挡下时用于确认「确实是配额问题」）。
+ * 单独抽出来是因为 UPDATE / INSERT 两条分支都要用，且必须只在 changes=0 时跑一次，
+ * 避免每次写入都多一次 COUNT。
+ * @param {any} env
+ * @param {string} userId
+ * @param {"entities"|"tombstones"} scope
+ */
+async function countKind(env, userId, scope) {
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM sync_entities WHERE user_id = ? AND deleted = ?",
+  )
+    .bind(userId, scope === "entities" ? 0 : 1)
+    .first();
+  return Number(row?.n) || 0;
+}
+
+/**
  * 乐观锁写入。
- * @returns {{ outcome: "applied"|"conflict", entity: object }}
+ * @returns {{ outcome: "applied"|"conflict"|"quota", scope?: string, current?: number, limit?: number, entity?: object }}
  */
 export async function applyChange(env, userId, domain, change) {
   const id = String(change.id);
@@ -143,16 +160,52 @@ export async function applyChange(env, userId, domain, change) {
    * 后续 pull 判成冲突。D1 只保证单条语句原子，所以这里用带 `revision = ?` 条件的
    * UPDATE（或带 NOT EXISTS 的 INSERT）把「判」和「写」合成一条语句，再按 changes 判胜负。
    */
+  /*
+   * 配额也必须落在「写」这一条 SQL 上。
+   *
+   * 2.0.4 之前 push 是「userQuotaStats 预检 → 逐条 applyChange」：两个并发请求都看到
+   * 「还剩 1 条额度」，各自写入成功，于是超过 5000 实体 / 2000 墓碑上限。预检保留下来
+   * 做快速失败，但真正守门的是下面的条件子查询：只有当前计数仍低于上限才允许写。
+   * 子查询和写语句一起执行，D1 保证单条语句原子，所以并发下最多只有一个请求抢到最后一个名额。
+   */
+  const currentDeleted = Number(current?.deleted) === 1;
+  const addsEntity = !deleted && (!current || currentDeleted);
+  const addsTombstone = deleted && (!current || !currentDeleted);
+  const quotaScope = addsEntity ? "entities" : addsTombstone ? "tombstones" : null;
+  const quotaLimit = addsEntity ? MAX_ENTITIES_PER_USER : addsTombstone ? MAX_TOMBSTONES_PER_USER : 0;
+  const quotaGuard = quotaScope
+    ? ` AND (SELECT COUNT(*) FROM sync_entities WHERE user_id = ? AND deleted = ${addsEntity ? 0 : 1}) < ?`
+    : "";
+  const quotaBinds = quotaScope ? [userId, quotaLimit] : [];
+
   if (current) {
     const updated = await env.DB.prepare(
       `UPDATE sync_entities
           SET revision = ?, deleted = ?, payload_json = ?, updated_at = ?, deleted_at = ?
-        WHERE user_id = ? AND domain = ? AND entity_id = ? AND revision = ?`,
+        WHERE user_id = ? AND domain = ? AND entity_id = ? AND revision = ?${quotaGuard}`,
     )
-      .bind(nextRevision, deleted ? 1 : 0, payload, nextUpdatedAt, nextDeletedAt, userId, domain, id, currentRevision)
+      .bind(
+        nextRevision,
+        deleted ? 1 : 0,
+        payload,
+        nextUpdatedAt,
+        nextDeletedAt,
+        userId,
+        domain,
+        id,
+        currentRevision,
+        ...quotaBinds,
+      )
       .run();
 
     if (Number(updated?.meta?.changes ?? 0) === 0) {
+      // 配额挡下时行并没有被改（revision 仍是读到的那个），不能当冲突返回给客户端。
+      if (quotaScope) {
+        const blocked = await countKind(env, userId, quotaScope);
+        if (blocked >= quotaLimit) {
+          return { outcome: "quota", scope: quotaScope, current: blocked, limit: quotaLimit };
+        }
+      }
       // 读完之后被其它请求抢先写入：按冲突返回对方的最新版本，让客户端合并。
       const fresh = await env.DB.prepare(
         `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
@@ -183,14 +236,28 @@ export async function applyChange(env, userId, domain, change) {
     }
   } else {
     // 插入同样要防并发：两个请求都读到「不存在」时，只允许一个插进去。
+    // 配额闸门也放在这条 INSERT 里：新实体/新墓碑必须还有名额。
     const inserted = await env.DB.prepare(
       `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
        SELECT ?, ?, ?, ?, ?, ?, ?, ?
         WHERE NOT EXISTS (
           SELECT 1 FROM sync_entities WHERE user_id = ? AND domain = ? AND entity_id = ?
-        )`,
+        )${quotaGuard}`,
     )
-      .bind(userId, domain, id, nextRevision, deleted ? 1 : 0, payload, nextUpdatedAt, nextDeletedAt, userId, domain, id)
+      .bind(
+        userId,
+        domain,
+        id,
+        nextRevision,
+        deleted ? 1 : 0,
+        payload,
+        nextUpdatedAt,
+        nextDeletedAt,
+        userId,
+        domain,
+        id,
+        ...quotaBinds,
+      )
       .run();
 
     if (Number(inserted?.meta?.changes ?? 0) === 0) {
@@ -201,6 +268,13 @@ export async function applyChange(env, userId, domain, change) {
         .bind(userId, domain, id)
         .first();
       if (fresh) return { outcome: "conflict", entity: mapRow(fresh) };
+      // 没插进去、也没有同 id 的行：只可能是配额闸门挡下的（例如并发抢最后一个名额）。
+      if (quotaScope) {
+        const blocked = await countKind(env, userId, quotaScope);
+        if (blocked >= quotaLimit) {
+          return { outcome: "quota", scope: quotaScope, current: blocked, limit: quotaLimit };
+        }
+      }
     }
   }
 

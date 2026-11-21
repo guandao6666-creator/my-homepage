@@ -57,6 +57,7 @@ export const RELEASES: Array<{ version: string; name: string; date: string; note
       "新增并发冲突、本地日边界单测，并给深目录删除补真实 Worker E2E（120 层 → 409 → 递归 → 清空）",
       "设备配对领取把状态转换当唯一闸门：两个并发轮询只会签发一枚 Session",
       "失败的备份按前缀清理 R2 半成品，避免 size_bytes 为 NULL 的孤儿对象悄悄累积",
+      "同步 push 与文件上传的配额检查改成「写语句内条件子查询 / 先占位再复核」，并发不再能突破 5000 实体、2000 墓碑与 5 GiB 上限",
     ],
   },
   {

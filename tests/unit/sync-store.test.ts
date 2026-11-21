@@ -19,6 +19,10 @@ import {
   purgeExpiredTombstones,
   userQuotaStats,
 } from "../../worker/api/sync/store.js";
+import {
+  MAX_ENTITIES_PER_USER,
+  MAX_TOMBSTONES_PER_USER,
+} from "../../worker/api/sync/limits.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MIGRATION_0014 = readFileSync(new URL("../../migrations/0014_sync.sql", import.meta.url), "utf8");
@@ -590,6 +594,76 @@ describe("配额与统计", () => {
     ]);
 
     expect(delta).toEqual({ entities: 2, tombstones: 0 });
+  });
+
+  /**
+   * 配额闸门必须落在写语句里。
+   *
+   * 2.0.4 之前 push 是「预检 → 逐条写」：两个并发请求都看到还剩 1 个名额，各自写入成功，
+   * 于是超过 5000 实体 / 2000 墓碑上限。这里直接构造「只剩一个名额」的局面，验证只有
+   * 一个请求能写进去，另一个拿到 quota 结果，且库里计数停在上限。
+   */
+  it("并发推送只剩一个实体名额：一条写入、一条以 quota 返回，计数不越界", async () => {
+    const seed = db.prepare(
+      `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
+       VALUES (?, 'notes', ?, 1, 0, ?, 1000, NULL)`,
+    );
+    for (let i = 0; i < MAX_ENTITIES_PER_USER - 1; i += 1) {
+      seed.run(USER_A, `seed-${i}`, JSON.stringify({ i }));
+    }
+
+    const [left, right] = await Promise.all([
+      applyChange(env, USER_A, "notes", { id: "last-a", baseRevision: 0, updatedAt: 2000, payload: { v: "A" } }),
+      applyChange(env, USER_A, "notes", { id: "last-b", baseRevision: 0, updatedAt: 2000, payload: { v: "B" } }),
+    ]);
+
+    const applied = [left, right].filter((result) => result.outcome === "applied");
+    const quota = [left, right].filter((result) => result.outcome === "quota");
+    expect(applied).toHaveLength(1);
+    expect(quota).toHaveLength(1);
+    expect(quota[0]).toMatchObject({
+      scope: "entities",
+      current: MAX_ENTITIES_PER_USER,
+      limit: MAX_ENTITIES_PER_USER,
+    });
+    expect((await userQuotaStats(env, USER_A)).entityCount).toBe(MAX_ENTITIES_PER_USER);
+  });
+
+  it("墓碑名额耗尽时把活实体改成墓碑：返回 quota，实体保持原样", async () => {
+    const seedTomb = db.prepare(
+      `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
+       VALUES (?, 'notes', ?, 1, 1, NULL, 1000, 1000)`,
+    );
+    for (let i = 0; i < MAX_TOMBSTONES_PER_USER - 1; i += 1) {
+      seedTomb.run(USER_A, `tomb-${i}`);
+    }
+    insertEntity(db, { id: "live-x", payload: JSON.stringify({ v: 1 }), updatedAt: 1000 });
+    insertEntity(db, { id: "live-y", payload: JSON.stringify({ v: 2 }), updatedAt: 1000 });
+
+    // 第 2000 个墓碑刚好占满上限，允许写入
+    const last = await applyChange(env, USER_A, "notes", {
+      id: "live-x",
+      baseRevision: 1,
+      deleted: true,
+      updatedAt: 2000,
+    });
+    expect(last.outcome).toBe("applied");
+
+    // 再删一条就超限：必须被写语句里的闸门挡下，且原行不被改动
+    const blocked = await applyChange(env, USER_A, "notes", {
+      id: "live-y",
+      baseRevision: 1,
+      deleted: true,
+      updatedAt: 3000,
+    });
+    expect(blocked).toMatchObject({
+      outcome: "quota",
+      scope: "tombstones",
+      current: MAX_TOMBSTONES_PER_USER,
+      limit: MAX_TOMBSTONES_PER_USER,
+    });
+    expect(readEntity(db, USER_A, "notes", "live-y")).toMatchObject({ deleted: 0, revision: 1 });
+    expect((await userQuotaStats(env, USER_A)).tombstoneCount).toBe(MAX_TOMBSTONES_PER_USER);
   });
 });
 

@@ -517,7 +517,7 @@
    新增 `tests/e2e/files-folders-deep.spec.ts`（120 层，真实 Worker + 真实 D1）：409 → 递归 200 →
    永久 200 → 再删 404，1 passed（16.3s）；还原旧 handler → 1 failed（实际 500）。
 4. 查证「分页 NaN → 500」不成立（store 层 clamp），不做无意义改动。
-5. 记录但未修：同步/文件配额 TOCTOU（见 BACKLOG Round 25）。
+5. 发现但当时未修：同步/文件配额 TOCTOU（下一段 7 修掉）。
 6. 续做（用户「继续」）：
    - 配对领取 `confirmed → completed` 改为条件更新 + `meta.changes` 判定：落败请求回
      `alreadyDelivered`，不写 Session；写 Session 失败把状态退回 `confirmed`。
@@ -527,9 +527,22 @@
    - `failBackup` 追加 `deleteBackupPrefix(users/<uid>/backups/<id>)`：失败备份不再留下
      `size_bytes = NULL` 的孤儿对象。`tests/unit/backup-cleanup.test.ts` 2 passed；
      还原旧 handler → 1 failed。
+7. 续做（用户「继续」第二轮）：把最后两条配额 TOCTOU 修掉。
+   - 同步 push：`applyChange` 的 UPDATE/INSERT 各加一条 `AND (SELECT COUNT(*) FROM sync_entities
+     WHERE user_id = ? AND deleted = <0|1>) < <limit>` 条件子查询；`changes = 0` 时先用
+     `countKind()` 判「是配额挡下还是 revision 冲突」，返回 `outcome: "quota"`；HTTP 层映射成
+     409 `QUOTA_EXCEEDED`（details 仍是 `{scope,current,limit}`）。`sync-store.test.ts` 新增
+     2 条（并发抢最后一个实体名额、墓碑满后改墓碑被拒）→ **20 passed**；还原 703ef74 版
+     store（有原子写、无配额闸门）→ **2 failed**。
+   - 文件上传：`insertPendingFile` 之后调 `assertReservedFileQuota()`，`usage()` 把 pending 也计入，
+     超限删占位 + 507，此时还没写 R2，不会留孤儿。新增 `tests/unit/files-quota.test.ts`
+     （真实 SQLite：migrations 0001 + 0003）3 条 → **3 passed**；把复核改成 `if (false)` → **2 failed**。
+   - 如实记录：409 可能出现在「一批里部分条目已写入」之后（D1 无事务），客户端整批重推会以
+     conflict 收敛；配额判别靠真实 SQLite 单测，不是 E2E（量级不适合本地造）。
 
 **版本与门禁**：升 2.0.4（9 处 + 断言族）；`npm run verify` exit 0（typecheck 0 error、
-22 files / 383 tests、html-security 294/0、build 30 页、CSP 12/31）；全量 E2E **192 passed（4.6m）**；
+25 files / 392 tests、html-security 294/0、build 30 页、CSP 12/31）；全量 E2E **193 passed（4.7m）**
+（F8/F9 落地后复跑，exit 0）；
 入口 JS 434.8/439.5 KB（98.9%）、首屏 CSS 184.7/195.3 KB（94.6%）。
 
 **事故与修正**
@@ -539,5 +552,10 @@
 - 编辑 `docs/AI-BUILD-STATUS.md` 时遇到两次 `ReplaceFileW EIO (Win32 1175)`，重试成功，属本机文件锁抖动。
 - 本地全量 E2E 仍受 `plugin-upload` 20 次/小时限流影响；用 `node:sqlite` 清 `rate_limits`，
   本次跑中每 20s 清一次，192 passed 未出现 SQLITE_BUSY 抖动。
+- 负向对照的「自动恢复」翻车一次：临时脚本打印 `restored` 但 `if (false)` 没写回文件，
+  下一次 `npm run verify` 在 `tests/unit/files-quota.test.ts` 红（`promise resolved "12" instead of
+  rejecting`）。用 `edit` 手工恢复并复核关键行才通过。教训：验证过生产代码后必须
+  `Select-String` 确认，不要信任临时脚本的自我报告。
 
-**状态**：代码已提交，**未部署**（无上线指令）；上线清单见 `docs/RELEASE-2.0.4.md §5`。
+**状态**：2.0.4 代码已提交（`eaa5448` 首轮 7 项 + 本轮 F8/F9 追加提交），**未 push、未部署**
+（无上线指令，生产仍 2.0.3）；上线清单见 `docs/RELEASE-2.0.4.md §5`。
