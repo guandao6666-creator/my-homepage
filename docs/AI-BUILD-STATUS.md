@@ -1,4 +1,4 @@
-# AI-BUILD-STATUS · Guandao OS 当前状态
+﻿# AI-BUILD-STATUS · Guandao OS 当前状态
 
 > 本文件只记录**当前事实**，不复制历史细节。
 > 历史细节见 `GUANDAO_2_0_AUDIT.md`（附录 A–P）、`GUANDAO_2_0_ROADMAP.md`、`docs/RELEASE-2.0.md`。
@@ -75,7 +75,7 @@
 | 门禁 | `node scripts/check-version.mjs` → 2.0.3；`npm run verify` **exit 0**；`npm run check:docs` 通过 |
 | 单测 / 体积 | 21 文件 / 375 通过（974ms）；入口 JS **434.3 / 439.5 KB（98.8%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
 | 全量 E2E | **191 passed（4.8m），exit 0**（191 条全部通过，含新增代理用例） |
-| 生产状态 | **2.0.3 已部署**：`npm run cf:deploy` → Version `f7af6eda-f904-4e99-b7a4-051653e8819a`（30 页、32 资源、734.42 KiB / gzip 161.45 KiB）；`/api/health` 2.0.3、响应头 2.0.3；生产 `/sb` + 假 JWT → **401 `PGRST301`**（修复前 `42501`）；请求体透传复核 `/sb/auth/v1/token` → `invalid_credentials`；`qa:prod` 35/35 |
+| 生产状态 | **2.0.3 已部署**：`npm run cf:deploy` → Version `f7af6eda-f904-4e99-b7a4-051653e8819a`（30 页、32 资源、734.42 KiB / gzip 161.45 KiB）；`/api/health` 2.0.3、响应头 2.0.3；生产 `/sb` + 假 JWT → **401 `PGRST301`**（修复前 `42501`）；请求体透传复核 `/sb/auth/v1/token` → `invalid_credentials`；`qa:prod` 35/35；推送 `1dfc50c` → CI run 44864220754 success、Cloudflare 自动构建 `1b8f50ac…` |
 
 ## 4.1 上一版验证结果（2.0.2，归档）
 

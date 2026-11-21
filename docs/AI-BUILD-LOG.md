@@ -494,3 +494,5 @@
   `wal_checkpoint(TRUNCATE)`，与 Worker 的 D1 写抢锁 → 偶发 `SQLITE_BUSY`。改为上跑前清一次即全绿。
 - 生产部署：Version `f7af6eda-f904-4e99-b7a4-051653e8819a`（30 页、734.42 KiB / gzip 161.45 KiB）；
   health 2.0.3、header 2.0.3；生产判别性复测 401 `PGRST301`；`qa:prod` 35/35，清理 `users=0`。
+- **推送与 CI**：`cc84892..1dfc50c` 推送 `main` → Actions `quality` run 44864220754 **success**；
+  Cloudflare 自动构建 Version `1b8f50ac-96d2-4d50-b346-7362ccc5ba52`（04:04:35Z），health 仍 2.0.3。

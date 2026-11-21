@@ -1,4 +1,4 @@
-# Guandao OS 2.0.3 · 发布说明与交付报告
+﻿# Guandao OS 2.0.3 · 发布说明与交付报告
 
 - **版本**：2.0.3
 - **代号**：Silent Ballot
@@ -154,7 +154,7 @@ create policy "votes insertable" on public.votes for insert
 | 请求体透传复核 | `POST /sb/auth/v1/token?grant_type=password` + 真实 JSON → **400 `invalid_credentials`**（上游确实解析到了 body，排除「只修了头、body 仍丢」的假绿） |
 | 读路径 | `GET /sb/rest/v1/polls?select=id,title&limit=1` → 200 |
 | `npm run qa:prod` | **35/35 通过**（生产环境）；清理后 `{"users":0}` |
-| 推送与 CI | 提交推送到 `main` 后 GitHub Actions `quality` 与 Cloudflare 自动构建见 LOG Round 29 尾条 |
+| 推送与 CI | `git push` `cc84892..1dfc50c` → GitHub Actions `quality` run **44864220754 success**；Cloudflare 自动构建 Version `1b8f50ac-96d2-4d50-b346-7362ccc5ba52`（2026-11-21T04:04:35Z），`/api/health` 仍 2.0.3 |
 
 ---
 
