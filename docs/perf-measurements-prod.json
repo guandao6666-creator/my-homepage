@@ -1,5 +1,5 @@
 {
-  "measuredAt": "2026-11-18T13:53:24.806Z",
+  "measuredAt": "2026-11-21T12:06:45.553Z",
   "environment": {
     "browser": "Google Chrome (channel=chrome, Playwright)",
     "viewport": "1440x900",
@@ -10,57 +10,57 @@
   "runs": [
     {
       "label": "冷启动 #1（新上下文，无缓存）",
-      "ttfb": 597,
-      "domContentLoaded": 1641,
-      "load": 3002,
-      "fcp": 1624,
-      "lcp": 1624,
+      "ttfb": 211,
+      "domContentLoaded": 664,
+      "load": 764,
+      "fcp": 476,
+      "lcp": 792,
       "cls": 0.003,
-      "transferTotal": 491248,
+      "transferTotal": 492572,
       "byType": {
-        "link": 43862,
+        "link": 44726,
         "img": 243256,
-        "script": 199880,
-        "fetch": 3719,
-        "other": 531
+        "script": 200811,
+        "fetch": 3253,
+        "other": 526
       },
-      "resourceCount": 26
+      "resourceCount": 25
     },
     {
       "label": "冷启动 #2（新上下文，无缓存）",
-      "ttfb": 284,
-      "domContentLoaded": 402,
-      "load": 941,
-      "fcp": 388,
-      "lcp": 688,
+      "ttfb": 148,
+      "domContentLoaded": 207,
+      "load": 285,
+      "fcp": 208,
+      "lcp": 292,
       "cls": 0.003,
-      "transferTotal": 3717,
+      "transferTotal": 3255,
       "byType": {
         "link": 0,
-        "img": 0,
         "script": 0,
-        "fetch": 3717,
+        "img": 0,
+        "fetch": 3255,
         "other": 0
       },
-      "resourceCount": 25
+      "resourceCount": 23
     },
     {
       "label": "冷启动 #3（新上下文，无缓存）",
-      "ttfb": 252,
-      "domContentLoaded": 327,
-      "load": 337,
-      "fcp": 300,
-      "lcp": 332,
+      "ttfb": 75,
+      "domContentLoaded": 128,
+      "load": 138,
+      "fcp": 132,
+      "lcp": 132,
       "cls": 0.003,
-      "transferTotal": 3719,
+      "transferTotal": 3254,
       "byType": {
         "link": 0,
         "img": 0,
         "script": 0,
-        "fetch": 3719,
+        "fetch": 3254,
         "other": 0
       },
-      "resourceCount": 25
+      "resourceCount": 23
     }
   ]
 }

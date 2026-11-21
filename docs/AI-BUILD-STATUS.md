@@ -6,7 +6,7 @@
 
 - **更新时间**：2026-11-21
 - **版本**：2.0.4（Quiet Repairs，补丁版本；发布说明 `docs/RELEASE-2.0.4.md`）
-- **生产状态**：**2.0.4 未部署**（本轮是缺陷扫描与修复，未获上线指令；生产仍是 2.0.3，Worker Version `f7af6eda-f904-4e99-b7a4-051653e8819a`，`/api/health` 报 2.0.3）
+- **生产状态**：**2.0.4 已部署**（2026-11-21，Worker Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`；`/api/health` 报 2.0.4、`qa:prod` 35/35、生产 D1 无待应用迁移）
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -15,12 +15,12 @@
 
 | 阶段 | 状态 | 说明 |
 | --- | --- | --- |
-| Phase 1 · 安全与数据基线 | `Verified`（本地/CI + 生产部署） | 2.0.2 已上生产、生产 D1 无待应用迁移、`qa:prod` 35/35；1.6 的备份/数据告警 webhook 仍未配置（见 §5 风险 1） |
+| Phase 1 · 安全与数据基线 | `Verified`（本地/CI + 生产部署） | 2.0.4 已上生产、生产 D1 无待应用迁移、`qa:prod` 35/35；1.6 的备份/数据告警 webhook 仍未配置（见 §5 风险 1） |
 | Phase 2 · Shell 拆分与工程护栏 | `Verified`（本地/CI） | 2.1–2.5 全部完成（附录 P / RELEASE §16.19） |
 | Phase 3 · 插件供应链与多设备 | `Verified`（本地/CI） | 签名 / 沙箱 / OAuth / 设备 |
 | Phase 4 · 同步与冲突策略 | `Verified`（本地/CI） | `qa:sync` 45/45 |
-| Phase 5 · 社区与市场发布链 | `Verified`（本地 + 生产） | 本地 260/260；生产发布链 9/9（`prod-community-qa.mjs`，2026-11-18）；`qa:prod` 复核公开接口可读 |
-| Phase 6 · 性能与可观测 | **进行中（6.1 部分完成）** | 见 §3 |
+| Phase 5 · 社区与市场发布链 | `Verified`（本地 + 生产只读） | 本地 260/260；生产发布链 9/9（`prod-community-qa.mjs`，2026-11-18）；2.0.4 `qa:prod` 35/35 复核公开接口；教程页面级 E2E 2 passed（17.3s） |
+| Phase 6 · 性能与可观测 | `Verified`（6.1–6.4） | 6.4 已进生产基线（`docs/perf-measurements-prod.json`）；见 §3 |
 
 ## 2. 当前质量基线（2026-11-21 本机实跑）
 
@@ -33,7 +33,8 @@
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
 | 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；两项预算均通过 |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **193 passed（4.7m），exit 0**（2.0.4 F8/F9 落地后复跑；含 `files-folders-deep`、`pairing-claim-race`） |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **193 passed（5.2m），exit 0**（含 `files-folders-deep`、`pairing-claim-race`；教程页面级断言并入 `community-tutorial`，单跑 2 passed / 17.3s） |
+| 生产 | `npm run cf:deploy` → Version `78e78621…`；health 2.0.4；`qa:prod` **35/35**；`npm run perf:prod` 冷启动 #1 TTFB 211 ms · FCP 476 ms · LCP 792 ms · CLS 0.003 · DCL 664 ms · Load 764 ms（25 资源 / 481 KB） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -42,10 +43,10 @@
 
 | 任务 | 状态 | 证据 |
 | --- | --- | --- |
-| 6.1 入口 JS ≤ 450 KB | **`Verified`（本地）**：525,102 B → **442,621 B**（−82,481 B / −15.7%），应用中心改 `load()` 后达标 | `manifest.ts`、`os14/appcenter/app.ts`；`LEGACY-APPLICATIONS.md` §9.1 |
-| 6.2 首屏 CSS ≤ 200 KB | **`Verified`（本地）**：首页 **185,110 B / 2 个样式表**（自 476,749 B 降 61.2%）。主题中心改懒加载后 `themes.css` 也移出首屏 | `lazy-css.ts`、`themes/app.ts`、`docs/PERF-BASELINE.md` |
+| 6.1 入口 JS ≤ 450 KB | **`Verified`（本地）**：525,102 B → **445,235 B**（2.0.4 实测 434.8 KB，-15.2%），应用中心改 `load()` 后达标 | `manifest.ts`、`os14/appcenter/app.ts`；`LEGACY-APPLICATIONS.md` §9.1 |
+| 6.2 首屏 CSS ≤ 200 KB | **`Verified`（本地）**：首页 **189,133 B / 2 个样式表**（自 476,749 B 降 60.3%）。主题中心改懒加载后 `themes.css` 也移出首屏 | `lazy-css.ts`、`themes/app.ts`、`docs/PERF-BASELINE.md` |
 | 6.3 诊断中心接入真实 LCP/CLS/INP | **`Verified`（本地）**：新增「指标」分区，`observeVitals`（buffered）在本机采集，无数据显示「未采集」、不支持显示「不支持」 | `src/lib/quality/diagnostics.ts`、`tests/e2e/desktop.spec.ts` |
-| 6.4 生产性能基线进发布报告 | `Not Started` | `scripts/prod-e2e.mjs` |
+| 6.4 生产性能基线进发布报告 | **`Verified`（生产，2026-11-21）**：`npm run perf:prod` 冷启动 #1 TTFB 211 / FCP 476 / LCP 792 / CLS 0.003 / DCL 664 / Load 764 ms，25 资源 481 KB；数据在 `docs/perf-measurements-prod.json`，报告 `docs/RELEASE-2.0.4.md §3` | `scripts/measure-perf.mjs`（顺带修正写死的「1.9」标题） |
 
 ### 3.1 入口包剩余体积归因（sourcemap 实测，2026-11-18）
 
@@ -79,8 +80,8 @@
 | 上传配额单测（`tests/unit/files-quota.test.ts`，真实 SQLite） | **3 passed**：占位后复核在限内返回用量；两个并发占位对 10 字节配额 → 507 且只删自己；配额按用户隔离。负向对照把复核改成 `if (false)` → **2 failed** |
 | 全量门禁 | `npm run verify` **exit 0**：typecheck 0 error；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全合计 294 处、未审查 0 |
 | 单测 / 体积 | **25 文件 / 392 通过**（1.12s）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
-| 全量 E2E | **193 passed（4.7m），exit 0**（workers=1、retries=0；F8/F9 落地后复跑） |
-| 生产状态 | **2.0.4 未部署**：本轮未获上线指令，生产仍为 2.0.3（Version `f7af6eda…`、health 2.0.3） |
+| 全量 E2E | **193 passed（5.2m），exit 0**（workers=1、retries=0；教程页面级断言落地后复跑） |
+| 生产状态 | **2.0.4 已部署**：Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`；health 2.0.4、header 2.0.4；`qa:prod` 35/35；部署前备份 `guandao-db-prod-20261121-200010.sql`（654,863 B）；`npm run perf:prod` 冷启动 #1 TTFB 211 / FCP 476 / LCP 792 / CLS 0.003 / DCL 664 / Load 764 ms（25 资源 481 KB） |
 
 ## 4.1 上一版验证结果（2.0.3，归档）
 
@@ -93,14 +94,13 @@
 
 ## 5. 重大风险（未关闭）
 
-1. **生产仍是 2.0.3，2.0.4 尚未部署**（本轮是缺陷扫描修复，未获上线指令）；1.6 的两条告警
-   webhook 仍未配置（`BACKUP_ALERT_WEBHOOK`、`DATA_ALERT_WEBHOOK`）：备份/数据监控的
+1. **生产已上 2.0.4（2026-11-21）**，但 1.6 的两条告警 webhook 仍未配置
+   （`BACKUP_ALERT_WEBHOOK`、`DATA_ALERT_WEBHOOK`）：备份/数据监控的
    **告警投递**没有在生产验证，只能依赖 `qa:prod` 与 `verify:d1-backup` 的主动检查。
-   2.0.2 部署前导出的生产 D1 全量备份仍在
-   `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261121-104235.sql`（625,640 B）。
-2. **审核链的页面级证据已在本地补齐，但生产侧只有 2.0.2 这一份构建、还没有生产级审核 E2E**：
+   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261121-200010.sql`（654,863 B）。
+2. **审核链的页面级证据已在本地补齐（4 条用例），生产侧只有公开接口与只读冒烟**：
    服务端本就没有「审核超时」分支（`admin.js:52` 只接受四种操作），不是缺口，是契约如此；
-   生产验证仍依赖 `qa:prod` 的公开接口检查，页面级审核链只在本地/CI 跑。
+   生产验证仍依赖 `qa:prod`，页面级审核链只在本地/CI 跑。
 3. **`os13.ts` 巨型闭包**（2,397 行）：壁纸/图标/Dock/控制中心/设置面板共用一份 cfg，
    是入口体积与可维护性的主要结构性债务，需 Core Settings API 才能干净拆分。
 4. 本地并发跑 Playwright 与 verify 会共享 `.wrangler/state` 本地 D1，互相干扰。
@@ -147,14 +147,11 @@
 
 ## 6. 下一步（按优先级）
 
-1. **P0 · 2.0.4 生产发布（待授权）**：代码、单测、E2E、verify 已齐；上线路径见
-   `docs/RELEASE-2.0.4.md §5`（迁移确认 → D1 导出 → `npm run cf:deploy` → health 2.0.4 →
-   `qa:prod` → 推送与 CI 复核）。
-3. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`，跑
-   `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
-4. **P2 · P3-2 教程页面级 E2E**：`community-tutorial.spec.ts` 已覆盖草稿→审核→公开→隐藏，
-   缺正文渲染的浏览器断言——这是最小可验证的下一步。
-5. **P2 · ACCEPTANCE 全表核对**：把 `ACCEPTANCE-2.0.md` 每行「结论 ↔ 证据」对齐，
-   过期行标「历史」，避免再出现 293/304 这种自相矛盾。
-6. **P3 · 6.4 生产性能基线**：发布报告记录真实 DCL/load/资源体积（需生产授权）。
-7. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+1. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
+   webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
+2. **P2 · 新一轮逐块审计**：按 `docs/RELEASE-2.0.4.md` 的边界继续读 os13 / shell 前端状态机、
+   os14 剩余模块；发现候选先找失败证据，再决定修或关。
+3. **P2 · ACCEPTANCE 全表核对（本轮已完成）**：Phase 3/4/5 生产行与 Phase 6.4 已按 2.0.4 实跑更新；
+   后续新增证据时同步该表。
+4. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
+5. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。

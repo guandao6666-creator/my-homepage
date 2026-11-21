@@ -1,4 +1,4 @@
-# AI-BUILD-LOG · 每轮开发记录
+﻿# AI-BUILD-LOG · 每轮开发记录
 
 > 追加式记录。每轮写：做了什么、改了哪些文件、测试结果、未完成、下一项。
 > 详细论证放 `docs/architecture/*` 与 `docs/RELEASE-2.0.md`，这里只留索引与结论。
@@ -559,3 +559,35 @@
 
 **状态**：2.0.4 代码已提交（`eaa5448` 首轮 7 项 + 本轮 F8/F9 追加提交），**未 push、未部署**
 （无上线指令，生产仍 2.0.3）；上线清单见 `docs/RELEASE-2.0.4.md §5`。
+
+## 2026-11-21 · Round 31 · 2.0.4 上线生产 + 6.4 生产基线 + 教程页面级 E2E
+
+**这一轮做完的三件事**
+
+1. **2.0.4 上生产**（用户 m04025「都做，你慢慢做就行」授权）：部署前 `d1 migrations list --remote`
+   → `No migrations to apply!`；导出生产备份 `guandao-db-prod-20261121-200010.sql`（654,863 B）；
+   `npm run cf:deploy` → 30 页、32 个静态资源、740.12 KiB（gzip 162.62 KiB）、Version
+   **`78e78621-8f36-4585-87bd-a91e74ceaa3f`**；`/api/health` 2.0.4、`x-guandao-version: 2.0.4`、
+   首页 200、入口 `index.astro_astro_type_script_index_0_lang.DmEHLhza.js`（445,610 B）；
+   `qa:prod` **35/35**、清理后 `{"users":0}`（既有 `event_type` 清理警告仍在，脚本 exit 0）。
+
+2. **P3-2 教程页面级 E2E**（补 STATUS 风险 2 的页面级缺口）：`community-tutorial.spec.ts`
+   新增 `bootDesktop` / `openCommunity` / `assertTutorialBodyInBrowser`，在审核通过后打开详情，
+   断言 `section.cx-panel`「教程正文」里的 `.cx-markdown` 渲染 h3/h4/strong/链接，并确认
+   `<img src=x onerror=alert(1)>` 只作为文本出现、无 `img` 元素与 `javascript:` 链接；
+   `test.setTimeout(120_000 → 180_000)`（桌面+社区启动约 15–25 s）。实跑 **2 passed（17.3s）**。
+
+3. **6.4 生产性能基线**：`npm run perf:prod`（3 次冷启动）→ 冷启动 #1 **TTFB 211 ms · FCP 476 ms ·
+   LCP 792 ms · CLS 0.003 · DCL 664 ms · Load 764 ms**，25 个资源 / 481 KB；#2/#3 命中 CDN（23 资源 / 3 KB）。
+   数据写入 `docs/perf-measurements-prod.json`，数字进 `docs/RELEASE-2.0.4.md §3` 与 STATUS §3。
+   顺带修 `scripts/measure-perf.mjs` 里写死的「Guandao OS 1.9」标题（2.x 报告头一直显示 1.9）。
+
+**ACCEPTANCE 全表核对**：Phase 3 生产验证行 → 通过（生产，2.0.4），整体仍 `Partially Verified`
+（生产独立 Sandbox Origin / 真机未验证）；Phase 4 生产行 → 通过（生产核心同步域），整体
+`Partially Verified`（冲突面板页面级 E2E 仍缺）；Phase 5 生产行 → 通过（只读冒烟，生产写入型
+发布链未执行），整体 `Partially Verified`；Phase 6 的 6.4 → 通过（生产），整体升 `Verified`。
+
+**门禁**：`npm run verify` exit 0（25 files / 392 tests、build 30 页、CSP 12/31、html-security 294/0）；
+全量 `npx playwright test` 复跑 **193 passed（5.2m）**（教程页面级断言并入后）；体积 434.8/439.5 KB、184.7/195.3 KB。
+
+**状态**：生产 2.0.4 已上线；本轮文档与测试改动待提交并推送（push 会触发 Cloudflare 自动构建）。

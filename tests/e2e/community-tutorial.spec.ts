@@ -17,7 +17,7 @@
  * 不做的事：不碰生产 API、不加表、不重写社区 UI、不写真实用户数据。
  * 夹具账号全部是 `scripts/e2e-server.mjs` 造的 `qa-p3-*` 本地行。
  */
-import { expect, test, type Browser, type BrowserContext } from "@playwright/test";
+import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
 import { renderMarkdown } from "../../src/lib/os14/core";
 import { API_BASE, waitForFixtures } from "./support/worker-api";
@@ -157,8 +157,70 @@ async function publicVisibility(visitor: BrowserContext, postId: string) {
   };
 }
 
+/** 等待桌面外壳就绪并跳过首屏引导（引导浮层会吃掉点击）。 */
+async function bootDesktop(page: Page): Promise<void> {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#os")).toBeVisible();
+  await page.waitForFunction(() => !document.getElementById("boot"), null, { timeout: 15_000 });
+  const skip = page.locator("[data-onb-skip]");
+  if (await skip.count()) {
+    await skip.click();
+    await page.waitForFunction(() => !document.querySelector(".os20-onb"), null, { timeout: 10_000 });
+  }
+}
+
+/** 打开社区应用并等到可交互（骨架屏消失）。 */
+async function openCommunity(page: Page) {
+  await page.evaluate(() => (window as any).GOS14.ctx.openApp("community"));
+  const win = page.locator('.window[data-app="community"]');
+  await expect(win).toBeVisible({ timeout: 15_000 });
+  await expect(win.locator("[data-cx-body]")).toBeVisible({ timeout: 15_000 });
+  await expect(win.locator("[data-cx-body] .cx-loading")).toHaveCount(0, { timeout: 20_000 });
+  return win;
+}
+
+/**
+ * P3-2 的浏览器级断言：教程正文不是只在 renderMarkdown 单测里成立，而是真的进了详情 DOM。
+ *
+ * 为什么单独走一遍 UI：服务端把 configuration.content 原样放在 JSON 里，转义责任在渲染层。
+ * 只断言 `renderMarkdown()` 的字符串输出证明不了「浏览器里点开详情能看到正文」——
+ * 中间还隔着社区详情的数据流（详情接口 → 内容包 → manifest → 模板拼接）。
+ */
+async function assertTutorialBodyInBrowser(context: BrowserContext, postId: string) {
+  const page = await context.newPage();
+  try {
+    await bootDesktop(page);
+    const win = await openCommunity(page);
+    await win.locator("[data-cx-search]").fill(RUN_ID);
+    await win.locator('[data-action="search"]').click();
+    const card = win.locator(`[data-post="${postId}"]`);
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    await card.locator("h3").click();
+
+    await expect(win.locator(".cx-detail-hero h1")).toHaveText(TITLE, { timeout: 20_000 });
+
+    // 详情里的「教程正文」面板（与介绍区 .cx-markdown 区分开）
+    const panel = win.locator("section.cx-panel").filter({ hasText: "教程正文" });
+    await expect(panel).toBeVisible({ timeout: 20_000 });
+    const body = panel.locator(".cx-markdown");
+    await expect(body.locator("h3")).toHaveText(`教程 ${RUN_ID}`);
+    await expect(body.locator("h4")).toHaveText("步骤");
+    await expect(body.locator("strong")).toHaveText("提示");
+    await expect(body.locator('a[href="https://example.com/docs"]')).toHaveCount(1);
+
+    // 转义：`<img onerror>` 只能是文本，不能变成 DOM 元素；javascript: 也不能变成 href
+    await expect(body.locator("img")).toHaveCount(0);
+    await expect(body).toContainText("<img src=x onerror=alert(1)>");
+    await expect(body.locator('a[href^="javascript:"]')).toHaveCount(0);
+    await expect(body).toContainText("完成。");
+  } finally {
+    await page.close();
+  }
+}
+
 test.describe("Guandao Community · Tutorials", () => {
-  test.setTimeout(120_000);
+  // 主用例现在还要启动桌面 + 社区窗口（约 15–25s），120s 对慢机不够。
+  test.setTimeout(180_000);
 
   test("tutorial 草稿 → 审核 → 公开 → 隐藏全链路（真实 Worker）", async ({ browser }) => {
     const fixtures = await waitForFixtures("complete");
@@ -316,6 +378,9 @@ test.describe("Guandao Community · Tutorials", () => {
         200,
       );
       expect(containsPost(wrongCategory.items, postId)).toBe(false);
+
+      /* ---------- 5b. P3-2：真实浏览器打开详情，断言教程正文渲染（转义 + 链接 + 结构） ---------- */
+      await assertTutorialBodyInBrowser(visitor, postId);
 
       /* ---------- 6. 重复 approve 按真实契约 400，且不破坏已公开状态 ---------- */
       const again = expectFail(

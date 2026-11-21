@@ -4,7 +4,7 @@
 - **代号**：Quiet Repairs
 - **日期**：2026-11-21
 - **类型**：补丁（上游 2.0.3「Silent Ballot」）
-- **状态**：代码与证据已齐，**未部署生产**（等待授权；按项目规则记为 Blocked）
+- **状态**：已部署生产（2026-11-21，Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`）
 
 ---
 
@@ -199,9 +199,11 @@ INSERT INTO sync_entities (...) SELECT ...
 | 深目录删除 E2E | `npx playwright test --project=worker tests/e2e/files-folders-deep.spec.ts` | 1 passed（16.3s） |
 | 深目录负向对照 | 还原旧 `files/handlers.js` 后同命令 | 1 failed（500，判别成立） |
 | 配对并发 E2E | `npx playwright test --project=worker tests/e2e/pairing-claim-race.spec.ts` | 1 passed（12.9s；旧代码也能通过，判别靠单测） |
-| 全量 E2E | `$env:E2E_ADMIN_PORT='18789'; npx playwright test` | **193 passed（4.7m）**，exit 0（F8/F9 落地后复跑） |
+| 教程页面级 E2E（P3-2） | `npx playwright test --project=worker tests/e2e/community-tutorial.spec.ts` | **2 passed（17.3s）**：新增浏览器内断言 —— 详情「教程正文」面板渲染 h3/h4/strong/链接，`<img onerror>` 只是文本、无 `img` 元素与 `javascript:` 链接 |
+| 全量 E2E | `$env:E2E_ADMIN_PORT='18789'; npx playwright test` | **193 passed（5.2m）**，exit 0（教程页面级断言并入后复跑） |
 | 全量门禁 | `npm run verify` | **exit 0**（typecheck 0 errors；build 30 页；CSP 12 哈希 / 31 HTML 一致；HTML 安全审查合计 294 处、未审查 0） |
 | 体积基线 | `node scripts/perf-baseline.mjs --json` | 入口 JS 434.8 / 439.5 KB（98.9%）；首屏 CSS 184.7 / 195.3 KB（94.6%） |
+| **生产性能基线（6.4）** | `npm run perf:prod`（`measure-perf.mjs --remote --runs 3`） | 冷启动 #1：**TTFB 211 ms · FCP 476 ms · LCP 792 ms · CLS 0.003 · DCL 664 ms · Load 764 ms**，25 个资源 / 481 KB；后续两次冷启动走 CDN 缓存（3 KB） |
 
 > 注：`perf-baseline` 仍提示 `dist` 有 7 组同名不同哈希的残留（未清理 dist 的历史现象），预算判定仍通过。
 
@@ -215,18 +217,19 @@ INSERT INTO sync_entities (...) SELECT ...
 
 ---
 
-## 5. 部署
+## 5. 部署（已完成，2026-11-21）
 
-**未部署**。本轮用户要求是「寻找各部分 bug，修复」，没有下达上线指令，按项目规则在文档里记为 Blocked，而不是写成 Verified。
+**已部署生产**。按项目规则，只有拿到生产实测证据后才从 Blocked 改为 Verified —— 下面是这一轮的实跑记录：
 
-发布路径（与 2.0.3 相同）：
-
-1. `npx wrangler d1 migrations list guandao-db --remote` → 预期 `No migrations to apply!`
-2. `npx wrangler d1 export guandao-db --remote --output .backups/guandao-db-prod-<时间>.sql`
-3. `npm run cf:deploy`
-4. 核对 `/api/health`（`version: 2.0.4`）、`x-guandao-version`、首页、`npm run qa:prod`
-5. 推送 `main` 后等 GitHub Actions；Cloudflare 每次推送会自动构建一个新 Version，ID 以 `wrangler deployments list` 与 `/api/health` 为准
-6. 回滚：`npx wrangler rollback`（或重新部署上一个 Version）
+| 步骤 | 结果 |
+| --- | --- |
+| 迁移检查 | `npx wrangler d1 migrations list guandao-db --remote` → `✅ No migrations to apply!` |
+| 部署前备份 | `npx wrangler d1 export guandao-db --remote` → `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261121-200010.sql`（654,863 B） |
+| 部署 | `npm run cf:deploy` exit 0 → build 30 页、32 个静态资源、Total Upload 740.12 KiB / gzip 162.62 KiB、Worker Startup 正常；**Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`** |
+| health | `/api/health` → `"version":"2.0.4"`、D1 connected、R2 available（put/get/head/delete 全 true） |
+| 响应头 / 首页 | `x-guandao-version: 2.0.4`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.DmEHLhza.js`（445,610 B）含 `2.0.4` |
+| 生产 E2E | `npm run qa:prod` → **35/35 通过**，清理后 `{"users":0}`（stderr 仍有既有 `event_type` CHECK 约束警告，脚本 exit 0） |
+| 回滚 | `npx wrangler rollback`（或重新部署上一个 Version `f7af6eda-f904-4e99-b7a4-051653e8819a` = 2.0.3） |
 
 ---
 

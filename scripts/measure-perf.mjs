@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Guandao OS 1.9 · 真实性能测量
+ * Guandao OS 2.0 · 真实性能测量
  *
  * 用本机 Chrome 打开构建产物，采集：
  *   TTFB / FCP / LCP / CLS / 资源传输量 / 首屏 JS 与 CSS 体积
@@ -192,7 +192,7 @@ await mkdir(path.dirname(jsonPath), { recursive: true });
 await writeFile(jsonPath, JSON.stringify(report, null, 2), "utf8");
 
 const kb = (bytes) => `${Math.round(bytes / 1024)} KB`;
-console.log("Guandao OS 1.9 · 实测性能（本机，无节流）\n");
+console.log("Guandao OS 2.0 · 实测性能（本机，无节流）\n");
 for (const run of report.runs) {
   console.log(run.label);
   console.log(`  TTFB ${run.ttfb} ms · FCP ${run.fcp} ms · LCP ${run.lcp} ms · CLS ${run.cls}`);

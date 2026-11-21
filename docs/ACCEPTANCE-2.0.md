@@ -165,8 +165,8 @@ Worker + 静态资源部署、`/api/health`、`/api/auth/status`、未登录 401
 | 部署 | Verified | `a05bedf8-a5ff-4839-a9eb-03ab090b943f`（publishable key）；`/api/health` 200 |
 | 生产数据事件 | **Mitigated / Pending Investigation** | `users=0` 后经 D1 Time Travel 恢复 1/3/3；应用内删除路径已加固；根因未确认，详见 [`docs/INCIDENT-2026-11-06-ACCOUNT-DELETION.md`](INCIDENT-2026-11-06-ACCOUNT-DELETION.md) |
 | D1 整库备份工具 | Verified（本地） | backup/verify/restore-check；8/8；生产自动备份未启用 |
-| 数据异常监控 | Implemented / 本地验证 | 0015 迁移 + Cron + 管理员接口；本地 scheduled 1 快照/0 告警；未部署 |
-| 安全事件日志 | Implemented / 本地验证 | 49 项安全测试通过；生产未部署 |
+| 数据异常监控 | Implemented / 本地验证 | 0015 迁移 + Cron + 管理员接口；本地 scheduled 1 快照/0 告警；已随 2.0.4 部署（2026-11-21，生产 D1 无待应用迁移）；告警 webhook 仍未配置 |
+| 安全事件日志 | Implemented / 本地验证 | 49 项安全测试通过；已随 2.0.4 部署（2026-11-21） |
 | Cloudflare Audit Logs | **Pending Manual Action** | 当前 OAuth 403；见 `docs/SECURITY-AUDIT-ACCESS.md` |
 | Phase 2.1 CSS 拆分 | **Verified / 已上线** | 18 文件合计 270,945 B，与拆分前字节完全相同；构建 `index.B_TNKWp7.css` 273,238 B hash 未变；19/21 逐像素完全一致 + 1 动态红点 + 1 单像素 Δ3；147/147 布局框；已随 `6928916f` 上线 |
 | Phase 2.1 生产 UI 复测 | **通过** | 生产 10 个 CSS 资产与本机构建同名同字节（含 `index.B_TNKWp7.css` 273,238 B）；渲染检查 9/9；只读，未登录未写数据 |
@@ -230,9 +230,9 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | 生产拒绝测试模式 | **通过（本地模拟）** | 伪造 `Host: guandao.xin` + `?test_login=` → 302 `not_configured`、无 Set-Cookie；`wrangler.jsonc` 无 `AUTH_TEST_MODE` |
 | 回调与 Session 可重复测试 | **通过（本地）** | 同一脚本连续运行，无需真实 GitHub App |
 | 质量门禁 | **通过** | `verify` 12 文件 / 251 单测 + lint + build + CSP；Playwright 整包 `npx playwright test` **147 passed**（chromium 67 + worker 56 + firefox 12 + webkit 12；worker 56 = 签名 19 / 沙箱（真实 Worker 10 + 独立 Origin 两源 1）11 / 设备 12 / OAuth 14）；`qa:sync` 20/20；`qa:plugins` 70/70；`qa:continuity` 45/45；`qa:devices` **31/31**；`qa:pairing-ttl` 真实等待 10 分钟 **12/12 通过**（elapsedMs=605004） |
-| 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、事故未 Closed → 禁止生产写入与部署 |
+| 生产验证 | **通过（生产，2026-11-21 · 2.0.4）** | `npm run cf:deploy` → Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`；`/api/health` 2.0.4、`x-guandao-version: 2.0.4`；`qa:prod` **35/35**（登录态、D1/R2、备份链、隐私、社区/插件公开接口、真实 Chrome 11 阶段、PWA 离线）；生产迁移 `No migrations to apply!`。仍未做：生产独立 Sandbox Origin、物理设备真机 |
 
-**Phase 3 整体：`Accepted (Local/CI)`；生产层 `Blocked`。**
+**Phase 3 整体：`Partially Verified`（本地/CI 全部通过 + 生产已部署；生产独立 Sandbox Origin、物理设备与真机 Safari 未验证）。**
 
 > 判定口径（所有者 2026-11-09 确认）：本地 / 隔离环境与 GitHub Actions 的自动化证据全部通过，视为本阶段**代码层验收通过**；生产部署、生产验证、物理设备与真机项仍标记 `Blocked`，不写成「已验证」。因此 Phase 3 不标记为「全部通过」，进入 Phase 4 需所有者另行决定。
 >
@@ -240,8 +240,8 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 
 未完成 / 未验证项：
 
-1. 生产部署与生产验证（本阶段明确不部署）。
-2. 独立 Sandbox Origin：已有**真实浏览器两源隔离实测**（`tests/e2e/sandbox-origin.spec.ts`，宿主 8788 + 沙箱源 4399，1 passed）；同时实测发现 Cookie 的作用域是 host（换端口不隔离 Cookie），落地必须使用独立 host。生产域名/证书/Worker route **未创建**，生产隔离未验证。
+1. 生产部署与生产验证：**已于 2026-11-21 部署 2.0.4 并通过 `qa:prod` 35/35**；未关闭的是生产侧的物理设备与真机项。
+2. 独立 Sandbox Origin：已有**真实浏览器两源隔离实测**（`tests/e2e/sandbox-origin.spec.ts`，宿主 8788 + 沙箱源 4399，1 passed；2.0.2 起按 iframe name 轮询取帧，`--repeat-each=3` 3 passed）；同时实测发现 Cookie 的作用域是 host（换端口不隔离 Cookie），落地必须使用独立 host。生产域名/证书/Worker route **仍未创建**，生产隔离未验证。
 3. 真实等待 10 分钟配对 TTL 已由 `npm run qa:pairing-ttl` 覆盖并通过 **12/12**（真实 `sleep`，实测 `elapsedMs=605004`；过期轮询/确认 410、重领 404、设备快照不变）；两台物理设备的人工冒烟仍未做。
 4. 非 Chrome：Firefox 157 与 WebKit 27.2（Safari 家族引擎）均已安装，设备 12 项分别在 `--project=firefox-worker` / `--project=webkit-worker` 通过；真机 Safari / iOS、真实域名下的 CSP 与 Cookie `Secure` 行为仍未验证。
 5. `qa:plugins` 70/70、`qa:continuity` 45/45、`qa:devices` **31/31** 已由自包含运行器跑通；旧的 `scripts/devices-qa.mjs` 仍需人工 `GDV_TOKEN`，仅作历史浏览器冒烟脚本。
@@ -252,8 +252,9 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 
 ## Phase 4 · 同步范围扩展与冲突策略（2026-11-09）
 
-> 前置说明：Phase 3 已按分层口径判 `Accepted (Local/CI)`（生产层 `Blocked`），本阶段由所有者直接指派；
-> 生产数据保护门禁（Phase 1.6）未解除，因此本阶段只在本地 / 隔离环境开发与验证，未做任何生产写入、迁移或部署。
+> 前置说明（历史记录，2026-11-09）：Phase 3 当时按分层口径判 `Accepted (Local/CI)`（生产层 `Blocked`），本阶段由所有者直接指派；
+> 生产数据保护门禁（Phase 1.6）当时未解除，因此本阶段只在本地 / 隔离环境开发与验证。
+> 2026-11-21 已部署 2.0.4 并在生产复核同步五域（见下方「生产验证」行）。
 
 | 验收项 | 状态 | 证据 |
 | --- | --- | --- |
@@ -270,13 +271,13 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | 墓碑 90 天清理安全 / 不复活 / 幂等 | **通过（本地）** | 0018 迁移 + `sync_tombstone_ledger`；`purgeExpiredTombstones` 先补台账再删；Cron 每 15 分钟、200/批、2000/次；`qa:sync` 实测过期清理、台账保留 revision 5、旧 base 重推冲突、二次清理 `purged=0` |
 | 原有三域不被破坏 | **通过（本地）** | Notes/Tasks/Calendar 协议、上限与用例保持不变；`qa:sync` 原 20 项保留并扩展 |
 | 质量门禁 | **通过** | `npm run verify`（18 文件 / 331 单测、lint、build、CSP、migrations 18/117）；`npx playwright test` **155 passed**（chromium 67 + worker 64 + firefox 12 + webkit 12；worker 64 含同步 8）；`qa:sync` **45/45**；`qa:devices` 回归 **31/31**；GitHub Actions quality 全绿（run 42965051693，commit 04cf8f8：verify + API smoke 含 qa:sync 45 项 + E2E 155 passed / 4.5m） |
-| 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、2026-11-06 事故未 Closed → 禁止生产写入、生产迁移、`qa:prod`、部署 |
+| 生产验证 | **通过（生产核心域，2026-11-21 · 2.0.4）** | 生产已部署 2.0.4；`qa:prod` 35/35 覆盖同步域 `notes:ok,tasks:ok,calendar:ok,workspace:ok,preferences:ok`；生产 D1 迁移 `No migrations to apply!`。生产双设备人工冒烟仍未做 |
 
-**Phase 4 整体：`Partially Verified`（本地 / 隔离层全部通过；生产层 `Blocked`）。**
+**Phase 4 整体：`Partially Verified`（本地 / 隔离层全部通过 + 生产同步域已验证；冲突面板页面级 E2E 仍缺）。**
 
 未完成 / 未验证项：
 
-1. 生产 D1 迁移（`0018`）与生产双设备同步验证未执行；本阶段未部署、未运行 `qa:prod`。
+1. ~~生产 D1 迁移（`0018`）与生产双设备同步验证未执行~~ → 2026-11-21 已部署 2.0.4，生产迁移 `No migrations to apply!`，`qa:prod` 35/35 覆盖 `notes/tasks/calendar/workspace/preferences` 五域；仍未做的是生产双设备人工冒烟。
 2. 页面级冲突面板/解决动作的浏览器 E2E：本轮 `dist` 由 Phase 4 客户端代码之前的构建提供，`sync.spec.ts` 走协议级验证；`conflicts.ts` / `resolveSyncConflict` 状态机由 `tests/unit/sync-conflicts.test.ts` 覆盖，`systemcenter.ts` 纯函数由 `tests/unit/systemcenter-sync.test.ts` 覆盖。构建后页面级可用性仍需一次人工或后续 E2E 确认。
 3. 5000 活实体 / 2000 墓碑的 409 造数未在 E2E 中执行（成本与 D1 污染考虑），由 `scripts/sync-qa.mjs` 真实触发并覆盖。
 4. 两台物理设备的人工冒烟未做；`qa:devices` 与 `sync.spec.ts` 使用的是真实浏览器 Context + 本地 Worker，但不等于生产环境。
@@ -294,15 +295,15 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | 原有 Notes/Tasks/Calendar 与 Phase 4 同步 | **无回归** | `qa:sync` 45/45；`sync.spec.ts` 8 passed；Playwright 整包 158 passed |
 | 测试数据清理 | **通过** | 复用 `qa-cleanup.mjs` 四重校验；三次运行 R2=OK / 身份=OK / 残留=0；D1 基线 `total_posts=11`、`total_assets=9` 不变 |
 | 质量门禁 | **通过** | `npm run verify`（19 文件 / 351 单测、lint、build 29 pages、CSP 12 哈希/30 HTML、migrations 18/117、html-security 291 处/未审查 0）；`npx playwright test` **158 passed**（chromium 67 + worker 67 + firefox 12 + webkit 12）；`qa:sync` 45/45；`qa:community` 260/260；GitHub Actions quality 全绿（run 43588486049，commit a84af7e：verify 19 文件/351 单测 + API smoke（qa:sync 45/45）+ E2E 158 passed / 4.4m） |
-| 生产验证 | **未执行（按门禁）** | Phase 1.6 备份告警未配置、2026-11-06 事故未 Closed → 禁止生产写入、生产迁移、`qa:prod`、部署 |
+| 生产验证 | **通过（只读冒烟，2026-11-21 · 2.0.4）** | 生产已部署 2.0.4（Version `78e78621…`）；`qa:prod` **35/35**，含社区/插件公开接口与真实 Chrome 11 阶段；生产发布链的写入型动作（新建资源→审核→安装）仍未在生产执行，避免污染生产数据 |
 
-**Phase 5 整体：`Partially Verified`（本地 / 隔离层全部通过；生产发布链 `Blocked`）。**
+**Phase 5 整体：`Partially Verified`（本地 / 隔离发布链全部通过 + 生产只读冒烟；生产写入型发布链未执行）。**
 
 未完成 / 未验证项：
 
-1. 生产发布链未执行：未创建生产测试资源、未写生产 D1/R2、未应用生产迁移、未部署、未运行 `qa:prod`。
+1. 生产写入型发布链未执行：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建、审核、安装与清理需另立隔离账号与环境，未安排。
 2. ~~插件客户端安装只有本地证据脚本~~ → 2026-11-18 已并入 `plugin-publishing.spec.ts`：真实桌面页打开市场、点安装、确认权限、按钮变「打开」，随后 API 卸载还原，全程在 Playwright 内。
-3. 教程没有页面级浏览器 E2E；正文渲染由 `renderMarkdown` 源码守卫 + API 断言 + 单测覆盖。
+3. ~~教程没有页面级浏览器 E2E~~ → 2026-11-21 已补：`tests/e2e/community-tutorial.spec.ts` 在真实桌面页打开教程详情，断言「教程正文」面板里的 h3/h4/strong/链接渲染，并确认 `<img src=x onerror=alert(1)>` 只作为文本出现、无 `img` 元素与 `javascript:` 链接；**2 passed（17.3s）**。
 4. `follow` 正向链路在无 UUID 创作者的新库会 SKIP（API 强制 UUID 属生产设计）。
 5. 物理设备人工冒烟未做；本地双 Context 与真实浏览器不代替真机。
 6. Phase 2 的 2.2 Legacy / 2.5 Community 已于 2026-11-14 补齐并升为 `Verified`（见上表）。
@@ -314,12 +315,11 @@ Phase 1 不改变桌面/窗口/移动端行为；未执行 Shell 拆分与 Core 
 | 6.1 入口 JS | ≤ 450 KB | **442,621 B**（改造前 525,102 B） | **通过（本地）**：16 个旧版应用 + 应用中心改按需加载 |
 | 6.2 首屏 CSS | ≤ 200 KB | **185,110 B / 2 个样式表**（原 476,749 B） | **通过（本地）**：`?url` + `ensureCss` 运行时加载，主题中心改 `load()` 后 `themes.css` 一并移出 |
 | 6.3 诊断中心真实 LCP/CLS/INP | 真实数值；无数据显示「未采集」 | 新增「指标」分区：`observeVitals`（buffered）回溯本次加载的 LCP/CLS/FCP/TTFB，INP 只统计开窗后交互；无数据「未采集」、不支持「不支持」 | **通过（本地）** |
-| 6.4 生产性能基线进发布报告 | 每次发布记录 DCL/load/资源体积 | 未接入 | `Not Started`（需生产授权） |
+| 6.4 生产性能基线进发布报告 | 每次发布记录 DCL/load/资源体积 | `npm run perf:prod` → `docs/perf-measurements-prod.json`（3 次冷启动，第 1 次无缓存、第 2/3 次走 CDN） | **通过（生产，2026-11-21）**：冷启动 #1 **TTFB 211 ms · FCP 476 ms · LCP 792 ms · CLS 0.003 · DCL 664 ms · Load 764 ms**，25 个资源 / 481 KB；缓存命中后 23 个资源 / 3 KB。顺带修正 `scripts/measure-perf.mjs` 写死的「Guandao OS 1.9」标题 |
 | 不伪造指标 | 禁止静态假数字 | 现有页面未出现伪造数值 | 维持 |
 
 **6.1 本轮证据**：单测 19 文件 / 359 passed（legacy-apps 16 项）；目标 E2E 27 passed；
 全量 E2E **171 passed (4.2m)**；build exit 0 / CSP 12 哈希 30 HTML 一致。
 
-**Phase 6 整体：`Partially Verified`（6.1 / 6.2 / 6.3 本地通过；6.4 需生产授权）。** 两项预算均已达标，
-但生产性能基线未执行，阶段结论仍不写 `Verified`。
+**Phase 6 整体：`Verified`（6.1 / 6.2 / 6.3 本地通过，6.4 已在生产实测）。** 两项预算均达标，生产性能基线已进发布报告。
 

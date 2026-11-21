@@ -7,7 +7,7 @@
 
 | # | 任务 | 状态 | 备注 |
 | --- | --- | --- | --- |
-| P0-1 | 生产部署 / 生产迁移 / `qa:prod` | **`Verified`（生产，2026-11-21 · 2.0.2）**：`npm run cf:deploy` 部署 Version `32adf7fb-a922-4c69-ab67-e626cdc4ac1a`，`/api/health` 报 `"version":"2.0.2"`、响应头 `x-guandao-version: 2.0.2`；生产 D1 无待应用迁移（`d1 migrations list --remote` → No migrations to apply）；`npm run qa:prod` **35/35 通过**（2.0.1 的 2026-11-20 部署与 35/35 见历史记录） | 部署前已导出生产 D1 全量备份（625,640 B，2026-11-21） |
+| P0-1 | 生产部署 / 生产迁移 / `qa:prod` | **`Verified`（生产，2026-11-21 · 2.0.4）**：`npm run cf:deploy` 部署 Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`，`/api/health` 报 `"version":"2.0.4"`、响应头 `x-guandao-version: 2.0.4`；生产 D1 无待应用迁移（`d1 migrations list --remote` → No migrations to apply）；`npm run qa:prod` **35/35 通过**；入口包 445,610 B 含 2.0.4（2.0.1/2.0.2/2.0.3 的部署与 35/35 见历史记录） | 部署前已导出生产 D1 全量备份（654,863 B，2026-11-21） |
 | P0-2 | 社区发布链生产验证 | **`Verified`（生产，2026-11-18）**：`prod-community-qa.mjs` 实跑 9/9 通过，qa-prod 清理归零 | 本地 260/260 已过 |
 
 ## P1 · 核心功能与一致性
@@ -165,8 +165,8 @@ html-security 合计 294 处未审查 0、build 30 页、CSP 12 哈希/31 HTML�
 证据仍在单测与负向对照，E2E 只做真实栈回归）；体积 入口 JS 434.8/439.5 KB（98.9%）、
 首屏 CSS 184.7/195.3 KB（94.6%）。
 
-**状态**：代码已提交、**未部署**（本轮没有上线指令），按规则写 Blocked，
-上线路径见 `docs/RELEASE-2.0.4.md §5`。
+**状态**：已部署生产（2026-11-21，Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`；
+health/header 2.0.4、`qa:prod` 35/35、生产 D1 无待应用迁移、部署前备份 654,863 B）。
 
 **教训（新增）**
 
