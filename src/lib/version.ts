@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.4";
+export const OS_VERSION = "2.0.5";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -46,6 +46,17 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.0.5",
+    name: "Param Budget",
+    date: "2026-11-21",
+    notes: [
+      "通知「标记已读」按 40 条分块：一条 UPDATE 绑定 now + user_id + N 个 id，N=99 就撞 D1 100 参数上限",
+      "插件市场 trending 的近 30 天下载聚合按块查询：候选最多 200 行，候选数 ≥99 时旧实现直接 500",
+      "新增 worker/api/sql.js 统一 chunkIds / placeholdersFor，深目录删除与同步分块也改用它，避免三份实现漂移",
+      "新增假 D1 强校验绑定参数上限的单测：退回单条 IN 立刻失败（负向对照已跑）",
+    ],
+  },
   {
     version: "2.0.4",
     name: "Quiet Repairs",

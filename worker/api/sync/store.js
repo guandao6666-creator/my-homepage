@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Guandao OS 2.0 · Phase 4 同步实体存储层（D1）
  *
  * 所有 SQL 都带 user_id 绑定参数；entity_id / domain 由调用方白名单校验。
@@ -22,9 +22,10 @@ import {
 /** 保持旧导出兼容：HTTP 层与历史脚本从 store.js 取域白名单。 */
 export { SYNC_DOMAINS, isSyncDomain } from "./limits.js";
 
+/** 单条 SQL 的绑定参数上限按 D1 的 100 保守留余量；分块实现统一在 ../sql.js。 */
+import { ID_CHUNK_SIZE, chunkIds } from "../sql.js";
+
 const MAX_INDEX_ROWS = 10000;
-/** 单条 SQL 的绑定参数上限按 D1 的 100 保守留余量。 */
-const ID_CHUNK_SIZE = 40;
 /** 多行台账写入：5 列 × 15 行 = 75 个参数。 */
 const LEDGER_INSERT_CHUNK = 15;
 /** 多行墓碑删除：3 列 × 20 行 = 60 个参数（再加 cutoff）。 */
@@ -51,7 +52,7 @@ export async function listByIds(env, userId, domain, ids) {
   if (!list.length) return [];
 
   const found = [];
-  for (const chunk of chunkArray(list, ID_CHUNK_SIZE)) {
+  for (const chunk of chunkIds(list, ID_CHUNK_SIZE)) {
     const placeholders = chunk.map(() => "?").join(", ");
     const rows = await env.DB.prepare(
       `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
@@ -358,7 +359,7 @@ export async function estimateQuotaDelta(env, userId, domain, changes) {
   const existing = new Map();
   const ledger = new Map();
 
-  for (const chunk of chunkArray(ids, ID_CHUNK_SIZE)) {
+  for (const chunk of chunkIds(ids, ID_CHUNK_SIZE)) {
     const placeholders = chunk.map(() => "?").join(", ");
     const rows = await env.DB.prepare(
       `SELECT entity_id, deleted FROM sync_entities
@@ -431,7 +432,7 @@ export async function purgeExpiredTombstones(env, options = {}) {
   if (!batch.length) return { scanned: 0, purged: 0, cutoff };
 
   // 1) 先确保台账记录了这批墓碑（0014 时代的墓碑删除时还没有台账）。
-  for (const chunk of chunkArray(batch, LEDGER_INSERT_CHUNK)) {
+  for (const chunk of chunkIds(batch, LEDGER_INSERT_CHUNK)) {
     const placeholders = chunk.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const params = chunk.flatMap((row) => [
       row.user_id,
@@ -450,7 +451,7 @@ export async function purgeExpiredTombstones(env, options = {}) {
 
   // 2) 再按主键删除（用 OR 主键谓词，兼容 D1 与内存 SQLite 的批量参数上限）。
   let purged = 0;
-  for (const chunk of chunkArray(batch, TOMBSTONE_DELETE_CHUNK)) {
+  for (const chunk of chunkIds(batch, TOMBSTONE_DELETE_CHUNK)) {
     const predicates = chunk.map(() => "(user_id = ? AND domain = ? AND entity_id = ?)").join(" OR ");
     const params = [cutoff, ...chunk.flatMap((row) => [row.user_id, row.domain, row.entity_id])];
     const result = await env.DB.prepare(
@@ -498,8 +499,3 @@ function mapRow(row) {
   };
 }
 
-function chunkArray(list, size) {
-  const chunks = [];
-  for (let i = 0; i < list.length; i += size) chunks.push(list.slice(i, i + size));
-  return chunks;
-}

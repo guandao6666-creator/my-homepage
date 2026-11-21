@@ -2,6 +2,7 @@
 
 import { ApiError, ok } from "../http.js";
 import { assertSameOrigin, readJson } from "../guards.js";
+import { chunkIds, placeholdersFor } from "../sql.js";
 import { authConfig } from "../auth/config.js";
 import { readSession } from "../auth/session.js";
 import {
@@ -39,21 +40,12 @@ import {
 const PREFIX = "/api/files";
 
 /**
- * D1 单条语句最多 100 个绑定参数（sync/store.js 的 ID_CHUNK_SIZE 注释里也有同一约束）。
+ * D1 单条语句最多 100 个绑定参数（分块实现见 ../sql.js，与 sync/store.js 共用）。
  *
  * 递归删除会把整棵子树展开成 `IN (?, ?, …)`，参数数 = 节点数 + 其它条件参数；
  * 超过 100 时 D1 直接报 SQL 错误 → 500，而且用户没有办法绕开（只能一个个删子目录）。
  * 这里按 40 个 id 一块执行，给 userId / 时间戳等参数留足余量。
  */
-const FOLDER_TREE_CHUNK = 40;
-
-const chunkIds = (ids, size = FOLDER_TREE_CHUNK) => {
-  const chunks = [];
-  for (let i = 0; i < ids.length; i += size) chunks.push(ids.slice(i, i + size));
-  return chunks;
-};
-
-const placeholdersFor = (chunk) => chunk.map(() => "?").join(",");
 
 export async function handleFilesRequest({ request, env, url, path }) {
   if (path !== PREFIX && !path.startsWith(`${PREFIX}/`)) return null;

@@ -1,12 +1,12 @@
-# AI-BUILD-STATUS · Guandao OS 当前状态
+﻿# AI-BUILD-STATUS · Guandao OS 当前状态
 
 > 本文件只记录**当前事实**，不复制历史细节。
 > 历史细节见 `GUANDAO_2_0_AUDIT.md`（附录 A–P）、`GUANDAO_2_0_ROADMAP.md`、`docs/RELEASE-2.0.md`。
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
 - **更新时间**：2026-11-21
-- **版本**：2.0.4（Quiet Repairs，补丁版本；发布说明 `docs/RELEASE-2.0.4.md`）
-- **生产状态**：**2.0.4 已部署**（2026-11-21，Worker Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`；`/api/health` 报 2.0.4、`qa:prod` 35/35、生产 D1 无待应用迁移）
+- **版本**：2.0.5（Param Budget，补丁版本；发布说明 `docs/RELEASE-2.0.5.md`）
+- **生产状态**：**生产仍是 2.0.4**（Worker Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`；`/api/health` 报 2.0.4、`qa:prod` 35/35）。2.0.5 本地完成、**未部署（Blocked，等授权）**
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -27,13 +27,13 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（362 文件） |
-| `npx vitest run` | **25 文件 / 392 单测通过**（1.12s；2.0.4 新增同步并发 4 条、抽奖本地日 6 条、配对领取 2 条、备份清理 2 条、上传配额 3 条） |
+| `npx vitest run` | **26 文件 / 399 单测通过**（2.0.5 新增 D1 参数预算 7 条；2.0.4 新增同步并发 4 条、抽奖本地日 6 条、配对领取 2 条、备份清理 2 条、上传配额 3 条） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
 | 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；两项预算均通过 |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **193 passed（5.2m），exit 0**（含 `files-folders-deep`、`pairing-claim-race`；教程页面级断言并入 `community-tutorial`，单跑 2 passed / 17.3s） |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **195 passed（4.7m），exit 0**（含 `files-folders-deep`、`pairing-claim-race`、`d1-param-bounds`；教程页面级断言并入 `community-tutorial`，单跑 2 passed / 17.3s） |
 | 生产 | `npm run cf:deploy` → Version `78e78621…`；health 2.0.4；`qa:prod` **35/35**；`npm run perf:prod` 冷启动 #1 TTFB 211 ms · FCP 476 ms · LCP 792 ms · CLS 0.003 · DCL 664 ms · Load 764 ms（25 资源 / 481 KB） |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
@@ -65,10 +65,14 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.4）
+## 4. 本轮验证结果（2.0.4 → 2.0.5）
 
 | 项 | 结果 |
 | --- | --- |
+| D1 参数预算单测（`tests/unit/d1-params.test.ts`，2.0.5） | **7 passed**：chunkIds/占位符边界、通知 120 个 id → 3 条 UPDATE 各 42 参数且全部标记、旧形态负向对照抛 `D1 绑定参数超限：101 > 100`、trending 源码约束 |
+| D1 参数预算负向对照 | `git stash push -- worker/api/community/write.js`（回 2.0.4 单条 UPDATE）→ **1 failed / 6 passed**，失败为 `D1 绑定参数超限：122 > 100`；恢复后 7 passed |
+| D1 参数上限真实 Worker E2E（`tests/e2e/d1-param-bounds.spec.ts`，2.0.5） | **2 passed（12.1s）**：通知 120 个 id → 200；trending 每条 `recentDownloads` 是数字 |
+| D1 参数上限 E2E 负向对照 | 回 2.0.4 单条 UPDATE → **1 failed / 1 passed（12.6s）**，失败为真实 D1 `500 INTERNAL_ERROR`；恢复后 2 passed |
 | 同步并发单测（`tests/unit/sync-store.test.ts`） | **20 passed**（新增 4 条：并发更新同 revision、并发首次插入、并发抢最后一个实体名额、墓碑满后改墓碑被拒）；负向对照还原旧实现 → **2 failed / 18 passed** |
 | 抽奖本地日单测（`tests/unit/draw-day.test.ts`） | **6 passed**（本地 00:05 / 07:59 / 23:55、跨月跨年补零、东八区与 UTC 日不同、源码断言写入用 `drawDateKey()`） |
 | 深目录删除 E2E（`files-folders-deep`，worker project） | **1 passed（16.3s）**：120 层 → 非递归 409（含 119 个子文件夹）→ 递归 200 → 永久 200 → 再删 404 |
@@ -78,8 +82,8 @@
 | 备份清理单测（`tests/unit/backup-cleanup.test.ts`） | **2 passed**：跨两页前缀全部删除；源码约束 `failBackup` 在状态更新后调用 `deleteBackupPrefix`；负向对照 → **1 failed** |
 | 同步 push 配额单测（`sync-store.test.ts` 新增 2 条） | **2 passed**：并发抢最后一个实体名额 → 1 applied / 1 quota 且计数停在上限；墓碑满后改墓碑 → quota 且原行不变。负向对照（还原 703ef74 版 store）→ **2 failed** |
 | 上传配额单测（`tests/unit/files-quota.test.ts`，真实 SQLite） | **3 passed**：占位后复核在限内返回用量；两个并发占位对 10 字节配额 → 507 且只删自己；配额按用户隔离。负向对照把复核改成 `if (false)` → **2 failed** |
-| 全量门禁 | `npm run verify` **exit 0**：typecheck 0 error；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全合计 294 处、未审查 0 |
-| 单测 / 体积 | **25 文件 / 392 通过**（1.12s）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
+| 全量门禁（2.0.5 复跑） | `npm run verify` **exit 0**：`[version] 一致：2.0.5`；typecheck 0 error；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全合计 294 处、未审查 0 |
+| 单测 / 体积 | **26 文件 / 399 通过**（2.0.5 复跑）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）**（体积未变，2.0.5 只改 Worker 端） |
 | 全量 E2E | **193 passed（5.2m），exit 0**（workers=1、retries=0；教程页面级断言落地后复跑） |
 | 生产状态 | **2.0.4 已部署**：Version `78e78621-8f36-4585-87bd-a91e74ceaa3f`；health 2.0.4、header 2.0.4；`qa:prod` 35/35；部署前备份 `guandao-db-prod-20261121-200010.sql`（654,863 B）；`npm run perf:prod` 冷启动 #1 TTFB 211 / FCP 476 / LCP 792 / CLS 0.003 / DCL 664 / Load 764 ms（25 资源 481 KB） |
 
@@ -144,14 +148,25 @@
 11. **已关闭（2.0.4）**：原风险 11 的两条配额 TOCTOU 已按「写语句内条件子查询 / 先占位再复核」
     修掉，证据见上方风险 10 与 `docs/RELEASE-2.0.4.md §2.7/§2.8`。剩余证据边界如实记录：
     配额判别靠真实 SQLite 单测而非 E2E（5000 条 / 5 GiB 量级不适合本地造）。
+12. **已修（2.0.5，未部署）**：
+    - 通知「标记已读」把最多 100 个 id 展开进一条 UPDATE，绑定 = `now + user_id + N`，
+      N=99 即 101 个 → D1 500。改为一次最多 200 个 id、按 40 分块写（120 个 id → 3 条 × 42 参数）。
+    - 插件市场 trending 把最多 200 行候选塞进一条 `IN`，`since + 200 个 id` = 201 个参数 →
+      市场上架 ≥99 个插件时页面固定 500。改为按 40 分块聚合后合并 Map。
+    - 新增 `worker/api/sql.js`（`D1_PARAM_LIMIT = 100` / `ID_CHUNK_SIZE = 40` / `chunkIds` /
+      `placeholdersFor` / `assertParamBudget`），files 与 sync 的本地分块实现一并收编，避免三份逻辑漂移。
+    - 判别证据：假 D1 在 `bind()` 强校验 100 上限，`tests/unit/d1-params.test.ts` 7 passed；
+      旧实现负向对照 1 failed（`122 > 100`）。证据边界：本轮没有造 99+ 通知/插件做真实 Worker E2E。
 
 ## 6. 下一步（按优先级）
 
-1. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
+1. **P0 · 发布 2.0.5**（本地已完成，`npm run verify` exit 0 / 399 单测）：等用户授权后
+   `npm run cf:deploy` → 核对 health/header 2.0.5 → `npm run qa:prod`；未授权前保持 Blocked。
+2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
-2. **P2 · 新一轮逐块审计**：按 `docs/RELEASE-2.0.4.md` 的边界继续读 os13 / shell 前端状态机、
+3. **P2 · 新一轮逐块审计**：按 `docs/RELEASE-2.0.5.md` 的边界继续读 os13 / shell 前端状态机、
    os14 剩余模块；发现候选先找失败证据，再决定修或关。
-3. **P2 · ACCEPTANCE 全表核对（本轮已完成）**：Phase 3/4/5 生产行与 Phase 6.4 已按 2.0.4 实跑更新；
+4. **P2 · ACCEPTANCE 全表核对（本轮已完成）**：Phase 3/4/5 生产行与 Phase 6.4 已按 2.0.4 实跑更新；
    后续新增证据时同步该表。
-4. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
-5. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+5. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
+6. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。

@@ -16,7 +16,7 @@
    5. activate 只清理本应用的缓存前缀。
    ============================================================ */
 
-const VERSION = "guandao-2.0.4";
+const VERSION = "guandao-2.0.5";
 const CACHE_PREFIX = "guandao-";
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;

@@ -9,6 +9,7 @@
  */
 
 import { compareSemver } from "../../../shared/plugin-spec.js";
+import { chunkIds, placeholdersFor } from "../sql.js";
 
 export const PLUGIN_SELECT = `
   SELECT p.*,
@@ -361,16 +362,20 @@ export async function marketList(env, { category = "", q = "", sort = "latest", 
   if (!items.length) return { items: [], total };
 
   // 近 30 天去重下载数：单独一次聚合查询，避免为每行写相关子查询。
+  // trending 会一次取出最多 200 行候选，参数是 since + 200 个 id，
+  // 直接塞进一条 IN (?,…) 会超过 D1 的 100 参数上限 —— 所以按 40 分块查再合并。
   const since = Date.now() - 30 * 86_400_000;
   const ids = items.map((row) => row.id);
-  const placeholders = ids.map(() => "?").join(",");
-  const trendRows = await env.DB.prepare(
-    `SELECT plugin_id, COUNT(*) AS n FROM plugin_download_events
-      WHERE created_at >= ? AND plugin_id IN (${placeholders}) GROUP BY plugin_id`,
-  )
-    .bind(since, ...ids)
-    .all();
-  const trend = new Map((trendRows.results ?? []).map((row) => [row.plugin_id, Number(row.n)]));
+  const trend = new Map();
+  for (const chunk of chunkIds(ids)) {
+    const trendRows = await env.DB.prepare(
+      `SELECT plugin_id, COUNT(*) AS n FROM plugin_download_events
+        WHERE created_at >= ? AND plugin_id IN (${placeholdersFor(chunk)}) GROUP BY plugin_id`,
+    )
+      .bind(since, ...chunk)
+      .all();
+    for (const row of trendRows.results ?? []) trend.set(row.plugin_id, Number(row.n));
+  }
 
   if (trending) {
     items = items

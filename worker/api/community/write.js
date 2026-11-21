@@ -9,6 +9,7 @@
  */
 
 import { ApiError, ok } from "../http.js";
+import { chunkIds, placeholdersFor } from "../sql.js";
 import { sha256Hex } from "../auth/crypto.js";
 import {
   assertCommentAllowed,
@@ -1482,13 +1483,18 @@ export async function markNotifications({ env, request, viewer }) {
       .bind(now, viewer.id)
       .run();
   } else if (Array.isArray(body?.ids) && body.ids.length) {
-    const ids = body.ids.filter((id) => UUID.test(String(id))).slice(0, 100);
+    // 一次最多处理 200 条：客户端「单条通知」场景远小于这个数，
+    // 但也不能让异常客户端用 500 个 id 把单条 UPDATE 撑过 D1 的 100 参数上限。
+    const ids = body.ids.filter((id) => UUID.test(String(id))).slice(0, 200);
     if (!ids.length) return ok({ unread: await unreadNotificationCount(env, viewer.id) });
-    await env.DB.prepare(
-      `UPDATE community_notifications SET read_at = ? WHERE user_id = ? AND id IN (${ids.map(() => "?").join(", ")})`,
-    )
-      .bind(now, viewer.id, ...ids)
-      .run();
+    // 分块写：一条 UPDATE 的绑定是 now + user_id + N 个 id，N=99 就会超出 100。
+    for (const chunk of chunkIds(ids)) {
+      await env.DB.prepare(
+        `UPDATE community_notifications SET read_at = ? WHERE user_id = ? AND id IN (${placeholdersFor(chunk)})`,
+      )
+        .bind(now, viewer.id, ...chunk)
+        .run();
+    }
   }
   return ok({ unread: await unreadNotificationCount(env, viewer.id) });
 }

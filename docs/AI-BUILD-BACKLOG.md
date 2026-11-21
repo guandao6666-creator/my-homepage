@@ -181,3 +181,39 @@ health/header 2.0.4、`qa:prod` 35/35、生产 D1 无待应用迁移、部署前
 - 负向对照后的「自动恢复」不可信：临时脚本打印 restored 也可能没写回，下一次门禁红就是证据。
   改完生产代码必须用 `Select-String` 复核关键行；Windows 上连续重写同一文件还会偶发
   `ReplaceFileW EIO`，重试即可，别急着怀疑测试。
+
+---
+
+## 2026-11-21 · Round 26 · 2.0.5 收口（Param Budget，未部署）
+
+| 编号 | 缺陷 | 证据 |
+| --- | --- | --- |
+| F10 | worker/api/community/write.js markNotifications 把最多 100 个 id 展开进一条 UPDATE ... IN (?,…)：绑定 = 
+ow + user_id + N，N=99 即 101 个参数 → D1 500，客户端传 99+ 个通知 id 可打挂接口 | 上限改 200 + 按 40 分块（120 个 id → 3 条 × 42 参数）；`tests/unit/d1-params.test.ts` 假 D1 强校验 100 上限，120 id 全标记；负向对照回 2.0.4 单条 UPDATE → 1 failed（`122 > 100`） |
+| F11 | worker/api/plugins/store.js marketList trending 一次取最多 200 行候选，随后 `since + 200 个 id` = 201 参数塞进一条聚合查询：市场上架 ≥99 个插件时 trending 页固定 500 | 按 40 分块查询并合并 `Map`；同文件源码约束（含 `chunkIds` 循环、不再拼一整条 `IN`、保留 100 上限注释） |
+| F12 | 分块实现三份：files 的 `FOLDER_TREE_CHUNK`、sync 的 `chunkArray`、通知又写一份 | 新增 `worker/api/sql.js`（`D1_PARAM_LIMIT` / `ID_CHUNK_SIZE = 40` / `chunkIds` / `placeholdersFor` / `assertParamBudget`），files 与 sync 改为共用；`tests/unit/sync-store.test.ts` + `files-quota` + `d1-params` 3 文件 30 passed |
+| F13 | 版本 9 处 + 断言族升 2.0.5 | `node scripts/check-version.mjs` → `[version] 一致：2.0.5`；`npm run verify` exit 0（`26 files / 399 tests`） |
+
+**真实 Worker 证据（补充）**：`tests/e2e/d1-param-bounds.spec.ts` **2 passed（12.1s）**：
+`PATCH /api/community/me/notifications` 带 120 个 id → 200、`data.unread` 是数字；
+`GET /api/plugins?tab=trending` → 每条 `recentDownloads` 是数字。负向对照回 2.0.4 单条 UPDATE
+→ **1 failed / 1 passed（12.6s）**，失败为真实 D1 `500 INTERNAL_ERROR`。
+
+**剩余证据边界**：trending 的「候选 ≥99 行」分支仍未在真实 E2E 里造满（上传限流 20 次/小时）；
+要补就先用 SQL seed 100 个插件行再请求 trending，不要靠上传接口造数据。
+
+**门禁**：`npm run verify` **exit 0**（typecheck 0 error、`26 files / 399 tests`、
+html-security 294 处 / 未审查 0、build 30 页、CSP 12 哈希 / 31 HTML；全量 E2E **195 passed（4.7m）**）；体积不变
+（入口 JS 434.8/439.5 KB、首屏 CSS 184.7/195.3 KB，2.0.5 只改 Worker 端）。
+
+**状态**：**未部署（Blocked，等授权）**；生产仍是 2.0.4（Version `78e78621…`）。
+推送未做——本仓库 push 到 `main` 会触发 Cloudflare 自动构建并切流，需要明确授权。
+
+**教训（新增）**
+
+- 「已经修过同类缺陷」不等于扫干净了：2.0.4 修了深目录删除，2.0.5 又在通知与 trending 各找到一处。
+  修完一处应按 `IN (…)` / `bind(…, ...ids)` 两种形态全仓扫。
+- `slice(0, 100)` 加上 `now + user_id` 就是 102 个参数：边界判断必须把其它绑定算进去。
+- 共用 helper 不是洁癖：三份分块实现意味着三处可能各自退回单条语句。
+- 证据要分层写：能造真实 E2E 的造（深目录 120 层），造不动的（99+ 通知）就用强校验桩 + 负向对照，
+  并在文档里明确「这是证据边界」。

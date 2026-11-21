@@ -1,4 +1,4 @@
-﻿# AI-BUILD-LOG · 每轮开发记录
+# AI-BUILD-LOG · 每轮开发记录
 
 > 追加式记录。每轮写：做了什么、改了哪些文件、测试结果、未完成、下一项。
 > 详细论证放 `docs/architecture/*` 与 `docs/RELEASE-2.0.md`，这里只留索引与结论。
@@ -591,3 +591,40 @@
 全量 `npx playwright test` 复跑 **193 passed（5.2m）**（教程页面级断言并入后）；体积 434.8/439.5 KB、184.7/195.3 KB。
 
 **状态**：生产 2.0.4 已上线；本轮文档与测试改动待提交并推送（push 会触发 Cloudflare 自动构建）。
+
+---
+
+## 2026-11-21 · Round 32 · 2.0.5 Param Budget（D1 参数预算，未部署）
+
+1. **审计形态**：2.0.4 修过「目录树塞进 IN」后，按 `IN (\)` / `bind(…, ...ids)`
+   两种形态重扫 Worker 层，又找到两处同形态缺陷：
+   - `worker/api/community/write.js` `markNotifications`：`slice(0, 100)` + 单条 UPDATE，
+     绑定 = `now + user_id + N`，N=99 即 101 → D1 500；
+   - `worker/api/plugins/store.js` `marketList` trending：候选 200 行 + since = 201 参数 →
+     上架插件 ≥99 时固定 500。
+2. **修复**：通知上限改 200 + 按 40 分块（120 id → 3 条 × 42 参数）；trending 按 40 分块聚合、
+   合并 Map；新增 `worker/api/sql.js` 统一 `chunkIds` / `placeholdersFor` /
+   `D1_PARAM_LIMIT = 100` / `ID_CHUNK_SIZE = 40`，files 与 sync 的本地分块实现一并收编。
+3. **证据**：`tests/unit/d1-params.test.ts` 7 passed（假 D1 在 bind 时强校验 100 上限，
+   120 id 全部标记，trending 源码约束）；负向对照 `git stash` 回 2.0.4 单条 UPDATE →
+   **1 failed / 6 passed**，失败为 `D1 绑定参数超限：122 > 100`；恢复后 7 passed。
+   回归：sync-store + files-quota + d1-params **3 files / 30 tests passed**。
+   补了真实 Worker E2E `tests/e2e/d1-param-bounds.spec.ts`：`PATCH /api/community/me/notifications`
+   120 个 id → 200、`GET /api/plugins?tab=trending` 每条 `recentDownloads` 是数字，
+   **2 passed（12.1s）**；负向对照回 2.0.4 → **1 failed / 1 passed（12.6s）**，失败是真实 D1
+   `500 INTERNAL_ERROR`。踩坑：路由实际是 `PATCH /api/community/me/notifications` 与
+   `GET /api/plugins?tab=trending`（不是 `/api/community/notifications/read`、`/api/plugins/market`），
+   公开字段是 `recentDownloads` 而非 `recent_downloads`。
+4. **门禁**：`npm run verify` **exit 0**（`[version] 一致：2.0.5`、typecheck 0 error、
+   `26 files / 399 tests`、html-security 294/0、build 30 页、CSP 12 哈希 / 31 HTML）；
+   全量 E2E **195 passed（4.7m）**。
+   体积未变（2.0.5 只改 Worker）：入口 JS 434.8/439.5 KB、首屏 CSS 184.7/195.3 KB。
+5. **版本**：9 处升 2.0.5（`Param Budget`），断言族同步（`os20.spec.ts` 4 处、
+   `community-qa.mjs:338`、`plugins-qa.mjs:196`、`quality.yml:146/158`）；
+   `node scripts/check-version.mjs` → 一致。
+6. **文档**：`docs/RELEASE-2.0.5.md`、`docs/PROMPT-2.0.5.md`、STATUS（2.0.5 未部署、
+   §2 26/399、§4 新增 F10/F11 行、§5 风险 12、§6 P0 发布待授权）、BACKLOG Round 26。
+7. **状态**：**未部署（Blocked，等授权）**。生产仍是 2.0.4；未 push —— 本仓库 push 到 main
+   会触发 Cloudflare 自动构建并切流。下一步：用户授权 → `npm run cf:deploy` → health/header
+   2.0.5 → `qa:prod`；trending 的「候选 ≥99 行」分支若要生产级证据，用 SQL seed 100 个插件行
+   （绕开上传限流）。
