@@ -737,4 +737,6 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
    两次失败都是启动时序（只等 `#boot` 抢跑、`openApp()` 早启动返回假值），改等 `GOS20_READY`、
    以窗口出现为准后通过；负向对照删掉详情栏重绘并重建 dist → 1 failed，restore `MATCH`。
    全量 `npx playwright test` → **199 passed（5.3m）**，exit 0。
-10. **未部署（Blocked）**：push 会触发 Cloudflare 自动构建=上线，需用户授权；生产仍是 2.0.7。
+10. **上线（2026-11-22 16:06）**：用户授权 → 迁移无待应用、D1 备份 648,923 B → `cf:deploy` 30 页
+    Version `9be8e25b…`（743.22 KiB / gzip 163.57 KiB）→ health/header 2.0.8、首页 27,812 B、
+    入口 `CZAyZYvn.js` 450,998 B 含 2.0.8 → `qa:prod` **35/35**、清理 `{"users":0}`。

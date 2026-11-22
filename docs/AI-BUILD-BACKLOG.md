@@ -345,7 +345,7 @@ build 30 页、CSP 12 哈希 / 31 HTML）；全量 E2E 见 §4（2.0.8 未新增
 删掉详情栏重绘块并重建 dist 后同一用例 **1 failed**（负向对照成立）。全量 E2E **199 passed（5.3m）**。
 `node scripts/check-version.mjs` → 2.0.8 一致。
 
-**状态**：**Implemented / Verified（本地）**，**未部署（Blocked，等上线授权）**；生产仍是 2.0.7（Version `a7728641…`）。
+**状态**：**Verified（本地 + 生产）**，2026-11-22 已部署 Version `9be8e25b…`（health/header 2.0.8、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1615.sql` 648,923 B、回滚目标 `a7728641…`）。
 
 **证据边界**：更新中心失败态与市场过滤后的详情没有真实 Worker 用例（需要拦截网络/构造失败），
 判别靠纯函数 + 源码约束；「点击后界面到哪」的正常路径仍由既有 `os20.spec.ts` 覆盖。

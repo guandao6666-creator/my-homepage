@@ -4,7 +4,7 @@
 - 代号：Trust Gate
 - 日期：2026-11-22
 - 类型：补丁版（上一版 2.0.7 Review Integrity）
-- 状态：**本地完成，未部署（Blocked，等上线授权）**
+- 状态：**Verified（本地 + 生产）**，已部署 Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`
 
 ## 1. 这一版修了什么
 
@@ -202,16 +202,19 @@ export function canApplyUpdate(phase, server, comparison): boolean {
 
 ## 5. 部署记录
 
-未部署。发布前检查：
+2026-11-22 16:06 上线：
 
-```bash
-node scripts/check-version.mjs        # 2.0.8
-npm run verify
-npx wrangler d1 migrations list guandao-db --remote   # 预期 No migrations to apply!
-npx wrangler d1 export guandao-db --remote --output .backups/guandao-db-prod-<ts>.sql
-npm run cf:deploy
-npm run qa:prod
-```
+| 步骤 | 结果 |
+| --- | --- |
+| `git fetch` | `origin/main…HEAD = 0 1`（本地领先 1，无落后） |
+| `npx wrangler d1 migrations list guandao-db --remote` | `✅ No migrations to apply!` |
+| D1 备份 | `.backups/guandao-db-prod-20261122-1615.sql`，**648,923 B** |
+| `npm run cf:deploy` | exit 0；30 页；32 个静态资源；`Total Upload: 743.22 KiB / gzip: 163.57 KiB`；Worker Startup **4 ms**；**Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`** |
+| 生产核对 | `/api/health` → `"version":"2.0.8"`、D1 connected、R2 available；响应头 `x-guandao-version: 2.0.8`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.CZAyZYvn.js`（450,998 B，含 2.0.8） |
+| `npm run qa:prod` | **35/35 通过**；清理 `{"users":0}`（既有 `event_type` CHECK 警告仍存在，脚本 exit 0） |
+
+回滚目标：2.0.7 的 Version `a7728641-876d-4351-8b4a-fcacc816ced1`。推送后 Cloudflare 会自动构建新 Version，最终版本以
+`wrangler deployments list` 末尾为准。
 
 ## 6. 未修与「需要迁移」清单
 

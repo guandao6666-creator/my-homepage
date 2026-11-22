@@ -6,7 +6,7 @@
 
 - **更新时间**：2026-11-22
 - **版本**：2.0.8（Trust Gate，补丁版本；发布说明 `docs/RELEASE-2.0.8.md`）
-- **生产状态**：**2.0.8 本地完成、未部署（Blocked，等上线授权）**；生产仍是 **2.0.7**（Version `a7728641-876d-4351-8b4a-fcacc816ced1`，health/header 2.0.7、`qa:prod` 35/35）。2.0.8 回滚目标同为 `a7728641-…`。
+- **生产状态**：**2.0.8 已部署（2026-11-22）**，Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`、health/header 2.0.8、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1615.sql`（648,923 B）、无待应用迁移；回滚目标 2.0.7 `a7728641-…`。
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -65,10 +65,14 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.6 → 2.0.7）
+## 4. 本轮验证结果（2.0.8）
 
 | 项 | 结果 |
 | --- | --- |
+| 2.0.8 全量门禁 | `npm run verify` **exit 0**：`[version] 一致：2.0.8`；**45 文件 / 490 单测**（1.78s）；HTML 安全 **295 处 / 未审查 0**；build 30 页；CSP 12 哈希 / 31 HTML |
+| 2.0.8 真实 Worker E2E（新增 `tests/e2e/market-search-detail.spec.ts`） | **1 passed（14.4s）**：打开市场 → 选中卡片（详情出现标题）→ 输入不匹配关键词 → 列表空态 + 详情 `is-empty` + 旧标题消失；删掉详情栏重绘块并重建 dist → **1 failed**（负向对照成立，restore SHA-256 MATCH） |
+| 2.0.8 全量 E2E | `npx playwright test` → **199 passed（5.3m）**，exit 0（2.0.7 的 198 + 新增 1） |
+| 生产部署（2.0.8，2026-11-22） | `npm run cf:deploy` exit 0 → Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`；`/api/health` 2.0.8、header 2.0.8、入口 `CZAyZYvn.js`（450,998 B）含 2.0.8；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-1615.sql`（648,923 B）；回滚目标 `a7728641-…` |
 | 审核状态策略单测（`tests/unit/community-review-policy.test.ts`，2.0.7） | **8 passed**：approve×6 / restore×6 状态矩阵、draft 文案含「作者已撤回」「重新提交审核」、deleted 一律拒绝、UI 按钮与策略一致；另有真的调 `adminReviewPost` 的行为用例（draft → 400 且文案正确） |
 | 删除结算单测（`tests/unit/community-delete-reports.test.ts`，2.0.7） | **3 passed**：`deletePost` 的 batch 含 `UPDATE community_reports ... status IN ('open','reviewing')`、resolution「作品已被删除」；`hide_post` 对 deleted 的守卫；privacy 的「先检查、后消费」顺序 |
 | 2.0.7 负向对照 | 分别还原 `write.js` / `moderation.ts` / `admin.js` → **各 1 failed**；`admin.js` 那组收到的旧文案是「作品还没有可安装的内容包，不能通过审核」 |
@@ -241,9 +245,8 @@
 
 ## 6. 下一步（按优先级）
 
-1. **P1 · 2.0.8 已完成本地验证，未部署（Blocked）**：`npm run verify` exit 0（45 文件 / 490 单测）、
-   全量 E2E 见 §4；部署需要授权（D1 备份 → `cf:deploy` → health/header 2.0.8 → `qa:prod`）。
-   生产当前仍是 2.0.7（Version `a7728641…`）。
+1. **P1 · 2.0.8 已上线（2026-11-22）**：Version `9be8e25b…`、health/header 2.0.8、`qa:prod` 35/35；
+   `npm run verify` exit 0（45 文件 / 490 单测）、全量 E2E 199 passed（5.3m）。推送后需复核 CI 与自动构建。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
 3. **P2 · 补 2.0.6/2.0.7 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；
