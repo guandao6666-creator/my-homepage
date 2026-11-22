@@ -233,6 +233,7 @@ path = miniflare-email-store
 | 5. 生产核对 | `/api/health` → `"version":"2.0.9"`、D1 connected、R2 available（put/get/head/delete 全 true）；`x-guandao-version: 2.0.9`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.0cIOslbc.js`（451,061 B）含 `2.0.9`；`/sw.js` → `guandao-2.0.9` |
 | 6. 生产 E2E | `npm run qa:prod` → **35/35 通过**，清理后 `{"users":0}`（既有清理 SQL 的 Cloudflare API 报错仍在 stderr，脚本 exit 0） |
 | 7. 回滚目标 | 2.0.8 Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d` |
+| 8. 推送与 CI | push `9012f35..a840827` 后 quality run **45014126338 失败**（`npm ci` EUSAGE：wrangler 4.166.0 的可选 peer `vitest ^4.1\|\|^5` 未写入 npm 11 生成的锁）；用 `npm@10.9.4` 重新生成 `package-lock.json` 并提交 `d0c256c`，push 后 run **45014667370 success**（Node 22 / npm 10 的 `npm ci` 通过）。Cloudflare 自动构建 Version `470a5244-890d-489c-b685-e74f9ed1e71b`（10:54:49Z），health/header 仍 2.0.9；每次 push 都会触发新 Version，以 `deployments list` 末尾为准 |
 
 ## 6. 未修清单
 

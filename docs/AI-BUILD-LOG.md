@@ -767,3 +767,9 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
     Version `a034902b-562b-4122-85bf-e238cbbe23d6`（30 页、`Total Upload: 745.87 KiB / gzip: 164.35 KiB`）；
     health/header 2.0.9、入口 `0cIOslbc.js`（451,061 B）含 2.0.9、`/sw.js` `guandao-2.0.9`；`qa:prod` 35/35、清理 `users=0`。
     回滚目标 2.0.8（`9be8e25b…`）。
+13. **CI 与自动构建（2026-11-22）**：push `9012f35..a840827` 后 quality run **45014126338 失败**——
+    `npm ci` 报 EUSAGE：wrangler 4.166.0 依赖的 `@cloudflare/workers-utils` 声明可选 peer
+    `vitest ^4.1||^5`，而 npm 11（本机 Node 26）没有把该 peer 解析写进锁；CI 用 Node 22（npm 10）判定锁不同步。
+    用 `npm@10.9.4 install --package-lock-only` 重新生成锁并提交 `d0c256c`，`npm@10 ci --dry-run` 通过，
+    本地 `npm run verify` 复跑 exit 0（49 文件 / 507 测试）；push 后 run **45014667370 success**。
+    Cloudflare 自动构建 Version `470a5244-890d-489c-b685-e74f9ed1e71b`（10:54:49Z），health/header 仍 2.0.9。

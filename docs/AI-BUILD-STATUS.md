@@ -79,6 +79,7 @@
 | 2.0.9 环境事故与依赖 | wrangler 4.157 的 workerd 起不来（`miniflare-email-store` CreateDirectory 拒绝访问，`d1 execute/migrations apply/dev` 全失败）；升级 devDependency `wrangler@4.166.0` 后恢复，`files-range-head` + `os20-tab-restore` 合并 3 passed（17.9s） |
 | 2.0.9 体积 | 入口 JS **440.5 / 439.5 KB（100.2%，超 1.0 KB）**；首屏 CSS **184.7 / 195.3 KB（94.6%）**；超预算在 2.0.8 已发生（生产入口 450,998 B），记为技术债 |
 | 生产部署（2.0.9，2026-11-22） | `npm run cf:deploy` exit 0 → Version `a034902b-562b-4122-85bf-e238cbbe23d6`；`/api/health` 2.0.9、header 2.0.9、入口 `0cIOslbc.js`（451,061 B）含 2.0.9、`/sw.js` `guandao-2.0.9`；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-1836.sql`（655,283 B）；回滚目标 `9be8e25b-…`（2.0.8） |
+| 2.0.9 推送与 CI | push `9012f35..a840827` 首跑 quality run **45014126338 失败**（`npm ci` EUSAGE：wrangler 4.166.0 的可选 peer `vitest ^4.1\|\|^5` 未被 npm 11 写入锁）；用 `npm@10.9.4` 重生成 `package-lock.json` 提交 `d0c256c` → run **45014667370 success**；Cloudflare 自动构建 `470a5244-890d-489c-b685-e74f9ed1e71b`（10:54:49Z），health 仍 2.0.9 |
 
 ### 4.1 上一版验证结果（2.0.8，归档）
 
