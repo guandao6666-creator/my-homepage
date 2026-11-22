@@ -6,7 +6,7 @@
 
 - **更新时间**：2026-11-22
 - **版本**：2.0.7（Review Integrity，补丁版本；发布说明 `docs/RELEASE-2.0.7.md`）
-- **生产状态**：**2.0.6 已部署（2026-11-22）**，Version `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6、`qa:prod` 35/35、部署前备份 `guandao-db-prod-20261122-1250.sql`、生产 D1 无待应用迁移。**2.0.7 已完成本地验证，未部署（等授权）**。
+- **生产状态**：**2.0.7 已部署（2026-11-22）**，Version `a7728641-876d-4351-8b4a-fcacc816ced1`；health/header 2.0.7、`qa:prod` 35/35、部署前备份 `guandao-db-prod-20261122-1412.sql`（639,545 B）、生产 D1 无待应用迁移。回滚目标 `835cb688-…`（2.0.6）。
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -75,6 +75,7 @@
 | 全量单测（2.0.7） | `npx vitest run` → **40 文件 / 460 passed（1.49s）** |
 | 全量门禁（2.0.7） | `npm run verify` **exit 0**：`[version] 一致：2.0.7`；typecheck 0 error（176 hints）；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全 294 处、未审查 0 |
 | 全量 E2E（2.0.7） | **198 passed（4.7m），exit 0**；首次跑 197/1 failed，原因是既有审核链用例还在点 `review-approve`（2.0.7 把已隐藏改为 `review-restore`），改按新契约后单跑 4 passed（26.2s）再复跑全量 |
+| 生产部署（2.0.7，2026-11-22） | `npm run cf:deploy` exit 0 → Version `a7728641-876d-4351-8b4a-fcacc816ced1`；`/api/health` 2.0.7、header 2.0.7、入口 `BCJOtq9k.js`（449,635 B）含 2.0.7；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-1412.sql`（639,545 B） |
 | 壁纸卡片转义单测（`tests/unit/os13-wallcard.test.ts`，2.0.6） | **5 passed**：标签/引号/id 属性转义、blob 放行、`javascript:` 挡掉、状态位 |
 | 拖拽落点单测（`tests/unit/icons-order.test.ts`，2.0.6） | **6 passed**：空列表、左侧、右侧、下方、两图标之间、同列上下 |
 | 强调色单测（`tests/unit/look-accent.test.ts`，2.0.6） | **5 passed**：auto 恢复、hex 接受、非法值忽略、只给 accent2 |

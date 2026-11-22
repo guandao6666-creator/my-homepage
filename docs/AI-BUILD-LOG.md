@@ -708,4 +708,4 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
    断言看到的是「作品不存在」；换成真 UUID 后才打到状态策略。
 7. **门禁与版本**：`[version] 一致：2.0.7`；typecheck 0 error；html-security 294/0；build 30 页；
    CSP 12 哈希 / 31 HTML；全量 E2E **198 passed（4.7m）**；首次 197/1 是既有审核链用例仍点 `review-approve`，按 2.0.7 的 `review-restore` 契约改后复跑全绿。
-8. **状态**：本地完成，未 push、未部署（生产仍 2.0.6，Version `835cb688…`）；等上线授权。
+8. **上线（2026-11-22 14:13）**：用户授权后 `npm run cf:deploy` → Version `a7728641-876d-4351-8b4a-fcacc816ced1`；health/header 2.0.7、入口 `BCJOtq9k.js` 含 2.0.7、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1412.sql`（639,545 B）；回滚目标 `835cb688-…`（2.0.6）。

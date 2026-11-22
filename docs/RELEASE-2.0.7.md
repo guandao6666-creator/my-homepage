@@ -1,11 +1,11 @@
-# Guandao OS 2.0.7 · Review Integrity
+﻿# Guandao OS 2.0.7 · Review Integrity
 
 - **版本**：2.0.7
 - **代号**：Review Integrity（审核完整性）
 - **日期**：2026-11-22
 - **类型**：补丁版本
 - **上游**：2.0.6 Shell Proof
-- **状态**：**Verified（本地）**；生产仍 2.0.6，本版未部署（等授权）
+- **状态**：**Verified（本地 + 生产）**，已部署到 guandao.xin（2026-11-22，Version `a7728641-876d-4351-8b4a-fcacc816ced1`）
 
 ---
 
@@ -178,16 +178,17 @@ UPDATE community_reports
 
 ## 5. 部署
 
-**未部署。** 生产仍 2.0.6（Version `835cb688-5ea2-4572-8d48-05d19947f03d`，
-自动构建 `017daf47-5eed-4215-becf-608b7d7eba80`）。部署步骤与 2.0.6 相同：
+**已部署（2026-11-22）**：Version `a7728641-876d-4351-8b4a-fcacc816ced1`。
 
-1. `git fetch` 确认 `origin/main` 无新提交；
-2. `npx wrangler d1 migrations list guandao-db --remote`（本版无迁移，应输出 `No migrations to apply!`）；
-3. `npx wrangler d1 export guandao-db --remote --output .backups/guandao-db-prod-<时间>.sql`；
-4. `npm run cf:deploy`；
-5. 核对 `/api/health` 与 `x-guandao-version: 2.0.7`、首页与入口 bundle；
-6. `npm run qa:prod`；
-7. push 后复核 CI 与 Cloudflare 自动构建。
+| 步骤 | 结果 |
+| --- | --- |
+| 起点 | `git fetch` 后 `origin/main...HEAD` = `0 1`（本地领先 1，无落后） |
+| 迁移 | `npx wrangler d1 migrations list guandao-db --remote` → `✅ No migrations to apply!` |
+| 备份 | `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1412.sql`（**639,545 B**） |
+| 部署 | `npm run cf:deploy` exit 0 → 30 页、`Uploaded 32 files`、`Total Upload: 742.42 KiB / gzip: 163.45 KiB`、Worker Startup 4 ms |
+| 生产核对 | `/api/health` → `"version":"2.0.7"`、D1 connected、R2 available（put/get/head/delete 全 true）；header `x-guandao-version: 2.0.7`；入口 `index.astro_astro_type_script_index_0_lang.BCJOtq9k.js`（449,635 B）含 `2.0.7` |
+| 生产 QA | `npm run qa:prod` **35/35 通过**，清理后 `{"users":0}`（stderr 仍有既有 `event_type` CHECK 警告，脚本 exit 0） |
+| push 后 | CI run 与 Cloudflare 自动构建见文末 |
 
 回滚目标：2.0.6 的 Version `835cb688-5ea2-4572-8d48-05d19947f03d`。
 

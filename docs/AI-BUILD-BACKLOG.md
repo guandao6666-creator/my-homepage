@@ -309,7 +309,7 @@ CSP 12 哈希 / 31 HTML）；全量 E2E **198 passed（4.7m）**。
 CSP 12 哈希 / 31 HTML）；全量 E2E **198 passed（4.7m）**（首次 197/1，既有审核链用例按新 `review-restore` 契约改完后复跑全绿）。
 `node scripts/check-version.mjs` → 2.0.7 一致。
 
-**状态**：**Verified（本地）**，生产未部署（Blocked，等上线授权；生产仍是 2.0.6）。
+**状态**：**Verified（本地 + 生产）**，2026-11-22 已部署 Version `a7728641…`（health/header 2.0.7、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1412.sql` 639,545 B）。
 
 **教训（新增）**
 
