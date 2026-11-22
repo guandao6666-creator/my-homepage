@@ -13,7 +13,7 @@
 import { ApiError } from "../http.js";
 
 /** 当前系统版本：内容包兼容性以此为基准。 */
-export const OS_VERSION = "2.0.6";
+export const OS_VERSION = "2.0.7";
 
 export const POST_TYPES = ["theme", "widget", "workspace", "wallpaper", "tutorial"];
 

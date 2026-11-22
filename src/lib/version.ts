@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.6";
+export const OS_VERSION = "2.0.7";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -46,6 +46,18 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.0.7",
+    name: "Review Integrity",
+    date: "2026-11-22",
+    notes: [
+      "审核「通过」只接受待审核/未通过，「恢复」只接受已隐藏：作者撤回的草稿不能再被审核员替他发布",
+      "作者删除作品时结算关联举报：否则 open 举报会一直挂着，后续举报处理还可能把软删作品改回 hidden",
+      "账号注销的重验票据改为检查通过后才消费：被 409 挡住时不必重走 GitHub OAuth",
+      "审核卡按状态给按钮（通过/恢复），draft 无按钮，与服务端策略一致",
+      "新增 2 个单测文件 11 条用例，并对三条修复各做了一次负向对照",
+    ],
+  },
   {
     version: "2.0.6",
     name: "Shell Proof",

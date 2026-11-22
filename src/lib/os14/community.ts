@@ -777,6 +777,11 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
       case "review-approve":
         if (actionEl?.dataset.id) void reviewModeration(actionEl.dataset.id, "approve");
         break;
+      case "review-restore":
+        // 已隐藏的内容用“恢复”，服务端只让 hidden → published 走这条；
+        // 和 approve 分开，避免把作者撤回的 draft 也当成“恢复”。
+        if (actionEl?.dataset.id) void reviewModeration(actionEl.dataset.id, "restore");
+        break;
       case "review-reject":
         if (actionEl?.dataset.id) void reviewModeration(actionEl.dataset.id, "reject");
         break;

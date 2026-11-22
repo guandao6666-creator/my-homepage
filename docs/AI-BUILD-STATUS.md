@@ -5,8 +5,8 @@
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
 - **更新时间**：2026-11-22
-- **版本**：2.0.6（Shell Proof，补丁版本；发布说明 `docs/RELEASE-2.0.6.md`）
-- **生产状态**：**2.0.6 已部署（2026-11-22）**，Version `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6、`qa:prod` 35/35、部署前备份 `guandao-db-prod-20261122-1250.sql`、生产 D1 无待应用迁移
+- **版本**：2.0.7（Review Integrity，补丁版本；发布说明 `docs/RELEASE-2.0.7.md`）
+- **生产状态**：**2.0.6 已部署（2026-11-22）**，Version `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6、`qa:prod` 35/35、部署前备份 `guandao-db-prod-20261122-1250.sql`、生产 D1 无待应用迁移。**2.0.7 已完成本地验证，未部署（等授权）**。
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -27,7 +27,7 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（383 文件） |
-| `npx vitest run` | **38 文件 / 449 单测通过**（2.0.6 新增外壳纯函数 19 条、插件市场 2 条、第二轮审计 29 条；2.0.5 新增 D1 参数预算 7 条） |
+| `npx vitest run` | **40 文件 / 460 单测通过**（2.0.7 新增审核策略 8 条、删除结算 3 条；2.0.6 新增外壳纯函数 19 条、第二轮审计 29 条；2.0.5 新增 D1 参数预算 7 条） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
@@ -65,10 +65,16 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.5 → 2.0.6）
+## 4. 本轮验证结果（2.0.6 → 2.0.7）
 
 | 项 | 结果 |
 | --- | --- |
+| 审核状态策略单测（`tests/unit/community-review-policy.test.ts`，2.0.7） | **8 passed**：approve×6 / restore×6 状态矩阵、draft 文案含「作者已撤回」「重新提交审核」、deleted 一律拒绝、UI 按钮与策略一致；另有真的调 `adminReviewPost` 的行为用例（draft → 400 且文案正确） |
+| 删除结算单测（`tests/unit/community-delete-reports.test.ts`，2.0.7） | **3 passed**：`deletePost` 的 batch 含 `UPDATE community_reports ... status IN ('open','reviewing')`、resolution「作品已被删除」；`hide_post` 对 deleted 的守卫；privacy 的「先检查、后消费」顺序 |
+| 2.0.7 负向对照 | 分别还原 `write.js` / `moderation.ts` / `admin.js` → **各 1 failed**；`admin.js` 那组收到的旧文案是「作品还没有可安装的内容包，不能通过审核」 |
+| 全量单测（2.0.7） | `npx vitest run` → **40 文件 / 460 passed（1.49s）** |
+| 全量门禁（2.0.7） | `npm run verify` **exit 0**：`[version] 一致：2.0.7`；typecheck 0 error（176 hints）；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全 294 处、未审查 0 |
+| 全量 E2E（2.0.7） | **198 passed（4.7m），exit 0**；首次跑 197/1 failed，原因是既有审核链用例还在点 `review-approve`（2.0.7 把已隐藏改为 `review-restore`），改按新契约后单跑 4 passed（26.2s）再复跑全量 |
 | 壁纸卡片转义单测（`tests/unit/os13-wallcard.test.ts`，2.0.6） | **5 passed**：标签/引号/id 属性转义、blob 放行、`javascript:` 挡掉、状态位 |
 | 拖拽落点单测（`tests/unit/icons-order.test.ts`，2.0.6） | **6 passed**：空列表、左侧、右侧、下方、两图标之间、同列上下 |
 | 强调色单测（`tests/unit/look-accent.test.ts`，2.0.6） | **5 passed**：auto 恢复、hex 接受、非法值忽略、只给 accent2 |
@@ -117,10 +123,10 @@
 
 ## 5. 重大风险（未关闭）
 
-1. **生产已上 2.0.5（2026-11-21）**，但 1.6 的两条告警 webhook 仍未配置
+1. **生产已上 2.0.6（2026-11-22）**，但 1.6 的两条告警 webhook 仍未配置
    （`BACKUP_ALERT_WEBHOOK`、`DATA_ALERT_WEBHOOK`）：备份/数据监控的
    **告警投递**没有在生产验证，只能依赖 `qa:prod` 与 `verify:d1-backup` 的主动检查。
-   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261121-213900.sql`（650,184 B）。
+   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1250.sql`。
 2. **审核链的页面级证据已在本地补齐（4 条用例），生产侧只有公开接口与只读冒烟**：
    服务端本就没有「审核超时」分支（`admin.js:52` 只接受四种操作），不是缺口，是契约如此；
    生产验证仍依赖 `qa:prod`，页面级审核链只在本地/CI 跑。
@@ -177,7 +183,7 @@
     - 判别证据：假 D1 在 `bind()` 强校验 100 上限，`tests/unit/d1-params.test.ts` 7 passed；
       旧实现负向对照 1 failed（`122 > 100`）；真实 Worker E2E `d1-param-bounds` 2 passed（12.1s），旧实现负向对照 1 failed（真实 D1 500）。证据边界：trending 的「候选 ≥99 行」分支仍未在真实 E2E 造满。
 
-13. **已修（2.0.6，本地未部署）**：
+13. **已修（2.0.6，已部署 2026-11-22）**：
     - 社区壁纸标题未转义：名字来自别人的作品标题（`community/install.ts` → `importWallpaperFromBlob`），
       直接拼进设置页 `title/alt/文本` 即存储型 XSS。已抽 `wall-card.ts` 纯函数并
       `escapeAttr`/`escapeHtml` 双上下文转义；单测 5 passed、E2E 2 passed、负向对照 1 failed
@@ -200,32 +206,36 @@
       按 `view.kind` 分派、`createSlideshow`，单测 8）。
     - 证据边界：布局/拖拽/强调色与第二批的归一化/分页只有单测；审核员的「同级审核员」矩阵
       只在假 D1 单测里（真实夹具只有 creator 是 UUID）。
-14. **未修（2.0.6 记录，下一轮候选）**：第二轮审计仍有 8 条没动，原因是会改公开计数语义、
-    需要新增预占表/迁移，或超出「补丁版本不加迁移」的约束：
-    - `deletePost` 不结算关联举报，后续 `hide_post` 可能把软删作品改回 `hidden`；
-    - `POST /posts/:id/view` 无鉴权/无去重，可重放刷 `view_count` 与 `community_view_daily`；
-    - `GET /posts/:id/package?count=1` 在 GET 里自增下载量，无鉴权无幂等；
-    - 审核 `approve` 允许 `draft`（`restore` 还跳过状态校验），可把作者撤回的草稿重新公开；
-    - 社区图片上传配额先查后写，无预占行，并发可破 `max_user_storage_bytes`；
-    - `consumeReauthTicket` 在 `activeDeletion/activeExport/activeBackup` 前置检查之前消费，
-      409 时票据已作废；
-    - 通知接口没有 `total`（分页只标「第 N 页」，不再编数量）；
-    - 生产侧的审核链仍只有 `qa:prod` 的公开接口与只读冒烟。
+14. **已修（2.0.7，本地未部署）**：2.0.6 记录的 8 条里，四条不需要迁移的已在 2.0.7 修掉：
+    - 审核 `approve` 接受 `draft`：作者撤回的草稿可被审核员重新公开。已把状态策略抽成
+      `review-policy.js`（approve 仅 `pending_review|rejected`、restore 仅 `hidden`、draft 明确
+      拒绝并提示作者重新提交），UI 按状态给「通过/恢复」按钮；单测 8 passed、负向对照 1 failed。
+    - `deletePost` 不结算关联举报：`open/reviewing` 举报会一直挂着，后续 `hide_post` 还会把
+      软删作品改回 `hidden`。已在删除 batch 里结算举报，并给 `adminReviewReport` 加 deleted 守卫；
+      单测 3 passed、负向对照 1 failed。
+    - `consumeReauthTicket` 在前置 409 检查之前消费：票据作废后重试要重走 OAuth。已改为检查通过后
+      才消费，源码顺序断言锁住。
+    - 审核队列的「draft 不能通过」已同步到 UI（draft 不渲染动作按钮）。
+
+15. **未修（2.0.7 记录）**：剩下两侧边界，都需要迁移或先定产品语义：
+    - `POST /posts/:id/view` 与 `GET /posts/:id/package?count=1` 无鉴权/无幂等，可重放刷计数；
+    - 社区图片上传配额先查后写（`/files` 有 pending 预占行，社区没有）；
+    - 生产侧的审核链仍只有 `qa:prod` 的公开接口与只读冒烟；
+    - 真机 Safari/Firefox 未测。
 
 ## 6. 下一步（按优先级）
 
-1. **P1 · 2.0.6 已发布**（2026-11-22）：Version `835cb688…`、health/header 2.0.6、`qa:prod`
-   35/35、备份 `guandao-db-prod-20261122-1250.sql`；下一步是 push 后复核 CI 与自动构建。
+1. **P1 · 2.0.7 已完成本地验证，未部署**：`npm run verify` exit 0（40 文件 / 460 单测）、
+   全量 E2E 见 §4；部署需要授权（D1 备份 → `cf:deploy` → health/header 2.0.7 → `qa:prod`）。
+   生产当前仍是 2.0.6（Version `835cb688…`）。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
-3. **P2 · 补 2.0.6 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；
+3. **P2 · 补 2.0.6/2.0.7 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；
    审核员的同级审核员矩阵若要进真实栈，需要给夹具账号补 UUID（会牵动 e2e-server 的 USER_IDS）。
-4. **P2 · 处理未修的 8 条**（见 §5 风险 14）：计数幂等与 `draft→approve` 需要先定产品语义；
-   社区上传预占与 reauth 票据顺序需要迁移或调整鉴权顺序。
+4. **P2 · 处理未修的边界**（见 §5 风险 15）：计数幂等需要去重表或指纹列，社区上传预占需要迁移。
 5. **P2 · 补 2.0.5 的剩余证据**：trending 的「候选 ≥99 行」分支用 SQL seed 100 个插件行再做真实
-   Worker 断言（不要走上传接口，会被限流）；CI 状态等 GitHub 网络恢复后复核。
-6. **P2 · ACCEPTANCE 全表核对（已完成 2.0.4）**：后续新增证据时同步该表。
-7. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
-8. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+   Worker 断言（不要走上传接口，会被限流）。
+6. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
+7. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
 
 

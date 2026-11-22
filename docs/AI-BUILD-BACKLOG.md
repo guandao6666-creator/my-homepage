@@ -1,4 +1,4 @@
-# AI-BUILD-BACKLOG · Guandao OS 待办与优先级
+﻿# AI-BUILD-BACKLOG · Guandao OS 待办与优先级
 
 > 只记录**尚未完成**的工作。已完成项在 `docs/AI-BUILD-LOG.md` 与 `docs/RELEASE-2.0.md`。
 > 优先级定义与纲领一致：P0 数据/安全/认证 → P1 核心功能/一致性/备份 → P2 架构/稳定/性能 → P3 规划功能 → P4 视觉 → P5 实验。
@@ -291,3 +291,33 @@ CSP 12 哈希 / 31 HTML）；全量 E2E **198 passed（4.7m）**。
 
 **部署（2026-11-22）**：已发布 2.0.6 —— Version `835cb688-5ea2-4572-8d48-05d19947f03d`，health/header 2.0.6，`qa:prod` 35/35，备份 `guandao-db-prod-20261122-1250.sql`；回滚目标 `1aeae3dc-…`（2.0.5）。
 
+
+---
+
+## 2026-11-22 · Round 35 · 2.0.7 Review Integrity（本地完成，未部署）
+
+**范围**：继续收口 `docs/RELEASE-2.0.6.md` §6 里不需要数据库迁移的四条，升 2.0.7。
+
+| # | 缺陷 | 修法 | 证据 |
+| --- | --- | --- | --- |
+| 1 | 审核 `approve` 接受 `draft`，作者撤回的草稿可被审核员重新公开 | 新增 `worker/api/community/review-policy.js`：approve 仅 `pending_review\|rejected`、restore 仅 `hidden`、draft 明确拒绝 | 单测 8 passed（含真调 `adminReviewPost` 的行为用例）；负向对照 1 failed（旧文案「作品还没有可安装的内容包」） |
+| 2 | 审核卡对 draft 也渲染「通过」按钮 | `moderation.ts` 按状态给「通过/恢复」，draft 无按钮；`community.ts` 新增 `review-restore` | 单测源码断言；负向对照 1 failed |
+| 3 | 作者 `deletePost` 不结算举报，后续 `hide_post` 可把软删作品改回 `hidden` | 删除 batch 补 `UPDATE community_reports … status IN ('open','reviewing')`；`adminReviewReport` 加 deleted 守卫 | 单测 3 passed；负向对照 1 failed |
+| 4 | `consumeReauthTicket` 在前置 409 检查之前消费 | 移到检查通过、真正开始删除之前 | 源码顺序断言（activeBackup < consume < markUserPendingDeletion） |
+
+**门禁**：`npm run verify` **exit 0**（40 文件 / 460 单测、html-security 294/0、build 30 页、
+CSP 12 哈希 / 31 HTML）；全量 E2E **198 passed（4.7m）**（首次 197/1，既有审核链用例按新 `review-restore` 契约改完后复跑全绿）。
+`node scripts/check-version.mjs` → 2.0.7 一致。
+
+**状态**：**Verified（本地）**，生产未部署（Blocked，等上线授权；生产仍是 2.0.6）。
+
+**教训（新增）**
+
+- 非 UUID 的测试 id 会先撞 `UUID.test()` 校验层：行为用例要用真 UUID，否则测的是 404 而不是状态策略。
+- 纯函数矩阵全绿 ≠ 接线正确：要有一条真的调入口函数的行为用例，再用源码断言锁 UI ↔ 服务端对应关系。
+- 逻辑删除的「跨表复活」单看每个函数都正常：`deletePost` 只改三张表、`hide_post` 无条件写 `hidden`，
+  合起来才让已删作品重新出现；审计要顺着状态传播链看。
+- `package-lock.json` 第 5097 行的 `2.0.6` 是 `fast-levenshtein` 的依赖版本，只改第 3、9 行。
+
+**未修（下一轮）**：`view` / `package?count=1` 计数幂等（需去重表/指纹列）、社区上传配额预占（需迁移）、
+生产写入型发布链 E2E、真机浏览器。

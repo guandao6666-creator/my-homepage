@@ -330,10 +330,12 @@ test.describe("社区审核链 · 真实 Worker + 真实 UI", () => {
       await expect(hiddenRow).toBeVisible({ timeout: 20_000 });
       // 审核卡片里有 2 个状态芯片：封面角落（coverHtml）与标题行。取标题行那个，避免 strict mode 撞车。
       await expect(hiddenRow.locator(".cx-mod-head .cx-status-chip")).toHaveText("已隐藏");
-      await hiddenRow.locator('[data-action="review-approve"]').click();
+      // 2.0.7 起「已隐藏」的作品对应的是「恢复」（restore），不再是「通过」（approve）：
+      // 服务端把两种动作分开，审核日志才能对上用户点的按钮。
+      await hiddenRow.locator('[data-action="review-restore"]').click();
       const restoreDialog = adminWin.locator(".g14-modal");
       await expect(restoreDialog).toBeVisible();
-      await restoreDialog.locator('[data-mv="approve"]').click();
+      await restoreDialog.locator('[data-mv="restore"]').click();
       await expect(hiddenRow).toHaveCount(0, { timeout: 20_000 });
 
       /* ---------- 4. 作者：重新出现在公开搜索 ---------- */

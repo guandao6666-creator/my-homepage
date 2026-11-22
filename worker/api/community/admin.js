@@ -29,6 +29,9 @@ import {
   publicSettings,
 } from "./store.js";
 
+// 审核动作的合法状态组合放进纯函数，便于单测穷举；见 review-policy.js 的注释。
+import { checkReviewTransition } from "./review-policy.js";
+
 const UUID = /^[0-9a-f-]{36}$/;
 
 function requireAdminRole(viewer) {
@@ -115,9 +118,10 @@ export async function adminReviewPost({ env, request, viewer, id }) {
     if (raw.author_id === viewer.id && viewer.role !== "admin") {
       throw new ApiError("FORBIDDEN", "审核员不能审核自己的作品，请让其他审核员或管理员处理", 403);
     }
-    if (!["pending_review", "hidden", "rejected", "draft"].includes(raw.status) && action !== "restore") {
-      bad("当前状态不能通过审核");
-    }
+    // 2.0.6 审计：原实现只排除 published，于是 draft（作者主动撤回）也能被“通过”。
+    // 状态组合交给 review-policy 统一判断，文案也区分 draft 与其它非法状态。
+    const transition = checkReviewTransition(action, raw.status);
+    if (!transition.ok) bad(transition.message);
     const pkg = await env.DB.prepare(
       "SELECT 1 AS ok FROM community_packages WHERE post_id = ? AND status = 'active'",
     )
@@ -287,6 +291,9 @@ export async function adminReviewReport({ env, request, viewer, id }) {
   } else if (action === "hide_post" || action === "delete_post") {
     const post = report.target_type === "post" ? await getRawPost(env, report.target_id) : null;
     if (!post) throw new ApiError("NOT_FOUND", "被举报作品不存在", 404);
+    // 已删除的作品不能再被“隐藏/删除”改回 hidden —— 否则会出现“软删后又半复活”
+    // 的作品（作者删除时关联举报已结算，正常不会走到这里，但旧数据可能留下 open 举报）。
+    if (post.status === "deleted") throw new ApiError("NOT_FOUND", "作品已删除", 404);
     targetUserId = post.author_id;
     if (action === "hide_post") {
       await env.DB.prepare(

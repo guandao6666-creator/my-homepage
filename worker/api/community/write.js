@@ -801,6 +801,13 @@ export async function deletePost({ env, viewer, id }) {
     env.DB.prepare(
       "UPDATE community_assets SET status = 'deleting', post_id = NULL WHERE post_id = ? AND status = 'ready'",
     ).bind(id),
+    // 2.0.6 审计：作者删除时关联举报不结算，会留下 open 举报；后续处理举报时
+    // 旧代码能把 deleted 作品改回 hidden（admin.js 已加 deleted 守卫，这里补结算）。
+    env.DB.prepare(
+      `UPDATE community_reports
+          SET status = 'resolved', resolution = ?, reviewer_id = ?, reviewed_at = ?
+        WHERE target_type = 'post' AND target_id = ? AND status IN ('open', 'reviewing')`,
+    ).bind("作品已被删除", viewer.id, Date.now(), id),
   ]);
   await audit(env, {
     actorId: viewer.id,

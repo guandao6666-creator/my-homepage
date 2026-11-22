@@ -1,4 +1,4 @@
-# AI-BUILD-LOG · 每轮开发记录
+﻿# AI-BUILD-LOG · 每轮开发记录
 
 > 追加式记录。每轮写：做了什么、改了哪些文件、测试结果、未完成、下一项。
 > 详细论证放 `docs/architecture/*` 与 `docs/RELEASE-2.0.md`，这里只留索引与结论。
@@ -687,3 +687,25 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
 7. **上线（2026-11-22 12:50）**：用户授权后 `npm run cf:deploy` 部署 2.0.6，Version
    `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6、入口 bundle 含 2.0.6、`qa:prod`
    35/35、部署前备份 `guandao-db-prod-20261122-1250.sql`；回滚目标 `1aeae3dc-…`（2.0.5）。
+
+## 2026-11-22 · Round 35 · 2.0.7 Review Integrity（本地完成）
+
+1. **审核状态策略**：`approve` 原来只排除 `published`，`draft` 也会被「通过」；用户撤回是作者意志，
+   审核员不能替他发布。新增 `review-policy.js`（approve 仅待审核/未通过、restore 仅已隐藏、
+   draft 提示「作者已撤回为草稿，需要作者重新提交审核」），`admin.js` 改为调用它。
+2. **UI 对齐**：审核卡按状态渲染「通过/恢复」，draft 无按钮；`community.ts` 新增 `review-restore`，
+   动作名与审计日志一致。
+3. **跨表复活**：作者 `deletePost` 只改 post/package/asset，`open` 举报会挂着；而 `adminReviewReport`
+   的 `hide_post` 对软删行无条件写 `hidden`，会把已删作品改回已隐藏。删除 batch 里补举报结算，
+   `hide_post/delete_post` 前加 deleted 守卫。
+4. **重验票据**：`consumeReauthTicket` 从三条 409 前置检查之前移到之后，避免检查失败也作废一次性票据。
+5. **测试**：新增 `community-review-policy.test.ts` 8 条（6×2 状态矩阵、文案、UI 源码断言、
+   真调 `adminReviewPost` 的 draft → 400 行为用例）与 `community-delete-reports.test.ts` 3 条
+   （假 D1 收集 batch、源码顺序断言）。全量 40 文件 / 460 passed。
+   负向对照分别还原 write.js / moderation.ts / admin.js，各 1 failed；admin.js 那组收到旧文案
+   「作品还没有可安装的内容包，不能通过审核」。
+6. **踩坑**：我最初用 `post-draft` 当测试 id，`adminReviewPost` 的 `UUID.test` 直接 404，
+   断言看到的是「作品不存在」；换成真 UUID 后才打到状态策略。
+7. **门禁与版本**：`[version] 一致：2.0.7`；typecheck 0 error；html-security 294/0；build 30 页；
+   CSP 12 哈希 / 31 HTML；全量 E2E **198 passed（4.7m）**；首次 197/1 是既有审核链用例仍点 `review-approve`，按 2.0.7 的 `review-restore` 契约改后复跑全绿。
+8. **状态**：本地完成，未 push、未部署（生产仍 2.0.6，Version `835cb688…`）；等上线授权。
