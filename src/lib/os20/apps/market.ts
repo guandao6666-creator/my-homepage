@@ -1,4 +1,4 @@
-// 6.2：本应用样式随 chunk 按需下载
+﻿// 6.2：本应用样式随 chunk 按需下载
 import cssUrl1 from "../../../styles/os20/market.css?url";
 import { ensureCss } from "../../ui/lazy-css";
 
@@ -16,6 +16,7 @@ export const stylesReady = ensureCss(cssUrl1);
  */
 
 import { safeUrl } from "../../html";
+import { marketThumbHtml } from "../market-thumb";
 import {
   badge,
   bindTabs,
@@ -98,8 +99,8 @@ const refreshData = () => {
 
 const card = (item: MarketItem) => `
   <article class="os20-mk-card ${state.selected === keyOf(item) ? "is-active" : ""}" data-item="${esc(keyOf(item))}" tabindex="0">
-    <div class="os20-mk-thumb" ${item.preview ? `style="background-image:url('${esc(item.preview)}')"` : ""}>
-      ${item.preview ? "" : iconHtml(item)}
+    <div class="os20-mk-thumb">
+      ${item.preview ? marketThumbHtml(item.preview) || iconHtml(item) : iconHtml(item)}
       ${item.installed ? `<span class="os20-mk-badge">已安装</span>` : ""}
     </div>
     <div class="os20-mk-body">

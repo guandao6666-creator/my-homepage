@@ -494,14 +494,36 @@ export async function adminUserStatus({ env, request, viewer, id }) {
 
 export async function adminUserRestriction({ env, request, viewer, id }) {
   if (!UUID.test(id)) throw new ApiError("NOT_FOUND", "用户不存在", 404);
-  const target = await env.DB.prepare("SELECT id, role, github_username, display_name FROM users WHERE id = ?").bind(id).first();
+  const target = await env.DB.prepare(
+    `SELECT u.id, u.role, u.github_username, u.display_name, pr.restriction,
+            cr.role AS moderator_role
+       FROM users u
+       LEFT JOIN community_profiles pr ON pr.user_id = u.id
+       LEFT JOIN community_roles cr ON cr.user_id = u.id
+      WHERE u.id = ?`,
+  )
+    .bind(id)
+    .first();
   if (!target) throw new ApiError("NOT_FOUND", "用户不存在", 404);
   if (target.role === "admin") bad("不能限制管理员账号");
+  // 审核员原本可以改任何人的 restriction，包括把管理员封禁的用户改回 none
+  // （handler 层只查 isStaff）。限制必须与操作者权力对等：解除封禁、动其他审核员
+  // 的发布权限都只留给管理员，否则审核权限可以被用来撤销管理员的处罚。
+  if (id === viewer.id) bad("不能修改自己的发布权限");
   const body = await readJson(request, 8 * 1024);
   const restriction = String(body?.restriction ?? "");
   if (!["none", "limited", "blocked"].includes(restriction)) bad("限制类型不合法");
-  if (restriction === "blocked" && viewer.role !== "admin") {
-    throw new ApiError("FORBIDDEN", "封禁发布权限需要管理员权限", 403);
+  const currentRestriction = String(target.restriction || "none");
+  if (viewer.role !== "admin") {
+    if (restriction === "blocked") {
+      throw new ApiError("FORBIDDEN", "封禁发布权限需要管理员权限", 403);
+    }
+    if (currentRestriction === "blocked" && restriction !== "blocked") {
+      throw new ApiError("FORBIDDEN", "解除封禁需要管理员权限", 403);
+    }
+    if (target.moderator_role === "moderator" && restriction !== currentRestriction) {
+      throw new ApiError("FORBIDDEN", "不能修改其他审核员的发布权限", 403);
+    }
   }
   const reason = cleanText(body?.reason ?? "", 300);
   const now = Date.now();

@@ -541,7 +541,17 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
         window.dispatchEvent(new CustomEvent("guandao:open-community-join"));
         break;
       case "retry":
-        void (view.kind === "tab" ? loadHome() : loadDetail((view as { id?: string }).id || ""));
+        // 旧实现只有 tab/detail 两个分支：创作者页把 id 当作品 id、搜索页传空串，
+        // 「重试」反而把用户带到 404。按当前视图重新分派。
+        if (view.kind === "detail") void loadDetail(view.id);
+        else if (view.kind === "creator") void loadCreator(view.id);
+        else if (view.kind === "search") void loadSearch(view.q);
+        else if (view.kind === "tab") {
+          if (view.tab === "explore") void loadExplore("");
+          else if (view.tab === "creators") void loadCreators();
+          else if (view.tab === "creations") void loadCreations("works");
+          else void loadHome();
+        } else void loadHome();
         break;
       case "explore-all":
         explore = { type: "", category: "", sort: "latest", page: 1 };

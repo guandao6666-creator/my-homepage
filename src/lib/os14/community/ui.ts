@@ -91,10 +91,17 @@ export const postCard = (post: Post, options: { row?: boolean; showStatus?: bool
     </div>
   </article>`;
 
-export const pageNav = (page: number, hasMore: boolean, total: number, label = "作品") => `
+/**
+ * 分页条。
+ *
+ * `total` 允许为 null：通知接口只返回当前页和 `unread`，没有总数；
+ * 2.0.6 之前把「本页条数」当总数传进来，满页时会显示「共 20 个条通知」
+ * 并且还能点进下一页的空状态。不知道总数就别编一个。
+ */
+export const pageNav = (page: number, hasMore: boolean, total: number | null, label = "作品") => `
   <div class="cx-pager">
     <button type="button" class="cx-btn is-ghost" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>上一页</button>
-    <span>第 ${page} 页 · 共 ${total} 个${label}</span>
+    <span>第 ${page} 页${total === null ? "" : ` · 共 ${total} 个${label}`}</span>
     <button type="button" class="cx-btn is-ghost" data-page="${page + 1}" ${!hasMore ? "disabled" : ""}>下一页</button>
   </div>`;
 

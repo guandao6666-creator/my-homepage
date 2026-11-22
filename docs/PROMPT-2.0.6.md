@@ -40,6 +40,19 @@
 7. **Windows 文件写入偶发 `ReplaceFileW EIO`**
    连续快速改同一文件时会撞（Win32 32 / 1175）。重试一次即可，别当成代码错误。
 
+8. **夹具 id 不都是 UUID，管理接口只认 UUID**
+   `e2e-fixtures.json` 里 `qa-p3-installer` 是短 id，而 `admin.js` 的 `UUID.test(id)` 会
+   `404 用户不存在`；只有 creator 是 UUID。真实栈测不了「审核员改同级审核员」，
+   → 这条矩阵用假 D1 单测覆盖，E2E 只测管理员与「非审核员 403」。
+
+9. **「100 参数上限」要用会拒绝的假 D1 证明**
+   新写的 `LimitDb`/`LimitStatement` 在 `bind()` 超过 100 就抛，才能让分块逻辑的
+   回归用例真的失败；真实 D1 只在 ≥99 个 id 时才 500，E2E 很难覆盖到。
+
+10. **分页文案也是契约**
+   通知接口没有 `total`，旧代码把本页条数当「共 N 个」；改成 `total: number | null`
+   并在 `pageNav` 里显式处理 `null`，比换个大数字诚实。判断依据先看接口实际返回什么。
+
 ---
 
 ## 2. 可复制任务书

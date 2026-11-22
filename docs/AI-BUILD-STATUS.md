@@ -27,13 +27,13 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（383 文件） |
-| `npx vitest run` | **31 文件 / 420 单测通过**（2.0.6 新增外壳纯函数与插件市场 19+2 条；2.0.5 新增 D1 参数预算 7 条） |
+| `npx vitest run` | **38 文件 / 449 单测通过**（2.0.6 新增外壳纯函数 19 条、插件市场 2 条、第二轮审计 29 条；2.0.5 新增 D1 参数预算 7 条） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
 | 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；2.0.6 只改前端逻辑，体积不变 |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **197 passed（4.8m），exit 0**（含新增 `shell-wallpaper-safety` 2 条） |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **198 passed（4.7m），exit 0**（含新增 `shell-wallpaper-safety` 2 条与 `community-restriction-guard` 1 条） |
 | 生产（2.0.5 现状） | Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`；health/header 2.0.5；入口 `9IE3LdKR.js` 446,165 B；`qa:prod` **35/35**；自动构建 `0cccf9e8…` |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
@@ -78,8 +78,8 @@
 | 壁纸安全 E2E 负向对照 | 换回 2.0.5 裸拼接 → **1 failed**，`toHaveText` 收到 `"壁纸"`（注入的 `<img>` 被解析） |
 | 插件市场分块单测（`tests/unit/plugins-market.test.ts`，2.0.6） | **2 passed**：120 候选 → 12 条、绑定全部 ≤100、聚合查询 3 次（块 40/40/40）；负向对照 1 failed（`121 > 100`） |
 | 全量门禁（2.0.6 复跑） | `npm run verify` **exit 0**：`[version] 一致：2.0.6`；typecheck 0 error（383 文件）；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全 294 处、未审查 0 |
-| 单测 / 体积 | **31 文件 / 420 通过**；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
-| 全量 E2E（2.0.6） | **197 passed（4.8m），exit 0**（workers=1、retries=0；比 2.0.5 多 2 条 `shell-wallpaper-safety`） |
+| 单测 / 体积 | **38 文件 / 449 通过**；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
+| 全量 E2E（2.0.6） | **198 passed（4.7m），exit 0**（workers=1、retries=0；比 2.0.5 多 3 条：`shell-wallpaper-safety` 2 + `community-restriction-guard` 1） |
 | D1 参数预算单测（`tests/unit/d1-params.test.ts`，2.0.5） | **7 passed**：chunkIds/占位符边界、通知 120 个 id → 3 条 UPDATE 各 42 参数且全部标记、旧形态负向对照抛 `D1 绑定参数超限：101 > 100`、trending 源码约束 |
 | D1 参数预算负向对照 | `git stash push -- worker/api/community/write.js`（回 2.0.4 单条 UPDATE）→ **1 failed / 6 passed**，失败为 `D1 绑定参数超限：122 > 100`；恢复后 7 passed |
 | D1 参数上限真实 Worker E2E（`tests/e2e/d1-param-bounds.spec.ts`，2.0.5） | **2 passed（12.1s）**：通知 120 个 id → 200；trending 每条 `recentDownloads` 是数字 |
@@ -90,6 +90,11 @@
 | 深目录负向对照 | 还原旧 `worker/api/files/handlers.js` 后同命令 → **1 failed**（实际 500 INTERNAL_ERROR），判别成立 |
 | 配对领取单测（`tests/unit/pairing-claim.test.ts`） | **2 passed**：假 D1 交错下只有一个请求拿到 `changes=1`，落败方回 `alreadyDelivered` 且不写 Session；负向对照还原旧 handler → **1 failed** |
 | 配对领取 E2E（`pairing-claim-race`，worker project） | **1 passed（12.9s）**：create → claim → confirm → 并发两次领取，恰好一个响应带 `gauth_sid` |
+| 市场封面单测（`tests/unit/market-thumb.test.ts`，2.0.6 第二批） | **4 passed**：http 出 `<img>`、`data:image` 放行、`javascript:` 返回空串、注入载荷无 `style=` 且属性值无裸引号 |
+| 评论刷新单测（`tests/unit/community-comments-refresh.test.ts`） | **2 passed**：同作品写入；切到别的作品后不写 B 的面板 |
+| 发布权限单测（`tests/unit/community-restriction-guard.test.ts`） | **6 passed**：审核员封禁/解封 403、同级审核员 403、改自己 400 不写库、管理员放行、审核员下调允许 |
+| 发布权限 E2E（`tests/e2e/community-restriction-guard.spec.ts`，worker project） | **1 passed（11.9s）**：管理员封禁 creator → 被封用户发作品 403 → 解封 → 恢复 200；developer 调管理接口 403 |
+| 笔记/任务/重试/分页单测 | **17 passed**：notes-model 5、tasks-priority 4、community-retry 3、community-pager 5（含幻灯片 start/stop） |
 | 备份清理单测（`tests/unit/backup-cleanup.test.ts`） | **2 passed**：跨两页前缀全部删除；源码约束 `failBackup` 在状态更新后调用 `deleteBackupPrefix`；负向对照 → **1 failed** |
 | 同步 push 配额单测（`sync-store.test.ts` 新增 2 条） | **2 passed**：并发抢最后一个实体名额 → 1 applied / 1 quota 且计数停在上限；墓碑满后改墓碑 → quota 且原行不变。负向对照（还原 703ef74 版 store）→ **2 failed** |
 | 上传配额单测（`tests/unit/files-quota.test.ts`，真实 SQLite） | **3 passed**：占位后复核在限内返回用量；两个并发占位对 10 字节配额 → 507 且只删自己；配额按用户隔离。负向对照把复核改成 `if (false)` → **2 failed** |
@@ -183,8 +188,27 @@
       按中心距离 + 水平/垂直阈值选落点；单测 6 passed。
     - `applyLook()` 无条件关闭壁纸取色：选「自动」无法恢复，改材质/圆角也会误关。已抽
       `resolveLookAccent`，只有显式 hex 才关闭联动；单测 5 passed。
-    - 证据边界：布局/拖拽/强调色只有单测，没有浏览器 E2E（需要真实指针几何与设置面板状态）；
-      `audit-worker` / `audit-os14` 未交付结论，worker 与 os14 本轮没有新证据。
+    - 第二轮子智能体审计（`audit-worker-b` 7 条、`audit-os14-c` 7 条）又修复五条：
+      市场封面 `preview` 拼进 `style="…url('…')"` 的 CSS 声明注入（改 `marketThumbHtml` +
+      `safeUrl`/`escapeAttr`，单测 4）；评论「加载更多」不校验作品身份导致串台（请求时记
+      `postId`、回来再比对，单测 2）；发布权限接口不要求管理员、审核员可撤销封禁（补角色
+      对等，单测 6、真实 Worker E2E 1 passed 11.9s）；笔记/任务读取不校验字段形状（新增
+      `notes-model.ts` / `tasks-model.ts` 归一化，单测 9）；错误面板「重试」只认 home/detail、
+      通知分页把本页条数当总数、幻灯片计时器不随灯箱关闭（`pageNav` total 可为 null、
+      按 `view.kind` 分派、`createSlideshow`，单测 8）。
+    - 证据边界：布局/拖拽/强调色与第二批的归一化/分页只有单测；审核员的「同级审核员」矩阵
+      只在假 D1 单测里（真实夹具只有 creator 是 UUID）。
+14. **未修（2.0.6 记录，下一轮候选）**：第二轮审计仍有 8 条没动，原因是会改公开计数语义、
+    需要新增预占表/迁移，或超出「补丁版本不加迁移」的约束：
+    - `deletePost` 不结算关联举报，后续 `hide_post` 可能把软删作品改回 `hidden`；
+    - `POST /posts/:id/view` 无鉴权/无去重，可重放刷 `view_count` 与 `community_view_daily`；
+    - `GET /posts/:id/package?count=1` 在 GET 里自增下载量，无鉴权无幂等；
+    - 审核 `approve` 允许 `draft`（`restore` 还跳过状态校验），可把作者撤回的草稿重新公开；
+    - 社区图片上传配额先查后写，无预占行，并发可破 `max_user_storage_bytes`；
+    - `consumeReauthTicket` 在 `activeDeletion/activeExport/activeBackup` 前置检查之前消费，
+      409 时票据已作废；
+    - 通知接口没有 `total`（分页只标「第 N 页」，不再编数量）；
+    - 生产侧的审核链仍只有 `qa:prod` 的公开接口与只读冒烟。
 
 ## 6. 下一步（按优先级）
 
@@ -192,11 +216,14 @@
    `qa:prod` 35/35 → push；生产仍是 2.0.5（Version `1aeae3dc…`）。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
-3. **P2 · 补 2.0.6 的证据边界**：布局/拖拽/强调色补真实浏览器 E2E；把 `audit-worker`、`audit-os14`
-   重新派出去并等到收尾消息（上一轮两个都没有交付）。
-4. **P2 · 补 2.0.5 的剩余证据**：trending 的「候选 ≥99 行」分支用 SQL seed 100 个插件行再做真实
+3. **P2 · 补 2.0.6 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；
+   审核员的同级审核员矩阵若要进真实栈，需要给夹具账号补 UUID（会牵动 e2e-server 的 USER_IDS）。
+4. **P2 · 处理未修的 8 条**（见 §5 风险 14）：计数幂等与 `draft→approve` 需要先定产品语义；
+   社区上传预占与 reauth 票据顺序需要迁移或调整鉴权顺序。
+5. **P2 · 补 2.0.5 的剩余证据**：trending 的「候选 ≥99 行」分支用 SQL seed 100 个插件行再做真实
    Worker 断言（不要走上传接口，会被限流）；CI 状态等 GitHub 网络恢复后复核。
-5. **P2 · ACCEPTANCE 全表核对（已完成 2.0.4）**：后续新增证据时同步该表。
-6. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
-7. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+6. **P2 · ACCEPTANCE 全表核对（已完成 2.0.4）**：后续新增证据时同步该表。
+7. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
+8. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+
 

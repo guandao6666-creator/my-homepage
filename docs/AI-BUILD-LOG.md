@@ -661,3 +661,27 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
 `audit-worker` / `audit-os14` 未交付结论（一个 inactive、一个被停止且无收尾消息）。
 **下一项**：上市 2.0.6 → 告警 webhook（需两个 URL）→ 补三条交互 E2E → 重启两个审计子智能体。
 
+
+## 2026-11-22 · Round 34 · 2.0.6 第二轮审计（Shell Proof 增补）
+
+1. **派单**：`audit-worker-b`（Worker 读写/配额/计数）与 `audit-os14-c`（社区与桌面应用）各交 7 条，
+   均带 `SCOPE:` 收尾行；上一轮「inactive 当交付」的坑这次没有重犯。
+2. **三条 P1**：
+   - 市场封面的 `preview` 被 `esc()` 后放进 `style="background-image:url('…')"` —— HTML 转义救不了
+     CSS 上下文，浏览器还原 `&#39;` 后可注入声明。改为 `marketThumbHtml()` 输出 `<img>`，
+     `safeUrl` 判协议、`escapeAttr` 处理属性；`html-security` 的 `url-interp` 因此先红后绿。
+   - 评论「加载更多」无作品身份校验：请求时记 `postId`，`await` 回来比对当前 `detailCache`，
+     不一致就丢弃。
+   - 发布权限接口只在路由层判 `isStaff`，审核员可以给任意非管理员（含同级审核员）解封/封禁。
+     补 `requireAdminRole` 对等语义 + 禁止改自己；单测 6 条假 D1 矩阵，真实 Worker E2E 只覆盖
+     「管理员封禁/解封 creator + 非审核员 403」（夹具短 id 过不了 `UUID.test`）。
+3. **三条 P2**：笔记/任务读取归一化（`notes-model.ts` / `tasks-model.ts`）、错误面板重试按
+   `view.kind` 分派、通知分页不再把本页条数当总数（`pageNav` 的 `total` 允许 `null`）。
+4. **一条 P2 前端计时器**：`gallery.ts` 的 `slideTimer` 在关闭灯箱时不清，Esc 关掉 4.2 秒后又弹回；
+   抽 `createSlideshow()` 统一 `start/stop/running`，关闭路径只调 `stop()`，并摘掉 keydown 监听。
+5. **工具/环境**：`check-html-security` 的 `url-interp` 规则对三元表达式里的 `safeUrl` 认不出来，
+   模板里直接 `escapeAttr(...)` 最省事；本地 E2E 仍需先清 `rate_limits`，并在跑中每 20 秒再清一次
+   （`plugin-upload` 20 次/小时）。
+6. **门禁**：`npm run verify` exit 0（38 文件 / 449 单测、html-security 294 处 / 未审查 0、
+   build 30 页、CSP 12 哈希 / 31 HTML）；全量 E2E 198 passed（4.7m）。
+7. **状态**：2.0.6 仍**未部署**（Blocked，等授权）；生产仍是 2.0.5（Version `1aeae3dc…`）。

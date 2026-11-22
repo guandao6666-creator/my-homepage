@@ -26,6 +26,22 @@
 | 4 | 网格拖拽用「左上角阈值」选落点 | 拖图标的用户 | 永远插到第一个图标之前，顺序保存错误 |
 | 5 | `applyLook()` 无条件关闭壁纸取色 | 选「自动」强调色的人 | 「自动」无法恢复；改材质也会误关 |
 
+第一轮之后又派了两个只读审计子智能体（`audit-worker-b` 看 Worker、`audit-os14-c` 看社区与
+桌面应用），各交回 7 条。其中能复现、且改动面可控的六条并入本版；
+
+| # | 问题 | 触发者 | 后果 |
+| --- | --- | --- | --- |
+| 6 | 市场封面的 `preview` 拼进 `style="…url('…')"` | 上架应用的人 | 任何打开市场的人被 CSS 声明注入 |
+| 7 | 评论「加载更多」不校验作品身份 | 快速切换作品的人 | A 的评论被写进 B 的面板 |
+| 8 | 发布权限接口不要求管理员 | 审核员 | 可自行解封/封禁，包括其他审核员 |
+| 9 | 笔记/任务读取不校验字段形状 | 有旧本地数据的人 | 首页 `TypeError`，任务页崩溃 |
+| 10 | 通知分页把本页条数当总数 | 点「下一页」的人 | 「共 20 个条通知」，下一页空状态 |
+| 11 | 错误面板「重试」只认两个视图 | 创作者页/搜索页出错的人 | 重试变成「作品不存在」 |
+| 12 | 幻灯片计时器不随灯箱关闭 | 看幻灯片的人 | Esc 关掉 4.2 秒后自动弹回 |
+
+其余八条（`deletePost` 不结算举报、`view`/下载计数可重放、绕过审核把草稿重新公开、
+社区图片上传配额 TOCTOU、reauth 票据先消费后校验）写进 §6 的未修边界，没有静默丢弃。
+
 ---
 
 ## 2. 逐条改动
@@ -156,9 +172,82 @@ export function resolveLookAccent(patch, currentAutoAccent, wallpaper) {
 - `os20/apply.ts` 在 `accent === "auto"` 且当前不是 auto 时传 `look.accentAuto = true`；
   只有显式给 hex 才关闭联动。
 
----
+### 2.6 市场封面不再拼 CSS
 
-## 3. 测试证据
+`src/lib/os20/market-thumb.ts`（新增）：
+
+```ts
+export function marketThumbHtml(preview: string): string {
+  const src = safeUrl(preview, { allowData: true });
+  if (!src) return "";
+  return `<img class="os20-mk-cover" src="${escapeAttr(src)}" alt="" loading="lazy" decoding="async" />`;
+}
+```
+
+- 旧代码 `style="background-image:url('${esc(item.preview)}')"`：`escapeHtml` 只做 HTML
+  实体转义，浏览器解析属性时先把 `&#39;` 还原成 `'`，再交给 CSS ——
+  `x');background:url(https://evil/…)` 能闭合 `url()` 注入任意声明。
+- 现在协议由 `safeUrl` 判定（只放 http/https 与 `data:image`），属性值再 `escapeAttr`
+  一次；`html-security` 的 `url-interp` 规则也只认可 `safeUrl`/`escapeAttr` 包裹的插值。
+- 样式 `.os20-mk-cover { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }`
+  保持原来的封面裁切效果。
+
+### 2.7 评论刷新带作品身份
+
+`src/lib/os14/community/detail.ts` 的 `refreshCommentsImpl`：
+
+```ts
+const postId = detailCache.data.post.id;
+const result = await api.getComments(postId, page, 12);
+const current = ctx.getDetailCache();
+if (!current || current.data.post.id !== postId) return;   // 期间切到了别的作品
+```
+
+以前 `await` 之后直接写 `detailCache` 并把旧评论 `innerHTML` 进「当前」面板，
+所以作品 A 点「加载更多」后立刻打开 B，B 的评论区会显示 A 的评论。
+现在以「请求时记住的 postId」为准，回来时作品已换就直接丢弃。
+
+### 2.8 发布权限接口要求管理员
+
+`worker/api/community/admin.js` 的 `adminUserRestriction`：
+
+- 目标查询补 `LEFT JOIN community_roles`，一并取 `moderator_role`；
+- 非管理员：不能封禁（`blocked`）、不能解除封禁、不能改同级审核员的限制，
+  且不能改自己的（`bad("不能修改自己的发布权限")`）。
+- 管理员不受限；审计动作与响应字段不变。
+
+**为什么这条重要**：审核员原本能把自己或同级的 `restriction` 从 `blocked` 改回 `none`，
+等于管理员封禁被审核员一键撤销。
+
+### 2.9 本地状态归一化
+
+- `src/lib/os14/apps/notes-model.ts`（新增）：`normalizeNote` 补 `title/body/folder/tags/pinned/createdAt/updatedAt`，
+  `tags` 只留字符串，无 `id` 的记录丢弃；`notes.ts` 的 `read()` 统一过一遍。
+- `src/lib/os14/tasks-model.ts`（新增）：`normalizePriority` 把枚举外的值收敛成 `normal`；
+  `read()`、`add`、`update`、`applySync` 都走归一化。
+
+旧数据缺字段时首页不再 `TypeError`（`note.body.split`、`n.tags.join`），
+任务的 `PRIORITY[priority].weight` 也不会因未知枚举取到 `undefined`。
+
+### 2.10 分页与重试
+
+- `pageNav(page, hasMore, total: number | null, label)`：不知道总数时只显示「第 N 页」。
+  通知接口只返回当前页和 `unread`，以前把本页条数当总数，满页就写「共 20 个条通知」，
+  点「下一页」是空状态。
+- `src/lib/os14/community.ts` 的 `case "retry"` 按 `view.kind` 分派：
+  `detail → loadDetail(id)`、`creator → loadCreator(id)`、`search → loadSearch(q)`、
+  `tab → 对应列表`。以前创作者页/搜索页出错后重试会被当成作品 id。
+
+### 2.11 幻灯片计时器随灯箱关闭
+
+`src/lib/os13/slideshow.ts`（新增）把计时器收成 `createSlideshow(tick, intervalMs)`
+（`start/stop/running`）；`gallery.ts` 在关闭灯箱（✕/Esc/背景）时 `slideshow.stop()`，
+并摘掉该灯箱的 keydown 监听。
+
+以前 `slideTimer` 只在下次点幻灯片或窗口 cleanup 时清：Esc 关掉后 4.2 秒又自动弹回，
+每开一次灯箱还会多挂一个 keydown。
+
+---
 
 ### 3.1 新增纯函数单测
 
@@ -194,24 +283,45 @@ export function resolveLookAccent(patch, currentAutoAccent, wallpaper) {
 
 ```
 $env:E2E_ADMIN_PORT='18789'; npx playwright test --reporter=line
-197 passed (4.8m)
+198 passed (4.7m)
 ```
 
-比 2.0.5 的 195 条多 2 条（新增 `shell-wallpaper-safety`）。跑前清空本地 `rate_limits`，
-否则 e2e-server 造夹具会被 `plugin-upload` 20 次/小时限流挡住。
+比 2.0.5 的 195 条多 3 条（新增 `shell-wallpaper-safety` 2 条与 `community-restriction-guard` 1 条）。
+跑前清空本地 `rate_limits`，并且跑中每 20 秒再清一次，否则 e2e-server 造夹具会被
+`plugin-upload` 20 次/小时限流挡住。
 
 ### 3.4 门禁
 
 ```
 npm run verify
 [version] 一致：2.0.6（package.json / version.ts / worker / sw.js）
-Test Files 31 passed / Tests 420 passed
+Test Files 38 passed / Tests 449 passed
 合计 294 处，未审查 0 处
 build: 30 page(s)
 [csp] 12 个哈希与 31 个 HTML 一致
 ```
 
-（日志见 `npm run verify` 本机输出；入口包与首屏 CSS 未变，本版只改前端逻辑，不加依赖。）
+（入口包与首屏 CSS 未变，本版只改前端逻辑与 Worker 校验，不加依赖、不加迁移。）
+
+### 3.5 第二轮修复的证据
+
+| 文件 | 用例 | 钉住什么 |
+| --- | --- | --- |
+| `tests/unit/market-thumb.test.ts` | 4 | http 出 `<img>`、`data:image` 放行、`javascript:` 返回空串、注入载荷没有 `style=` 且属性值里没有裸引号 |
+| `tests/unit/community-comments-refresh.test.ts` | 2 | 同作品写入缓存；切到别的作品后不写 B 的面板 |
+| `tests/unit/community-restriction-guard.test.ts` | 6 | 审核员封禁/解封 403、同级审核员 403、改自己 400 且不写库、管理员放行、审核员下调仍允许 |
+| `tests/unit/notes-model.test.ts` | 5 | 缺 `tags`/`body` 不崩、非字符串 tags 丢弃、无 id 丢弃、非法时间戳补 0、`read()` 调用归一化 |
+| `tests/unit/tasks-priority.test.ts` | 4 | 枚举外优先级收敛成 normal、`applySync` 不再原样落库、排序不取 `undefined` |
+| `tests/unit/community-retry.test.ts` | 3 | 重试按 `view.kind` 分派，防止退回「只认 home/detail」 |
+| `tests/unit/community-pager.test.ts` | 5 | `total=null` 时不写数量；`hasMore` 决定下一页；幻灯片 `start/stop` 与重复 start 不叠加 |
+
+合计 **29 passed**（`npx vitest run tests/unit/market-thumb.test.ts tests/unit/community-comments-refresh.test.ts tests/unit/community-restriction-guard.test.ts tests/unit/notes-model.test.ts tests/unit/tasks-priority.test.ts tests/unit/community-retry.test.ts tests/unit/community-pager.test.ts`）。
+
+**真实 Worker E2E**：`tests/e2e/community-restriction-guard.spec.ts` —— 管理员封禁 creator →
+被封用户发作品 403 → 管理员解封 → 恢复 200；developer 调管理接口 403。**1 passed（11.9s）**。
+
+**为什么审核员边界没进 E2E**：管理接口只接受 UUID，夹具里只有 creator 是 UUID，
+审核员账号是短 id —— 真实栈造不出「审核员改同级审核员」的组合，所以那部分由假 D1 单测钉住。
 
 ---
 
@@ -244,12 +354,20 @@ build: 30 page(s)
 
 ## 6. 未做到 / 边界
 
-- **布局、拖拽、强调色只有单测，没有浏览器 E2E**：它们要复现真实指针几何与设置面板状态，
-  单测已覆盖纯函数判定；E2E 只覆盖了注入与清空两条最容易出事的链路。
-- **audit-worker / audit-os14-b 没有交付结论**：一个两次 inactive，一个被停止且没有收尾消息，
-  所以本轮 worker 与 os14 的审计**没有新证据**，只有我手工读过的部分（D1 备份文档）。
-- **`audit-shell` 的第 4 条（拖拽）判断依赖几何假设**：`pickGridDrop` 用的是中心距离 +
-  水平/垂直阈值；如果将来网格改成非均匀列宽，需要重新校准阈值。
-- **没有在真机上验证**：IndexedDB `clear()` 与 `safeUrl` 的 blob 放行在 Chromium 内核上验证，
+- **第二轮审计仍有 8 条没修**（都在 §1 末尾列过）：
+  - `deletePost` 不结算关联举报，后续 `hide_post` 可能把软删作品改回 `hidden`；
+  - `POST /posts/:id/view` 与 `GET /posts/:id/package?count=1` 无鉴权/无去重，可重放刷计数；
+  - 审核接口 `approve` 允许 `draft`（且 `restore` 跳过状态校验），可把作者撤回的草稿重新公开；
+  - 社区图片上传的存储配额先查后写（`/files` 有 pending 预占行，社区没有），并发可破上限；
+  - `consumeReauthTicket` 在 `activeDeletion/activeExport/activeBackup` 前置检查之前消费，
+    409 时票据已作废。
+  这些都要么动公开计数语义、要么需要新增预占表/迁移，超出「补丁版本不加迁移」的约束，
+  记为下一轮候选。
+- **E2E 真实栈只覆盖了限制权限的一半**：管理用户接口要求 UUID，而夹具里只有 creator 是 UUID，
+  所以 E2E 走「管理员封禁/解除 creator + 非审核员 403」；审核员与同级审核员的边界靠
+  `tests/unit/community-restriction-guard.test.ts` 的假 D1 会话。
+- **布局、拖拽、强调色、笔记/任务归一化、分页与重试只有单测**：它们要构造真实几何或旧本地数据，
+  单测已覆盖判定与归一化；浏览器 E2E 仍只覆盖注入与清空两条链路。
+- **没有在真机上验证**：IndexedDB `clear()`、`safeUrl` 的 blob 放行、键盘事件在 Chromium 内核验证，
   Safari/Firefox 未测。
 

@@ -358,9 +358,14 @@ const renderCommentComposer = (ctx: CommunityContext) => {
 export const refreshCommentsImpl = async (ctx: CommunityContext, page = 1) => {
     const detailCache = ctx.getDetailCache();
     if (!detailCache) return;
-    const comments = await api.getComments(detailCache.data.post.id, page, 12);
-    detailCache.comments = comments;
-    detailCache.commentsPage = page;
+    // 记住发起请求时是哪个作品：await 期间用户可能已经返回列表并打开别的作品，
+    // 回来时不能再把 A 的评论写进 B 的缓存与面板（旧实现完全没有校验）。
+    const postId = detailCache.data.post.id;
+    const comments = await api.getComments(postId, page, 12);
+    const current = ctx.getDetailCache();
+    if (!current || current.data.post.id !== postId) return;
+    current.comments = comments;
+    current.commentsPage = page;
     const panel = ctx.win.querySelector<HTMLElement>("[data-comments-panel]");
     if (panel) panel.innerHTML = renderComments(comments);
   };

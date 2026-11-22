@@ -7,6 +7,7 @@
 
 import { emit, ls, uid } from "./core";
 import { recordTombstone } from "../sync/tombstones";
+import { normalizePriority, normalizeTaskRecords } from "./tasks-model";
 
 export type Priority = "low" | "normal" | "high";
 
@@ -79,7 +80,11 @@ const seed = (): Task[] => {
 
 const read = (): TaskState => {
   const raw = ls.get<TaskState | null>(KEY, null);
-  if (raw && raw.v === 1 && Array.isArray(raw.tasks)) return raw;
+  if (raw && raw.v === 1 && Array.isArray(raw.tasks)) {
+    // 旧记录/别的设备写进来的 priority 可能是任意字符串，先在入口收敛，
+    // 否则 PRIORITY[...] 查不到会让任务中心整页抛错。
+    return { v: 1, tasks: normalizeTaskRecords(raw.tasks) as Task[] };
+  }
   const seeded: TaskState = { v: 1, tasks: seed() };
   ls.set(KEY, seeded);
   return seeded;
@@ -96,7 +101,7 @@ export const taskStore = {
     const ad = a.due || "9999-99-99";
     const bd = b.due || "9999-99-99";
     if (ad !== bd) return ad < bd ? -1 : 1;
-    return PRIORITY[b.priority].weight - PRIORITY[a.priority].weight;
+    return PRIORITY[normalizePriority(b.priority)].weight - PRIORITY[normalizePriority(a.priority)].weight;
   }),
   add: (patch: Partial<Task>): Task => {
     const st = read();
@@ -105,7 +110,7 @@ export const taskStore = {
       id: uid(),
       title: String(patch.title ?? "").slice(0, 120) || "未命名任务",
       note: String(patch.note ?? "").slice(0, 600),
-      priority: (patch.priority as Priority) ?? "normal",
+      priority: normalizePriority(patch.priority),
       due: patch.due ?? "",
       category: patch.category ?? "other",
       done: false,
@@ -122,6 +127,7 @@ export const taskStore = {
     const t = st.tasks.find((x) => x.id === id);
     if (!t) return;
     Object.assign(t, patch, { id: t.id, createdAt: t.createdAt, updatedAt: Date.now() });
+    t.priority = normalizePriority(t.priority);
     write(st);
   },
   toggle: (id: string) => {
@@ -192,7 +198,7 @@ export const taskStore = {
         id: item.id,
         title: String(incoming.title ?? "").slice(0, 120) || "未命名任务",
         note: String(incoming.note ?? "").slice(0, 600),
-        priority: (incoming.priority as Priority) ?? "normal",
+        priority: normalizePriority(incoming.priority),
         due: String(incoming.due ?? ""),
         category: String(incoming.category ?? "other"),
         done: Boolean(incoming.done),

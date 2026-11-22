@@ -251,3 +251,40 @@ html-security 294 处 / 未审查 0、build 30 页、CSP 12 哈希 / 31 HTML）�
   不能只写「旧代码不安全」。
 - `check-html-security` 只认直接被 `safeUrl`/`escapeAttr`/`escapeHtml` 包住的插值；
   三元表达式里再调用也算不出来，模板里直接包一层最省事。
+
+---
+
+## 2026-11-22 · Round 34 · 2.0.6 第二轮审计修复（Shell Proof 增补）
+
+**来源**：`audit-worker-b`（Worker，7 条）与 `audit-os14-c`（社区/桌面应用，7 条）只读审计；
+两者都交回了 `SCOPE:` 收尾行，这次不再是「inactive 即结束」。
+
+**已修（补充进 2.0.6，共 6 条）**
+
+| # | 条目 | 证据位置 |
+| --- | --- | --- |
+| 1 | 市场封面 `preview` 拼进 `style="…url('…')"` → CSS 声明注入 | `src/lib/os20/market-thumb.ts`；`tests/unit/market-thumb.test.ts` 4 passed |
+| 2 | 评论「加载更多」不校验作品身份 → A 的评论写进 B | `detail.ts` 的 `refreshCommentsImpl`；`tests/unit/community-comments-refresh.test.ts` 2 passed |
+| 3 | 发布权限接口不要求管理员 → 审核员可撤销封禁 | `worker/api/community/admin.js`；单测 6 passed、E2E `community-restriction-guard` 1 passed（11.9s） |
+| 4 | 笔记/任务读取不校验字段形状 → 首页 `TypeError` | `notes-model.ts`、`tasks-model.ts`；单测 5 + 4 passed |
+| 5 | 通知分页把本页条数当总数、错误面板「重试」只认 home/detail | `ui.ts pageNav(total: number \| null)`、`community.ts retry`；单测 5 + 3 passed |
+| 6 | 幻灯片计时器不随灯箱关闭 → Esc 后自动弹回 | `src/lib/os13/slideshow.ts`；`community-pager.test.ts` 内 2 passed |
+
+**未修（8 条，见 STATUS §5 风险 14）**：`deletePost` 不结算举报、`view`/下载计数可重放、
+`approve` 允许 `draft`、社区上传配额 TOCTOU、`consumeReauthTicket` 消费顺序、通知接口无 `total`
+（已用「第 N 页」规避）、生产审核链只读。它们会改公开计数语义或需要迁移/新预占表，
+补丁版本不动。
+
+**门禁**：`npm run verify` exit 0（38 文件 / 449 单测、html-security 294/0、build 30 页、
+CSP 12 哈希 / 31 HTML）；全量 E2E **198 passed（4.7m）**。
+
+**状态**：**Implemented / Verified（本地）**，生产未部署（Blocked，等上线授权）。
+
+**教训（新增）**
+
+- 夹具账号不都是 UUID：管理接口只认 UUID，真实栈造不出「审核员改同级审核员」，
+  这部分矩阵只能交给假 D1 单测；写 E2E 前先看接口的 id 校验。
+- 真实栈「≥99 行」的边界很难撞：用「超过 100 就抛」的假 D1 证明分块逻辑，比堆数据可靠。
+- 分页文案要先看接口实际返回什么；没有 `total` 就不写数量，比编一个本页条数诚实。
+- 抽纯函数是安全修复的最短路径：`marketThumbHtml`/`pickGridDrop`/`normalizePriority`/
+  `createSlideshow` 都只有几十行，却让 E2E 与负向对照都能稳定复现。
