@@ -5,7 +5,7 @@
 - **日期**：2026-11-22
 - **类型**：补丁版本
 - **上游**：2.0.5 Param Budget
-- **状态**：**Implemented / Verified（本地）**，生产未部署（Blocked，等上线授权）
+- **状态**：**Verified（本地 + 生产）**，已部署到 guandao.xin（2026-11-22，Version `835cb688-5ea2-4572-8d48-05d19947f03d`）
 
 ---
 
@@ -337,18 +337,17 @@ build: 30 page(s)
 
 ## 5. 部署记录
 
-**未部署**（等授权）。当前生产仍是 2.0.5（Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`）。
-上线时按顺序：
+已部署（2026-11-22）。上一步生产是 2.0.5（Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`）。
 
-1. `git fetch` 确认无冲突，`npm run verify` 全绿；
-2. `npx wrangler d1 migrations list guandao-db --remote` → 预期 `No migrations to apply!`；
-3. `npx wrangler d1 export guandao-db --remote --output .backups\guandao-db-prod-<时间>.sql`；
-4. `npm run cf:deploy`；
-5. `/api/health` 应为 `"version":"2.0.6"`，响应头 `x-guandao-version: 2.0.6`，入口包含 `2.0.6`；
-6. `npm run qa:prod` → 35/35；
-7. `git push`（触发 Cloudflare 自动构建与 CI）。
+1. `git fetch`：`origin/main` 无新提交，本地领先 2（`3c7536a`、`47027fc`）；
+2. `npx wrangler d1 migrations list guandao-db --remote` → `✅ No migrations to apply!`（无迁移）；
+3. 备份 → `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1250.sql`；
+4. `npm run cf:deploy` → 30 页、`Total Upload: 740.93 KiB / gzip: 162.82 KiB`、**Version `835cb688-5ea2-4572-8d48-05d19947f03d`**；
+5. `/api/health` → `"version":"2.0.6"`，响应头 `x-guandao-version: 2.0.6`，首页 200（27,812 B），入口 bundle 内容含 `2.0.6`；
+6. `npm run qa:prod` → 35/35（清理后 `users=0`，既有 `event_type` CHECK 警告不影响结果）；
+7. `git push` 触发 Cloudflare 自动构建与 GitHub Actions。
 
-回滚：Cloudflare 控制台把 Version 回退到 `1aeae3dc…`。
+回滚：Cloudflare 控制台把 Version 回退到 `1aeae3dc-…`（2.0.5）。
 
 ---
 

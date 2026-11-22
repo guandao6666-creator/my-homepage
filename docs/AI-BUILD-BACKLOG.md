@@ -288,3 +288,6 @@ CSP 12 哈希 / 31 HTML）；全量 E2E **198 passed（4.7m）**。
 - 分页文案要先看接口实际返回什么；没有 `total` 就不写数量，比编一个本页条数诚实。
 - 抽纯函数是安全修复的最短路径：`marketThumbHtml`/`pickGridDrop`/`normalizePriority`/
   `createSlideshow` 都只有几十行，却让 E2E 与负向对照都能稳定复现。
+
+**部署（2026-11-22）**：已发布 2.0.6 —— Version `835cb688-5ea2-4572-8d48-05d19947f03d`，health/header 2.0.6，`qa:prod` 35/35，备份 `guandao-db-prod-20261122-1250.sql`；回滚目标 `1aeae3dc-…`（2.0.5）。
+

@@ -1,4 +1,4 @@
-﻿# AI-BUILD-STATUS · Guandao OS 当前状态
+# AI-BUILD-STATUS · Guandao OS 当前状态
 
 > 本文件只记录**当前事实**，不复制历史细节。
 > 历史细节见 `GUANDAO_2_0_AUDIT.md`（附录 A–P）、`GUANDAO_2_0_ROADMAP.md`、`docs/RELEASE-2.0.md`。
@@ -6,7 +6,7 @@
 
 - **更新时间**：2026-11-22
 - **版本**：2.0.6（Shell Proof，补丁版本；发布说明 `docs/RELEASE-2.0.6.md`）
-- **生产状态**：**2.0.6 本地完成，未部署（Blocked，等上线授权）**；生产仍是 2.0.5（2026-11-21，Worker Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`；`qa:prod` 35/35、生产 D1 无待应用迁移）
+- **生产状态**：**2.0.6 已部署（2026-11-22）**，Version `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6、`qa:prod` 35/35、部署前备份 `guandao-db-prod-20261122-1250.sql`、生产 D1 无待应用迁移
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -74,6 +74,7 @@
 | 强调色单测（`tests/unit/look-accent.test.ts`，2.0.6） | **5 passed**：auto 恢复、hex 接受、非法值忽略、只给 accent2 |
 | 布局快照单测（`tests/unit/legacy-layout.test.ts`，2.0.6） | **3 passed**：不写 viewport/schemaVersion；旧 0×0 快照把 120/80 压成 800/480 的回归证据 |
 | 2.0.6 负向对照 | 临时脚本把四模块改回旧实现 → 同命令 **12 failed / 7 passed**；恢复（4 个 SHA256_MATCH）后 19 passed |
+| 生产部署（2.0.6，2026-11-22） | `npm run cf:deploy` exit 0 → Version `835cb688-5ea2-4572-8d48-05d19947f03d`；`/api/health` 2.0.6、header 2.0.6、入口 bundle 含 2.0.6；`npm run qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-1250.sql` |
 | 壁纸安全 E2E（`tests/e2e/shell-wallpaper-safety.spec.ts`，2.0.6） | **2 passed（16.0s）**：恶意标题不执行、`.wc-name` 保留原文；清空后 IndexedDB count 0、localStorage custom 为 `[]` |
 | 壁纸安全 E2E 负向对照 | 换回 2.0.5 裸拼接 → **1 failed**，`toHaveText` 收到 `"壁纸"`（注入的 `<img>` 被解析） |
 | 插件市场分块单测（`tests/unit/plugins-market.test.ts`，2.0.6） | **2 passed**：120 候选 → 12 条、绑定全部 ≤100、聚合查询 3 次（块 40/40/40）；负向对照 1 failed（`121 > 100`） |
@@ -101,7 +102,8 @@
 | 全量门禁（2.0.5 复跑） | `npm run verify` **exit 0**：`[version] 一致：2.0.5`；typecheck 0 error；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全合计 294 处、未审查 0 |
 | 单测 / 体积 | **26 文件 / 399 通过**（2.0.5 复跑）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）**（体积未变，2.0.5 只改 Worker 端） |
 | 全量 E2E | **195 passed（4.7m），exit 0**（workers=1、retries=0；含新增 `d1-param-bounds` 2 条与教程页面级断言） |
-| 生产状态 | **2.0.5 已部署**：Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`；health/header 2.0.5；`qa:prod` 35/35；部署前备份 `guandao-db-prod-20261121-213900.sql`（650,184 B）；推送后自动构建 `0cccf9e8-…`（13:39:58Z） |
+| 生产状态 | **2.0.6 已部署**：Version `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6；`qa:prod` 35/35；部署前备份 `guandao-db-prod-20261122-1250.sql`；入口 bundle 含 `2.0.6`；回滚目标 `1aeae3dc-…`（2.0.5） |
+| 生产状态（上一版 2.0.5，归档） | Version `1aeae3dc-…`；health/header 2.0.5；推送后自动构建 `0cccf9e8-…`（13:39:58Z） |
 | 生产状态（上一版 2.0.4，归档） | Version `78e78621…`；health 2.0.4；`npm run perf:prod` 冷启动 #1 TTFB 211 / FCP 476 / LCP 792 / CLS 0.003 / DCL 664 / Load 764 ms（25 资源 481 KB） |
 
 ## 4.1 上一版验证结果（2.0.3，归档）
@@ -212,8 +214,8 @@
 
 ## 6. 下一步（按优先级）
 
-1. **P1 · 发布 2.0.6**（本地已验证，等上线授权）：`npm run cf:deploy` → health/header 2.0.6 →
-   `qa:prod` 35/35 → push；生产仍是 2.0.5（Version `1aeae3dc…`）。
+1. **P1 · 2.0.6 已发布**（2026-11-22）：Version `835cb688…`、health/header 2.0.6、`qa:prod`
+   35/35、备份 `guandao-db-prod-20261122-1250.sql`；下一步是 push 后复核 CI 与自动构建。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
 3. **P2 · 补 2.0.6 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；

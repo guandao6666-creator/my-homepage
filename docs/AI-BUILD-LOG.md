@@ -1,4 +1,4 @@
-﻿# AI-BUILD-LOG · 每轮开发记录
+# AI-BUILD-LOG · 每轮开发记录
 
 > 追加式记录。每轮写：做了什么、改了哪些文件、测试结果、未完成、下一项。
 > 详细论证放 `docs/architecture/*` 与 `docs/RELEASE-2.0.md`，这里只留索引与结论。
@@ -684,4 +684,6 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
    （`plugin-upload` 20 次/小时）。
 6. **门禁**：`npm run verify` exit 0（38 文件 / 449 单测、html-security 294 处 / 未审查 0、
    build 30 页、CSP 12 哈希 / 31 HTML）；全量 E2E 198 passed（4.7m）。
-7. **状态**：2.0.6 仍**未部署**（Blocked，等授权）；生产仍是 2.0.5（Version `1aeae3dc…`）。
+7. **上线（2026-11-22 12:50）**：用户授权后 `npm run cf:deploy` 部署 2.0.6，Version
+   `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6、入口 bundle 含 2.0.6、`qa:prod`
+   35/35、部署前备份 `guandao-db-prod-20261122-1250.sql`；回滚目标 `1aeae3dc-…`（2.0.5）。
