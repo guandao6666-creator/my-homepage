@@ -73,6 +73,7 @@
 | 2.0.8 真实 Worker E2E（新增 `tests/e2e/market-search-detail.spec.ts`） | **1 passed（14.4s）**：打开市场 → 选中卡片（详情出现标题）→ 输入不匹配关键词 → 列表空态 + 详情 `is-empty` + 旧标题消失；删掉详情栏重绘块并重建 dist → **1 failed**（负向对照成立，restore SHA-256 MATCH） |
 | 2.0.8 全量 E2E | `npx playwright test` → **199 passed（5.3m）**，exit 0（2.0.7 的 198 + 新增 1） |
 | 生产部署（2.0.8，2026-11-22） | `npm run cf:deploy` exit 0 → Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`；`/api/health` 2.0.8、header 2.0.8、入口 `CZAyZYvn.js`（450,998 B）含 2.0.8；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-1615.sql`（648,923 B）；回滚目标 `a7728641-…` |
+| 2.0.8 推送复核（2026-11-22） | push `fe51b05..58b1103` → quality run **45001712326 success**；Cloudflare 自动构建 `ab595f66-…`（08:13:16Z）；health/header 仍 2.0.8 |
 | 审核状态策略单测（`tests/unit/community-review-policy.test.ts`，2.0.7） | **8 passed**：approve×6 / restore×6 状态矩阵、draft 文案含「作者已撤回」「重新提交审核」、deleted 一律拒绝、UI 按钮与策略一致；另有真的调 `adminReviewPost` 的行为用例（draft → 400 且文案正确） |
 | 删除结算单测（`tests/unit/community-delete-reports.test.ts`，2.0.7） | **3 passed**：`deletePost` 的 batch 含 `UPDATE community_reports ... status IN ('open','reviewing')`、resolution「作品已被删除」；`hide_post` 对 deleted 的守卫；privacy 的「先检查、后消费」顺序 |
 | 2.0.7 负向对照 | 分别还原 `write.js` / `moderation.ts` / `admin.js` → **各 1 failed**；`admin.js` 那组收到的旧文案是「作品还没有可安装的内容包，不能通过审核」 |

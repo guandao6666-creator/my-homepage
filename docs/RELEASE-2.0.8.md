@@ -213,8 +213,11 @@ export function canApplyUpdate(phase, server, comparison): boolean {
 | 生产核对 | `/api/health` → `"version":"2.0.8"`、D1 connected、R2 available；响应头 `x-guandao-version: 2.0.8`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.CZAyZYvn.js`（450,998 B，含 2.0.8） |
 | `npm run qa:prod` | **35/35 通过**；清理 `{"users":0}`（既有 `event_type` CHECK 警告仍存在，脚本 exit 0） |
 
-回滚目标：2.0.7 的 Version `a7728641-876d-4351-8b4a-fcacc816ced1`。推送后 Cloudflare 会自动构建新 Version，最终版本以
-`wrangler deployments list` 末尾为准。
+回滚目标：2.0.7 的 Version `a7728641-876d-4351-8b4a-fcacc816ced1`。
+
+推送 `fe51b05..58b1103` 后：GitHub Actions quality run **45001712326 success**（attempt 1）；
+Cloudflare 自动构建新 Version `ab595f66-c58a-4075-9c44-eed86a14ff75`（08:13:16Z，100%），`/api/health` 仍 2.0.8。
+每次 push 都会触发一次自动构建，最终版本以 `wrangler deployments list` 末尾为准。
 
 ## 6. 未修与「需要迁移」清单
 

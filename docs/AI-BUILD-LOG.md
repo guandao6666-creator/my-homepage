@@ -1,4 +1,4 @@
-﻿# AI-BUILD-LOG · 每轮开发记录
+# AI-BUILD-LOG · 每轮开发记录
 
 > 追加式记录。每轮写：做了什么、改了哪些文件、测试结果、未完成、下一项。
 > 详细论证放 `docs/architecture/*` 与 `docs/RELEASE-2.0.md`，这里只留索引与结论。
@@ -740,3 +740,5 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
 10. **上线（2026-11-22 16:06）**：用户授权 → 迁移无待应用、D1 备份 648,923 B → `cf:deploy` 30 页
     Version `9be8e25b…`（743.22 KiB / gzip 163.57 KiB）→ health/header 2.0.8、首页 27,812 B、
     入口 `CZAyZYvn.js` 450,998 B 含 2.0.8 → `qa:prod` **35/35**、清理 `{"users":0}`。
+11. **推送复核（2026-11-22 16:15）**：push `fe51b05..58b1103` → quality run **45001712326 success**；
+    Cloudflare 自动构建 `ab595f66-c58a-4075-9c44-eed86a14ff75`（08:13:16Z，100%）；health/header 仍 2.0.8。
