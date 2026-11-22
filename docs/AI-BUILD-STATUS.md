@@ -75,7 +75,7 @@
 | 全量单测（2.0.7） | `npx vitest run` → **40 文件 / 460 passed（1.49s）** |
 | 全量门禁（2.0.7） | `npm run verify` **exit 0**：`[version] 一致：2.0.7`；typecheck 0 error（176 hints）；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全 294 处、未审查 0 |
 | 全量 E2E（2.0.7） | **198 passed（4.7m），exit 0**；首次跑 197/1 failed，原因是既有审核链用例还在点 `review-approve`（2.0.7 把已隐藏改为 `review-restore`），改按新契约后单跑 4 passed（26.2s）再复跑全量 |
-| 生产部署（2.0.7，2026-11-22） | `npm run cf:deploy` exit 0 → Version `a7728641-876d-4351-8b4a-fcacc816ced1`；`/api/health` 2.0.7、header 2.0.7、入口 `BCJOtq9k.js`（449,635 B）含 2.0.7；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-1412.sql`（639,545 B） |
+| 生产部署（2.0.7，2026-11-22） | `npm run cf:deploy` exit 0 → Version `a7728641-876d-4351-8b4a-fcacc816ced1`；`/api/health` 2.0.7、header 2.0.7、入口 `BCJOtq9k.js`（449,635 B）含 2.0.7；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-1412.sql`（639,545 B）；CI run 44993044299 success；推送后自动构建 `c6fb44fe-…`（06:18:15Z） |
 | 壁纸卡片转义单测（`tests/unit/os13-wallcard.test.ts`，2.0.6） | **5 passed**：标签/引号/id 属性转义、blob 放行、`javascript:` 挡掉、状态位 |
 | 拖拽落点单测（`tests/unit/icons-order.test.ts`，2.0.6） | **6 passed**：空列表、左侧、右侧、下方、两图标之间、同列上下 |
 | 强调色单测（`tests/unit/look-accent.test.ts`，2.0.6） | **5 passed**：auto 恢复、hex 接受、非法值忽略、只给 accent2 |

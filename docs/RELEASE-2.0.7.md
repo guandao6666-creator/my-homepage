@@ -188,7 +188,7 @@ UPDATE community_reports
 | 部署 | `npm run cf:deploy` exit 0 → 30 页、`Uploaded 32 files`、`Total Upload: 742.42 KiB / gzip: 163.45 KiB`、Worker Startup 4 ms |
 | 生产核对 | `/api/health` → `"version":"2.0.7"`、D1 connected、R2 available（put/get/head/delete 全 true）；header `x-guandao-version: 2.0.7`；入口 `index.astro_astro_type_script_index_0_lang.BCJOtq9k.js`（449,635 B）含 `2.0.7` |
 | 生产 QA | `npm run qa:prod` **35/35 通过**，清理后 `{"users":0}`（stderr 仍有既有 `event_type` CHECK 警告，脚本 exit 0） |
-| push 后 | CI run 与 Cloudflare 自动构建见文末 |
+| push 后 | 推送 `63a8731..23bb6ac`；GitHub Actions quality run **44993044299 success**（attempt 1）；Cloudflare 自动构建 Version `c6fb44fe-5bd2-4c8f-a130-ab806c75a9e5`（06:18:15Z）；`/api/health` 仍 2.0.7。每次 push 都会触发新 Version，以 `wrangler deployments list` 末尾为准 |
 
 回滚目标：2.0.6 的 Version `835cb688-5ea2-4572-8d48-05d19947f03d`。
 
