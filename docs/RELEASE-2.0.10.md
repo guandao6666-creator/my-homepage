@@ -103,7 +103,7 @@ const commitNumberSetting = (range: HTMLInputElement) => {
 | 生产核对 | `/api/health` → `"version":"2.0.10"`、D1 connected、R2 available（put/get/head/delete 全 true）；header `x-guandao-version: 2.0.10`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.CnPgsDvL.js`（452,121 B，含 5 处 `2.0.10`）；`/sw.js` → `guandao-2.0.10` |
 | 生产 E2E | `npm run qa:prod` → **35/35 通过**，清理后 `{"users":0}`（既有 `event_type` CHECK 约束警告仍在 stderr，脚本 exit 0） |
 | 回滚 | 2.0.9 生产 Version `a034902b-562b-4122-85bf-e238cbbe23d6` |
-| push 后 | 每次 push 都会触发 CI 与 Cloudflare 自动构建；Version 以 `wrangler deployments list` 末尾与 `/api/health` 为准 |
+| 推送复核 | push `f335c9b..eb0825a` 后 quality run **45023083005 success**；Cloudflare 自动构建 **`423253b9-1166-44a0-83b7-9bc3f1ceabe6`**（12:36:35Z，100%），`/api/health` 仍 2.0.10 |
 
 ## 6. 仍未修 / 边界
 

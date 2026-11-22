@@ -75,7 +75,7 @@
 | 滑杆键盘提交真实 Worker E2E（`tests/e2e/systemcenter-number-keyboard.spec.ts`） | **1 passed（16.0s）**：设置→个性化→方向键调音量→关窗→重开断言值保留 |
 | 滑杆键盘提交负向对照 | 改回只有 `pointerup` 落盘 → **1 failed**：`toHaveValue` 期望 `"40"` 实际 `"45"`；恢复 `MATCH` 后重建复跑 1 passed |
 | 2.0.10 全量 E2E | **203 passed（4.7m），exit 0**（2.0.9 的 202 + 本版 1 条）；首跑曾 1 failed（配对确认 500），复跑单文件 12 passed、全量 203 passed，判定为 20 秒一次清 `rate_limits` 与 D1 抢锁的环境抖动，之后改为 90 秒一次 |
-| 生产部署（2.0.10，2026-11-22） | `npm run cf:deploy` exit 0 → Version `b207dbcb-09d9-4f30-943e-37a281d4de56`；`/api/health` 2.0.10、header 2.0.10、入口 `CnPgsDvL.js`（452,121 B，含 5 处 2.0.10）、`/sw.js` `guandao-2.0.10`；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-2029.sql`（658,291 B）；回滚目标 `a034902b-…`（2.0.9） |
+| 生产部署（2.0.10，2026-11-22） | `npm run cf:deploy` exit 0 → Version `b207dbcb-09d9-4f30-943e-37a281d4de56`；`/api/health` 2.0.10、header 2.0.10、入口 `CnPgsDvL.js`（452,121 B，含 5 处 2.0.10）、`/sw.js` `guandao-2.0.10`；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-2029.sql`（658,291 B）；回滚目标 `a034902b-…`（2.0.9）；push `eb0825a` → CI run **45023083005 success**、自动构建 `423253b9-1166-44a0-83b7-9bc3f1ceabe6`（12:36:35Z） |
 | 2.0.9 全量门禁 | `npm run verify` **exit 0**：`[version] 一致：2.0.9`；typecheck 0 error（414 文件，176 hints）；**45 文件 / 507 单测**（1.58s）；HTML 安全 **295 处 / 未审查 0**；build 30 页；CSP 12 哈希 / 31 HTML |
 | 2.0.9 文件 Range/HEAD 单测 | `tests/unit/files-range.test.ts` **9 passed**：越界判不可满足、416 不读 R2、HEAD body 为空、HEAD/GET 206 与 `content-range`、R2 忽略 Range 时不伪造 206 |
 | 2.0.9 插件流式截断单测 | `tests/unit/plugins-net-stream.test.ts` **4 passed**：300 KB 流只留 256 KiB + `truncated` + cancel、小响应不 cancel、无 body、源码不再整包读 |
