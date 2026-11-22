@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.5";
+export const OS_VERSION = "2.0.6";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -46,6 +46,19 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.0.6",
+    name: "Shell Proof",
+    date: "2026-11-22",
+    notes: [
+      "社区壁纸标题转义：自定义名字来自别人的作品标题，直接拼进设置页 title/alt/文本就是存储型 HTML 注入",
+      "1.x 升级布局快照不再写 0×0 viewport：旧写法会让比例计算放大 1440 倍、窗口被夹到右下",
+      "「清空本机数据」真正清空 IndexedDB 壁纸库：原来删的是一个不存在的伪键，且刷新没等清理完成",
+      "网格图标拖拽按图标中心选落点：原来用左上角阈值判定，第一个图标恒命中，顺序永远插到最前",
+      "强调色「自动」可以恢复：只有显式给色才关闭壁纸主色联动，改材质/圆角不再误关",
+      "新增 4 个纯函数模块与 19 条单测、2 条真实浏览器 E2E（注入 + 清空），并跑了负向对照",
+    ],
+  },
   {
     version: "2.0.5",
     name: "Param Budget",

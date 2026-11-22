@@ -4,9 +4,9 @@
 > 历史细节见 `GUANDAO_2_0_AUDIT.md`（附录 A–P）、`GUANDAO_2_0_ROADMAP.md`、`docs/RELEASE-2.0.md`。
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
-- **更新时间**：2026-11-21
-- **版本**：2.0.5（Param Budget，补丁版本；发布说明 `docs/RELEASE-2.0.5.md`）
-- **生产状态**：**2.0.5 已部署**（2026-11-21，Worker Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`；`/api/health` 报 2.0.5、`qa:prod` 35/35、生产 D1 无待应用迁移；部署前备份 650,184 B；推送后自动构建 `0cccf9e8-e2d8-4845-877c-05f4694459eb`）
+- **更新时间**：2026-11-22
+- **版本**：2.0.6（Shell Proof，补丁版本；发布说明 `docs/RELEASE-2.0.6.md`）
+- **生产状态**：**2.0.6 本地完成，未部署（Blocked，等上线授权）**；生产仍是 2.0.5（2026-11-21，Worker Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`；`qa:prod` 35/35、生产 D1 无待应用迁移）
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -22,19 +22,19 @@
 | Phase 5 · 社区与市场发布链 | `Verified`（本地 + 生产只读） | 本地 260/260；生产发布链 9/9（`prod-community-qa.mjs`，2026-11-18）；2.0.4 `qa:prod` 35/35 复核公开接口；教程页面级 E2E 2 passed（17.3s） |
 | Phase 6 · 性能与可观测 | `Verified`（6.1–6.4） | 6.4 已进生产基线（`docs/perf-measurements-prod.json`）；见 §3 |
 
-## 2. 当前质量基线（2026-11-21 本机实跑）
+## 2. 当前质量基线（2026-11-22 本机实跑）
 
 | 门禁 | 结果 |
 | --- | --- |
-| `npm run typecheck` | 0 error（362 文件） |
-| `npx vitest run` | **26 文件 / 399 单测通过**（2.0.5 新增 D1 参数预算 7 条；2.0.4 新增同步并发 4 条、抽奖本地日 6 条、配对领取 2 条、备份清理 2 条、上传配额 3 条） |
+| `npm run typecheck` | 0 error（383 文件） |
+| `npx vitest run` | **31 文件 / 420 单测通过**（2.0.6 新增外壳纯函数与插件市场 19+2 条；2.0.5 新增 D1 参数预算 7 条） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
-| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；两项预算均通过 |
+| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；2.0.6 只改前端逻辑，体积不变 |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **195 passed（4.7m），exit 0**（含 `files-folders-deep`、`pairing-claim-race`、`d1-param-bounds`；教程页面级断言并入 `community-tutorial`，单跑 2 passed / 17.3s） |
-| 生产（2.0.5 复跑） | `npm run cf:deploy` → Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`；health/header 2.0.5；入口 `9IE3LdKR.js` 446,165 B 含 2.0.5；`qa:prod` **35/35**；自动构建 `0cccf9e8…`。上版 `npm run perf:prod` 冷启动 #1 TTFB 211 ms · FCP 476 ms · LCP 792 ms · CLS 0.003 · DCL 664 ms · Load 764 ms（25 资源 / 481 KB） |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **197 passed（4.8m），exit 0**（含新增 `shell-wallpaper-safety` 2 条） |
+| 生产（2.0.5 现状） | Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`；health/header 2.0.5；入口 `9IE3LdKR.js` 446,165 B；`qa:prod` **35/35**；自动构建 `0cccf9e8…` |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -65,10 +65,21 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.4 → 2.0.5）
+## 4. 本轮验证结果（2.0.5 → 2.0.6）
 
 | 项 | 结果 |
 | --- | --- |
+| 壁纸卡片转义单测（`tests/unit/os13-wallcard.test.ts`，2.0.6） | **5 passed**：标签/引号/id 属性转义、blob 放行、`javascript:` 挡掉、状态位 |
+| 拖拽落点单测（`tests/unit/icons-order.test.ts`，2.0.6） | **6 passed**：空列表、左侧、右侧、下方、两图标之间、同列上下 |
+| 强调色单测（`tests/unit/look-accent.test.ts`，2.0.6） | **5 passed**：auto 恢复、hex 接受、非法值忽略、只给 accent2 |
+| 布局快照单测（`tests/unit/legacy-layout.test.ts`，2.0.6） | **3 passed**：不写 viewport/schemaVersion；旧 0×0 快照把 120/80 压成 800/480 的回归证据 |
+| 2.0.6 负向对照 | 临时脚本把四模块改回旧实现 → 同命令 **12 failed / 7 passed**；恢复（4 个 SHA256_MATCH）后 19 passed |
+| 壁纸安全 E2E（`tests/e2e/shell-wallpaper-safety.spec.ts`，2.0.6） | **2 passed（16.0s）**：恶意标题不执行、`.wc-name` 保留原文；清空后 IndexedDB count 0、localStorage custom 为 `[]` |
+| 壁纸安全 E2E 负向对照 | 换回 2.0.5 裸拼接 → **1 failed**，`toHaveText` 收到 `"壁纸"`（注入的 `<img>` 被解析） |
+| 插件市场分块单测（`tests/unit/plugins-market.test.ts`，2.0.6） | **2 passed**：120 候选 → 12 条、绑定全部 ≤100、聚合查询 3 次（块 40/40/40）；负向对照 1 failed（`121 > 100`） |
+| 全量门禁（2.0.6 复跑） | `npm run verify` **exit 0**：`[version] 一致：2.0.6`；typecheck 0 error（383 文件）；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全 294 处、未审查 0 |
+| 单测 / 体积 | **31 文件 / 420 通过**；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
+| 全量 E2E（2.0.6） | **197 passed（4.8m），exit 0**（workers=1、retries=0；比 2.0.5 多 2 条 `shell-wallpaper-safety`） |
 | D1 参数预算单测（`tests/unit/d1-params.test.ts`，2.0.5） | **7 passed**：chunkIds/占位符边界、通知 120 个 id → 3 条 UPDATE 各 42 参数且全部标记、旧形态负向对照抛 `D1 绑定参数超限：101 > 100`、trending 源码约束 |
 | D1 参数预算负向对照 | `git stash push -- worker/api/community/write.js`（回 2.0.4 单条 UPDATE）→ **1 failed / 6 passed**，失败为 `D1 绑定参数超限：122 > 100`；恢复后 7 passed |
 | D1 参数上限真实 Worker E2E（`tests/e2e/d1-param-bounds.spec.ts`，2.0.5） | **2 passed（12.1s）**：通知 120 个 id → 200；trending 每条 `recentDownloads` 是数字 |
@@ -159,15 +170,33 @@
     - 判别证据：假 D1 在 `bind()` 强校验 100 上限，`tests/unit/d1-params.test.ts` 7 passed；
       旧实现负向对照 1 failed（`122 > 100`）；真实 Worker E2E `d1-param-bounds` 2 passed（12.1s），旧实现负向对照 1 failed（真实 D1 500）。证据边界：trending 的「候选 ≥99 行」分支仍未在真实 E2E 造满。
 
+13. **已修（2.0.6，本地未部署）**：
+    - 社区壁纸标题未转义：名字来自别人的作品标题（`community/install.ts` → `importWallpaperFromBlob`），
+      直接拼进设置页 `title/alt/文本` 即存储型 XSS。已抽 `wall-card.ts` 纯函数并
+      `escapeAttr`/`escapeHtml` 双上下文转义；单测 5 passed、E2E 2 passed、负向对照 1 failed
+      （旧实现把注入的 `<img>` 当标签解析）。
+    - 1.x 升级布局快照写 `0×0`：`isSnapshot()` 认它有效 → 跳过归一化 → 比例放大 1440 倍后夹到右下。
+      已改为写真实 `innerWidth/innerHeight`，旧形状快照仍可读（`legacyLayoutSnapshot`）；单测 3 passed。
+    - 「清空本机数据」删的是不存在的伪键 `"__all__"`，且刷新不等事务完成：壁纸 blob 留在 IndexedDB。
+      已改为 `idbClearAll()`（`clear()` + 等 `oncomplete` + 关库）后再刷新；E2E 断言 IDB count 0。
+    - 网格拖拽用左上角阈值判定，第一个图标恒命中 → 永远插到最前。已抽 `pickGridDrop`
+      按中心距离 + 水平/垂直阈值选落点；单测 6 passed。
+    - `applyLook()` 无条件关闭壁纸取色：选「自动」无法恢复，改材质/圆角也会误关。已抽
+      `resolveLookAccent`，只有显式 hex 才关闭联动；单测 5 passed。
+    - 证据边界：布局/拖拽/强调色只有单测，没有浏览器 E2E（需要真实指针几何与设置面板状态）；
+      `audit-worker` / `audit-os14` 未交付结论，worker 与 os14 本轮没有新证据。
+
 ## 6. 下一步（按优先级）
 
-1. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
+1. **P1 · 发布 2.0.6**（本地已验证，等上线授权）：`npm run cf:deploy` → health/header 2.0.6 →
+   `qa:prod` 35/35 → push；生产仍是 2.0.5（Version `1aeae3dc…`）。
+2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
-2. **P2 · 新一轮逐块审计**：按 `docs/RELEASE-2.0.5.md` 的边界继续读 os13 / shell 前端状态机、
-   os14 剩余模块；发现候选先找失败证据，再决定修或关。
-3. **P2 · 补 2.0.5 的剩余证据**：trending 的「候选 ≥99 行」分支用 SQL seed 100 个插件行再做真实
-   Worker 断言（不要走上传接口，会被限流）；CI 状态等 GitHub 网络恢复后复核 2.0.4/2.0.5 两次推送。
-4. **P2 · ACCEPTANCE 全表核对（已完成）**：Phase 3/4/5 生产行与 Phase 6.4 已按 2.0.4 实跑更新；
-   后续新增证据时同步该表。
-5. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
-6. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+3. **P2 · 补 2.0.6 的证据边界**：布局/拖拽/强调色补真实浏览器 E2E；把 `audit-worker`、`audit-os14`
+   重新派出去并等到收尾消息（上一轮两个都没有交付）。
+4. **P2 · 补 2.0.5 的剩余证据**：trending 的「候选 ≥99 行」分支用 SQL seed 100 个插件行再做真实
+   Worker 断言（不要走上传接口，会被限流）；CI 状态等 GitHub 网络恢复后复核。
+5. **P2 · ACCEPTANCE 全表核对（已完成 2.0.4）**：后续新增证据时同步该表。
+6. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
+7. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+

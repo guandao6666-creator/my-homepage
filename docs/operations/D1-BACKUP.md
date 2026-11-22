@@ -1,8 +1,8 @@
 # D1 备份（独立 R2 SQL 归档）
 
-**状态**：`Implemented / Partially Verified`（生产备份已成功；告警通知渠道未配置）
-**最后核对**：2026-11-07
-**当前生产**：版本 `6928916f`；Bucket `guandao-db-backups`；Cron `0 19 * * *`；最近成功备份 `cf_ff32148d...`。
+**状态**：`Implemented / Verified（Workers Workflow 层）`（2026-11-21 复核：连续三天实例成功、加密对象 SHA-256 校验通过；GitHub Actions 的 `db-backup` 路径**仍未启用**——缺 Secrets；生产告警渠道未配置）
+**最后核对**：2026-11-21
+**当前生产**：版本 `2.0.5`（Worker `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`）；Bucket `guandao-db-backups`；Cron `0 19 * * *`；最近成功备份 `daily/2026/11/20/d1-backup-2026-11-20.sql.enc`（SQL 614,792 B / 对象 614,808 B，SHA-256 匹配）
 
 ---
 
@@ -11,7 +11,7 @@
 | 层 | 机制 | 范围 | 本阶段状态 |
 | --- | --- | --- | --- |
 | 第一层 | D1 Time Travel | 官方文档：最近 **30 天**（Workers Paid）/ **7 天**（Free），按分钟恢复；Bookmark 可撤销恢复 | 已有，不替代第二层 |
-| 第二层 | 独立 R2 SQL 归档 | 每日 Workflow 导出整库 SQL，独立 Bucket，保留 ≥30 个版本 | **本阶段新增，未启用** |
+| 第二层 | 独立 R2 SQL 归档 | 每日 Workflow 导出整库 SQL，独立 Bucket，保留 ≥30 个版本 | **已启用**（2026-11-21 复核：11-18/19/20 三天实例 Completed，详见 §12） |
 
 两者不能混为一谈：
 
@@ -206,8 +206,9 @@ DATABASE_NAME   guandao-db
 
 - 独立 Bucket 已创建；
 - `workflows` / `DB_BACKUPS` / `ACCOUNT_ID` / `DATABASE_ID` 已合并到主 `wrangler.jsonc`；
-- Worker 已部署 `6928916f`，Cron `0 19 * * *` 已启用；
-- 仍缺：Token 的 D1 export 权限（当前 export 401）。
+- Worker 已部署 `2.0.5`（`1aeae3dc…`），Cron `0 19 * * *` 已启用；
+- D1 export 权限已由 Workflow 的 D1 REST 绑定实际验证（2026-11-21 连续三天成功）；旧记录里的
+  「export 401」是当时 Token 权限问题，当前生产路径不再依赖该 Token。
 
 ---
 
@@ -331,22 +332,34 @@ BACKUP_ENCRYPTION_KEY=... node scripts/verify-d1-backup.mjs --manifest ... --sql
 
 ## 12. 当前状态与下一步
 
-**Implemented / Partially Verified**
+**Implemented / Verified（Workers Workflow 层，2026-11-21 复核）**
 
-已满足：Workflow 代码、Mock 测试、本地 Workflows 真实执行、**Cloudflare 生产 Workflow 成功**、
-**SQL 写入独立 R2**、**R2 回读 SHA-256 通过**、**隔离恢复 63 表/16 迁移**、Bucket/Secrets/迁移/部署/Cron。
+已满足：Workflow 代码、Mock 测试、本地 Workflows 真实执行、Cloudflare 生产 Workflow 连续成功
+（2026-11-18/19/20 三个实例）、**SQL 写入独立 R2**、**R2 回读 SHA-256 通过**、隔离恢复 63 表/16 迁移、
+Bucket/Secrets/迁移/部署/Cron。
 
-未满足（因此不能 Verified）：
+2026-11-21 复核证据（实例 `d1-backup-2026-11-20`）：
 
-1. ~~**真实告警通知渠道未配置**~~ → **部分关闭（2026-11-07）**：告警**代码链路**已用真实外部
-   HTTPS 验通（`npm run qa:alerts` 16/16，webhook.site 实际收到两种 payload）；
-   但 Cloudflare 上 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK` **仍未设置**，
-   生产故障不会真正外发，仍需所有者提供渠道并部署；
-2. Token 的完整权限列表无法通过 API 枚举，只验证了 D1 GET + export 可用；
+- `npx wrangler workflows instances list guandao-d1-backup`：11-18/19/20 三个实例均 `✅ Completed`；
+- `instances describe`：`sqlKey=daily/2026/11/20/d1-backup-2026-11-20.sql.enc`、
+  `manifestKey=daily/2026/11/20/d1-backup-2026-11-20.manifest.json`、`sql.bytes=614792`、
+  `object.bytes=614808`、`verify.status=sha256_match`、`upload.status=put_ok`；
+- 备份步骤内一次 R2 `put` 失败后自动重试成功（实例时间线可见 `10001` 错误 → 2 秒后成功），
+  说明重试路径在真实环境可用。
+
+仍不满足（因此不能把**恢复演练**写成 Verified）：
+
+1. ~~真实告警通知渠道未配置~~ → 部分关闭（2026-11-07）：告警代码链路用真实外部 HTTPS 验通
+   （`npm run qa:alerts` 16/16）；但 Cloudflare 上 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`
+   **仍未设置**，生产故障不会真正外发，需所有者提供渠道并部署；
+2. **GitHub Actions 的 `db-backup` 路径未启用**：2026-11-21 唯一一次运行（`03:15 UTC` 定时）
+   在「Check required secrets」失败，缺 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` /
+   `D1_BACKUP_KEY`；日常整库归档由 Workers Workflow 承担，该 workflow 是**额外一层**，
+   配置前会一直显示红灯（设计如此：缺 Secrets 明确失败，不静默跳过）；
 3. 生产恢复演练是隔离 node:sqlite，不是 D1 原地恢复；
 4. Phase 2.1 生产 UI 已于 2026-11-07 只读复测通过（CSS 资产与本机构建同名同字节）。
 
-**已完成的真实备份**：
+**已完成的真实备份（历史，2026-11-07）**：
 
 - runId `cf_ff32148d3003f667d8e336ac19fc0b037d484124bb27e6220d7f110cab622ec3`
 - SQL 100,976 B；对象 100,992 B

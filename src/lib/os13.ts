@@ -11,7 +11,9 @@
  *
  * 依赖主脚本通过 initOs13(ctx) 注入的能力，不直接访问其闭包。
  */
-import { safeUrl } from "./html";
+import { pickGridDrop } from "./os13/icons-order";
+import { resolveLookAccent } from "./os13/look";
+import { wallCardHtml } from "./os13/wall-card";
 import { WALLPAPERS, WALL_CATEGORY_LABEL, wallpaperById, type Wallpaper } from "./wallpapers";
 import { installIcons } from "./icons13";
 
@@ -340,6 +342,25 @@ const idbDel = async (key: string) => {
   db.close();
 };
 
+/**
+ * 清空壁纸库。
+ *
+ * 2.0.5 之前 `reset-all` 调的是 `idbDel("__all__")`——库里没有这个 key，
+ * 于是「清空本机数据」之后自定义壁纸的 blob 仍然留在 IndexedDB 里
+ * （隐私残留，也继续占配额）。这里直接清空整个 object store。
+ */
+const idbClearAll = async () => {
+  const db = await openDb();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+  db.close();
+};
+
 /* ============================================================
    主入口
    ============================================================ */
@@ -447,6 +468,12 @@ export function initOs13(ctx: Os13Context) {
   let syncWallUI = () => {};
 
   let applySeq = 0;
+  /** 当前壁纸的主色对：自定义壁纸用上传时算好的颜色，内置壁纸用资源自带颜色 */
+  const wallpaperAccents = (id: string) =>
+    id.startsWith(CUSTOM_PREFIX)
+      ? { accent: customById(id)?.accent ?? cfg.appearance.accent, accent2: cfg.appearance.accent2 }
+      : { accent: wallpaperById(id).accent, accent2: wallpaperById(id).accent2 };
+
   const setWallpaper = (id: string, opts: { silent?: boolean; remember?: boolean } = {}) => {
     const target = id.startsWith(CUSTOM_PREFIX) ? id : wallpaperById(id).id;
     const src = wallSrc(target);
@@ -454,9 +481,7 @@ export function initOs13(ctx: Os13Context) {
     cfg.wall.id = target;
     if (opts.remember !== false) cfg.wall.last = Date.now();
 
-    const info = target.startsWith(CUSTOM_PREFIX)
-      ? { accent: customById(target)?.accent ?? cfg.appearance.accent, accent2: cfg.appearance.accent2 }
-      : { accent: wallpaperById(target).accent, accent2: wallpaperById(target).accent2 };
+    const info = wallpaperAccents(target);
 
     if (cfg.appearance.autoAccent) {
       cfg.appearance.accent = info.accent;
@@ -870,20 +895,28 @@ export function initOs13(ctx: Os13Context) {
       return;
     }
 
-    // 网格模式：找到落点位置，插入到那个图标之前
+    // 网格模式：按落点与图标中心的距离决定插入位置
     el.style.position = "";
     el.style.zIndex = "";
     el.style.left = "";
     el.style.top = "";
     el.style.width = "";
     const hostRect = iconsHost!.getBoundingClientRect();
-    const target = iconEls().find((other) => {
-      if (other === el) return false;
+    const others = iconEls().filter((other) => other !== el);
+    const rects = others.map((other) => {
       const r = other.getBoundingClientRect();
-      return r.left - hostRect.left <= lastDrop.x + 24 && r.top - hostRect.top <= lastDrop.y + 24;
+      return { left: r.left - hostRect.left, top: r.top - hostRect.top, width: r.width, height: r.height };
     });
-    if (target) iconsHost!.insertBefore(el, target);
-    else iconsHost!.appendChild(el);
+    // 2.0.5 前用「左上角阈值」判断：第一个图标在 (0,0) 恒满足，
+    // 于是任何落点都插到第一位，用户拖到哪儿都排不出想要的顺序。
+    const hit = lastDrop ? pickGridDrop(rects, lastDrop) : null;
+    if (!hit) {
+      iconsHost!.appendChild(el);
+    } else {
+      const neighbour = others[hit.index];
+      if (hit.after) neighbour.after(el);
+      else neighbour.before(el);
+    }
     cfg.icons.order = iconEls().map((x) => iconId(x));
     save();
   };
@@ -1487,6 +1520,8 @@ export function initOs13(ctx: Os13Context) {
     radius?: "soft" | "round" | "sharp";
     accent?: string;
     accent2?: string;
+    /** 显式要求「跟随壁纸取色」；与 accent/accent2 互斥，二者都没给时保持原状态 */
+    accentAuto?: boolean;
     wall?: string;
     darken?: number;
     kenburns?: boolean;
@@ -1496,13 +1531,15 @@ export function initOs13(ctx: Os13Context) {
     if (look.mode) cfg.appearance.mode = look.mode;
     if (look.material) cfg.appearance.material = look.material;
     if (look.radius) cfg.appearance.radius = look.radius;
-    if (look.accent && /^#[0-9a-f]{6}$/i.test(look.accent)) cfg.appearance.accent = look.accent;
-    if (look.accent2 && /^#[0-9a-f]{6}$/i.test(look.accent2)) cfg.appearance.accent2 = look.accent2;
+    // 只有这次 look 真的谈到了强调色才动 autoAccent：
+    // 改材质 / 圆角 / 程序坞位置不应该顺手关掉「跟随壁纸取色」。
+    const accent = resolveLookAccent(look, cfg.appearance.autoAccent, wallpaperAccents(cfg.wall.id));
+    cfg.appearance.autoAccent = accent.autoAccent;
+    if (accent.accent) cfg.appearance.accent = accent.accent;
+    if (accent.accent2) cfg.appearance.accent2 = accent.accent2;
     if (typeof look.darken === "number") cfg.wall.darken = Math.max(0, Math.min(80, look.darken));
     if (typeof look.kenburns === "boolean") cfg.wall.kenburns = look.kenburns;
     if (look.dock) cfg.dock = { ...cfg.dock, ...look.dock };
-    // 主题自己带强调色，别再被壁纸主色覆盖
-    cfg.appearance.autoAccent = false;
     cfg.preset = look.preset ?? "custom";
     save();
     if (look.wall) setWallpaper(look.wall);
@@ -1828,16 +1865,18 @@ export function initOs13(ctx: Os13Context) {
     const filtered = list.filter((w) => cat === "all" || w.cat === cat);
     grid.innerHTML = filtered
       .map((w) => {
-        const active = cfg.wall.id === w.id;
-        const fav = cfg.wall.favorites.includes(w.id);
-        const thumb = "custom" in w ? objUrls.get(w.id) ?? "" : (w as Wallpaper).thumb;
-        return `<button class="wall-card ${active ? "is-active" : ""}" type="button" data-wall-id="${w.id}" title="${w.name}">
-          ${thumb ? `<img src="${safeUrl(thumb, { allowBlob: true })}" alt="${w.name}" loading="lazy" decoding="async" />` : `<span class="wc-void">自定义</span>`}
-          <span class="wc-name">${w.name}</span>
-          <span class="wc-fav ${fav ? "is-on" : ""}" data-fav="${w.id}" role="button" aria-label="收藏">★</span>
-          ${"custom" in w ? `<span class="wc-del" data-del="${w.id}" role="button" aria-label="删除">✕</span>` : ""}
-          ${active ? `<span class="wc-check">✓</span>` : ""}
-        </button>`;
+        const custom = "custom" in w;
+        // 自定义壁纸的名字来自社区作品标题，必须转义后才能拼 HTML
+        // （2.0.5 前直接拼进 title/alt/文本，标题里带 <svg/onload> 就能执行）。
+        return wallCardHtml(
+          {
+            id: w.id,
+            name: w.name,
+            thumb: custom ? objUrls.get(w.id) ?? "" : (w as Wallpaper).thumb,
+            custom,
+          },
+          { active: cfg.wall.id === w.id, favorite: cfg.wall.favorites.includes(w.id) },
+        );
       })
       .join("");
     grid.dataset.cat = cat;
@@ -2074,8 +2113,9 @@ export function initOs13(ctx: Os13Context) {
             } catch {
               /* 忽略 */
             }
-            void idbDel("__all__");
-            window.location.reload();
+            // 先清壁纸库再刷新：2.0.5 前删的是伪键 "__all__"，
+            // 自定义壁纸的 blob 会一直留在 IndexedDB 里（隐私残留 + 配额）。
+            void idbClearAll().then(() => window.location.reload());
           }
           break;
         default:

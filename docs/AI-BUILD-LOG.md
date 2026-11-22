@@ -634,3 +634,30 @@
    446,165 B；`qa:prod` 35/35；部署前备份 650,184 B；push `08db11d..afa7222` 后 Cloudflare
    自动构建 `0cccf9e8-…`（13:39:58Z）。CI 状态**未复核**（本机 `api.github.com` 连接超时）。
    剩余边界：trending「候选 ≥99 行」未用真实 E2E 造满；告警 webhook 仍需两个 URL。
+
+## 2026-11-22 · Round 33 · 2.0.6 Shell Proof（外壳取证，未部署）
+
+**做了什么**：把只读子智能体 `audit-shell` 找出的 5 条外壳缺陷全部修掉，并补纯函数单测与两条真实浏览器 E2E。
+
+- 壁纸标题存储型 XSS：新增 `src/lib/os13/wall-card.ts`（`escapeAttr`/`escapeHtml`/`safeUrl`），`renderWallGallery` 改用它。
+- 1.x 布局快照 `0×0`：新增 `src/lib/os20/legacy-layout.ts`，`migrations.ts` 改写真实 viewport。
+- 清空本机数据不删 IndexedDB：`idbClearAll()`（`clear()` + 等 `oncomplete`）后再刷新。
+- 网格拖拽恒插首位：新增 `src/lib/os13/icons-order.ts` 的 `pickGridDrop`（中心距离判定）。
+- 强调色「自动」无法恢复：新增 `src/lib/os13/look.ts` 的 `resolveLookAccent`；`os20/apply.ts` 传 `accentAuto`。
+
+**改动的文件**：新增 `src/lib/os13/{wall-card,icons-order,look}.ts`、`src/lib/os20/legacy-layout.ts`、
+`tests/unit/{os13-wallcard,icons-order,look-accent,legacy-layout,plugins-market}.test.ts`、
+`tests/e2e/shell-wallpaper-safety.spec.ts`、`docs/RELEASE-2.0.6.md`、`docs/PROMPT-2.0.6.md`；
+修改 `src/lib/os13.ts`、`src/lib/os20/{migrations,apply}.ts`、`playwright.config.ts`、
+`docs/operations/D1-BACKUP.md`、`docs/D1-BACKUP-RECOVERY.md`、版本号 9 处与断言族。
+
+**测试结果**：新增单测 19 passed（wall-card 5 / icons-order 6 / look-accent 5 / legacy-layout 3）+
+plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed / 7 passed，恢复（SHA256 校验）后全绿。
+`shell-wallpaper-safety` **2 passed（16.0s）**；E2E 负向对照回裸拼接 → 1 failed（注入的 `<img>` 被解析）。
+`npm run verify` **exit 0**：`[version] 一致：2.0.6`、31 文件 / 420 单测、html-security 294/0、build 30 页、CSP 12/31；
+全量 E2E **197 passed（4.8m）**（`shell-wallpaper-safety` 已并入 worker project）。
+
+**未完成**：生产部署（Blocked，等授权，生产仍 2.0.5）；布局/拖拽/强调色没有浏览器 E2E；
+`audit-worker` / `audit-os14` 未交付结论（一个 inactive、一个被停止且无收尾消息）。
+**下一项**：上市 2.0.6 → 告警 webhook（需两个 URL）→ 补三条交互 E2E → 重启两个审计子智能体。
+

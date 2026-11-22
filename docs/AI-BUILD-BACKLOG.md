@@ -218,3 +218,36 @@ Cloudflare 自动构建 `0cccf9e8-…`（13:39:58Z）。CI 状态因本机 GitHu
 - 共用 helper 不是洁癖：三份分块实现意味着三处可能各自退回单条语句。
 - 证据要分层写：能造真实 E2E 的造（深目录 120 层），造不动的（99+ 通知）就用强校验桩 + 负向对照，
   并在文档里明确「这是证据边界」。
+
+## 2026-11-22 · Round 27 · 2.0.6 外壳取证（Shell Proof，本地已验证，未部署）
+
+| 编号 | 缺陷 | 证据 |
+| --- | --- | --- |
+| F14 | 社区壁纸标题直接拼进设置页 `innerHTML`（`renderWallGallery`）：名字来自别人的作品标题，可注入 `<svg/onload>`；无哈希构建时 CSP 回退 `unsafe-inline`，构成存储型 XSS | 抽 `src/lib/os13/wall-card.ts`，`escapeAttr`（属性）+ `escapeHtml`（文本）+ `safeUrl`（预览协议）；`tests/unit/os13-wallcard.test.ts` 5 passed；`shell-wallpaper-safety` E2E 2 passed（16.0s）；负向对照回裸拼接 → 1 failed（`toHaveText` 收到 `"壁纸"`） |
+| F15 | 1.x 升级布局快照写 `viewport:{width:0,height:0}`：`isSnapshot()` 认它有效 → 跳过归一化 → 比例放大 1440 倍后被 `clampRect` 压到右下，原布局丢失 | `src/lib/os20/legacy-layout.ts` + `migrations.ts` 改写真实 `innerWidth/innerHeight`；`tests/unit/legacy-layout.test.ts` 3 passed（含 120/80 → 800/480 回归） |
+| F16 | 「清空本机数据」调用 `idbDel("__all__")`：按 key 删除的伪键，实际没删；且 `void` 没等事务完成就刷新，壁纸 blob 留在 IndexedDB | `idbClearAll()`（`objectStore.clear()` + 等 `oncomplete` + 关库）后再刷新；E2E 断言 IDB count 0、localStorage custom 为 `[]` |
+| F17 | 网格拖拽用「左上角阈值」找目标：第一个图标在 (0,0) 恒满足，`insertBefore` 永远插到最前，`icons.order` 存错顺序 | 抽 `src/lib/os13/icons-order.ts` 的 `pickGridDrop`（中心距离 + 水平/垂直阈值）；`tests/unit/icons-order.test.ts` 6 passed |
+| F18 | `applyLook()` 结尾无条件 `autoAccent = false`：选「自动」不恢复，改材质/圆角/程序坞位置也永久关闭壁纸取色 | 抽 `src/lib/os13/look.ts` 的 `resolveLookAccent`；`os20/apply.ts` 在 `accent==="auto"` 时传 `accentAuto`；`tests/unit/look-accent.test.ts` 5 passed |
+| F19 | 版本 9 处 + 断言族升 2.0.6 | `node scripts/check-version.mjs` → `[version] 一致：2.0.6`；`npm run verify` exit 0（`31 files / 420 tests`） |
+
+**证据分层**：F14 与 F16 有真实浏览器 E2E（一条注入、一条清空）；F15/F17/F18 是纯几何/状态判定，
+只有单测（真实指针几何与设置面板状态在 E2E 里造不划算，已写进 RELEASE §6 的证据边界）。
+2.0.6 负向对照：四模块改回旧实现 → 12 failed / 7 passed，恢复（逐文件 SHA256）后 19 passed。
+
+**门禁**：`npm run verify` exit 0（typecheck 0 error 383 文件、31 文件 / 420 单测、
+html-security 294 处 / 未审查 0、build 30 页、CSP 12 哈希 / 31 HTML）；体积不变
+（434.8/439.5 KB、184.7/195.3 KB）。
+
+**状态**：**Implemented / Verified（本地）**，生产未部署（Blocked，等上线授权）；
+生产仍是 2.0.5（Version `1aeae3dc…`）。
+
+**教训（新增）**
+
+- 子智能体「inactive」不等于交付：`audit-worker` 两次 inactive、`audit-os14-b` 被停止后没有收尾消息，
+  本轮 worker / os14 审计实际没有证据。派单后必须等到 closing message。
+- 临时脚本的默认动作必须是「拒绝执行」：误跑 `node .tmp-neg-os13.mjs` 二次打补丁，
+  造成重复 import 与 tsc 报错，修回来的时间比写脚本还长。
+- 安全修复的负向对照要拿到「旧行为真的发生了」的可读证据（注入的 `<img>` 被当标签解析），
+  不能只写「旧代码不安全」。
+- `check-html-security` 只认直接被 `safeUrl`/`escapeAttr`/`escapeHtml` 包住的插值；
+  三元表达式里再调用也算不出来，模板里直接包一层最省事。

@@ -55,7 +55,11 @@ export function applySettings(kernel: Kernel, ctx: Ctx, options: { silent?: bool
     if (appearance.radius !== radius) look.radius = radius;
 
     const accent = String(values["appearance.accent"] ?? "auto");
-    if (accent !== "auto" && appearance.accent !== accent) {
+    // 「跟随壁纸」必须显式告诉 os13：否则 os13 只能在收到固定色时关闭取色，
+    // 却没法把取色重新打开（2.0.5 前选回 auto 会静默失效）。
+    if (accent === "auto") {
+      if (appearance.autoAccent !== true) look.accentAuto = true;
+    } else if (appearance.accent !== accent) {
       look.accent = accent;
     }
 
