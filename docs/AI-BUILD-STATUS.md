@@ -6,7 +6,7 @@
 
 - **更新时间**：2026-11-22
 - **版本**：2.0.9（Range Proof，补丁版本；发布说明 `docs/RELEASE-2.0.9.md`）
-- **生产状态**：**2.0.8 仍在生产（2026-11-22 部署）**，Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`、health/header 2.0.8、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1615.sql`（648,923 B）；2.0.9 本地完成、**未部署（Blocked：等授权）**，回滚目标 2.0.8。
+- **生产状态**：**2.0.9 已部署（2026-11-22）**，Version `a034902b-562b-4122-85bf-e238cbbe23d6`、health/header 2.0.9、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1836.sql`（655,283 B）、无待应用迁移；回滚目标 2.0.8（`9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`）。
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -78,6 +78,7 @@
 | 2.0.9 全量 E2E | `npx playwright test` → **202 passed（5.2m）**，exit 0（2.0.8 的 199 + 本版 3 条） |
 | 2.0.9 环境事故与依赖 | wrangler 4.157 的 workerd 起不来（`miniflare-email-store` CreateDirectory 拒绝访问，`d1 execute/migrations apply/dev` 全失败）；升级 devDependency `wrangler@4.166.0` 后恢复，`files-range-head` + `os20-tab-restore` 合并 3 passed（17.9s） |
 | 2.0.9 体积 | 入口 JS **440.5 / 439.5 KB（100.2%，超 1.0 KB）**；首屏 CSS **184.7 / 195.3 KB（94.6%）**；超预算在 2.0.8 已发生（生产入口 450,998 B），记为技术债 |
+| 生产部署（2.0.9，2026-11-22） | `npm run cf:deploy` exit 0 → Version `a034902b-562b-4122-85bf-e238cbbe23d6`；`/api/health` 2.0.9、header 2.0.9、入口 `0cIOslbc.js`（451,061 B）含 2.0.9、`/sw.js` `guandao-2.0.9`；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261122-1836.sql`（655,283 B）；回滚目标 `9be8e25b-…`（2.0.8） |
 
 ### 4.1 上一版验证结果（2.0.8，归档）
 
@@ -147,10 +148,10 @@
 
 ## 5. 重大风险（未关闭）
 
-1. **生产已上 2.0.8（2026-11-22），2.0.9 本地完成未部署（Blocked：等授权）**，但 1.6 的两条告警 webhook 仍未配置
+1. **生产已上 2.0.9（2026-11-22）**，但 1.6 的两条告警 webhook 仍未配置
    （`BACKUP_ALERT_WEBHOOK`、`DATA_ALERT_WEBHOOK`）：备份/数据监控的
    **告警投递**没有在生产验证，只能依赖 `qa:prod` 与 `verify:d1-backup` 的主动检查。
-   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1615.sql`。
+   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1836.sql`。
 2. **审核链的页面级证据已在本地补齐（4 条用例），生产侧只有公开接口与只读冒烟**：
    服务端本就没有「审核超时」分支（`admin.js:52` 只接受四种操作），不是缺口，是契约如此；
    生产验证仍依赖 `qa:prod`，页面级审核链只在本地/CI 跑。
@@ -260,7 +261,7 @@
     - 生产侧的审核链仍只有 `qa:prod` 的公开接口与只读冒烟；
     - 真机 Safari/Firefox 未测。
 
-17. **已修（2.0.9，本地未部署）**：
+17. **已修（2.0.9，已部署 2026-11-22）**：
     - 文件 Range 越界被 R2 当整包：现在 worker 自己解析单区间，越界回 **416 + `Content-Range: bytes */总长`**，
       且不读 R2；HEAD 与 GET 共用元数据、body 为空。单测 9 passed、真实 E2E 1 passed、负向对照
       （越界回 206）成立。
@@ -282,10 +283,8 @@
 
 ## 6. 下一步（按优先级）
 
-1. **P0 · 2.0.9 发布（本地完成，Blocked：等授权）**：`npm run verify` exit 0（45 文件 / 507 单测）、
-   全量 E2E 202 passed（5.2m）；生产仍 2.0.8（Version `9be8e25b…`）。授权后：
-   `git fetch` → `migrations list --remote` → D1 备份 → `cf:deploy` → `/api/health` 2.0.9 →
-   `qa:prod` → 推送并复核 CI/自动构建。
+1. ~~**P0 · 2.0.9 发布**~~：**已完成（2026-11-22）**——Version `a034902b-…`、health/header 2.0.9、
+   `qa:prod` 35/35、备份 655,283 B；待补：push 后复核 CI 与 Cloudflare 自动构建。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
 3. **P2 · 补 2.0.6/2.0.7 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；

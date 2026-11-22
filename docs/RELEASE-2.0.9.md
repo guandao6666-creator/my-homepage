@@ -7,7 +7,7 @@
 | 日期 | 2026-11-22 |
 | 类型 | 补丁版（无数据库迁移、无公开响应字段变化） |
 | 上游 | 2.0.8 Trust Gate |
-| 状态 | 本地完成，**未部署（Blocked：等待上线授权）** |
+| 状态 | **Verified（本地 + 生产）**，已部署 Version `a034902b-562b-4122-85bf-e238cbbe23d6`（2026-11-22） |
 
 ## 1. 为什么有这个版本
 
@@ -222,15 +222,17 @@ path = miniflare-email-store
 - **无数据库迁移**：`wrangler d1 migrations list --remote` 应为 `No migrations to apply!`。
 - **wrangler devDependency 4.166.0**：只影响本地/CI 开发环境。
 
-## 5. 部署注意（未部署，等授权）
+## 5. 部署记录
 
-1. `git fetch` 确认 `origin/main...HEAD` 只领先、不落后。
-2. `npx wrangler d1 migrations list guandao-db --remote` → 应无待应用迁移。
-3. 先备份：`npx wrangler d1 export guandao-db --remote --output ..\.backups\guandao-db-prod-<时间>.sql`。
-4. `npm run cf:deploy`。
-5. 核对 `/api/health` 的 `version`、`x-guandao-version` 响应头、首页入口包含 `2.0.9`。
-6. `npm run qa:prod`（应 35/35）。
-7. 回滚目标：2.0.8 的 Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`。
+| 步骤 | 结果 |
+| --- | --- |
+| 1. 上游检查 | `git fetch` → `origin/main...HEAD` = `0 1`（只领先一个提交，无落后） |
+| 2. 迁移 | `npx wrangler d1 migrations list guandao-db --remote` → `✅ No migrations to apply!` |
+| 3. D1 备份 | `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1836.sql`（**655,283 B**） |
+| 4. 部署 | `npm run cf:deploy` exit 0 → 30 页（2.37s）、`Total Upload: 745.87 KiB / gzip: 164.35 KiB`、**Version `a034902b-562b-4122-85bf-e238cbbe23d6`** |
+| 5. 生产核对 | `/api/health` → `"version":"2.0.9"`、D1 connected、R2 available（put/get/head/delete 全 true）；`x-guandao-version: 2.0.9`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.0cIOslbc.js`（451,061 B）含 `2.0.9`；`/sw.js` → `guandao-2.0.9` |
+| 6. 生产 E2E | `npm run qa:prod` → **35/35 通过**，清理后 `{"users":0}`（既有清理 SQL 的 Cloudflare API 报错仍在 stderr，脚本 exit 0） |
+| 7. 回滚目标 | 2.0.8 Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d` |
 
 ## 6. 未修清单
 

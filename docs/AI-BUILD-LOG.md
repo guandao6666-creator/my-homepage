@@ -762,4 +762,8 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
 10. 体积：入口 440.5 / 439.5 KB（100.2%，2.0.8 起已超）、首屏 CSS 184.7 / 195.3 KB（94.6%），
     记为技术债，写进 STATUS 风险 18。
 11. 文档：`docs/RELEASE-2.0.9.md`、`docs/PROMPT-2.0.9.md`、STATUS、BACKLOG Round 37、本文件。
-12. **未部署（Blocked：等上线授权）**，生产仍 2.0.8；本地提交待建。
+12. **上线（2026-11-22 18:37）**：`git fetch` 后 `origin/main...HEAD = 0 1`；迁移 `No migrations to apply!`；
+    D1 备份 `guandao-db-prod-20261122-1836.sql`（655,283 B）；`npm run cf:deploy` exit 0 →
+    Version `a034902b-562b-4122-85bf-e238cbbe23d6`（30 页、`Total Upload: 745.87 KiB / gzip: 164.35 KiB`）；
+    health/header 2.0.9、入口 `0cIOslbc.js`（451,061 B）含 2.0.9、`/sw.js` `guandao-2.0.9`；`qa:prod` 35/35、清理 `users=0`。
+    回滚目标 2.0.8（`9be8e25b…`）。
