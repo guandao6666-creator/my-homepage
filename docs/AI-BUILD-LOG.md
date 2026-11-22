@@ -795,6 +795,6 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
    单跑 device 12 passed、改 90 秒清理后全量 203 passed。`systemcenter-number-keyboard` 首跑 60s 超时
    是因为没有等 fixtures（补 `waitForFixtures("accounts")` 与 120s 超时）。
 10. **体积**：入口 440.5 / 439.5 KB（100.2%）、首屏 CSS 184.7 / 195.3 KB（94.6%），未变；技术债保留。
-11. **状态**：本地提交（见 git log）；**未 push、未部署**，生产仍 2.0.9，等用户授权。
+11. **上线（2026-11-22 20:30）**：`cf:deploy` → Version `b207dbcb-09d9-4f30-943e-37a281d4de56`；health/header 2.0.10、`qa:prod` 35/35、备份 658,291 B；未 push（下一步推送并复核 CI）。
 12. **未修**：备份 merge 孤儿对象、插件安装上限并发、窗口双关、布局 cascade、sync `since` tiebreak；
     需迁移两条（计数幂等、社区上传配额预占）仍单独列清单。

@@ -6,7 +6,7 @@
 | 代号 | `Cleanup` |
 | 日期 | 2026-11-22 |
 | 类型 | 补丁版（上游 `2.0.9` Range Proof） |
-| 生产状态 | **未部署（Blocked，等授权）**；生产仍是 2.0.9 |
+| 生产状态 | **已部署生产（2026-11-22）**，Version `b207dbcb-09d9-4f30-943e-37a281d4de56`；health/header 2.0.10、`qa:prod` 35/35 |
 
 ## 1. 这一版修了什么
 
@@ -93,17 +93,17 @@ const commitNumberSetting = (range: HTMLInputElement) => {
 - 列表请求的理论延迟上限增加一次 R2 批量 delete + 一次 D1 delete；`pending_delete` 通常为空，正常路径只多一条 SELECT。
 - 不涉及数据库迁移；`status` 列的既有 CHECK 约束不变。
 
-## 5. 部署（待授权）
+## 5. 部署记录（2026-11-22）
 
-```powershell
-git fetch && git status --short          # 应为干净
-npx wrangler d1 migrations list guandao-db --remote   # 预期 No migrations to apply!
-npx wrangler d1 export guandao-db --remote --output .backups\guandao-db-prod-<ts>.sql
-npm run cf:deploy
-npm run qa:prod                           # 预期 35/35
-```
-
-回滚目标：2.0.9 生产 Version `a034902b-562b-4122-85bf-e238cbbe23d6`。
+| 步骤 | 结果 |
+| --- | --- |
+| 部署前检查 | `git fetch` 后 `origin/main...HEAD = 0 1`（无落后）；`npx wrangler d1 migrations list guandao-db --remote` → `✅ No migrations to apply!` |
+| D1 备份 | `C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-2029.sql`（**658,291 B**） |
+| 部署 | `npm run cf:deploy` exit 0 → 30 页、`Uploaded 32 of 32 assets`、`Total Upload: 746.85 KiB / gzip: 164.54 KiB`、Worker Startup 4 ms、**Current Version ID `b207dbcb-09d9-4f30-943e-37a281d4de56`**；绑定 BACKUP_WORKFLOW/DB/FILES/DB_BACKUPS/ASSETS 正常 |
+| 生产核对 | `/api/health` → `"version":"2.0.10"`、D1 connected、R2 available（put/get/head/delete 全 true）；header `x-guandao-version: 2.0.10`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.CnPgsDvL.js`（452,121 B，含 5 处 `2.0.10`）；`/sw.js` → `guandao-2.0.10` |
+| 生产 E2E | `npm run qa:prod` → **35/35 通过**，清理后 `{"users":0}`（既有 `event_type` CHECK 约束警告仍在 stderr，脚本 exit 0） |
+| 回滚 | 2.0.9 生产 Version `a034902b-562b-4122-85bf-e238cbbe23d6` |
+| push 后 | 每次 push 都会触发 CI 与 Cloudflare 自动构建；Version 以 `wrangler deployments list` 末尾与 `/api/health` 为准 |
 
 ## 6. 仍未修 / 边界
 
