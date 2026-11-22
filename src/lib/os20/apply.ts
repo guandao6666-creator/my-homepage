@@ -12,6 +12,7 @@
 import type { Kernel } from "../core/kernel";
 import type { Ctx } from "../os14/core";
 import { readPrefs, patchPrefs } from "../os14/prefs";
+import { normalizeNotificationVolume } from "./notify-volume";
 
 type Api13 = {
   cfg: () => Record<string, unknown>;
@@ -129,7 +130,8 @@ export function applySettings(kernel: Kernel, ctx: Ctx, options: { silent?: bool
   try {
     const prefs = readPrefs();
     const nextDnd = Boolean(values["notifications.dnd"]);
-    const nextVolume = Math.max(0, Math.min(100, Number(values["notifications.volume"]) || 45));
+    // 0 是合法的「静音」，不能用 `|| 45` 回落（2.0.8）。
+    const nextVolume = normalizeNotificationVolume(values["notifications.volume"]);
     if (prefs.dnd !== nextDnd || prefs.volume !== nextVolume) {
       patchPrefs({ dnd: nextDnd, volume: nextVolume });
       applied.push("notifications.dnd", "notifications.volume");

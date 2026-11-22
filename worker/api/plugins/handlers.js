@@ -491,6 +491,39 @@ async function pluginPackage({ env, session, viewer, url, id }) {
    安装 / 状态
    ============================================================ */
 
+/**
+ * 签名信任闸门：install / update / rollback 三条路径必须共用。
+ *
+ * 为什么抽成函数：2.0.8 之前只有「首次安装」查签名状态，update 与 rollback
+ * 只看 packageHash。开发者密钥被撤销、或某版本签名被判定 invalid 后，
+ * 用户仍能通过「更新」或「回退」把旧包装回来，撤销就形同虚设。
+ *
+ * 这里只读 database 状态，不写任何东西；失败时抛 ApiError（409），
+ * 错误码与 install 路径保持一致，前端已有的提示不需要改。
+ */
+export async function assertVersionTrusted(env, version, pluginRow) {
+  if (!version) throw new ApiError("VERSION_NOT_AVAILABLE", "该版本不可安装", 409);
+  if (version.signature_status === "invalid") {
+    throw new ApiError("SIGNATURE_INVALID", "该版本的发布者签名无效，已阻止安装", 409, {
+      signatureCode: "SIG_INVALID",
+    });
+  }
+  if (version.signature_key_id) {
+    const key = await getKeyRow(env, version.signature_key_id);
+    if (!key || key.user_id !== pluginRow?.developer_id) {
+      throw new ApiError("SIGNATURE_KEY_UNKNOWN", "该版本的签名密钥不可信，已阻止安装", 409, {
+        signatureCode: "SIG_KEY_UNKNOWN",
+      });
+    }
+    if (key.status !== "active") {
+      throw new ApiError("SIGNATURE_KEY_REVOKED", "该版本的签名密钥已撤销，请升级到新版本", 409, {
+        signatureCode: "SIG_KEY_REVOKED",
+      });
+    }
+  }
+  return version;
+}
+
 async function installPlugin(context) {
   const { request, env, session } = context;
   if (!session) throw new ApiError("UNAUTHENTICATED", "请先登录 Guandao Account 再安装插件", 401);
@@ -522,24 +555,7 @@ async function installPlugin(context) {
 
   // 签名门禁：invalid 直接拒绝；已撤销/不可信密钥签出的版本也必须拒绝，
   // 否则撤回密钥后旧包仍可被安装，「撤销」就只是装饰。
-  if (version.signature_status === "invalid") {
-    throw new ApiError("SIGNATURE_INVALID", "该版本的发布者签名无效，已阻止安装", 409, {
-      signatureCode: "SIG_INVALID",
-    });
-  }
-  if (version.signature_key_id) {
-    const key = await getKeyRow(env, version.signature_key_id);
-    if (!key || key.user_id !== row.developer_id) {
-      throw new ApiError("SIGNATURE_KEY_UNKNOWN", "该版本的签名密钥不可信，已阻止安装", 409, {
-        signatureCode: "SIG_KEY_UNKNOWN",
-      });
-    }
-    if (key.status !== "active") {
-      throw new ApiError("SIGNATURE_KEY_REVOKED", "该版本的签名密钥已撤销，请升级到新版本", 409, {
-        signatureCode: "SIG_KEY_REVOKED",
-      });
-    }
-  }
+  await assertVersionTrusted(env, version, row);
 
   const manifest = safeParse(version.manifest_json, null);
   if (!manifest) throw new ApiError("INVALID_MANIFEST", "插件清单损坏，不能安装", 409);
@@ -652,6 +668,9 @@ async function updateInstallation({ request, env, session, id }) {
     throw new ApiError("PACKAGE_INTEGRITY_ERROR", "插件包校验值与服务端记录不一致", 409);
   }
 
+  // 2.0.8：更新同样受签名信任约束——否则撤销密钥后还能把旧包装回来。
+  await assertVersionTrusted(env, version, row);
+
   const manifest = safeParse(version.manifest_json, null);
   const current = await env.DB.prepare("SELECT manifest_json FROM plugin_versions WHERE plugin_id = ? AND version = ?")
     .bind(id, install.version)
@@ -714,6 +733,11 @@ async function rollbackInstallation({ request, env, session, id }) {
   if (compareSemver(versionText, install.version) >= 0) {
     throw new ApiError("NOT_A_ROLLBACK", "回退版本必须低于当前版本", 409);
   }
+  // 2.0.8：被安全下架的插件不允许回退——否则 rollback 会绕过下架。
+  const row = await getPluginRow(env, id);
+  if (!row) throw new ApiError("NOT_FOUND", "插件不存在", 404);
+  if (row.status === "blocked") throw new ApiError("PLUGIN_BLOCKED", "该插件已被安全下架，不能回退", 409);
+  if (row.status !== "published") throw new ApiError("NOT_PUBLISHED", "插件当前不可回退", 409);
   const version = await env.DB.prepare(
     "SELECT * FROM plugin_versions WHERE plugin_id = ? AND version = ? AND status IN ('approved', 'superseded')",
   )
@@ -724,6 +748,8 @@ async function rollbackInstallation({ request, env, session, id }) {
   if (packageHash !== version.package_sha256) {
     throw new ApiError("PACKAGE_INTEGRITY_ERROR", "插件包校验值与服务端记录不一致", 409);
   }
+  // 2.0.8：历史版本也要过签名信任——密钥撤销后不能靠回退复活旧包。
+  await assertVersionTrusted(env, version, row);
   const manifest = safeParse(version.manifest_json, null);
   const declared = new Set(manifest?.permissions ?? []);
   const keep = (await permissionsFor(env, session.user.id, id)).filter((permission) => declared.has(permission));

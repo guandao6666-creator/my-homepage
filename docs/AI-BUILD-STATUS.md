@@ -5,8 +5,8 @@
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
 - **更新时间**：2026-11-22
-- **版本**：2.0.7（Review Integrity，补丁版本；发布说明 `docs/RELEASE-2.0.7.md`）
-- **生产状态**：**2.0.7 已部署（2026-11-22）**，Version `a7728641-876d-4351-8b4a-fcacc816ced1`；health/header 2.0.7、`qa:prod` 35/35、部署前备份 `guandao-db-prod-20261122-1412.sql`（639,545 B）、生产 D1 无待应用迁移。回滚目标 `835cb688-…`（2.0.6）。
+- **版本**：2.0.8（Trust Gate，补丁版本；发布说明 `docs/RELEASE-2.0.8.md`）
+- **生产状态**：**2.0.8 本地完成、未部署（Blocked，等上线授权）**；生产仍是 **2.0.7**（Version `a7728641-876d-4351-8b4a-fcacc816ced1`，health/header 2.0.7、`qa:prod` 35/35）。2.0.8 回滚目标同为 `a7728641-…`。
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -27,14 +27,14 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（383 文件） |
-| `npx vitest run` | **40 文件 / 460 单测通过**（2.0.7 新增审核策略 8 条、删除结算 3 条；2.0.6 新增外壳纯函数 19 条、第二轮审计 29 条；2.0.5 新增 D1 参数预算 7 条） |
+| `npx vitest run` | **45 文件 / 490 单测通过**（2.0.8 新增 5 个文件 30 条：插件信任 8、通知音量 4、引导补丁 7、更新中心 5、市场选中 6；2.0.7 审核策略 8 + 删除结算 3；2.0.6 外壳 19 + 第二轮 29；2.0.5 D1 预算 7） |
 | `npm run security:test` | 六组自检全过 |
-| `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 294 处全审查、0 未审查） |
+| `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 295 处全审查、0 未审查；2.0.8 市场详情重绘新增 1 处 sink，已复核并登记） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
 | 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；2.0.6 只改前端逻辑，体积不变 |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **198 passed（4.7m），exit 0**（含新增 `shell-wallpaper-safety` 2 条与 `community-restriction-guard` 1 条） |
-| 生产（2.0.5 现状） | Version `1aeae3dc-e6fa-4e37-b069-b4f042c0a3e1`；health/header 2.0.5；入口 `9IE3LdKR.js` 446,165 B；`qa:prod` **35/35**；自动构建 `0cccf9e8…` |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **199 passed（5.3m），exit 0**（2.0.7 的 198 条 + 本版新增 `market-search-detail` 1 条） |
+| 生产（当前 2.0.7） | Version `a7728641-876d-4351-8b4a-fcacc816ced1`；health/header 2.0.7；入口 `BCJOtq9k.js` 449,635 B；`qa:prod` **35/35**；自动构建 `c6fb44fe…` → `017daf47…` |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -106,6 +106,10 @@
 | 备份清理单测（`tests/unit/backup-cleanup.test.ts`） | **2 passed**：跨两页前缀全部删除；源码约束 `failBackup` 在状态更新后调用 `deleteBackupPrefix`；负向对照 → **1 failed** |
 | 同步 push 配额单测（`sync-store.test.ts` 新增 2 条） | **2 passed**：并发抢最后一个实体名额 → 1 applied / 1 quota 且计数停在上限；墓碑满后改墓碑 → quota 且原行不变。负向对照（还原 703ef74 版 store）→ **2 failed** |
 | 上传配额单测（`tests/unit/files-quota.test.ts`，真实 SQLite） | **3 passed**：占位后复核在限内返回用量；两个并发占位对 10 字节配额 → 507 且只删自己；配额按用户隔离。负向对照把复核改成 `if (false)` → **2 failed** |
+| 2.0.8 单测（新增 5 文件 30 条） | **30 passed**；`npx vitest run` 全量 **45 文件 / 490 passed（1.78s）** |
+| 2.0.8 负向对照 | 更新中心/市场改回旧行为 → **4 failed**（各 2 条源码约束）；恢复输出两行 SHA-256 `MATCH` 与 `RESTORE_OK`，复跑 **11 passed** |
+| 2.0.8 插件信任负向对照 | 删掉 update 路径的 `assertVersionTrusted` → **1 failed / 7 passed**（源码断言 3→2）；恢复后 8 passed |
+| 2.0.8 门禁 | `npm run verify` **exit 0**：版本 2.0.8、**45 文件 / 490 单测**、html-security **295 处 / 未审查 0**、build 30 页、CSP 12 哈希 / 31 HTML |
 | 全量门禁（2.0.5 复跑） | `npm run verify` **exit 0**：`[version] 一致：2.0.5`；typecheck 0 error；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全合计 294 处、未审查 0 |
 | 单测 / 体积 | **26 文件 / 399 通过**（2.0.5 复跑）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）**（体积未变，2.0.5 只改 Worker 端） |
 | 全量 E2E | **195 passed（4.7m），exit 0**（workers=1、retries=0；含新增 `d1-param-bounds` 2 条与教程页面级断言） |
@@ -124,7 +128,7 @@
 
 ## 5. 重大风险（未关闭）
 
-1. **生产已上 2.0.6（2026-11-22）**，但 1.6 的两条告警 webhook 仍未配置
+1. **生产已上 2.0.7（2026-11-22）**，但 1.6 的两条告警 webhook 仍未配置
    （`BACKUP_ALERT_WEBHOOK`、`DATA_ALERT_WEBHOOK`）：备份/数据监控的
    **告警投递**没有在生产验证，只能依赖 `qa:prod` 与 `verify:d1-backup` 的主动检查。
    最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1250.sql`。
@@ -207,7 +211,7 @@
       按 `view.kind` 分派、`createSlideshow`，单测 8）。
     - 证据边界：布局/拖拽/强调色与第二批的归一化/分页只有单测；审核员的「同级审核员」矩阵
       只在假 D1 单测里（真实夹具只有 creator 是 UUID）。
-14. **已修（2.0.7，本地未部署）**：2.0.6 记录的 8 条里，四条不需要迁移的已在 2.0.7 修掉：
+14. **已修（2.0.7，已部署 2026-11-22）**：2.0.6 记录的 8 条里，四条不需要迁移的已在 2.0.7 修掉：
     - 审核 `approve` 接受 `draft`：作者撤回的草稿可被审核员重新公开。已把状态策略抽成
       `review-policy.js`（approve 仅 `pending_review|rejected`、restore 仅 `hidden`、draft 明确
       拒绝并提示作者重新提交），UI 按状态给「通过/恢复」按钮；单测 8 passed、负向对照 1 failed。
@@ -218,7 +222,18 @@
       才消费，源码顺序断言锁住。
     - 审核队列的「draft 不能通过」已同步到 UI（draft 不渲染动作按钮）。
 
-15. **未修（2.0.7 记录）**：剩下两侧边界，都需要迁移或先定产品语义：
+15. **已修（2.0.8，本地未部署）**：第二轮审计里不需要迁移的 6 条：
+    - 插件 update/rollback 不过签名信任闸门（撤销密钥/invalid/别人的密钥/blocked 都能装回来）
+      → 抽 `assertVersionTrusted`，三条路径共用；单测 8 passed、负向对照 1 failed；
+    - 通知音量 0 被 `|| 45` 回落 → `normalizeNotificationVolume`（0 与 "0" 合法）；单测 4；
+    - 引导收尾无条件写 dock.autohide / system.mode → `buildOnboardingPatch` 只写 touched 字段；单测 7；
+    - 引导 Esc 不过滤输入框、finish 无 in-flight 守卫 → 忽略输入态 + finishing 守卫（同上 7 条）；
+    - 更新检查失败不清陈旧 server → `canApplyUpdate(phase, server, comparison)` + 两分支清空；单测 5；
+    - 市场搜索只重绘列表 → `resolveSelection` + 同时重绘详情栏；单测 6。
+    - 证据边界：这两条界面的失败态没有真实 Worker 用例（需要拦截网络/构造失败），判别靠纯函数与源码约束；
+      更新中心与市场的「点击后界面到哪」仍由既有 `os20.spec.ts` 覆盖正常路径。
+
+16. **未修（2.0.7 记录）**：剩下两侧边界，都需要迁移或先定产品语义：
     - `POST /posts/:id/view` 与 `GET /posts/:id/package?count=1` 无鉴权/无幂等，可重放刷计数；
     - 社区图片上传配额先查后写（`/files` 有 pending 预占行，社区没有）；
     - 生产侧的审核链仍只有 `qa:prod` 的公开接口与只读冒烟；
@@ -226,9 +241,9 @@
 
 ## 6. 下一步（按优先级）
 
-1. **P1 · 2.0.7 已完成本地验证，未部署**：`npm run verify` exit 0（40 文件 / 460 单测）、
-   全量 E2E 见 §4；部署需要授权（D1 备份 → `cf:deploy` → health/header 2.0.7 → `qa:prod`）。
-   生产当前仍是 2.0.6（Version `835cb688…`）。
+1. **P1 · 2.0.8 已完成本地验证，未部署（Blocked）**：`npm run verify` exit 0（45 文件 / 490 单测）、
+   全量 E2E 见 §4；部署需要授权（D1 备份 → `cf:deploy` → health/header 2.0.8 → `qa:prod`）。
+   生产当前仍是 2.0.7（Version `a7728641…`）。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
 3. **P2 · 补 2.0.6/2.0.7 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；

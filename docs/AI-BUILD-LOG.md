@@ -709,3 +709,32 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
 7. **门禁与版本**：`[version] 一致：2.0.7`；typecheck 0 error；html-security 294/0；build 30 页；
    CSP 12 哈希 / 31 HTML；全量 E2E **198 passed（4.7m）**；首次 197/1 是既有审核链用例仍点 `review-approve`，按 2.0.7 的 `review-restore` 契约改后复跑全绿。
 8. **上线（2026-11-22 14:13）**：用户授权后 `npm run cf:deploy` → Version `a7728641-876d-4351-8b4a-fcacc816ced1`；health/header 2.0.7、入口 `BCJOtq9k.js` 含 2.0.7、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1412.sql`（639,545 B）；回滚目标 `835cb688-…`（2.0.6）。
+
+## 2026-11-22 · Round 36 · 2.0.8 Trust Gate
+
+1. 起点：`git status` 干净、HEAD `fe51b05`、`check-version` 2.0.7；读 STATUS §5 与 RELEASE-2.0.7 §6 定范围。
+2. 派两个只读审计子智能体（一次最多两个）：`audit-worker-c`（worker/api/*，6 条）、`audit-os20-d`
+   （os20 + shell，9 条）。排除需要迁移的计数幂等/社区上传配额预占，以及已修项。
+3. 选 6 条不需要迁移的修：
+   - 插件 update/rollback 的签名信任闸门（`assertVersionTrusted`，install/update/rollback 共用）；
+   - 通知音量 0 不再被 `|| 45` 回落（`notify-volume.ts`）；
+   - 引导收尾只写用户点过的选项（`onboarding-patch.ts`：dock/mode touched 才写）；
+   - 引导 Esc 忽略输入框、finish 加 in-flight 守卫；
+   - 更新检查失败/离线清空陈旧 server（`update-state.ts` 的 `canApplyUpdate`）；
+   - 市场搜索后同时重绘详情栏（`market-selection.ts` + `.os20-mk-detail`）。
+4. 单测：新增 5 文件 30 条（插件信任 8、音量 4、引导 7、更新中心 5、市场选中 6），全量 **45 文件 / 490 passed**。
+5. 负向对照：`.tmp-neg-208.mjs patch` 改回旧行为 → **4 failed**；`restore` 两行 SHA-256 `MATCH` + `RESTORE_OK`，
+   复跑 11 passed。插件信任另做 `1 failed / 7 passed`。
+6. 门禁：`npm run verify` 第一次红在 `check:html-security`（新增 1 处 `outerHTML` 使 market.ts 计数
+   6→7 失配）；把 allowlist 的 market.ts 改为 7 并写 reason 后 **exit 0**（295 处 / 未审查 0、30 页、CSP 12/31）。
+   过程中 `Set-Content -Encoding utf8` 给 allowlist 写入了 BOM，JSON.parse 报错，改用
+   `[IO.File]::WriteAllText` + `UTF8Encoding($false)` 去掉 BOM。
+7. 版本 2.0.8「Trust Gate」：9 处同步 + 断言族（os20.spec 4 处、community-qa、plugins-qa、quality.yml），
+   package-lock 只改第 3/9 行；`check-version` → 2.0.8 一致。
+8. 文档：新建 `docs/RELEASE-2.0.8.md` 与 `docs/PROMPT-2.0.8.md`；STATUS 头部/§2/§4/§5 风险 15/§6、
+   BACKLOG Round 36、本 LOG 一条。
+9. 全量 E2E：先加 `tests/e2e/market-search-detail.spec.ts`（真实 Worker，1 passed 14.4s）——
+   两次失败都是启动时序（只等 `#boot` 抢跑、`openApp()` 早启动返回假值），改等 `GOS20_READY`、
+   以窗口出现为准后通过；负向对照删掉详情栏重绘并重建 dist → 1 failed，restore `MATCH`。
+   全量 `npx playwright test` → **199 passed（5.3m）**，exit 0。
+10. **未部署（Blocked）**：push 会触发 Cloudflare 自动构建=上线，需用户授权；生产仍是 2.0.7。

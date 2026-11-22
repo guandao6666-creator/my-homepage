@@ -335,7 +335,7 @@ async function runTests() {
 
   const metaGuest = await request("/api/community/meta");
   mustStatus("meta: 访客 200", metaGuest, 200);
-  must(dataOf(metaGuest)?.osVersion === "2.0.7", "meta: osVersion 2.0.7", JSON.stringify(dataOf(metaGuest)?.osVersion));
+  must(dataOf(metaGuest)?.osVersion === "2.0.8", "meta: osVersion 2.0.8", JSON.stringify(dataOf(metaGuest)?.osVersion));
   check("meta: 许可证与分类", Array.isArray(dataOf(metaGuest)?.licenses) && Array.isArray(dataOf(metaGuest)?.categories?.theme));
   const metaCreator = await request("/api/community/meta", { cookie: CREATOR_COOKIE });
   must(metaCreator.status === 200 && dataOf(metaCreator)?.viewer?.id === CREATOR.id, "meta: creator 身份");

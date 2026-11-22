@@ -321,3 +321,43 @@ CSP 12 哈希 / 31 HTML）；全量 E2E **198 passed（4.7m）**（首次 197/1�
 
 **未修（下一轮）**：`view` / `package?count=1` 计数幂等（需去重表/指纹列）、社区上传配额预占（需迁移）、
 生产写入型发布链 E2E、真机浏览器。
+
+## 2026-11-22 · Round 36 · 2.0.8 Trust Gate（校验前置 + 引导副作用）
+
+**范围**：第二轮只读审计（`audit-worker-c` 6 条、`audit-os20-d` 9 条）中**不需要迁移、不改公开响应字段**的 6 条。
+需要计数表/预占行的两条（社区 view/download 幂等、社区上传配额预占）明确不进本版。
+
+| # | 缺陷 | 修法 | 证据 |
+| --- | --- | --- | --- |
+| 1 | 插件 `update`/`rollback` 不过签名信任：撤销密钥、invalid 签名、别人的密钥、被 blocked 下架都能装回来 | 抽 `assertVersionTrusted(env, version, pluginRow)`，install/update/rollback 三条路径共用；rollback 额外要求插件 published | 单测 8 passed；负向对照删掉 update 调用 → 1 failed（源码断言 3→2） |
+| 2 | 通知音量 0 被 `Number(v) || 45` 回落成 45 | 新增 `notify-volume.ts`：0 与 "0" 合法，缺失/NaN/布尔才回落，钳 0–100 | 单测 4 passed |
+| 3 | 引导收尾无条件写 dock.autohide=false 与 system.mode，跳过引导会关掉自动隐藏、可能把 Cloud 切回 local | 新增 `onboarding-patch.ts`：只写 `desktop.iconLabels/clockSeconds`，dock/mode 仅在用户点过时写 | 单测 7 passed（四组 touched 组合 + 源码约束） |
+| 4 | 引导 Esc 不过滤输入框、`finish` 无 in-flight 守卫 | `isTypingTarget()` 忽略输入态；`finishing` 守卫防重复应用 | 同上 |
+| 5 | 更新检查失败不清 `state.server`，旧版本号让「应用更新」继续可点 | 新增 `update-state.ts` 的 `canApplyUpdate(phase, server, comparison)`；失败/离线两分支清空 server | 单测 5 passed；负向对照 2 failed |
+| 6 | 市场搜索只重绘列表，右侧仍画被过滤掉的旧详情 | 新增 `market-selection.ts` 的 `resolveSelection`；搜索后同时重绘 `.os20-mk-detail` | 单测 6 passed；负向对照 2 failed |
+
+**负向对照**：`.tmp-neg-208.mjs`（无参数 `REFUSED` exit 2；`restore` 打印两行 SHA-256 `MATCH` 与 `RESTORE_OK`）
+把两个文件改回旧行为后 **4 failed**，恢复后 **11 passed**。插件信任的负向对照单独做过（1 failed / 7 passed）。
+
+**门禁**：`npm run verify` **exit 0**（版本 2.0.8、**45 文件 / 490 单测**、html-security **295 处 / 未审查 0**、
+build 30 页、CSP 12 哈希 / 31 HTML）；全量 E2E 见 §4（2.0.8 未新增 E2E）。
+真实 Worker E2E：新增 `tests/e2e/market-search-detail.spec.ts` **1 passed（14.4s）**；
+删掉详情栏重绘块并重建 dist 后同一用例 **1 failed**（负向对照成立）。全量 E2E **199 passed（5.3m）**。
+`node scripts/check-version.mjs` → 2.0.8 一致。
+
+**状态**：**Implemented / Verified（本地）**，**未部署（Blocked，等上线授权）**；生产仍是 2.0.7（Version `a7728641…`）。
+
+**证据边界**：更新中心失败态与市场过滤后的详情没有真实 Worker 用例（需要拦截网络/构造失败），
+判别靠纯函数 + 源码约束；「点击后界面到哪」的正常路径仍由既有 `os20.spec.ts` 覆盖。
+
+**教训（新增）**
+
+- 版本号批量替换前先确认 `package-lock.json` 第 3/9 行才是根版本；第 5097 行是依赖版本。
+- 源码断言会被注释触发：注释里写 `autohide: false` 让「不得再传」的断言失败，措辞要避开代码片段。
+- 纯函数全绿 ≠ 接线正确：界面契约用「纯函数矩阵 + 源码约束」双层，必要时再加真实渲染。
+- 临时脚本默认动作必须拒绝；`restore` 必须校验 SHA-256，才能证明真的回到了旧内容。
+- 新模块的 HTML sink 会让 `check:html-security` 的 count 失配：新增 1 处 outerHTML 后要把 allowlist 的
+  market.ts 从 6 改为 7 并写 reason，否则 verify 红在最后一步。
+
+**未修（下一轮）**：文件 `pending_delete` 回收路径、插件 `/api/plugins/net` 流式截断、文件 Range/HEAD、
+窗口双重关闭/布局 cascade/bridge subtree、sync `since` 游标 tiebreak、插件安装上限并发、计数幂等与社区上传配额预占。

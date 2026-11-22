@@ -1,4 +1,4 @@
-// 6.2：本应用样式随 chunk 按需下载
+﻿// 6.2：本应用样式随 chunk 按需下载
 import cssUrl1 from "../../../styles/os20/updatecenter.css?url";
 import { ensureCss } from "../../ui/lazy-css";
 
@@ -27,6 +27,7 @@ import type { Kernel } from "../../core/kernel";
 import type { Sys } from "../../os14/system";
 import { OS_VERSION, RELEASE_NAME, RELEASE_NAME_ZH, BUILD_INFO, RELEASES } from "../../version";
 import { compareVersions } from "../../core/manifest";
+import { canApplyUpdate } from "./update-state";
 import { installedRecords } from "../../plugins/registry";
 import { idb } from "../../os14/core";
 
@@ -218,7 +219,7 @@ const view = () => {
         `${statusCard()}
          <div class="os20-inline">
            <button class="g14-btn is-primary" type="button" data-check ${state.busy ? "disabled" : ""}>${state.phase === "checking" ? "检查中…" : "检查更新"}</button>
-           <button class="g14-btn" type="button" data-apply ${server && comparison() === 1 ? "" : "disabled"}>重新加载并更新</button>
+           <button class="g14-btn" type="button" data-apply ${canApplyUpdate(state.phase, server, comparison()) ? "" : "disabled"}>重新加载并更新</button>
          </div>
          ${server ? `<p class="g14-hint">服务端 ${esc(server.version)}（${esc(server.releaseName)}）· ${esc(server.detail)} · ${esc(fmtDateTime(server.at))}</p>` : ""}`,
       ) +
@@ -299,6 +300,8 @@ export const initUpdateCenter = (win: HTMLElement, ctx: Ctx, _sys: Sys, kernel: 
         | null;
       if (!payload?.version) {
         state.phase = "failed";
+        // 2.0.8：失败时必须丢掉上一轮的 server，否则旧版本号会让「应用更新」按钮继续可点
+        state.server = null;
         state.error = `接口返回异常（HTTP ${response.status}），无法读取版本号`;
       } else {
         state.phase = "ready";
@@ -313,6 +316,8 @@ export const initUpdateCenter = (win: HTMLElement, ctx: Ctx, _sys: Sys, kernel: 
       }
     } catch (error) {
       state.phase = navigator.onLine === false ? "offline" : "failed";
+      // 同上：离线/失败都清空陈旧 server，避免「有更新 → 点了无效」的循环
+      state.server = null;
       state.error = error instanceof Error ? error.message : "网络请求失败";
     } finally {
       state.busy = false;
