@@ -773,3 +773,28 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
     用 `npm@10.9.4 install --package-lock-only` 重新生成锁并提交 `d0c256c`，`npm@10 ci --dry-run` 通过，
     本地 `npm run verify` 复跑 exit 0（49 文件 / 507 测试）；push 后 run **45014667370 success**。
     Cloudflare 自动构建 Version `470a5244-890d-489c-b685-e74f9ed1e71b`（10:54:49Z），health/header 仍 2.0.9。
+
+## 2026-11-22 · Round 38 · 2.0.10 Cleanup
+
+1. **起点**：`git status` 干净、`node scripts/check-version.mjs` → 2.0.9 一致；按 STATUS §6 P2 继续修不需要迁移的边界。
+2. **前提**：用户未要求发布新版本，但按既有节奏把本轮修复合入 2.0.10（Cleanup），生产暂不动。
+3. **`pending_delete` 回收**：`permanentDeleteHandler`/`permanentFolderHandler` 在 R2 删除失败时置
+   `status='pending_delete'`，但全仓无读取分支（`usage()` 只算 ready/trash/pending、回收站只查 trash）。
+   新增 `retryPendingDeletes`：列表时最多重试 20 行，R2 删成功后才按 40 个一块删行；失败保留、不阻塞列表。
+4. **数值滑杆键盘提交**：`systemcenter.ts` 原来只有 `pointerup` 写 settings；键盘调整只更新标签。
+   抽 `commitNumberSetting`，`change` 与 `pointerup` 共用，并按值去重。
+5. **测试**：`files-pending-delete` 4 passed（含 R2 失败保留、空行不碰 R2、列表接线源码断言）；
+   `systemcenter-number-keyboard` 真实 Worker E2E 1 passed（16.0s：方向键调音量 → 关窗 → 重开保留）。
+6. **负向对照**：删掉接线调用 → 单测 1 failed；改回 pointerup-only → E2E 1 failed（期望 40 实收 45）；
+   两个 restore 都输出 SHA-256 `MATCH` + `RESTORE_OK`，复跑全绿。
+7. **版本/文档**：2.0.10 九处同步（package-lock 只改根两行）；补回被批量替换吃掉的 2.0.8 RELEASES 条目；
+   RELEASE-2.0.10、PROMPT-2.0.10、STATUS、BACKLOG Round 38、LOG 本条目。
+8. **门禁**：`npm run verify` exit 0（50 文件 / 511 单测、html-security 295/0、build 30 页、CSP 12/31）；
+   全量 E2E 203 passed（4.7m）。
+9. **环境事故**：全量 E2E 首跑因 20 秒一次清 `rate_limits` 与 D1 抢锁，`device.spec.ts` 配对确认 500；
+   单跑 device 12 passed、改 90 秒清理后全量 203 passed。`systemcenter-number-keyboard` 首跑 60s 超时
+   是因为没有等 fixtures（补 `waitForFixtures("accounts")` 与 120s 超时）。
+10. **体积**：入口 440.5 / 439.5 KB（100.2%）、首屏 CSS 184.7 / 195.3 KB（94.6%），未变；技术债保留。
+11. **状态**：本地提交（见 git log）；**未 push、未部署**，生产仍 2.0.9，等用户授权。
+12. **未修**：备份 merge 孤儿对象、插件安装上限并发、窗口双关、布局 cascade、sync `since` tiebreak；
+    需迁移两条（计数幂等、社区上传配额预占）仍单独列清单。

@@ -407,3 +407,32 @@ health/header 2.0.9、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1836.sq
 - 环境阻塞要留证据链：`d1 execute`/`dev`/`migrations apply` 三种入口都失败、全权限重试仍失败、
   ACL 里 `CodexSandboxUsers` 只有读权限、手动建目录成功——这些一起指向 wrangler/workerd 版本而不是权限配置。
 - 临时脚本默认动作必须拒绝；`patch` 备份 + `restore` SHA-256 `MATCH` 才允许继续。
+
+## 2026-11-22 · Round 38 · 2.0.10 Cleanup
+
+| 缺陷 | 状态 | 证据位置 |
+| --- | --- | --- |
+| `pending_delete` 行无回收路径（R2 删除失败后行与对象永久泄漏，回收站/配额都看不见） | Fixed | `worker/api/files/handlers.js` 的 `retryPendingDeletes`（listHandler 调用）；`tests/unit/files-pending-delete.test.ts` 4 passed；负向对照删除接线 → 1 failed |
+| 数值滑杆只有 `pointerup` 落盘（键盘调整后关窗重开回旧值） | Fixed | `src/lib/os20/apps/systemcenter.ts` 的 `commitNumberSetting`；`tests/e2e/systemcenter-number-keyboard.spec.ts` 1 passed（16.0s）；负向对照 → 期望 40 实收 45 |
+
+**负向对照**：`.tmp-neg-210b.mjs` 删掉列表入口重试调用 → 单测 1 failed / 3 passed，`handlers: MATCH` + `RESTORE_OK`；
+`.tmp-neg-210.mjs` 把滑杆改回只有 pointerup → E2E 1 failed，`systemcenter: MATCH` + `RESTORE_OK`。
+
+**门禁**：`npm run verify` **exit 0**（`[version] 一致：2.0.10`、typecheck 0 error、**50 文件 / 511 单测**、
+html-security **295 处 / 未审查 0**、build 30 页、CSP 12 哈希 / 31 HTML）；全量 E2E **203 passed（4.7m）**，exit 0。
+
+**环境事故**：全量 E2E 首跑 1 failed（`device.spec.ts` 配对确认 500），单独复跑 device.spec.ts 12 passed、
+全量复跑 203 passed；诱因是 20 秒一次清 `rate_limits` 与 D1 抢锁 → 改为 90 秒一次。`systemcenter-number-keyboard`
+首跑 60s 超时，因为没等 fixtures 就启动；补 `waitForFixtures("accounts")` + `test.setTimeout(120_000)` 后 16.0s 通过。
+
+**体积**：入口 JS 440.5 / 439.5 KB（100.2%，未变）、首屏 CSS 184.7 / 195.3 KB（94.6%）。
+
+**状态**：`Implemented`（本地 / CI 证据完整）——**未部署（Blocked，等授权）**；生产仍是 2.0.9。
+
+**教训（新增）**
+
+- 状态机的「失败态」也要有回收路径：`pending_delete` 写了不读等于永久泄漏，写入方要顺手定义谁来读。
+- 控件的键盘路径是独立入口：range/select 要同时处理 `change` 与指针事件，并按值去重。
+- 本地清限流的频率本身会变成干扰源：D1 抢锁能造成真实 500，定时器别打太勤。
+- E2E 启动必须先等 fixtures，否则 e2e-server 还在造数据，60 秒不够。
+- 版本号批量替换会吞掉历史 RELEASES 条目（本次 2.0.8 条目被上轮替换吃掉），换完要逐条核对并补回。

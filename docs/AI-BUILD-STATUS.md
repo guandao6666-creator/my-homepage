@@ -5,8 +5,8 @@
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
 - **更新时间**：2026-11-22
-- **版本**：2.0.9（Range Proof，补丁版本；发布说明 `docs/RELEASE-2.0.9.md`）
-- **生产状态**：**2.0.9 已部署（2026-11-22）**，Version `a034902b-562b-4122-85bf-e238cbbe23d6`、health/header 2.0.9、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1836.sql`（655,283 B）、无待应用迁移；回滚目标 2.0.8（`9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`）。
+- **版本**：2.0.10（Cleanup，补丁版本；发布说明 `docs/RELEASE-2.0.10.md`）
+- **生产状态**：**2.0.9 已部署（2026-11-22）**，Version `a034902b-562b-4122-85bf-e238cbbe23d6`、health/header 2.0.9、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1836.sql`（655,283 B）、无待应用迁移；2.0.10 本地完成、**未部署（Blocked，等授权）**；回滚目标 2.0.8（`9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`）。
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -27,14 +27,14 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（414 文件，176 hints） |
-| `npx vitest run` | **45 文件 / 507 单测通过**（2.0.9 新增 4 个文件 17 条：文件 Range 9、插件流式截断 4、hidden 发布闸门 3、评论举报结算 1；2.0.8 新增 5 文件 30 条） |
+| `npx vitest run` | **50 文件 / 511 单测通过**（2.0.10 新增 1 文件 4 条：pending_delete 回收；2.0.9 新增 4 文件 17 条；2.0.8 新增 5 文件 30 条） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 295 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致 |
 | 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **440.5 KB / 439.5 KB（100.2%，超预算 1.0 KB）**；首屏 CSS **184.7 KB / 195.3 KB（94.6%）**；超预算来自 2.0.8 的功能增量，2.0.9 只 +0.1 KB |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **203 passed（4.7m），exit 0**（2.0.9 的 202 + `systemcenter-number-keyboard` 1；跑前清 `rate_limits`，运行中每 90 秒清一次，20 秒一次会与 D1 抢锁导致配对确认偶发 500） |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **202 passed（5.2m），exit 0**（2.0.8 的 199 + `files-range-head` 1 + `os20-tab-restore` 2） |
-| 生产（当前 2.0.8） | Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`；health/header 2.0.8；入口 `CZAyZYvn.js`（450,998 B，440.4 KB）；`qa:prod` **35/35**；自动构建 `ab595f66…` → `e09bb6bb…` |
+| 生产（当前 2.0.9） | Version `a034902b-562b-4122-85bf-e238cbbe23d6`；health/header 2.0.9；入口 `0cIOslbc.js`（451,061 B）；`qa:prod` **35/35**；自动构建 `470a5244…` → `705facb5…` |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -65,10 +65,16 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.9）
+## 4. 本轮验证结果（2.0.10）
 
 | 项 | 结果 |
 | --- | --- |
+| 2.0.10 全量门禁 | `npm run verify` **exit 0**：`[version] 一致：2.0.10`；typecheck 0 error；**50 文件 / 511 单测**（1.60s）；HTML 安全 **295 处 / 未审查 0**；build 30 页；CSP 12 哈希 / 31 HTML |
+| pending_delete 回收单测（`tests/unit/files-pending-delete.test.ts`） | **4 passed**：R2 成功后批量删 key + 按块删行且带 `status='pending_delete'`；R2 失败保留行（console.error）；空行不碰 R2；源码断言 `listHandler` 调用点 |
+| pending_delete 负向对照 | 删掉列表入口重试调用 → **1 failed / 3 passed**；`node .tmp-neg-210b.mjs restore` 输出 `handlers: MATCH` + `RESTORE_OK`，复跑 4 passed |
+| 滑杆键盘提交真实 Worker E2E（`tests/e2e/systemcenter-number-keyboard.spec.ts`） | **1 passed（16.0s）**：设置→个性化→方向键调音量→关窗→重开断言值保留 |
+| 滑杆键盘提交负向对照 | 改回只有 `pointerup` 落盘 → **1 failed**：`toHaveValue` 期望 `"40"` 实际 `"45"`；恢复 `MATCH` 后重建复跑 1 passed |
+| 2.0.10 全量 E2E | **203 passed（4.7m），exit 0**（2.0.9 的 202 + 本版 1 条）；首跑曾 1 failed（配对确认 500），复跑单文件 12 passed、全量 203 passed，判定为 20 秒一次清 `rate_limits` 与 D1 抢锁的环境抖动，之后改为 90 秒一次 |
 | 2.0.9 全量门禁 | `npm run verify` **exit 0**：`[version] 一致：2.0.9`；typecheck 0 error（414 文件，176 hints）；**45 文件 / 507 单测**（1.58s）；HTML 安全 **295 处 / 未审查 0**；build 30 页；CSP 12 哈希 / 31 HTML |
 | 2.0.9 文件 Range/HEAD 单测 | `tests/unit/files-range.test.ts` **9 passed**：越界判不可满足、416 不读 R2、HEAD body 为空、HEAD/GET 206 与 `content-range`、R2 忽略 Range 时不伪造 206 |
 | 2.0.9 插件流式截断单测 | `tests/unit/plugins-net-stream.test.ts` **4 passed**：300 KB 流只留 256 KiB + `truncated` + cancel、小响应不 cancel、无 body、源码不再整包读 |
@@ -282,17 +288,27 @@
     下一轮做 `os13` 之外的按需拆分（appcenter/workspaces app UI、widgetstore 画廊），或调整预算并在
     `docs/PERF-BASELINE.md` 写明理由。
 
+19. **已修（2.0.10，本地未部署）**：
+    - 删除失败的文件行 `pending_delete` 没有任何回收路径：行与 R2 对象永久泄漏、回收站看不见、配额也不统计。
+      已在 `files/handlers.js` 新增 `retryPendingDeletes`（每次列表最多重试 20 行，R2 删除成功才按块删行，
+      失败留给下次、不阻塞列表）；单测 4 passed、负向对照 1 failed（接线断言）。
+    - 系统设置的数值滑杆只有 `pointerup` 落盘，键盘（方向键/Home/End）调整后关窗重开回到旧值。
+      已抽 `commitNumberSetting` 同时接 `change` 与 `pointerup`，按值去重避免重复写；
+      真实 Worker E2E 1 passed（16.0s）、负向对照 1 failed（重开值 45 ≠ 改后的 40）。
+    - 证据边界：`pending_delete` 的回收只在用户打开云盘列表时发生，长期不访问的用户对象仍会留着；
+      真实 Worker E2E 无法造该状态（需要直接改 D1），判别靠假 D1/R2 单测。
+
 ## 6. 下一步（按优先级）
 
-1. ~~**P0 · 2.0.9 发布**~~：**已完成（2026-11-22）**——Version `a034902b-…`、health/header 2.0.9、
-   `qa:prod` 35/35、备份 655,283 B；待补：push 后复核 CI 与 Cloudflare 自动构建。
+1. **P0 · 2.0.10 发布（Blocked，等授权）**：本地已 `verify` exit 0、全量 E2E 203 passed、提交待做；
+   生产仍是 2.0.9（Version `a034902b-…`）。授权后 `cf:deploy` + `qa:prod` + push 复核 CI/自动构建。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
 3. **P2 · 补 2.0.6/2.0.7 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；
    审核员的同级审核员矩阵若要进真实栈，需要给夹具账号补 UUID（会牵动 e2e-server 的 USER_IDS）。
 4. **P2 · 处理未修的边界**（见 §5 风险 16）：计数幂等需要去重表或指纹列，社区上传预占需要迁移；
-   文件 `pending_delete` 回收、备份 merge 孤儿对象、插件安装上限并发可不需要迁移。
-5. **P2 · 体积技术债**（见 §5 风险 18）：入口包已超预算 1.0 KB，做按需拆分或明确调整预算。
+   备份 merge 孤儿对象、插件安装上限并发、窗口双关、布局 cascade、sync `since` tiebreak 可不需要迁移。
+5. **P2 · 体积技术债**（见 §5 风险 18）：入口包 440.5 / 439.5 KB（100.2%），做按需拆分或明确调整预算。
 6. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
 7. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
 

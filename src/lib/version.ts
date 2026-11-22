@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.9";
+export const OS_VERSION = "2.0.10";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -47,6 +47,15 @@ export const BUILD_INFO = {
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
   {
+    version: "2.0.10",
+    name: "Cleanup",
+    date: "2026-11-22",
+    notes: [
+      "删除失败的文件（pending_delete）会在云盘列表时自动重试清理：R2 删除成功才删行，失败留给下次，不再永久泄漏对象与行",
+      "系统设置的数值滑杆用键盘（方向键 / Home / End）调整后立即落盘：关窗重开不再回到旧值",
+    ],
+  },
+  {
     version: "2.0.9",
     name: "Range Proof",
     date: "2026-11-22",
@@ -58,6 +67,19 @@ export const RELEASES: Array<{ version: string; name: string; date: string; note
       "评论举报按目标批量结算：隐藏一条评论会同时关闭它全部 open/reviewing 举报，不再留下悬挂工单",
       "重开系统设置/市场时侧栏高亮跟随当前分类，不再出现「高亮在 A、内容是 B」",
       "wrangler 升级到 4.166.0：修复本机 workerd 启动时 `miniflare-email-store` 拒绝访问，本地 E2E 不再被环境卡住",
+    ],
+  },
+  {
+    version: "2.0.8",
+    name: "Trust Gate",
+    date: "2026-11-22",
+    notes: [
+      "插件更新与回退同样校验签名信任：撤销密钥、invalid 签名、非原开发者的密钥都不能再装/更新/回退",
+      "通知音量可以设成 0（静音）：设置面板显示 0、实际也按 0，不再被 `|| 45` 打回默认",
+      "引导收尾只写用户真正点过的选项：不再关掉程序坞自动隐藏、不把 Cloud 模式改成 local",
+      "设备命名框里按 Esc 不再跳过引导，连点也不会重复收尾",
+      "更新中心检查失败后清掉旧版本号：「应用更新」不会停留在可点却无效的状态",
+      "插件市场搜索过滤后详情栏随选中状态重绘，不会出现旧内容配空按钮",
     ],
   },
   {

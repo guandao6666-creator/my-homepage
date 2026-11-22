@@ -1,4 +1,4 @@
-﻿/** /api/files/* 业务处理。所有分支都要求有效 Session。 */
+/** /api/files/* 业务处理。所有分支都要求有效 Session。 */
 
 import { ApiError, ok } from "../http.js";
 import { assertSameOrigin, readJson } from "../guards.js";
@@ -216,6 +216,43 @@ export async function handleFilesRequest({ request, env, url, path }) {
 /* 列表                                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 回收 `pending_delete` 行（2.0.10）。
+ *
+ * R2 删除失败时 permanentDeleteHandler 会把行标成 pending_delete 再抛 502；修复前
+ * 这个状态没有任何读取或重试分支，行与对象会永久留在 R2 里（回收站看不见、
+ * quota 也不统计，用户无法自助清理）。这里在每次列云盘时顺手重试有限条数：
+ * R2 删除成功才删行，失败就保留给下一次，不阻塞列表请求。
+ */
+export async function retryPendingDeletes(env, userId, limit = 20) {
+  const rows = await env.DB.prepare(
+    "SELECT id, r2_key FROM files WHERE user_id = ? AND status = 'pending_delete' ORDER BY updated_at ASC LIMIT ?",
+  )
+    .bind(userId, limit)
+    .all();
+  const items = (rows.results || []).filter((row) => row?.id);
+  if (!items.length) return 0;
+
+  const keys = items.map((row) => row.r2_key).filter(Boolean);
+  try {
+    if (keys.length) await env.FILES.delete(keys);
+  } catch (error) {
+    console.error("[files] pending_delete retry failed:", error?.message ?? error);
+    return 0;
+  }
+
+  let removed = 0;
+  for (const chunk of chunkIds(items.map((row) => row.id))) {
+    await env.DB.prepare(
+      `DELETE FROM files WHERE user_id = ? AND status = 'pending_delete' AND id IN (${placeholdersFor(chunk)})`,
+    )
+      .bind(userId, ...chunk)
+      .run();
+    removed += chunk.length;
+  }
+  return removed;
+}
+
 async function listHandler(env, userId, url) {
   const view = url.searchParams.get("view") || "folder";
   const search = (url.searchParams.get("search") || "").trim().slice(0, 80);
@@ -223,6 +260,9 @@ async function listHandler(env, userId, url) {
   const dir = url.searchParams.get("dir") === "asc" ? "asc" : "desc";
   const limit = Number(url.searchParams.get("limit") || 60);
   const offset = Number(url.searchParams.get("offset") || 0);
+
+  // 顺手清理删除失败的行；失败不影响列表本身
+  await retryPendingDeletes(env, userId).catch(() => undefined);
 
   if (view === "trash") {
     const [rows, folders] = await Promise.all([trashFiles(env, userId), trashFolders(env, userId)]);
