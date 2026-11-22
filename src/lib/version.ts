@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.8";
+export const OS_VERSION = "2.0.9";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -47,17 +47,17 @@ export const BUILD_INFO = {
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
   {
-    version: "2.0.8",
-    name: "Trust Gate",
+    version: "2.0.9",
+    name: "Range Proof",
     date: "2026-11-22",
     notes: [
-      "插件更新与回退也要过签名信任闸门：撤销密钥、invalid 签名、别人的密钥、已下架插件都不能再装回来",
-      "通知音量 0 是合法静音：不再被 `|| 45` 回落成 45，设置显示与实际音量终于一致",
-      "引导收尾只写用户点过的选项：跳过引导不再关掉程序坞自动隐藏、也不再把运行模式改回本地",
-      "引导的 Esc 忽略输入框、收尾加 in-flight 守卫：命名时按 Esc 不会丢名字，连点也不会重复应用",
-      "更新检查失败/离线时清空陈旧 server：「应用更新」只在 ready 且服务端确实更新时可点",
-      "市场搜索过滤后同时重绘详情栏：不再留下看不见却仍可点击的旧详情",
-      "新增 5 个单测文件 30 条用例，两组负向对照（改回旧行为后 4 条断言失败，恢复后 SHA-256 MATCH）",
+      "文件读取按字节区间解析 Range：起点越过文件末尾统一回 416 与 `Content-Range: bytes */总长`，不再把整包当 206",
+      "文件的 content/download 支持 HEAD：只返回元数据、body 为空，探测大小不必先下载整包",
+      "插件 /net 代理边读边截断（256 KiB 上限）：超大响应不再整包进内存，超限后主动取消上游读取避免挂连接",
+      "被版主下架（hidden）的作品不能由作者重新发布：恢复只能走审核「恢复」，重发也不能抹掉审核记录",
+      "评论举报按目标批量结算：隐藏一条评论会同时关闭它全部 open/reviewing 举报，不再留下悬挂工单",
+      "重开系统设置/市场时侧栏高亮跟随当前分类，不再出现「高亮在 A、内容是 B」",
+      "wrangler 升级到 4.166.0：修复本机 workerd 启动时 `miniflare-email-store` 拒绝访问，本地 E2E 不再被环境卡住",
     ],
   },
   {

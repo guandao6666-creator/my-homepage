@@ -361,3 +361,48 @@ build 30 页、CSP 12 哈希 / 31 HTML）；全量 E2E 见 §4（2.0.8 未新增
 
 **未修（下一轮）**：文件 `pending_delete` 回收路径、插件 `/api/plugins/net` 流式截断、文件 Range/HEAD、
 窗口双重关闭/布局 cascade/bridge subtree、sync `since` 游标 tiebreak、插件安装上限并发、计数幂等与社区上传配额预占。
+
+## 2026-11-22 · Round 37 · 2.0.9 Range Proof（协议边界与审核一致性）
+
+**范围**：从 2.0.8 §6 与 STATUS §5 风险表里挑「不需要迁移、不改公开响应字段」的缺陷。复用第二轮两个审计员
+的线索，最终修五条，另有一条工程环境修复。
+
+**缺陷 → 处理**
+
+| # | 缺陷 | 处理 | 证据 |
+| --- | --- | --- | --- |
+| F1 | 文件 Range 越界被 R2 当整包回 206 | `parseByteRange` 自己解析单区间；越界回 416 + `Content-Range: bytes */总长`，不读 R2 | 单测 9 passed；真实 Worker E2E 1 passed；负向对照 416→206 |
+| F2 | content/download 不支持 HEAD | 路由接 HEAD，`contentHandler(..., headOnly)` 传 `null` body | 单测 HEAD 200 空 body / HEAD+Range 206 |
+| F3 | 插件 `/net` 整包读入再截断 | `readLimitedBody` 流式读取，256 KiB 上限后 `reader.cancel()` | 单测 4 passed；负向对照 3 条红 |
+| F4 | 作者重发 hidden 作品会抹掉 `moderation_note` | `assertAuthorPublishAllowed` → 409 `POST_HIDDEN`，恢复只能走版主 `restore` | 单测 3 passed；负向对照 2 failed |
+| F5 | 隐藏评论只结算一条举报 | `hide_comment` 的 batch 按 `target_type/target_id` 结算 `open/reviewing` | 单测 1 passed |
+| F6 | 重开设置/市场时侧栏高亮错位 | `shell`/`bindTabs` 传当前分类（`systemcenter` 的 `tab`、`market` 的 `state.kind`） | 真实 Worker E2E 2 passed（关窗重开断言高亮） |
+
+**工程环境**：wrangler 4.157 的 workerd 在本机启动时报
+`kj/filesystem-disk-win32.c++:773: failed: CreateDirectory: #5 拒绝访问; path = miniflare-email-store`，
+`d1 execute --local` / `d1 migrations apply --local` / `wrangler dev --local` 全部失败，e2e-server 连迁移都过不去。
+升级 devDependency `wrangler@4.166.0`（workerd 2026-11-19）后恢复；`files-range-head` + `os20-tab-restore`
+合并 **3 passed（17.9s）**。
+
+**门禁**：`npm run verify` **exit 0**（`[version] 一致：2.0.9`、typecheck 0 error 414 文件、**45 文件 / 507 单测**、
+html-security **295 处 / 未审查 0**、build 30 页、CSP 12 哈希 / 31 HTML）。
+全量 E2E **202 passed（5.2m）**，exit 0（2.0.8 的 199 + 本版 3 条）。
+`node scripts/check-version.mjs` → 2.0.9 一致。
+
+**体积**：入口 JS **440.5 / 439.5 KB（100.2%）**——超预算来自 2.0.8（生产入口 450,998 B），2.0.9 只 +0.1 KB；
+首屏 CSS 184.7 / 195.3 KB（94.6%）。记为技术债（STATUS §5 风险 18）。
+
+**状态**：`Verified（本地）`，**未部署（Blocked：等上线授权）**；生产仍 2.0.8（Version `9be8e25b…`）。
+本地提交 `fe51b05` 之后的新提交待建。
+
+**教训（新增）**
+
+- workerd 会改写响应头：流式 body 走 chunked（可能 gzip）并丢掉 `content-length`，断言要换成
+  `content-range`/`accept-ranges`/body 长度；诊断靠解压 trace.zip 看真实响应头。
+- R2 不把越界 Range 当错误：范围校验必须在 worker 里做完，不能把非法区间丢给存储层。
+- HEAD 必须显式空 body：`new Response(object.body)` 在 HEAD 下会出问题，`null` 才是对的做法。
+- 客户端 E2E 要 dist、Worker E2E 不需要：worker project 跑 wrangler dev 源码，改客户端必须 `astro build`
+  再跑，否则负向对照假通过。
+- 环境阻塞要留证据链：`d1 execute`/`dev`/`migrations apply` 三种入口都失败、全权限重试仍失败、
+  ACL 里 `CodexSandboxUsers` 只有读权限、手动建目录成功——这些一起指向 wrangler/workerd 版本而不是权限配置。
+- 临时脚本默认动作必须拒绝；`patch` 备份 + `restore` SHA-256 `MATCH` 才允许继续。

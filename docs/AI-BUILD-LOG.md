@@ -441,7 +441,7 @@
   （本次单独跑 plugin-publishing 时被 429 打断，次生 `version.checksum` 读空）。处置只能
   `node:sqlite` 直连本地 D1 `DELETE FROM rate_limits`（`wrangler d1 execute --local` 因
   `miniflare-email-store` 权限不可用）；全量跑期间用后台循环每 20 s 清一次计数器，188 passed。
-  `node .tmp-clear-rate.mjs "$db"` 必须带引号，否则 PowerShell 把 `(path)` 当命令。
+  `node scripts/clear-rate-limits.mjs "$db"` 必须带引号，否则 PowerShell 把 `(path)` 当命令。
 - 生产：当轮未部署（等授权）；同日得到「推送并部署」答复后上线，见 Round 28。
 
 ---
@@ -742,3 +742,24 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
     入口 `CZAyZYvn.js` 450,998 B 含 2.0.8 → `qa:prod` **35/35**、清理 `{"users":0}`。
 11. **推送复核（2026-11-22 16:15）**：push `fe51b05..58b1103` → quality run **45001712326 success**；
     Cloudflare 自动构建 `ab595f66-c58a-4075-9c44-eed86a14ff75`（08:13:16Z，100%）；health/header 仍 2.0.8。
+
+## 2026-11-22 · Round 37 · 2.0.9 Range Proof
+
+1. 起点：`git status` 干净、HEAD `9012f35`、`check-version` 2.0.8 一致；读 STATUS §5 与 RELEASE-2.0.8 §6，
+   选出不需要迁移的五条，派两个只读审计员（`audit-worker-d` 3 条、`audit-front-d` 3 条）交叉验证。
+2. F1/F2 文件协议：抽出 `parseByteRange`（单区间、后缀、越界）与 `contentHandler(..., headOnly)`；
+   越界不再读 R2，直接 416 + `Content-Range: bytes */总长`；路由补 HEAD，body 传 `null`。
+3. F3 插件网络代理：`readLimitedBody` 逐块读、到 256 KiB 停下并 `reader.cancel()`，替换整包 `arrayBuffer()`。
+4. F4 发布闸门：hidden 作品 409 `POST_HIDDEN`，恢复只走审核「恢复」；F5 评论举报按目标批量结算。
+5. F6 侧栏高亮：`shell`/`bindTabs` 传当前分类，重开窗口高亮与内容一致。
+6. 单测 17 条新增（files-range 9、plugins-net-stream 4、publish-hidden 3、comment-reports 1），
+   全量 **45 文件 / 507 passed（1.58s）**；两组负向对照都真改回旧行为（单测 3 failed、E2E 416→206；2 failed），
+   恢复后 SHA-256 MATCH。
+7. 真实 Worker E2E：`files-range-head` 1 passed（13.0s）；`os20-tab-restore` 2 passed；全量 **202 passed（5.2m）**。
+8. 环境事故：wrangler 4.157 的 workerd 起不来（`miniflare-email-store` CreateDirectory 拒绝访问），
+   `d1 execute`/`dev`/`migrations apply` 全失败；升级 `wrangler@4.166.0` 后恢复，E2E 3 passed（17.9s）。
+9. 版本 2.0.9（9 处 + 断言族），`check-version` 一致；标题名 `Range Proof`。
+10. 体积：入口 440.5 / 439.5 KB（100.2%，2.0.8 起已超）、首屏 CSS 184.7 / 195.3 KB（94.6%），
+    记为技术债，写进 STATUS 风险 18。
+11. 文档：`docs/RELEASE-2.0.9.md`、`docs/PROMPT-2.0.9.md`、STATUS、BACKLOG Round 37、本文件。
+12. **未部署（Blocked：等上线授权）**，生产仍 2.0.8；本地提交待建。

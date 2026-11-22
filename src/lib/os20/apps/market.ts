@@ -295,7 +295,8 @@ const installOverlay = () => {
 };
 
 export const renderMarket = () =>
-  shell("market", KINDS.map(([id, label, icon]) => [id, label, icon]), `<div data-mk-host></div>`, "市场");
+  // 2.0.9：state.kind 跨窗口保留，重开时侧栏高亮要与内容一致（同 systemcenter）。
+  shell("market", KINDS.map(([id, label, icon]) => [id, label, icon]), `<div data-mk-host></div>`, "市场", state.kind);
 
 export const initMarket = (win: HTMLElement, ctx: Ctx, sys: Sys): (() => void) => {
   ctxRef = ctx;
@@ -483,7 +484,7 @@ export const initMarket = (win: HTMLElement, ctx: Ctx, sys: Sys): (() => void) =
       state.selected = "";
       paint();
     }
-  });
+  }, state.kind);
 
   paint();
   return () => {

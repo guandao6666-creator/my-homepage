@@ -1,4 +1,4 @@
-/** /api/files/* 业务处理。所有分支都要求有效 Session。 */
+﻿/** /api/files/* 业务处理。所有分支都要求有效 Session。 */
 
 import { ApiError, ok } from "../http.js";
 import { assertSameOrigin, readJson } from "../guards.js";
@@ -191,11 +191,12 @@ export async function handleFilesRequest({ request, env, url, path }) {
     const file = await getFile(env, userId, id);
     if (!file) throw new ApiError("NOT_FOUND", "文件不存在", 404);
 
-    if (action === "content" && method === "GET") {
-      return contentHandler(env, request, file, false);
+    // HEAD 与 GET 共用元数据逻辑，但 body 必须为空（2.0.9）
+    if (action === "content" && (method === "GET" || method === "HEAD")) {
+      return contentHandler(env, request, file, false, method === "HEAD");
     }
-    if (action === "download" && method === "GET") {
-      return contentHandler(env, request, file, true);
+    if (action === "download" && (method === "GET" || method === "HEAD")) {
+      return contentHandler(env, request, file, true, method === "HEAD");
     }
     if (action === "restore" && method === "POST") {
       if (file.status !== "trash") throw new ApiError("NOT_TRASHED", "文件不在回收站", 409);
@@ -383,12 +384,43 @@ export async function assertReservedFileQuota(env, userId, id, limit) {
 /* 内容 / 下载                                                         */
 /* ------------------------------------------------------------------ */
 
-async function contentHandler(env, request, file, forceDownload) {
+/**
+ * 2.0.9：只解析单区间 Range，才判得了「起点越过文件末尾」。
+ *
+ * R2 的 `get(key, { range: headers })` 遇到不可满足的区间不会抛错，而是回整包 200，
+ * 客户端拿到 200 + 完整内容，会误以为续传成功。RFC 7233 要求 416 + `Content-Range: bytes *\/size`。
+ * 多区间/畸形头按 RFC 允许忽略（退回 200），不在这里拆包。
+ */
+export function parseByteRange(header, total) {
+  if (!header || !Number.isFinite(total) || total <= 0) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match) return null;
+  const [, rawStart, rawEnd] = match;
+  if (!rawStart && !rawEnd) return null;
+
+  let start;
+  let end;
+  if (!rawStart) {
+    const suffix = Number(rawEnd);
+    if (!Number.isFinite(suffix) || suffix <= 0) return null;
+    start = Math.max(0, total - suffix);
+    end = total - 1;
+  } else {
+    start = Number(rawStart);
+    end = rawEnd ? Number(rawEnd) : total - 1;
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (start >= total) return { unsatisfiable: true };
+  if (end < start) return null;
+  return { start, end: Math.min(end, total - 1) };
+}
+
+export async function contentHandler(env, request, file, forceDownload, headOnly = false) {
   if (file.status !== "ready") throw new ApiError("NOT_FOUND", "文件不存在", 404);
 
   const rangeHeader = request.headers.get("range");
-  const object = await env.FILES.get(file.r2_key, rangeHeader ? { range: request.headers } : undefined);
-  if (!object) throw new ApiError("NOT_FOUND", "文件内容不存在", 404);
+  const total = Number(file.size_bytes || 0);
+  const planned = parseByteRange(rangeHeader, total);
 
   const inline = !forceDownload && isInlineSafe(file.mime_type);
   const headers = new Headers({
@@ -398,11 +430,23 @@ async function contentHandler(env, request, file, forceDownload) {
     "x-content-type-options": "nosniff",
     "accept-ranges": "bytes",
   });
-  const etag = object.httpEtag || file.etag;
+  const etag = file.etag;
   if (etag) headers.set("etag", etag);
 
+  // 起点越界：不读 R2，直接 416，否则客户端会把整包 200 当成续传成功
+  if (planned && planned.unsatisfiable) {
+    headers.set("content-range", `bytes */${total}`);
+    headers.set("content-length", "0");
+    return new Response(null, { status: 416, headers });
+  }
+
+  const object = await env.FILES.get(file.r2_key, rangeHeader ? { range: request.headers } : undefined);
+  if (!object) throw new ApiError("NOT_FOUND", "文件内容不存在", 404);
+
+  if (object.httpEtag) headers.set("etag", object.httpEtag);
+
   let status = 200;
-  let length = Number(object.size || file.size_bytes);
+  let length = Number(object.size || total);
   if (rangeHeader && object.range) {
     status = 206;
     const offset = Number(object.range.offset || 0);
@@ -412,7 +456,8 @@ async function contentHandler(env, request, file, forceDownload) {
   }
   headers.set("content-length", String(length));
 
-  return new Response(object.body, { status, headers });
+  // HEAD 只回元数据：body 必须是 null，否则运行时会把整段内容也读出来
+  return new Response(headOnly ? null : object.body, { status, headers });
 }
 
 /* ------------------------------------------------------------------ */

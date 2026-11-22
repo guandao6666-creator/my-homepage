@@ -996,7 +996,8 @@ const view = () => {
 };
 
 export const renderSystemCenter = () =>
-  shell("systemcenter", TABS.map(([id, label, icon]) => [id, label, icon]), `<div data-sc-host></div>`, "系统设置");
+  // 2.0.9：tab 是模块级状态，重开窗口时侧栏高亮必须跟上，否则内容在「系统」、高亮却在「外观」。
+  shell("systemcenter", TABS.map(([id, label, icon]) => [id, label, icon]), `<div data-sc-host></div>`, "系统设置", tab);
 
 export const initSystemCenter = (win: HTMLElement, ctx: Ctx, sys: Sys, kernelArg?: Kernel): (() => void) => {
   const kernel = kernelArg ?? getOs20()?.kernel ?? null;
@@ -1290,7 +1291,7 @@ export const initSystemCenter = (win: HTMLElement, ctx: Ctx, sys: Sys, kernelArg
     tab = (TABS.some(([id]) => id === next) ? next : "appearance") as Tab;
     if (tab === "plugins") void refreshPlugins();
     paint();
-  });
+  }, tab);
 
   paint();
   void refreshPlugins();

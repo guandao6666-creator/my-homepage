@@ -193,7 +193,7 @@ async function main() {
   const health = await request("/api/health");
   check("Worker 与 D1 可用", health.status === 200 && health.json?.services?.d1 === "connected");
   const meta = await request("/api/plugins/meta", { cookie: ADMIN });
-  check("插件元信息可读", meta.status === 200 && meta.json?.data?.osVersion === "2.0.8");
+  check("插件元信息可读", meta.status === 200 && meta.json?.data?.osVersion === "2.0.9");
   check("权限目录完整（17 项）", meta.json?.data?.permissions?.length === 17, String(meta.json?.data?.permissions?.length));
   check(
     "管理员会话被识别",

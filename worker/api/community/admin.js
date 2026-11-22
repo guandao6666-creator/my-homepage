@@ -330,17 +330,20 @@ export async function adminReviewReport({ env, request, viewer, id }) {
     const comment = await env.DB.prepare("SELECT * FROM community_comments WHERE id = ?").bind(report.target_id).first();
     if (!comment) throw new ApiError("NOT_FOUND", "评论不存在", 404);
     targetUserId = comment.user_id;
-    await env.DB.prepare("UPDATE community_comments SET status = 'hidden', updated_at = ? WHERE id = ?")
-      .bind(now, comment.id)
-      .run();
-    await env.DB.prepare(
-      "UPDATE community_posts SET comment_count = (SELECT COUNT(*) FROM community_comments WHERE post_id = ? AND status = 'visible') WHERE id = ?",
-    )
-      .bind(comment.post_id, comment.post_id)
-      .run();
-    await env.DB.prepare(
-      "UPDATE community_reports SET status = 'resolved', resolution = ?, reviewer_id = ?, reviewed_at = ? WHERE id = ?",
-    ).bind(resolution || "评论已隐藏", viewer.id, now, id).run();
+    // 2.0.9：同一条评论可能被多个用户分别举报（UNIQUE 只约束 reporter+target）。
+    // 旧实现只按当前 report id 结算，其余 open 举报会永久挂在队列里，
+    // 版主重复处置、作者收到重复通知。这里与 hide_post 对称，按目标批量结算。
+    await env.DB.batch([
+      env.DB.prepare("UPDATE community_comments SET status = 'hidden', updated_at = ? WHERE id = ?").bind(now, comment.id),
+      env.DB.prepare(
+        "UPDATE community_posts SET comment_count = (SELECT COUNT(*) FROM community_comments WHERE post_id = ? AND status = 'visible') WHERE id = ?",
+      ).bind(comment.post_id, comment.post_id),
+      env.DB.prepare(
+        `UPDATE community_reports
+            SET status = 'resolved', resolution = ?, reviewer_id = ?, reviewed_at = ?
+          WHERE target_type = 'comment' AND target_id = ? AND status IN ('open', 'reviewing')`,
+      ).bind(resolution || "评论已隐藏", viewer.id, now, comment.id),
+    ]);
     await notify(env, {
       userId: comment.user_id,
       type: "moderation",

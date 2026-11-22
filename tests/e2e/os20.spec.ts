@@ -51,7 +51,7 @@ test.describe("Guandao OS 2.0 · 内核与引导", () => {
 
     const report = await page.evaluate(() => (window as any).GOS20.bootReport());
     expect(report).toBeTruthy();
-    expect(report.version).toBe("2.0.8");
+    expect(report.version).toBe("2.0.9");
     expect(report.stages).toHaveLength(11);
     // 每个阶段都有耗时；不允许出现「没有证据的 ok」，也不允许有阶段失败
     for (const stage of report.stages) {
@@ -165,7 +165,7 @@ test.describe("Guandao OS 2.0 · 系统设置", () => {
 
     // 切到「系统」页，确认展示的是真实版本与启动报告
     await win.locator('.g14-nav[data-tab="system"]').click();
-    await expect(win).toContainText("Guandao OS 2.0.8");
+    await expect(win).toContainText("Guandao OS 2.0.9");
     await expect(win.locator(".os20-stage")).not.toHaveCount(0);
 
     // 回到外观，改材质
@@ -229,13 +229,13 @@ test.describe("Guandao OS 2.0 · 市场与更新", () => {
     await page.evaluate(() => (window as any).GOS14.ctx.openApp("updatecenter"));
     const win = page.locator('.window[data-app="updatecenter"]');
     await expect(win).toBeVisible();
-    await expect(win).toContainText("Guandao OS 2.0.8");
+    await expect(win).toContainText("Guandao OS 2.0.9");
 
     // 没有 Worker 时不能显示「已是最新」，必须显示无法确认
     await expect(win.locator(".os20-update-state")).toContainText(/检查失败|离线|已是最新/, { timeout: 15_000 });
     if (await win.locator(".os20-update-state.is-ok").count()) {
       // 若确实有 Worker，则必须同时显示服务端版本号
-      await expect(win.locator(".os20-update-state")).toContainText("2.0.8");
+      await expect(win.locator(".os20-update-state")).toContainText("2.0.9");
     }
   });
 });

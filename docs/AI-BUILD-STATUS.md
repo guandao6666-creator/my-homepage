@@ -5,8 +5,8 @@
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
 - **更新时间**：2026-11-22
-- **版本**：2.0.8（Trust Gate，补丁版本；发布说明 `docs/RELEASE-2.0.8.md`）
-- **生产状态**：**2.0.8 已部署（2026-11-22）**，Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`、health/header 2.0.8、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1615.sql`（648,923 B）、无待应用迁移；回滚目标 2.0.7 `a7728641-…`。
+- **版本**：2.0.9（Range Proof，补丁版本；发布说明 `docs/RELEASE-2.0.9.md`）
+- **生产状态**：**2.0.8 仍在生产（2026-11-22 部署）**，Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`、health/header 2.0.8、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-1615.sql`（648,923 B）；2.0.9 本地完成、**未部署（Blocked：等授权）**，回滚目标 2.0.8。
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -26,15 +26,15 @@
 
 | 门禁 | 结果 |
 | --- | --- |
-| `npm run typecheck` | 0 error（383 文件） |
-| `npx vitest run` | **45 文件 / 490 单测通过**（2.0.8 新增 5 个文件 30 条：插件信任 8、通知音量 4、引导补丁 7、更新中心 5、市场选中 6；2.0.7 审核策略 8 + 删除结算 3；2.0.6 外壳 19 + 第二轮 29；2.0.5 D1 预算 7） |
+| `npm run typecheck` | 0 error（414 文件，176 hints） |
+| `npx vitest run` | **45 文件 / 507 单测通过**（2.0.9 新增 4 个文件 17 条：文件 Range 9、插件流式截断 4、hidden 发布闸门 3、评论举报结算 1；2.0.8 新增 5 文件 30 条） |
 | `npm run security:test` | 六组自检全过 |
-| `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 295 处全审查、0 未审查；2.0.8 市场详情重绘新增 1 处 sink，已复核并登记） |
-| `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致；HTML 安全 294 处全审查、0 未审查 |
-| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **434.8 KB / 439.5 KB**（98.9%）；首屏 CSS **184.7 KB / 195.3 KB**（94.6%）；2.0.6 只改前端逻辑，体积不变 |
+| `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 295 处全审查、0 未审查） |
+| `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致 |
+| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **440.5 KB / 439.5 KB（100.2%，超预算 1.0 KB）**；首屏 CSS **184.7 KB / 195.3 KB（94.6%）**；超预算来自 2.0.8 的功能增量，2.0.9 只 +0.1 KB |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **199 passed（5.3m），exit 0**（2.0.7 的 198 条 + 本版新增 `market-search-detail` 1 条） |
-| 生产（当前 2.0.7） | Version `a7728641-876d-4351-8b4a-fcacc816ced1`；health/header 2.0.7；入口 `BCJOtq9k.js` 449,635 B；`qa:prod` **35/35**；自动构建 `c6fb44fe…` → `017daf47…` |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **202 passed（5.2m），exit 0**（2.0.8 的 199 + `files-range-head` 1 + `os20-tab-restore` 2） |
+| 生产（当前 2.0.8） | Version `9be8e25b-eab0-43e6-bb0d-a0d8e3ca5d4d`；health/header 2.0.8；入口 `CZAyZYvn.js`（450,998 B，440.4 KB）；`qa:prod` **35/35**；自动构建 `ab595f66…` → `e09bb6bb…` |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -65,7 +65,21 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.8）
+## 4. 本轮验证结果（2.0.9）
+
+| 项 | 结果 |
+| --- | --- |
+| 2.0.9 全量门禁 | `npm run verify` **exit 0**：`[version] 一致：2.0.9`；typecheck 0 error（414 文件，176 hints）；**45 文件 / 507 单测**（1.58s）；HTML 安全 **295 处 / 未审查 0**；build 30 页；CSP 12 哈希 / 31 HTML |
+| 2.0.9 文件 Range/HEAD 单测 | `tests/unit/files-range.test.ts` **9 passed**：越界判不可满足、416 不读 R2、HEAD body 为空、HEAD/GET 206 与 `content-range`、R2 忽略 Range 时不伪造 206 |
+| 2.0.9 插件流式截断单测 | `tests/unit/plugins-net-stream.test.ts` **4 passed**：300 KB 流只留 256 KiB + `truncated` + cancel、小响应不 cancel、无 body、源码不再整包读 |
+| 2.0.9 审核链单测 | `tests/unit/community-publish-hidden.test.ts` **3 passed**（hidden 发布 409、其它状态放行、调用点在清单读取前）；`tests/unit/community-comment-reports.test.ts` **1 passed**（按 target 批量结算、含 `open/reviewing`） |
+| 2.0.9 真实 Worker E2E | `files-range-head` **1 passed（13.0s）**：GET 200 → `bytes=0-9` 206 + body → `bytes=1001-` **416** + `bytes */1000` → HEAD 200 空 body；`os20-tab-restore` **2 passed**：设置/市场关窗重开高亮跟随分类 |
+| 2.0.9 负向对照 | `.tmp-neg-209.mjs` 改回旧行为 → 单测 **3 failed / 10 passed**、E2E **1 failed**（416 收到 **206**）；恢复 SHA-256 `MATCH` 后 13 passed、E2E 1 passed（14.0s）。`.tmp-neg-209b.mjs` 删发布闸门 / 举报单条结算 → **2 failed / 2 passed**；恢复 `MATCH` 后 4 passed |
+| 2.0.9 全量 E2E | `npx playwright test` → **202 passed（5.2m）**，exit 0（2.0.8 的 199 + 本版 3 条） |
+| 2.0.9 环境事故与依赖 | wrangler 4.157 的 workerd 起不来（`miniflare-email-store` CreateDirectory 拒绝访问，`d1 execute/migrations apply/dev` 全失败）；升级 devDependency `wrangler@4.166.0` 后恢复，`files-range-head` + `os20-tab-restore` 合并 3 passed（17.9s） |
+| 2.0.9 体积 | 入口 JS **440.5 / 439.5 KB（100.2%，超 1.0 KB）**；首屏 CSS **184.7 / 195.3 KB（94.6%）**；超预算在 2.0.8 已发生（生产入口 450,998 B），记为技术债 |
+
+### 4.1 上一版验证结果（2.0.8，归档）
 
 | 项 | 结果 |
 | --- | --- |
@@ -133,10 +147,10 @@
 
 ## 5. 重大风险（未关闭）
 
-1. **生产已上 2.0.7（2026-11-22）**，但 1.6 的两条告警 webhook 仍未配置
+1. **生产已上 2.0.8（2026-11-22），2.0.9 本地完成未部署（Blocked：等授权）**，但 1.6 的两条告警 webhook 仍未配置
    （`BACKUP_ALERT_WEBHOOK`、`DATA_ALERT_WEBHOOK`）：备份/数据监控的
    **告警投递**没有在生产验证，只能依赖 `qa:prod` 与 `verify:d1-backup` 的主动检查。
-   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1250.sql`。
+   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1615.sql`。
 2. **审核链的页面级证据已在本地补齐（4 条用例），生产侧只有公开接口与只读冒烟**：
    服务端本就没有「审核超时」分支（`admin.js:52` 只接受四种操作），不是缺口，是契约如此；
    生产验证仍依赖 `qa:prod`，页面级审核链只在本地/CI 跑。
@@ -149,10 +163,12 @@
 6. 仓库中的 `src/**` 存在 CRLF/LF 抖动：构建/格式化后会显示为已修改，`git checkout` 即恢复，
    不要误提交。
 7. **本地 E2E 会被自己的限流卡住**：`plugin-upload` 规则 20 次/小时，e2e-server 造夹具
-   每轮就要上传约 20 个签名包，同一小时内连跑两三遍全量就会 `429 RATE_LIMITED`；
-   且 `wrangler d1 execute --local` 在本机因 `miniflare-email-store` 目录权限起不来，
-   只能用 Node 26 的 `node:sqlite` 直连 `.wrangler/state/v3/d1/**/*.sqlite` 清
-   `rate_limits`。连跑前先清计数器，否则报错会被误读成产品回归。
+   每轮就要上传约 20 个签名包，同一小时内连跑两三遍全量就会 `429 RATE_LIMITED`。
+   连跑前先用 Node 26 的 `node:sqlite` 直连 `.wrangler/state/v3/d1/**/*.sqlite` 清
+   `rate_limits`（脚本 `scripts/clear-rate-limits.mjs` 默认拒绝执行，需显式 `run <sqlite>`）。
+   `wrangler d1 execute --local` 在 wrangler 4.157 会因 `miniflare-email-store` 目录权限起不来，
+   **2.0.9 已把 devDependency 升到 `wrangler@4.166.0` 修好**，现在 `d1 execute/migrations apply/dev`
+   都能本地启动。
 8. **已关闭（2.0.2）**：
    - 原风险 4「页面级插件安装未并入 Playwright」——`plugin-publishing.spec.ts:375-431`
      一直在跑真实桌面安装链路，2.0.2 实跑复核（全量 188 passed），结论作废。
@@ -244,17 +260,39 @@
     - 生产侧的审核链仍只有 `qa:prod` 的公开接口与只读冒烟；
     - 真机 Safari/Firefox 未测。
 
+17. **已修（2.0.9，本地未部署）**：
+    - 文件 Range 越界被 R2 当整包：现在 worker 自己解析单区间，越界回 **416 + `Content-Range: bytes */总长`**，
+      且不读 R2；HEAD 与 GET 共用元数据、body 为空。单测 9 passed、真实 E2E 1 passed、负向对照
+      （越界回 206）成立。
+    - 插件 `/api/plugins/net` 先 `arrayBuffer()` 整包读入再截断：改为 `readLimitedBody` 逐块读、
+      到 256 KiB 停并 `reader.cancel()`。单测 4 passed、负向对照 3 条单测红。
+    - 作者可重新发布 hidden 作品并抹掉 `moderation_note`：`publishPost` 现在先过
+      `assertAuthorPublishAllowed`（409 `POST_HIDDEN`），恢复只能走版主「恢复」。单测 3 passed、负向对照 2 failed。
+    - 隐藏评论只结算一条举报：改为按 `target_type/target_id` 批量结算 `open/reviewing`，
+      与 `hide_post` 一致。单测 1 passed。
+    - 重开系统设置/市场时侧栏高亮错位：`shell`/`bindTabs` 传当前分类；真实 Worker E2E 2 passed。
+    - 工程侧：`wrangler` 升到 `4.166.0`，修复本地 workerd 启动 `miniflare-email-store` 拒绝访问。
+    - 证据边界：F4/F5/F6 的失败态没有在生产复现（本地真实 Worker + 假 D1 覆盖），审核链的生产写入型
+      E2E 仍未做。
+
+18. **入口包超预算（2.0.9 记录）**：入口 JS **440.5 KB / 439.5 KB（100.2%）**，2.0.8 生产入口
+    450,998 B 即已超；2.0.9 只 +0.1 KB。首屏 CSS 仍在预算内（184.7 / 195.3 KB）。记为技术债：
+    下一轮做 `os13` 之外的按需拆分（appcenter/workspaces app UI、widgetstore 画廊），或调整预算并在
+    `docs/PERF-BASELINE.md` 写明理由。
+
 ## 6. 下一步（按优先级）
 
-1. **P1 · 2.0.8 已上线（2026-11-22）**：Version `9be8e25b…`、health/header 2.0.8、`qa:prod` 35/35；
-   `npm run verify` exit 0（45 文件 / 490 单测）、全量 E2E 199 passed（5.3m）。推送后需复核 CI 与自动构建。
+1. **P0 · 2.0.9 发布（本地完成，Blocked：等授权）**：`npm run verify` exit 0（45 文件 / 507 单测）、
+   全量 E2E 202 passed（5.2m）；生产仍 2.0.8（Version `9be8e25b…`）。授权后：
+   `git fetch` → `migrations list --remote` → D1 备份 → `cf:deploy` → `/api/health` 2.0.9 →
+   `qa:prod` → 推送并复核 CI/自动构建。
 2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
 3. **P2 · 补 2.0.6/2.0.7 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；
    审核员的同级审核员矩阵若要进真实栈，需要给夹具账号补 UUID（会牵动 e2e-server 的 USER_IDS）。
-4. **P2 · 处理未修的边界**（见 §5 风险 15）：计数幂等需要去重表或指纹列，社区上传预占需要迁移。
-5. **P2 · 补 2.0.5 的剩余证据**：trending 的「候选 ≥99 行」分支用 SQL seed 100 个插件行再做真实
-   Worker 断言（不要走上传接口，会被限流）。
+4. **P2 · 处理未修的边界**（见 §5 风险 16）：计数幂等需要去重表或指纹列，社区上传预占需要迁移；
+   文件 `pending_delete` 回收、备份 merge 孤儿对象、插件安装上限并发可不需要迁移。
+5. **P2 · 体积技术债**（见 §5 风险 18）：入口包已超预算 1.0 KB，做按需拆分或明确调整预算。
 6. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
 7. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
 

@@ -1343,9 +1343,7 @@ async function handleNetworkProxy({ request, env, session }) {
     if (response.status >= 300 && response.status < 400) {
       throw new ApiError("REDIRECT_BLOCKED", "外部服务返回了跳转，已阻止跟随", 502);
     }
-    const buffer = await response.arrayBuffer();
-    const truncated = buffer.byteLength > 256 * 1024;
-    const bytes = truncated ? buffer.slice(0, 256 * 1024) : buffer;
+    const { bytes, truncated } = await readLimitedBody(response, 256 * 1024);
     const text = new TextDecoder().decode(bytes);
     await audit(env, {
       actorId: session.user.id,
@@ -1366,6 +1364,50 @@ async function handleNetworkProxy({ request, env, session }) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * 2.0.9：按块读，读到上限就取消，别把整包读进内存。
+ *
+ * 旧实现 `await response.arrayBuffer()` 会先把外部响应全部读进 isolate——
+ * 插件只要指一个返回 100 MB 的地址，就能把内存打满（Worker 128 MB 上限）。
+ */
+export async function readLimitedBody(response, limit = 256 * 1024) {
+  const reader = response.body?.getReader();
+  if (!reader) return { bytes: new Uint8Array(), truncated: false };
+
+  const chunks = [];
+  let total = 0;
+  let truncated = false;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value || value.byteLength === 0) continue;
+      const remaining = limit - total;
+      if (value.byteLength > remaining) {
+        if (remaining > 0) {
+          chunks.push(value.subarray(0, remaining));
+          total += remaining;
+        }
+        truncated = true;
+        break;
+      }
+      chunks.push(value);
+      total += value.byteLength;
+    }
+  } finally {
+    // 提前停不能只 break：不取消会把上游连接挂到超时
+    if (truncated) await reader.cancel().catch(() => undefined);
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { bytes, truncated };
 }
 
 function matchesHost(host, list) {

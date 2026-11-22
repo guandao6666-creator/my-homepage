@@ -819,11 +819,24 @@ export async function deletePost({ env, viewer, id }) {
   return ok({ deleted: true });
 }
 
+/**
+ * 2.0.9：被版主下架的作品，作者不能自己重新发布。旧实现只挡 published，
+ * hidden 会继续走到发布 UPDATE：把状态改回 published（或被要求审核时改回待审核），
+ * 同时 moderation_note 被清空——等于作者一键撤掉下架决定，还抹掉了下架原因。
+ * 恢复只能由版主在审核中心执行 restore（见 review-policy 的状态矩阵）。
+ */
+export function assertAuthorPublishAllowed(status) {
+  if (status === "hidden") {
+    throw new ApiError("POST_HIDDEN", "作品已被版主下架，不能自行重新发布；如有异议请联系审核", 409);
+  }
+}
+
 export async function publishPost({ env, request, viewer, id }) {
   const settings = await assertPublishingAllowed(env, viewer.id);
   const { row, isOwner } = await loadPost(env, id, viewer);
   if (!isOwner) throw new ApiError("FORBIDDEN", "只能发布自己的作品", 403);
   if (row.status === "published") return ok({ post: (await loadPost(env, id, viewer)).post, message: "作品已经发布" });
+  assertAuthorPublishAllowed(row.status);
   const body = await readJson(request, 320 * 1024);
 
   let manifest = null;
