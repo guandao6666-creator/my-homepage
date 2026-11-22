@@ -345,7 +345,9 @@ build: 30 page(s)
 4. `npm run cf:deploy` → 30 页、`Total Upload: 740.93 KiB / gzip: 162.82 KiB`、**Version `835cb688-5ea2-4572-8d48-05d19947f03d`**；
 5. `/api/health` → `"version":"2.0.6"`，响应头 `x-guandao-version: 2.0.6`，首页 200（27,812 B），入口 bundle 内容含 `2.0.6`；
 6. `npm run qa:prod` → 35/35（清理后 `users=0`，既有 `event_type` CHECK 警告不影响结果）；
-7. `git push` 触发 Cloudflare 自动构建与 GitHub Actions。
+7. `git push`（`a95ce4e..d3f1ca5`）→ GitHub Actions quality run **44987397901 success**；Cloudflare
+   自动构建 Version `ff33065b-d7aa-4aa2-b899-a735648dd900`（05:00:16Z），`/api/health` 仍 2.0.6。
+   注意：每次 push 都会触发一次自动构建，Version ID 会变，以 `wrangler deployments list` 末尾为准。
 
 回滚：Cloudflare 控制台把 Version 回退到 `1aeae3dc-…`（2.0.5）。
 

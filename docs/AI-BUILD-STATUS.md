@@ -102,7 +102,7 @@
 | 全量门禁（2.0.5 复跑） | `npm run verify` **exit 0**：`[version] 一致：2.0.5`；typecheck 0 error；build 30 页；CSP 12 哈希 / 31 HTML；HTML 安全合计 294 处、未审查 0 |
 | 单测 / 体积 | **26 文件 / 399 通过**（2.0.5 复跑）；入口 JS **434.8 / 439.5 KB（98.9%）**；首屏 CSS **184.7 / 195.3 KB（94.6%）**（体积未变，2.0.5 只改 Worker 端） |
 | 全量 E2E | **195 passed（4.7m），exit 0**（workers=1、retries=0；含新增 `d1-param-bounds` 2 条与教程页面级断言） |
-| 生产状态 | **2.0.6 已部署**：Version `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6；`qa:prod` 35/35；部署前备份 `guandao-db-prod-20261122-1250.sql`；入口 bundle 含 `2.0.6`；回滚目标 `1aeae3dc-…`（2.0.5） |
+| 生产状态 | **2.0.6 已部署**：Version `835cb688-5ea2-4572-8d48-05d19947f03d`；health/header 2.0.6；`qa:prod` 35/35；部署前备份 `guandao-db-prod-20261122-1250.sql`；入口 bundle 含 `2.0.6`；CI run 44987397901 success；推送后自动构建 `ff33065b-…`（05:00:16Z）；回滚目标 `1aeae3dc-…`（2.0.5） |
 | 生产状态（上一版 2.0.5，归档） | Version `1aeae3dc-…`；health/header 2.0.5；推送后自动构建 `0cccf9e8-…`（13:39:58Z） |
 | 生产状态（上一版 2.0.4，归档） | Version `78e78621…`；health 2.0.4；`npm run perf:prod` 冷启动 #1 TTFB 211 / FCP 476 / LCP 792 / CLS 0.003 / DCL 664 / Load 764 ms（25 资源 481 KB） |
 
