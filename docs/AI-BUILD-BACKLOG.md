@@ -460,7 +460,7 @@ html-security **295 处 / 未审查 0**、build 30 页、CSP 12 哈希 / 31 HTML
 **体积**：入口 JS **442.9 / 439.5 KB（100.8%）**（+2.4 KB 来自 settleCascade/notifyClosedOnce 进入入口包，技术债）；
 首屏 CSS 184.7 / 195.3 KB（94.6%）。
 
-**状态**：`Verified（本地）`，**未部署（Blocked：等授权）**；生产仍 2.0.10（Version `b207dbcb-…`），回滚目标同前。
+**状态**：`Verified（本地 + 生产）`，**已部署（2026-11-23）**：Version `c6444ff6-5fd6-439b-b2c7-6296e2a9aa1f`、health/header 2.0.11、`qa:prod` 35/35、备份 `guandao-db-prod-20261123-1415.sql`（668,753 B）；回滚目标 2.0.10（`b207dbcb-…`）。
 
 **教训（新增）**
 

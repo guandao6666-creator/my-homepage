@@ -818,5 +818,5 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
    固定 10 轮 dismissOverlays 后全量 **205 passed（5.3m）**，exit 0。
 9. **体积**：入口 JS 442.9 / 439.5 KB（100.8%）、首屏 CSS 184.7 / 195.3 KB（94.6%）；入口 +2.4 KB 来自
    settleCascade/notifyClosedOnce，记为技术债。
-10. **状态**：`Verified（本地）`，未部署（Blocked：等授权）；生产仍 2.0.10。
+10. **上线（2026-11-23 14:12）**：`cf:deploy` → Version `c6444ff6-5fd6-439b-b2c7-6296e2a9aa1f`；health/header 2.0.11、`qa:prod` 35/35、备份 668,753 B；回滚目标 2.0.10（`b207dbcb-…`）。
 11. **未修**：多区间 Range（判不改，RFC 允许忽略）、两条需迁移项（计数幂等、社区上传配额预占）。

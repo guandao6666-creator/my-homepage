@@ -6,7 +6,7 @@
 | 版本名 | Loose Ends |
 | 日期 | 2026-11-23 |
 | 分支 | `dsh-da37e99c-1ac8`（本工作树） |
-| 状态 | 本地完成、门禁全绿、**未部署（Blocked：等授权上线）** |
+| 状态 | **已部署（Verified：本地 + 生产）**，Version `c6444ff6-5fd6-439b-b2c7-6296e2a9aa1f` |
 | 生产现状 | 2.0.10（Version `b207dbcb-09d9-4f30-943e-37a281d4de56`） |
 
 ## 1. 为什么做这一版
@@ -166,17 +166,18 @@ restore `MATCH` + `RESTORE_OK`。
      `error=DUPLICATE_CONTENT`（原来根本不建行）。
 - **不加迁移**：两条需迁移项仍挂起（见 §6）。
 
-## 5. 部署步骤（Blocked：等授权）
+## 5. 部署记录（2026-11-23 14:12）
 
-1. `git status` 干净、HEAD 是本版提交；`node scripts/check-version.mjs` → 2.0.11。
-2. `npx wrangler d1 migrations list guandao-db --remote` —— 预期 `No migrations to apply!`。
-3. `npx wrangler d1 export guandao-db --remote --output <备份路径>`。
-4. `npm run cf:deploy`，记下 Version ID。
-5. 核对 `/api/health` 的 `version`、`x-guandao-version`、首页、入口包含 `2.0.11`、`/sw.js`。
-6. `npm run qa:prod` 应 35/35。
-7. push 到 `main` 会触发 Cloudflare 自动构建（等于再上线一次），用
-   `curl.exe --resolve api.github.com:443:140.82.113.6` 复核 GitHub Actions。
-8. 回滚目标：2.0.10 的 Version `b207dbcb-09d9-4f30-943e-37a281d4de56`。
+| 步骤 | 结果 |
+| --- | --- |
+| 推送前检查 | `git fetch` 后 `origin/main...HEAD` = `0 1`（无落后）；`node scripts/check-version.mjs` → 2.0.11 |
+| 数据库迁移 | `npx wrangler d1 migrations list guandao-db --remote` → `✅ No migrations to apply!`（本版不加迁移） |
+| D1 备份 | `npx wrangler d1 export guandao-db --remote --output ...\guandao-db-prod-20261123-1415.sql` → **668,753 B** |
+| 部署 | `npm run cf:deploy` exit 0 → 30 页、`Uploaded my-homepage`、`Total Upload: 755.29 KiB / gzip: 167.31 KiB`、Worker Startup 5 ms、**Version `c6444ff6-5fd6-439b-b2c7-6296e2a9aa1f`** |
+| 生产核对 | `/api/health` → `"version":"2.0.11"`、D1 connected、R2 available（put/get/head/delete 全 true）；header `x-guandao-version: 2.0.11`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.C3KRcFM4.js`（453,522 B，含 `2.0.11`）；`/sw.js` → `guandao-2.0.11` |
+| 生产端到端 | `npm run qa:prod` → **35/35 通过**、清理 `{"users":0}`（既有 `event_type` CHECK 警告仍在，exit 0） |
+| 回滚目标 | 2.0.10：Version `b207dbcb-09d9-4f30-943e-37a281d4de56` |
+| 推送后 | push 会触发 Cloudflare 自动构建（再生成一个 Version），CI 用 `curl.exe --resolve api.github.com:443:140.82.113.6` 复核 |
 
 ## 6. 未修 / 边界
 
