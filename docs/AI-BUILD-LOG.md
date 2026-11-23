@@ -798,3 +798,25 @@ plugins-market 2 passed；负向对照把四模块改回旧实现 → 12 failed 
 11. **上线（2026-11-22 20:30）**：`cf:deploy` → Version `b207dbcb-09d9-4f30-943e-37a281d4de56`；health/header 2.0.10、`qa:prod` 35/35、备份 658,291 B；push `f335c9b..eb0825a` → CI run 45023083005 success、自动构建 `423253b9-…`（12:36:35Z）。
 12. **未修**：备份 merge 孤儿对象、插件安装上限并发、窗口双关、布局 cascade、sync `since` tiebreak；
     需迁移两条（计数幂等、社区上传配额预占）仍单独列清单。
+
+## 2026-11-23 · Round 39 · 2.0.11 Loose Ends
+
+1. **起点**：用户 m07872「修复未修复的」。`git status` 干净、HEAD `f2c189a`、`check-version` 2.0.10。
+2. **F1 备份 merge 恢复去重**：`worker/api/backups/restore-copy.js`（`classifyRestoreFiles`/`loadReadySha256`/
+   `copyRestoreObject`/`runRestoreCopy`）；命中哈希的文件只登记 `copied`+`DUPLICATE_CONTENT`，不读不写 R2；
+   `plan.skippedIds` 传给元数据阶段，兼容 2.0.10 之前建的任务。单测 8 passed、负向对照 1 failed（restore MATCH）。
+3. **F2 插件安装名额**：`worker/api/plugins/install-slot.js` 的条件 INSERT + 重装 UPDATE；`installPlugin` 只多一次调用。
+   单测 5 passed（真实 SQLite 0001+0010）、负向对照 4 failed（restore MATCH）。
+4. **F3/F4 窗口与布局**：`notifyClosedOnce` 与 `settleCascade`；单测 7 passed、负向对照 2 failed。
+5. **F5 同步游标**：`worker/api/sync/cursor.js` + `listChangesPage` 元组比较 + pull 的 `cursor`/`nextCursor`；
+   单测 6 passed、E2E 2 passed（19.1s）；E2E 负向对照让 Worker 忽略 cursor → 1 failed（重复+漏一条），restore MATCH。
+6. **版本/文档**：2.0.11 九处（package-lock 只改 3/9 行，`git diff` 确认 2 行）；`version.ts` 手工插
+   `2.0.11 / Loose Ends / 2026-11-23`（未用批量替换，避免吞旧条目）；RELEASE-2.0.11、PROMPT-2.0.11、
+   STATUS、BACKLOG Round 39、LOG 本条目。
+7. **门禁**：`npm run verify` exit 0（54 文件 / 537 单测、html-security 295/0、build 30 页、CSP 12/31）。
+8. **全量 E2E**：首跑 204/1 failed（`systemcenter-number-keyboard` 点击被晚挂载引导层拦截）→ spec 的清理升级为
+   固定 10 轮 dismissOverlays 后全量 **205 passed（5.3m）**，exit 0。
+9. **体积**：入口 JS 442.9 / 439.5 KB（100.8%）、首屏 CSS 184.7 / 195.3 KB（94.6%）；入口 +2.4 KB 来自
+   settleCascade/notifyClosedOnce，记为技术债。
+10. **状态**：`Verified（本地）`，未部署（Blocked：等授权）；生产仍 2.0.10。
+11. **未修**：多区间 Range（判不改，RFC 允许忽略）、两条需迁移项（计数幂等、社区上传配额预占）。

@@ -12,6 +12,7 @@
  */
 
 import { ApiError, ok } from "../http.js";
+import { MAX_INSTALLED, reserveInstallSlot } from "./install-slot.js";
 import { sha256Hex, randomToken } from "../auth/crypto.js";
 import {
   assertSameOrigin,
@@ -74,7 +75,6 @@ import {
 } from "./store.js";
 
 const PREFIX = "/api/plugins";
-const MAX_INSTALLED = 40;
 const DAY_MS = 86_400_000;
 
 export async function handlePluginsRequest({ request, env, url, path }) {
@@ -583,21 +583,11 @@ async function installPlugin(context) {
     throw new ApiError("DEPENDENCY_MISSING", `缺少依赖插件：${missing.join("、")}`, 409);
   }
 
+  // 2.0.11：安装上限必须在同一条写语句里判断。原来的「先 COUNT 再 INSERT」是
+  // check-then-insert —— 两个并发新装都能通过 40 的上限检查，实际装到 41 个。
+  // 条件 INSERT 与重装回退都收在 install-slot.js 里，便于用真实 SQLite 证明。
   const now = Date.now();
-  await env.DB.prepare(
-    `INSERT INTO plugin_installations
-       (id, user_id, plugin_id, version, enabled, status, package_sha256, source, installed_at, updated_at)
-     VALUES (?, ?, ?, ?, 1, 'installed', ?, 'market', ?, ?)
-     ON CONFLICT (user_id, plugin_id) DO UPDATE SET
-       version = excluded.version,
-       enabled = 1,
-       status = 'installed',
-       package_sha256 = excluded.package_sha256,
-       installed_at = excluded.installed_at,
-       updated_at = excluded.updated_at`,
-  )
-    .bind(`pins-${randomToken(10)}`, session.user.id, pluginId, versionText, packageHash, now, now)
-    .run();
+  await reserveInstallSlot(env, { userId: session.user.id, pluginId, versionText, packageHash, now });
 
   const effective = await setPermissions(env, session.user.id, pluginId, granted, "install");
   await recomputePluginCounters(env, pluginId);

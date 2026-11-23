@@ -9,28 +9,37 @@ import { waitForFixtures } from "./support/worker-api";
  * 关窗重开就恢复旧值 —— 用户以为改过了，实际没保存。
  */
 
+/**
+ * 引导层与欢迎文章窗都可能「晚一步」挂载（全量套件时机器更慢）。
+ * 这里反复清理而不是只清一次：一次清理赶在挂载之前，后续点击就会被模态吃掉
+ * （2.0.11 全量 E2E 里设置侧栏点击曾因此超时 120s）。
+ */
+async function dismissOverlays(page: Page) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    let acted = false;
+    const skip = page.locator("[data-onb-skip]");
+    if (await skip.count()) {
+      await skip.first().click({ timeout: 1_500 }).catch(() => undefined);
+      acted = true;
+    }
+    const welcome = page.locator('.window[data-app="posts"] .dot-close');
+    if (await welcome.count()) {
+      await welcome.first().click({ timeout: 1_500 }).catch(() => undefined);
+      acted = true;
+    }
+    if (!acted) await page.waitForTimeout(200);
+    await page.waitForTimeout(150);
+  }
+}
+
 async function bootDesktop(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => Boolean((window as unknown as { GOS20_READY?: boolean }).GOS20_READY), null, {
     timeout: 30_000,
   });
   await expect(page.locator("#os")).toBeVisible();
-
-  // 引导层可能晚挂载，按「看到就关、直到消失」循环，否则后续点击会被模态吃掉
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    if (!(await page.locator(".os20-onb").count())) break;
-    const skip = page.locator("[data-onb-skip]");
-    if (await skip.count()) await skip.first().click().catch(() => undefined);
-    await page.waitForTimeout(250);
-  }
+  await dismissOverlays(page);
   await expect(page.locator(".os20-onb")).toHaveCount(0);
-
-  // 欢迎文章窗会盖住桌面图标与设置窗口
-  const welcome = page.locator('.window[data-app="posts"] .dot-close');
-  if (await welcome.count()) {
-    await welcome.first().click().catch(() => undefined);
-    await expect(page.locator('.window[data-app="posts"]')).toHaveCount(0);
-  }
 }
 
 async function openSettings(page: Page) {
@@ -53,7 +62,9 @@ test.describe("系统设置 · 数值滑杆键盘提交", () => {
   await bootDesktop(page);
   let win = await openSettings(page);
 
-  await win.locator('.g14-nav[data-tab="personal"]').click();
+  // 打开设置之后引导层也可能刚挂上，再清一遍，避免侧栏点击被吃掉
+  await dismissOverlays(page);
+  await win.locator('.g14-nav[data-tab="personal"]').click({ timeout: 20_000 });
   const slider = win.locator('input[data-set-number="notifications.volume"]');
   await expect(slider).toBeVisible();
 
@@ -74,7 +85,9 @@ test.describe("系统设置 · 数值滑杆键盘提交", () => {
   await expect(page.locator('.window[data-app="systemcenter"]')).toHaveCount(0);
 
   win = await openSettings(page);
-  await win.locator('.g14-nav[data-tab="personal"]').click();
+  // 打开设置之后引导层也可能刚挂上，再清一遍，避免侧栏点击被吃掉
+  await dismissOverlays(page);
+  await win.locator('.g14-nav[data-tab="personal"]').click({ timeout: 20_000 });
   const reopened = win.locator('input[data-set-number="notifications.volume"]');
   await expect(reopened).toBeVisible();
   await expect(reopened).toHaveValue(changed);

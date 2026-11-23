@@ -33,9 +33,11 @@ import {
   estimateQuotaDelta,
   listByIds,
   listChanges,
+  listChangesPage,
   listIndex,
   userQuotaStats,
 } from "./store.js";
+import { parseSyncCursor } from "./cursor.js";
 
 const PREFIX = "/api/sync";
 const MAX_BATCH = 100;
@@ -79,17 +81,22 @@ export async function handleSyncRequest({ request, env, url, path }) {
       const ids = idsParam.split(",").map((id) => id.trim()).filter(Boolean);
       if (ids.length > 200) throw new ApiError("TOO_MANY_IDS", "一次最多拉取 200 条", 400);
       const changes = await listByIds(env, userId, domain, ids);
-      return ok({ domain, serverTime: Date.now(), changes, hasMore: false });
+      return ok({ domain, serverTime: Date.now(), changes, hasMore: false, nextCursor: null });
     }
 
     const since = Number(url.searchParams.get("since")) || 0;
     const limit = Number(url.searchParams.get("limit")) || 300;
-    const changes = await listChanges(env, userId, domain, { since, limit });
+    const cursorText = url.searchParams.get("cursor");
+    const cursor = cursorText == null || cursorText === "" ? null : parseSyncCursor(cursorText);
+    if (cursorText && !cursor) throw new ApiError("INVALID_CURSOR", "同步游标格式不正确，请使用上次响应里的 nextCursor", 400);
+    const page = await listChangesPage(env, userId, domain, { since, limit }, cursor);
     return ok({
       domain,
       serverTime: Date.now(),
-      changes,
-      hasMore: changes.length >= Math.min(500, limit),
+      changes: page.changes,
+      hasMore: page.changes.length >= Math.min(500, Math.max(1, limit)),
+      // 新增字段：客户端带上它继续翻页，才能保证同毫秒多条变更不被跳过。
+      nextCursor: page.nextCursor,
     });
   }
 

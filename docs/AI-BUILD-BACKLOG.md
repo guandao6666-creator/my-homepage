@@ -436,3 +436,35 @@ html-security **295 处 / 未审查 0**、build 30 页、CSP 12 哈希 / 31 HTML
 - 本地清限流的频率本身会变成干扰源：D1 抢锁能造成真实 500，定时器别打太勤。
 - E2E 启动必须先等 fixtures，否则 e2e-server 还在造数据，60 秒不够。
 - 版本号批量替换会吞掉历史 RELEASES 条目（本次 2.0.8 条目被上轮替换吃掉），换完要逐条核对并补回。
+
+## 2026-11-23 · Round 39 · 2.0.11 Loose Ends（把 2.0.10 未修清单收口）
+
+**范围**：2.0.10 发布报告 §6 的「未修」里，所有不需要迁移、不改公开响应字段的项。
+
+| 编号 | 缺陷 | 修法 | 证据 |
+| --- | --- | --- | --- |
+| F1 | 备份 merge 恢复先写 R2 再去重，留下看不见的孤儿对象 | 新增 `worker/api/backups/restore-copy.js`：复制阶段先按 `sha256` 判重，命中只登记 `copied`/`DUPLICATE_CONTENT`，不读不写 R2；`skippedIds` 传给元数据阶段 | `tests/unit/backup-restore-dedupe.test.ts` **8 passed**；负向对照 1 failed |
+| F2 | 插件安装上限 40 是 check-then-insert | 新增 `worker/api/plugins/install-slot.js`：条件 `INSERT ... SELECT ... WHERE COUNT<40` 抢名额，0 再试重装 UPDATE，仍 0 才 409 `INSTALL_LIMIT` | `tests/unit/plugins-install-limit.test.ts` **5 passed**（真实 SQLite）；负向对照 4 failed |
+| F3 | 窗口关闭双通道重复通知 | `src/lib/core/windows.ts` 新增 `notifyClosedOnce`（微任务内按 appId 去重） | `tests/unit/windows-close-cascade.test.ts` **7 passed**；负向对照 2 failed |
+| F4 | 窄视口恢复布局完全重叠 | `src/lib/core/layout.ts` 新增 `settleCascade`（重叠 >85% 才错开，候选限制视口） | 同上 |
+| F5 | 同步 `since` 游标缺 tiebreak，同毫秒跨页丢变更 | 新增 `worker/api/sync/cursor.js`，`listChangesPage` 用 `(updated_at, entity_id)` 元组比较；`GET /api/sync/pull` 新增可选 `cursor` 与 `nextCursor`（新增字段，`since` 兼容） | 单测 6 passed（真实 SQLite）；真实 E2E `sync-cursor` **2 passed（19.1s）**、E2E 负向对照 1 failed |
+
+**不改**：多区间 `Range`（RFC 7233 允许忽略并返回 200，已写进 RELEASE §6）。
+
+**需迁移（仍挂起）**：`view`/`package` 计数幂等、社区上传配额预占（见 STATUS 风险 16）。
+
+**门禁**：`npm run verify` **exit 0**（`[version] 一致：2.0.11`、**54 文件 / 537 单测**、html-security 295/0、build 30 页、CSP 12/31）；
+全量 E2E **205 passed（5.3m）**，exit 0。首跑 204/1 failed：`systemcenter-number-keyboard` 的侧栏点击被晚挂载的引导层拦截，
+把「看到就关」循环升级为固定 10 轮清理后复跑全绿。
+
+**体积**：入口 JS **442.9 / 439.5 KB（100.8%）**（+2.4 KB 来自 settleCascade/notifyClosedOnce 进入入口包，技术债）；
+首屏 CSS 184.7 / 195.3 KB（94.6%）。
+
+**状态**：`Verified（本地）`，**未部署（Blocked：等授权）**；生产仍 2.0.10（Version `b207dbcb-…`），回滚目标同前。
+
+**教训（新增）**
+
+- 补丁版的边界要写死在任务书里：删/改/新增的选择比「修得多」重要，多区间 Range 明确判「不改」比硬塞实现更省事。
+- 负向对照的脚本本身也会引入 bug（`.mjs` 里写 TS `as` 直接语法错），脚本必须有「无参数拒绝」与 SHA-256 恢复校验。
+- 全量套件比单跑更容易暴露时序问题：引导层「看到就关」只清一轮会赶在挂载之前，固定轮数更稳。
+- JSDoc 的解构参数推断会把新增可选参数钉成 `null`，把可选参数拆成独立形参最省心。

@@ -64,6 +64,7 @@ import {
   updateRestore,
   upsertRestoreFile,
 } from "./store.js";
+import { loadReadySha256, runRestoreCopy } from "./restore-copy.js";
 
 const PREFIX = "/api/backups";
 const LOCAL_DOMAINS = new Set(["notes", "tasks", "calendar", "desktop", "workspace"]);
@@ -1103,66 +1104,19 @@ async function runRestore(env, userId, restoreRow) {
   const backupRow = await getBackup(env, userId, restoreRow.backup_id);
   if (!backupRow) throw new ApiError("NOT_FOUND", "备份不存在", 404);
 
-  const started = Date.now();
-  const items = await listRestoreFiles(env, userId, restoreRow.id);
-  const done = new Set(items.filter((item) => item.status === "verified" || item.status === "copied").map((item) => item.file_id));
+  // 2.0.11：复制阶段先按内容哈希跳过重复文件，再写 R2；跳过项记进 plan.skippedIds，
+  // 元数据阶段直接复用，保证两个阶段对「哪些文件算重复」判断一致。
+  const copied = await runRestoreCopy(env, {
+    userId,
+    restoreId: restoreRow.id,
+    backupId: restoreRow.backup_id,
+    jobId: job.id,
+    mode: restoreRow.mode,
+    plan,
+  });
 
-  for (const file of plan.files) {
-    if (done.has(file.id)) continue;
-    if (done.size >= plan.files.length) break;
-    if (Date.now() - started > TIME_BUDGET_MS) break;
-    if (done.size > 0 && done.size % COPY_BATCH === 0 && Date.now() - started > TIME_BUDGET_MS / 2) break;
-
-    const sourceKey = `users/${userId}/backups/${restoreRow.backup_id}/files/${file.id}`;
-    const liveKey = `users/${userId}/files/${file.newId}`;
-    const object = await env.FILES.get(sourceKey);
-    if (!object) {
-      await upsertRestoreFile(env, {
-        userId,
-        restoreId: restoreRow.id,
-        fileId: file.id,
-        newFileId: file.newId,
-        status: "failed",
-        error: "BACKUP_OBJECT_MISSING",
-      });
-      await updateRestore(env, userId, restoreRow.id, {
-        status: "failed",
-        errorMessage: `备份文件缺失：${file.id}`,
-      });
-      throw new ApiError("BACKUP_BROKEN", "备份文件缺失，恢复已中止", 409);
-    }
-
-    const [hashBranch, writeBranch] = object.body.tee();
-    const hashPromise = hashStream(hashBranch);
-    await env.FILES.put(liveKey, writeBranch, { httpMetadata: { contentType: file.mimeType } });
-    const digest = await hashPromise;
-
-    if (digest.size !== Number(file.sizeBytes) || (file.sha256 && digest.sha256 !== file.sha256)) {
-      await env.FILES.delete(liveKey).catch(() => undefined);
-      await updateRestore(env, userId, restoreRow.id, {
-        status: "failed",
-        errorMessage: `恢复文件校验失败：${file.id}`,
-      });
-      throw new ApiError("RESTORE_VERIFY_FAILED", "恢复文件校验失败，已中止", 409);
-    }
-
-    await upsertRestoreFile(env, {
-      userId,
-      restoreId: restoreRow.id,
-      fileId: file.id,
-      newFileId: file.newId,
-      status: "verified",
-    });
-    done.add(file.id);
-
-    await updateJob(env, userId, job.id, {
-      processed: done.size,
-      total: plan.files.length,
-      progress: plan.files.length ? Math.round((done.size / plan.files.length) * 80) : 80,
-    });
-  }
-
-  if (done.size < plan.files.length) {
+  if (copied.done.size < plan.files.length) {
+    await updateJob(env, userId, job.id, { checkpoint: { plan } });
     return restoreResult(env, userId, await getRestore(env, userId, restoreRow.id), { partial: true });
   }
 
@@ -1216,20 +1170,21 @@ async function applyRestoreMetadata(env, userId, restoreRow, plan) {
 
   // 2.0：Merge 不再「所有文件都复制一份」。按 SHA-256 跳过已存在的内容，
   // 只补缺失的文件；不覆盖、不重复占空间。文件夹仍按备份结构重建（空目录不算数据丢失）。
+  // 2.0.11：跳过集合来自复制阶段写入的 plan.skippedIds；只有旧任务（2.0.11 之前创建、
+  // 复制阶段没有记录）才在这里现查一遍哈希，避免恢复中途升级时把重复文件重复插入。
   let skippedFiles = 0;
   let mergeFiles = plan.files;
   if (restoreRow.mode === "merge" && plan.files.length) {
-    const existing = await env.DB.prepare(
-      "SELECT sha256 FROM files WHERE user_id = ? AND status = 'ready' AND sha256 IS NOT NULL",
-    )
-      .bind(userId)
-      .all();
-    const hashes = new Set((existing.results || []).map((row) => row.sha256));
-    mergeFiles = plan.files.filter((file) => {
-      const duplicate = Boolean(file.sha256) && hashes.has(file.sha256);
-      if (duplicate) skippedFiles += 1;
-      return !duplicate;
-    });
+    const skipped = new Set(plan.skippedIds ?? []);
+    if (skipped.size === 0) {
+      const hashes = await loadReadySha256(env, userId);
+      for (const file of plan.files) {
+        if (file.sha256 && hashes.has(file.sha256)) skipped.add(file.id);
+      }
+      plan.skippedIds = [...skipped];
+    }
+    skippedFiles = skipped.size;
+    mergeFiles = plan.files.filter((file) => !skipped.has(file.id));
   }
 
   for (let i = 0; i < plan.folders.length; i += 40) {

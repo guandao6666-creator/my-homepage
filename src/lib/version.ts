@@ -8,7 +8,7 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.10";
+export const OS_VERSION = "2.0.11";
 
 /** 对外展示的版本代号 */
 export const RELEASE_NAME = "The Platform Era";
@@ -46,6 +46,18 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.0.11",
+    name: "Loose Ends",
+    date: "2026-11-23",
+    notes: [
+      "备份合并恢复先按哈希跳过再写 R2：重复内容不再产生看不见的孤儿对象，同一次备份里的重复文件也只落一份",
+      "插件安装上限把「数一遍再插入」改成条件插入抢名额：并发安装不再能把 40 个上限撑破",
+      "窗口关闭只通知一次：Shell 回调与 close() 返回值双通道不再重复触发清理与 saveLayout",
+      "窄视口恢复布局时把叠在一起的窗口错开位置，不再全部压在屏幕右下角",
+      "同步增量拉取新增 (updated_at, entity_id) 游标（nextCursor）：同毫秒写入的多条变更分页不再被跳过",
+    ],
+  },
   {
     version: "2.0.10",
     name: "Cleanup",

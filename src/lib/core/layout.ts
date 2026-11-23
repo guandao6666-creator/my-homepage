@@ -213,11 +213,7 @@ export function rescaleSnapshot(
   const ratioH = target.height / Math.max(1, snapshot.viewport.height);
   const ratio = Math.min(1, Math.max(0.35, Math.min(ratioW, ratioH)));
 
-  const windows: Record<string, WindowState> = {};
-  const seen = new Set<string>();
-  let cascade = 0;
-
-  for (const [appId, state] of Object.entries(snapshot.windows)) {
+  const entries = Object.entries(snapshot.windows).map(([appId, state]) => {
     let rect: Rect;
     if (state.zone && !sameViewport) {
       rect = snapRect(state.zone, target);
@@ -231,25 +227,72 @@ export function rescaleSnapshot(
         height: state.height * ratio,
       };
     }
-    rect = clampRect(rect, target);
+    return { appId, state, rect: clampRect(rect, target) };
+  });
 
-    if (options.cascade !== false) {
-      const key = `${rect.x}:${rect.y}`;
-      if (seen.has(key)) {
-        cascade += 1;
-        rect = clampRect({ ...rect, x: rect.x + cascade * 26, y: rect.y + cascade * 26 }, target);
-      }
-      seen.add(`${rect.x}:${rect.y}`);
-    }
+  // 2.0.11：级联偏移必须在「可移动范围」内挑位置。旧实现把 rect 偏移 +26 再 clamp，
+  // 当窗口已被夹到右下角时 clamp 又把它顶回原处 —— 多个窗口肉眼完全重叠。
+  const placed =
+    options.cascade === false ? entries.map((entry) => entry.rect) : settleCascade(entries.map((entry) => entry.rect), target);
 
-    windows[appId] = {
-      ...state,
+  const windows: Record<string, WindowState> = {};
+  entries.forEach((entry, index) => {
+    const rect = placed[index]!;
+    windows[entry.appId] = {
+      ...entry.state,
       left: rect.x,
       top: rect.y,
       width: rect.width,
       height: rect.height,
     };
-  }
+  });
 
   return { schemaVersion: 2, at: Date.now(), viewport: { ...target }, windows };
+}
+
+/** 两个窗口的重叠比例（按较小面积算），0 表示不重叠 */
+function overlapRatio(a: Rect, b: Rect): number {
+  const width = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+  const height = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  if (width <= 0 || height <= 0) return 0;
+  const smaller = Math.max(1, Math.min(a.width * a.height, b.width * b.height));
+  return (width * height) / smaller;
+}
+
+const CASCADE_STEP = 26;
+const CASCADE_TRIES = 16;
+const CASCADE_OVERLAP = 0.85;
+
+/**
+ * 2.0.11：把一排窗口摆成不互相压住。
+ *
+ * 为什么不用「偏移后 clamp」：clampRect 会把越界位置顶回边界，右下角的窗口
+ * 偏移再 clamp 后位置不变，两个窗口就完全重叠。这里只在真实可移动范围
+ * （0..viewport-width，0..viewport-height）里找候选点，正反交替、由近及远；
+ * 视口本身装不下两个窗口时（maxX 或 maxY 为 0）保留原位置，不制造抖动。
+ */
+export function settleCascade(rects: Rect[], viewport: Viewport): Rect[] {
+  const placed: Rect[] = [];
+  for (const rect of rects) {
+    const maxX = Math.max(0, viewport.width - rect.width);
+    const maxY = Math.max(0, viewport.height - rect.height);
+    let candidate = rect;
+    if (maxX === 0 && maxY === 0) {
+      placed.push(candidate);
+      continue;
+    }
+    for (let attempt = 1; attempt <= CASCADE_TRIES; attempt += 1) {
+      const collides = placed.some((existing) => overlapRatio(candidate, existing) > CASCADE_OVERLAP);
+      if (!collides) break;
+      const sign = attempt % 2 === 1 ? 1 : -1;
+      const step = Math.ceil(attempt / 2) * CASCADE_STEP;
+      candidate = {
+        ...rect,
+        x: Math.min(maxX, Math.max(0, rect.x + sign * step)),
+        y: Math.min(maxY, Math.max(0, rect.y + sign * Math.round(step * 0.7))),
+      };
+    }
+    placed.push(candidate);
+  }
+  return placed;
 }

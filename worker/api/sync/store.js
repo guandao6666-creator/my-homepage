@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Guandao OS 2.0 · Phase 4 同步实体存储层（D1）
  *
  * 所有 SQL 都带 user_id 绑定参数；entity_id / domain 由调用方白名单校验。
@@ -24,6 +24,7 @@ export { SYNC_DOMAINS, isSyncDomain } from "./limits.js";
 
 /** 单条 SQL 的绑定参数上限按 D1 的 100 保守留余量；分块实现统一在 ../sql.js。 */
 import { ID_CHUNK_SIZE, chunkIds } from "../sql.js";
+import { formatSyncCursor } from "./cursor.js";
 
 const MAX_INDEX_ROWS = 10000;
 /** 多行台账写入：5 列 × 15 行 = 75 个参数。 */
@@ -31,19 +32,46 @@ const LEDGER_INSERT_CHUNK = 15;
 /** 多行墓碑删除：3 列 × 20 行 = 60 个参数（再加 cutoff）。 */
 const TOMBSTONE_DELETE_CHUNK = 20;
 
-/** 增量拉取（updated_at > since），按时间升序，便于客户端顺序应用 */
-export async function listChanges(env, userId, domain, { since = 0, limit = 300 } = {}) {
+/**
+ * 增量拉取（按 (updated_at, entity_id) 游标分页），按时间升序，便于客户端顺序应用。
+ *
+ * 2.0.11：裸 `since` 在分页边界会漏掉「与上一页最后一条同毫秒」的其余变更——台账时间戳是
+ * 毫秒整数，同一毫秒写入多条时 `updated_at > since` 全被跳过。这里用元组比较补齐 tiebreak；
+ * 不带游标时退回旧的 `since` 语义，老客户端行为不变。
+ *
+ * @param {{ since?: number, limit?: number }} options 旧参数（since 语义保持兼容）
+ * @param {{ updatedAt: number, entityId: string } | null} cursor 新增游标；null 时按 since 分页
+ */
+export async function listChangesPage(env, userId, domain, { since = 0, limit = 300 } = {}, cursor = null) {
+  const bounded = Math.min(500, Math.max(1, Number(limit) || 300));
+  const where = cursor
+    ? "user_id = ? AND domain = ? AND (updated_at > ? OR (updated_at = ? AND entity_id > ?))"
+    : "user_id = ? AND domain = ? AND updated_at > ?";
+  const binds = cursor
+    ? [userId, domain, cursor.updatedAt, cursor.updatedAt, cursor.entityId, bounded]
+    : [userId, domain, Number(since) || 0, bounded];
+
   const rows = await env.DB.prepare(
     `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
        FROM sync_entities
-      WHERE user_id = ? AND domain = ? AND updated_at > ?
+      WHERE ${where}
       ORDER BY updated_at ASC, entity_id ASC
       LIMIT ?`,
   )
-    .bind(userId, domain, Number(since) || 0, Math.min(500, Math.max(1, Number(limit) || 300)))
+    .bind(...binds)
     .all();
 
-  return (rows.results || []).map(mapRow);
+  const results = rows.results || [];
+  return {
+    changes: results.map(mapRow),
+    nextCursor: results.length ? formatSyncCursor(results[results.length - 1]) : null,
+  };
+}
+
+/** 保持 2.0.10 及更早调用方的返回形状：只要 changes 数组。 */
+export async function listChanges(env, userId, domain, options = {}, cursor = null) {
+  const page = await listChangesPage(env, userId, domain, options, cursor);
+  return page.changes;
 }
 
 /** 按 id 批量取实体（客户端按索引 diff 后只拉需要的） */

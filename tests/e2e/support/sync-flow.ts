@@ -107,11 +107,12 @@ export function syncIndex(actor: ApiActor, domain: SyncDomain | string): Promise
 export function syncPull(
   actor: ApiActor,
   domain: SyncDomain | string,
-  options: { ids?: string[]; since?: number; limit?: number } = {},
+  options: { ids?: string[]; since?: number; limit?: number; cursor?: string } = {},
 ): Promise<ApiResult> {
   const params = new URLSearchParams({ domain });
   if (options.ids) params.set("ids", options.ids.join(","));
   else if (options.since !== undefined) params.set("since", String(options.since));
+  if (options.cursor !== undefined) params.set("cursor", options.cursor);
   if (options.limit !== undefined) params.set("limit", String(options.limit));
   return api(actor, "GET", `/api/sync/pull?${params.toString()}`);
 }

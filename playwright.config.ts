@@ -29,7 +29,7 @@ const ADMIN_PORT = Number(process.env.E2E_ADMIN_PORT || API_PORT + 1);
 
 /** 需要真实 Worker 的 spec —— 只有这些进 `worker` project。 */
 const WORKER_SPEC =
-  /(plugin-signature|plugin-publishing|sandbox-worker|sandbox-origin|device|oauth|pairing-claim-race|d1-param-bounds|sync|sync-conflicts-page|community-follow|community-tutorial|community-search-open|community-admin-review|supabase-proxy-auth|files-folders-deep|shell-wallpaper-safety|community-restriction-guard|market-search-detail|files-range-head|os20-tab-restore|systemcenter-number-keyboard)\.spec\.ts$/;
+  /(plugin-signature|plugin-publishing|sandbox-worker|sandbox-origin|device|oauth|pairing-claim-race|d1-param-bounds|sync|sync-conflicts-page|community-follow|community-tutorial|community-search-open|community-admin-review|supabase-proxy-auth|files-folders-deep|shell-wallpaper-safety|community-restriction-guard|market-search-detail|files-range-head|os20-tab-restore|systemcenter-number-keyboard|sync-cursor)\.spec\.ts$/;
 
 export default defineConfig({
   testDir: "./tests/e2e",

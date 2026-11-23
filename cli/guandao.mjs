@@ -50,7 +50,7 @@ import {
   signEd25519,
 } from "../shared/plugin-signature.js";
 
-const CLI_VERSION = "2.0.10";
+const CLI_VERSION = "2.0.11";
 const BINARY_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "woff", "woff2", "ttf", "otf"]);
 const IGNORED = new Set(["node_modules", ".git", "dist", ".DS_Store"]);
 

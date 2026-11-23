@@ -4,9 +4,9 @@
 > 历史细节见 `GUANDAO_2_0_AUDIT.md`（附录 A–P）、`GUANDAO_2_0_ROADMAP.md`、`docs/RELEASE-2.0.md`。
 > 每轮开发结束必须更新本文件；`Implemented` 不得写成 `Verified`。
 
-- **更新时间**：2026-11-22
-- **版本**：2.0.10（Cleanup，补丁版本；发布说明 `docs/RELEASE-2.0.10.md`）
-- **生产状态**：**2.0.10 已部署（2026-11-22）**，Version `b207dbcb-09d9-4f30-943e-37a281d4de56`、health/header 2.0.10、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-2029.sql`（658,291 B）、无待应用迁移；回滚目标 2.0.9（`a034902b-562b-4122-85bf-e238cbbe23d6`）。
+- **更新时间**：2026-11-23
+- **版本**：2.0.11（Loose Ends，补丁版本；发布说明 `docs/RELEASE-2.0.11.md`）
+- **生产状态**：**2.0.10 已部署（2026-11-22）**，Version `b207dbcb-09d9-4f30-943e-37a281d4de56`、health/header 2.0.10、`qa:prod` 35/35、备份 `guandao-db-prod-20261122-2029.sql`（658,291 B）、无待应用迁移；回滚目标 2.0.9（`a034902b-562b-4122-85bf-e238cbbe23d6`）。**2.0.11 已完成本地验证，未部署（Blocked：等授权）**。
 - **分支**：`dsh-da37e99c-1ac8`
 - **当前里程碑**：Milestone A（系统基础成熟）收尾 → Milestone D（性能与稳定性）起步
 - **当前阶段**：Phase 6（性能与可观测），P2
@@ -27,14 +27,14 @@
 | 门禁 | 结果 |
 | --- | --- |
 | `npm run typecheck` | 0 error（414 文件，176 hints） |
-| `npx vitest run` | **50 文件 / 511 单测通过**（2.0.10 新增 1 文件 4 条：pending_delete 回收；2.0.9 新增 4 文件 17 条；2.0.8 新增 5 文件 30 条） |
+| `npx vitest run` | **54 文件 / 537 单测通过**（2.0.11 新增 4 文件 26 条：备份去重 8、插件名额 5、窗口/布局 7、同步游标 6） |
 | `npm run security:test` | 六组自检全过 |
 | `npm run check:unused` / `check:astro` / `check:html-security` / `lint` | 通过（html-security 295 处全审查、0 未审查） |
 | `npm run build` | exit 0，**30 页**；CSP 12 哈希 / **31 HTML** 一致 |
-| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **440.5 KB / 439.5 KB（100.2%，超预算 1.0 KB）**；首屏 CSS **184.7 KB / 195.3 KB（94.6%）**；超预算来自 2.0.8 的功能增量，2.0.9 只 +0.1 KB |
-| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **203 passed（4.7m），exit 0**（2.0.9 的 202 + `systemcenter-number-keyboard` 1；跑前清 `rate_limits`，运行中每 90 秒清一次，20 秒一次会与 D1 抢锁导致配对确认偶发 500） |
+| 产物体积（`node scripts/perf-baseline.mjs --json`） | 入口 JS **442.9 KB / 439.5 KB（100.8%，超预算 3.4 KB）**；首屏 CSS **184.7 KB / 195.3 KB（94.6%）**；2.0.11 的 `settleCascade`/`notifyClosedOnce` 进入入口包 +2.4 KB |
+| `npx playwright test`（`E2E_ADMIN_PORT=18789`） | **205 passed（5.3m），exit 0**（2.0.10 的 203 + `sync-cursor` 2；首跑 204/1 failed 为 `systemcenter-number-keyboard` 的引导层抢挂模态，已把「看到就关」升级为固定 10 轮清理，复跑全量 205 passed） |
 | `npm run verify` | **exit 0**（版本一致性 → 迁移 → typecheck → 单测 → 安全 → unused → astro → html-security → lint → build → csp） |
-| 生产（当前 2.0.9） | Version `a034902b-562b-4122-85bf-e238cbbe23d6`；health/header 2.0.9；入口 `0cIOslbc.js`（451,061 B）；`qa:prod` **35/35**；自动构建 `470a5244…` → `705facb5…` |
+| 生产（当前 2.0.10） | Version `b207dbcb-09d9-4f30-943e-37a281d4de56`；health/header 2.0.10；入口 `CnPgsDvL.js`（452,121 B）；`qa:prod` **35/35**；自动构建 `423253b9…` → `d5f41e1d…` |
 
 > 环境注意：本机 WorkBuddy 沙箱的 safe-delete 守卫会在 Astro 清理 `dist/.prerender` 时中断进程（exit 1），
 > 属环境问题而非代码失败。规避方式：构建前 `mv dist/.prerender /tmp/...`。
@@ -65,10 +65,20 @@
 （appcenter/workspaces 的 app UI 走 `load()`、widgetstore 画廊拆分）。
 要达到 450 KB 需同时处理 6.2 或引入 Settings Service。
 
-## 4. 本轮验证结果（2.0.10）
+## 4. 本轮验证结果（2.0.11）
+
+> 2.0.10 及更早的行保留在同表作为历史证据。
 
 | 项 | 结果 |
 | --- | --- |
+| 2.0.11 全量门禁 | `npm run verify` **exit 0**：`[version] 一致：2.0.11`；typecheck 0 error；**54 文件 / 537 单测**（1.97s）；HTML 安全 **295 处 / 未审查 0**；build 30 页；CSP 12 哈希 / 31 HTML |
+| 备份合并恢复去重单测（`tests/unit/backup-restore-dedupe.test.ts`） | **8 passed**：merge 三文件（一个已存在、一个同内容）→ 只对确实要复制的文件 `get/put`、`skippedIds` 一致传给元数据阶段；对象缺失 → `BACKUP_BROKEN`；哈希不符 → 删 live key + `RESTORE_VERIFY_FAILED`；负向对照改回「先写 R2 再判」→ **1 failed / 7 passed**，restore `MATCH` 后 8 passed |
+| 插件安装名额单测（`tests/unit/plugins-install-limit.test.ts`，真实 SQLite） | **5 passed**：39 条后并发两个新装只成功一个、总数停在 40；满额重装可成功且版本更新；满额新装 409；负向对照把条件改 `WHERE 1 = 1` → **4 failed / 1 passed**，restore `MATCH` 后 5 passed |
+| 窗口/布局单测（`tests/unit/windows-close-cascade.test.ts`） | **7 passed**：同一次关闭只通知一次、微任务后再次关闭仍通知、`settleCascade` 把同位置两窗错开、视口比窗口小保留原位；负向对照恢复双通知 + 关掉错开 → **2 failed / 5 passed** |
+| 同步游标单测（`tests/unit/sync-cursor.test.ts`，真实 SQLite） | **6 passed**：同毫秒三条跨页不丢、裸 `since=1000` 形态确实返回 []、末尾 nextCursor null、域/用户隔离、格式非法矩阵；负向对照改回裸 since → **1 failed / 5 passed** |
+| 同步游标真实 Worker E2E（`tests/e2e/sync-cursor.spec.ts`） | **2 passed（19.1s）**：push 三条 → `limit=2` 两页并集正好三条无重复、`nextCursor` 是合法游标；`cursor=not-a-cursor` → 400 `INVALID_CURSOR`。E2E 负向对照让 Worker 忽略 cursor → **1 failed**（2 vs 4：重复且漏一条），restore `MATCH` |
+| 2.0.11 全量 E2E | **205 passed（5.3m），exit 0**（2.0.10 的 203 + `sync-cursor` 2）；首跑 204/1 failed（`systemcenter-number-keyboard` 侧栏点击被晚挂载的引导层拦截），修复 spec 的固定 10 轮清理后复跑全绿 |
+| 2.0.11 体积 | 入口 JS **442.9 / 439.5 KB（100.8%，超 3.4 KB，技术债）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
 | 2.0.10 全量门禁 | `npm run verify` **exit 0**：`[version] 一致：2.0.10`；typecheck 0 error；**50 文件 / 511 单测**（1.60s）；HTML 安全 **295 处 / 未审查 0**；build 30 页；CSP 12 哈希 / 31 HTML |
 | pending_delete 回收单测（`tests/unit/files-pending-delete.test.ts`） | **4 passed**：R2 成功后批量删 key + 按块删行且带 `status='pending_delete'`；R2 失败保留行（console.error）；空行不碰 R2；源码断言 `listHandler` 调用点 |
 | pending_delete 负向对照 | 删掉列表入口重试调用 → **1 failed / 3 passed**；`node .tmp-neg-210b.mjs restore` 输出 `handlers: MATCH` + `RESTORE_OK`，复跑 4 passed |
@@ -156,10 +166,10 @@
 
 ## 5. 重大风险（未关闭）
 
-1. **生产已上 2.0.9（2026-11-22）**，但 1.6 的两条告警 webhook 仍未配置
+1. **生产已上 2.0.10（2026-11-22）**，但 1.6 的两条告警 webhook 仍未配置
    （`BACKUP_ALERT_WEBHOOK`、`DATA_ALERT_WEBHOOK`）：备份/数据监控的
    **告警投递**没有在生产验证，只能依赖 `qa:prod` 与 `verify:d1-backup` 的主动检查。
-   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-1836.sql`。
+   最近的生产 D1 备份：`C:\Users\1\Desktop\my-homepage\.backups\guandao-db-prod-20261122-2029.sql`（658,291 B）。
 2. **审核链的页面级证据已在本地补齐（4 条用例），生产侧只有公开接口与只读冒烟**：
    服务端本就没有「审核超时」分支（`admin.js:52` 只接受四种操作），不是缺口，是契约如此；
    生产验证仍依赖 `qa:prod`，页面级审核链只在本地/CI 跑。
@@ -299,18 +309,34 @@
     - 证据边界：`pending_delete` 的回收只在用户打开云盘列表时发生，长期不访问的用户对象仍会留着；
       真实 Worker E2E 无法造该状态（需要直接改 D1），判别靠假 D1/R2 单测。
 
+20. **已修（2.0.11，本地未部署）**：
+    - 备份 merge 恢复先写 R2 再去重 → 被跳过的文件留下看不见的孤儿对象：改为复制阶段先按
+      `sha256` 判重（命中只登记 `copied/DUPLICATE_CONTENT`，不读不写 R2），`skippedIds` 传给元数据阶段。
+      单测 8 passed、负向对照 1 failed。
+    - 插件安装上限 40 是 check-then-insert：改为条件 `INSERT ... SELECT ... WHERE COUNT < 40` 抢名额，
+      `changes=0` 再尝试重装 UPDATE，仍 0 才 409。单测 5 passed（真实 SQLite）、负向对照 4 failed。
+    - 窗口关闭双通道重复通知：`notifyClosedOnce` 在微任务内按 appId 去重；单测 7 passed、负向对照 2 failed。
+    - 窄视口恢复布局完全重叠：`settleCascade` 把窗口错开（重叠 >85% 才换点，候选限制在视口内）；
+      与上一条同一单测文件、同一负向对照。
+    - 同步 `since` 游标缺 tiebreak：`GET /api/sync/pull` 新增可选 `cursor` 与响应 `nextCursor`
+      （(updated_at, entity_id) 元组比较）；单测 6 passed + 真实 E2E 2 passed（19.1s），E2E 负向对照 1 failed。
+    - 证据边界：窗口/布局只有纯逻辑单测；备份去重与插件名额的并发由真实 SQLite 单测证明，Worker 层无并发 E2E；
+      多区间 Range 判定不改（RFC 允许忽略，见 RELEASE-2.0.11 §6）；两条需迁移项仍在风险 16。
+
 ## 6. 下一步（按优先级）
 
-1. **P0 · 2.0.10 已发布（2026-11-22）**：Version `b207dbcb-…`、health/header 2.0.10、`qa:prod` 35/35、备份 658,291 B；
-   推送后复核 CI 与 Cloudflare 自动构建（见 §4）。
-2. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
+1. **P0 · 2.0.11 待发布（Blocked）**：本地已过全部门禁（54 文件 / 537 单测、205 passed、verify exit 0），
+   等授权后按 `docs/RELEASE-2.0.11.md` §5 部署；2.0.10 已在生产（Version `b207dbcb-…`）。
+2. **P0 · 2.0.10 已发布（已完成）**：Version `b207dbcb-…`、health/header 2.0.10、`qa:prod` 35/35、备份 658,291 B；
+   推送后 CI 45023083005 success、自动构建 `423253b9…` → `d5f41e1d…`。
+3. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个
    webhook URL，不能臆造），跑 `npm run qa:alerts` 与 `npm run verify:cloudflare`，把 1.6 生产门禁补成全绿。
-3. **P2 · 补 2.0.6/2.0.7 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；
+4. **P2 · 补 2.0.6/2.0.7 的证据边界**：布局/拖拽/强调色、笔记/任务归一化、分页/重试补真实浏览器 E2E；
    审核员的同级审核员矩阵若要进真实栈，需要给夹具账号补 UUID（会牵动 e2e-server 的 USER_IDS）。
-4. **P2 · 处理未修的边界**（见 §5 风险 16）：计数幂等需要去重表或指纹列，社区上传预占需要迁移；
-   备份 merge 孤儿对象、插件安装上限并发、窗口双关、布局 cascade、sync `since` tiebreak 可不需要迁移。
-5. **P2 · 体积技术债**（见 §5 风险 18）：入口包 440.5 / 439.5 KB（100.2%），做按需拆分或明确调整预算。
-6. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
-7. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
+5. **P2 · 处理未修的边界**（见 §5 风险 16）：只剩计数幂等（需去重表/指纹列）与社区上传预占（需 pending 行）
+   两条需迁移项；其余已在 2.0.11 修完。
+6. **P2 · 体积技术债**（见 §5 风险 18）：入口包 442.9 / 439.5 KB（100.8%），做按需拆分或明确调整预算。
+7. **P3 · 生产写入型发布链**：`qa:prod` 只覆盖公开接口与只读链路；生产资源创建→审核→安装需隔离账号，未安排。
+8. **暂不推进**：P3-3 真机冒烟（需要物理设备）、P2-6 `os13.ts` 拆分（需要 Core Settings API）。
 
 
