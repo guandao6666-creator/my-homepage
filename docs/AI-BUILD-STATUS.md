@@ -77,7 +77,7 @@
 | 窗口/布局单测（`tests/unit/windows-close-cascade.test.ts`） | **7 passed**：同一次关闭只通知一次、微任务后再次关闭仍通知、`settleCascade` 把同位置两窗错开、视口比窗口小保留原位；负向对照恢复双通知 + 关掉错开 → **2 failed / 5 passed** |
 | 同步游标单测（`tests/unit/sync-cursor.test.ts`，真实 SQLite） | **6 passed**：同毫秒三条跨页不丢、裸 `since=1000` 形态确实返回 []、末尾 nextCursor null、域/用户隔离、格式非法矩阵；负向对照改回裸 since → **1 failed / 5 passed** |
 | 同步游标真实 Worker E2E（`tests/e2e/sync-cursor.spec.ts`） | **2 passed（19.1s）**：push 三条 → `limit=2` 两页并集正好三条无重复、`nextCursor` 是合法游标；`cursor=not-a-cursor` → 400 `INVALID_CURSOR`。E2E 负向对照让 Worker 忽略 cursor → **1 failed**（2 vs 4：重复且漏一条），restore `MATCH` |
-| 生产部署（2.0.11，2026-11-23 14:12） | `cf:deploy` exit 0 → Version `c6444ff6-5fd6-439b-b2c7-6296e2a9aa1f`；health/header 2.0.11、首页 27,812 B、入口 `C3KRcFM4.js`（453,522 B）含 2.0.11、`/sw.js` `guandao-2.0.11`；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261123-1415.sql`（668,753 B）；回滚目标 `b207dbcb-…`（2.0.10） |
+| 生产部署（2.0.11，2026-11-23 14:12） | `cf:deploy` exit 0 → Version `c6444ff6-5fd6-439b-b2c7-6296e2a9aa1f`；health/header 2.0.11、首页 27,812 B、入口 `C3KRcFM4.js`（453,522 B）含 2.0.11、`/sw.js` `guandao-2.0.11`；`qa:prod` **35/35**、清理后 `users=0`；备份 `guandao-db-prod-20261123-1415.sql`（668,753 B）；回滚目标 `b207dbcb-…`（2.0.10）；push `f2c189a..1a18aa8` → CI run **45122842141 success**、Cloudflare 自动构建 `c065505b-e69f-4f4e-924f-6e48cf6a76a5`（06:16:01Z） |
 | 2.0.11 全量 E2E | **205 passed（5.3m），exit 0**（2.0.10 的 203 + `sync-cursor` 2）；首跑 204/1 failed（`systemcenter-number-keyboard` 侧栏点击被晚挂载的引导层拦截），修复 spec 的固定 10 轮清理后复跑全绿 |
 | 2.0.11 体积 | 入口 JS **442.9 / 439.5 KB（100.8%，超 3.4 KB，技术债）**；首屏 CSS **184.7 / 195.3 KB（94.6%）** |
 | 2.0.10 全量门禁 | `npm run verify` **exit 0**：`[version] 一致：2.0.10`；typecheck 0 error；**50 文件 / 511 单测**（1.60s）；HTML 安全 **295 处 / 未审查 0**；build 30 页；CSP 12 哈希 / 31 HTML |
@@ -327,7 +327,7 @@
 ## 6. 下一步（按优先级）
 
 1. **P0 · 2.0.11 已发布（2026-11-23）**：Version `c6444ff6-…`、health/header 2.0.11、`qa:prod` 35/35、备份 668,753 B；
-   推送后复核 CI 与 Cloudflare 自动构建（见 §4）。
+   推送后 CI run 45122842141 success、自动构建 `c065505b-…`（06:16:01Z），见 §4。
 2. **P0 · 2.0.10 已发布（已完成）**：Version `b207dbcb-…`、health/header 2.0.10、`qa:prod` 35/35、备份 658,291 B；
    推送后 CI 45023083005 success、自动构建 `423253b9…` → `d5f41e1d…`。
 3. **P1 · 生产告警收尾**：配置 `BACKUP_ALERT_WEBHOOK` / `DATA_ALERT_WEBHOOK`（需要用户提供两个

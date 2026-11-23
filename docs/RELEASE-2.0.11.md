@@ -177,7 +177,8 @@ restore `MATCH` + `RESTORE_OK`。
 | 生产核对 | `/api/health` → `"version":"2.0.11"`、D1 connected、R2 available（put/get/head/delete 全 true）；header `x-guandao-version: 2.0.11`；首页 200（27,812 B）；入口 `index.astro_astro_type_script_index_0_lang.C3KRcFM4.js`（453,522 B，含 `2.0.11`）；`/sw.js` → `guandao-2.0.11` |
 | 生产端到端 | `npm run qa:prod` → **35/35 通过**、清理 `{"users":0}`（既有 `event_type` CHECK 警告仍在，exit 0） |
 | 回滚目标 | 2.0.10：Version `b207dbcb-09d9-4f30-943e-37a281d4de56` |
-| 推送后 | push 会触发 Cloudflare 自动构建（再生成一个 Version），CI 用 `curl.exe --resolve api.github.com:443:140.82.113.6` 复核 |
+| 推送与 CI | push `f2c189a..1a18aa8` 后 quality run **45122842141 success**（`curl.exe --resolve api.github.com:443:140.82.113.6` 复核） |
+| 自动构建 | Cloudflare 在 push 后生成 Version `c065505b-e69f-4f4e-924f-6e48cf6a76a5`（2026-11-23T06:16:01Z，100%）；`/api/health` 仍 2.0.11。每次 push 都会再触发一次，Version 以 `wrangler deployments list` 末尾为准 |
 
 ## 6. 未修 / 边界
 
