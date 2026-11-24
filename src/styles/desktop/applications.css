@@ -37,6 +37,35 @@
         color: #fff;
       }
 
+      a.side-item {
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.16s ease, color 0.16s ease;
+      }
+
+      a.side-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+      }
+
+      a.side-item:hover::after {
+        content: "→";
+        float: right;
+        opacity: 0.7;
+      }
+
+      .file-row {
+        cursor: pointer;
+      }
+
+      .file-row .file-name {
+        transition: color 0.16s ease;
+      }
+
+      .file-row:hover .file-name {
+        color: #9fb4ff;
+      }
+
       .finder-files {
         padding: 8px;
         overflow: auto;

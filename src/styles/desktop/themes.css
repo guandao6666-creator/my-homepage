@@ -188,8 +188,15 @@
         background: rgba(111, 140, 255, 0.2);
         color: #26307e;
       }
+      [data-os-theme="light"] a.side-item:hover {
+        background: rgba(20, 24, 40, 0.06);
+        color: #1c2030;
+      }
       [data-os-theme="light"] .file-row:hover {
         background: rgba(20, 24, 40, 0.06);
+      }
+      [data-os-theme="light"] .file-row:hover .file-name {
+        color: #3b5bdb;
       }
       [data-os-theme="light"] .file-name {
         color: #1c2030;
