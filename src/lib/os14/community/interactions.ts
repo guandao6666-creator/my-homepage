@@ -27,8 +27,11 @@ import { detailPermissionText, esc, safeHex, safeWallId } from "./ui";
 import {
   loadCreators,
   loadCreations,
+  loadExplore,
+  loadFollowingTab,
   loadHome,
   loadMyFavorites,
+  loadSearch,
 } from "./loaders";
 import { licenseName, loadDetailImpl } from "./detail";
 import { loadPublishImpl } from "./publish";
@@ -39,12 +42,30 @@ import type { Post } from "./types";
 export const backToListImpl = (ctx: CommunityContext) => {
     const view = ctx.getView();
     const lastTab = ctx.getLastTab();
+    if (view.kind === "detail" && lastTab === "search" && ctx.getSearchState().q) {
+      void loadSearch(ctx, ctx.getSearchState().q, false);
+      return;
+    }
     const tab = view.kind === "detail" ? lastTab : view.kind === "creator" ? "creators" : "home";
     ctx.setActiveNav(tab);
     ctx.setView({ kind: "tab", tab });
     if (tab === "creators") void loadCreators(ctx);
     else if (tab === "creations") void loadCreations(ctx);
-    else void loadHome(ctx);
+    else if (tab === "favorites") void loadMyFavorites(ctx);
+    else if (tab === "following") void loadFollowingTab(ctx);
+    else if (["explore", "themes", "widgets", "workspaces", "wallpapers"].includes(tab)) {
+      const type =
+        tab === "themes"
+          ? "theme"
+          : tab === "widgets"
+            ? "widget"
+            : tab === "workspaces"
+              ? "workspace"
+              : tab === "wallpapers"
+                ? "wallpaper"
+                : ctx.getExplore().type;
+      void loadExplore(ctx, type);
+    } else void loadHome(ctx);
   };
 
 export const refreshPostButtonsImpl = (
@@ -416,7 +437,7 @@ export const openPostFromEventImpl = (ctx: CommunityContext, target: HTMLElement
     if (target.closest("button,a,input,textarea,select,[data-action]")) return false;
     const postButton = target.closest<HTMLElement>("[data-post]");
     if (postButton?.dataset.post) {
-      ctx.setLastTab(view.kind === "tab" ? view.tab : ctx.getLastTab());
+      ctx.setLastTab(view.kind === "search" ? "search" : view.kind === "tab" ? view.tab : ctx.getLastTab());
       void loadDetailImpl(ctx, postButton.dataset.post);
       return true;
     }

@@ -94,6 +94,9 @@ const jsonLd = {
             {post.updatedDate && (
               <span class="px-meta-item">更新于 {formatShortDate(post.updatedDate)}</span>
             )}
+            <button class="px-font-toggle" id="px-font-toggle" type="button" title="切换正文字号">
+              字号：标准
+            </button>
           </div>
         </header>
 
@@ -174,7 +177,7 @@ const jsonLd = {
 
           <nav class="px-pager" aria-label="上下篇">
             {prev ? (
-              <a class="px-pager-item" href={`/blog/${prev.slug}/`}>
+              <a class="px-pager-item" data-prev-post href={`/blog/${prev.slug}/`}>
                 <span class="px-pager-label"><Icon name="chevron-left" size={13} /> 上一篇</span>
                 <strong>{prev.title}</strong>
               </a>
@@ -184,7 +187,7 @@ const jsonLd = {
               </span>
             )}
             {next ? (
-              <a class="px-pager-item px-pager-item--right" href={`/blog/${next.slug}/`}>
+              <a class="px-pager-item px-pager-item--right" data-next-post href={`/blog/${next.slug}/`}>
                 <span class="px-pager-label">下一篇 <Icon name="chevron-right" size={13} /></span>
                 <strong>{next.title}</strong>
               </a>
@@ -364,4 +367,62 @@ const jsonLd = {
     }
   })();
 </script>
+
+<script>
+  // 阅读字号切换（持久化到 localStorage）+ 键盘 [ / ] 切换上下篇
+  (() => {
+    const KEY = "guandao.reader.fontsize";
+    const sheet = document.querySelector<HTMLElement>(".px-sheet");
+    const btn = document.getElementById("px-font-toggle");
+    const apply = (large: boolean) => {
+      if (sheet) sheet.style.fontSize = large ? "1.09rem" : "";
+      if (btn) btn.textContent = large ? "字号：偏大" : "字号：标准";
+    };
+    let large = false;
+    try {
+      large = localStorage.getItem(KEY) === "large";
+    } catch {}
+    apply(large);
+    btn?.addEventListener("click", () => {
+      large = !large;
+      try {
+        localStorage.setItem(KEY, large ? "large" : "normal");
+      } catch {}
+      apply(large);
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (e.key === "[") {
+        const prev = document.querySelector<HTMLAnchorElement>("[data-prev-post]");
+        if (prev) prev.click();
+      } else if (e.key === "]") {
+        const next = document.querySelector<HTMLAnchorElement>("[data-next-post]");
+        if (next) next.click();
+      }
+    });
+  })();
+</script>
+
+<style>
+  .px-font-toggle {
+    margin-left: auto;
+    padding: 3px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: color 0.16s ease, border-color 0.16s ease;
+  }
+
+  .px-font-toggle:hover {
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+</style>
 </BaseLayout>

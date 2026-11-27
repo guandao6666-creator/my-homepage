@@ -93,8 +93,18 @@ const data = {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Guandao OS · 管道</title>
-    <meta name="description" content="把博客做成一个可以拖窗口的桌面。点「回博客」进入普通版。" />
+    <meta name="description" content="把博客做成一个可以拖窗口的桌面。点「博客」进入纯净阅读版。" />
+    <link rel="canonical" href="https://guandao.xin/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="管道的博客" />
+    <meta property="og:title" content="Guandao OS · 管道" />
+    <meta property="og:description" content="把博客做成一个可以拖窗口的桌面。点「博客」进入纯净阅读版。" />
+    <meta property="og:url" content="https://guandao.xin/" />
+    <meta property="og:image" content="https://guandao.xin/og-default.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="preload" as="image" href="/wallpapers/aurora.webp" fetchpriority="high" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0b0e15" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -260,6 +270,7 @@ const data = {
               <button type="button" data-menu-action="close-all">全部关闭</button>
             </div>
           </div>
+          <a class="mb-menu-btn mb-blog-link" href="/home/" title="切换到纯净博客版">博客 ↗</a>
         </nav>
         <div class="mb-status">
           <div class="spaces" id="spaces" title="虚拟桌面"></div>

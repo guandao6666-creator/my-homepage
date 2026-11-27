@@ -159,6 +159,7 @@ describe("legacy-apps 注册", () => {
       "draw",
       "monitor",
       "news",
+      "posts",
       "rank",
       "social",
       "terminal",

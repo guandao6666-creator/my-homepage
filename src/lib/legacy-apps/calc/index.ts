@@ -44,7 +44,8 @@ export const calculatorApp: LegacyAppModule = {
       if (!/^[\d+\-*/.() ]+$/.test(clean)) return null;
       try {
         const v = Function('"use strict";return(' + clean + ")")();
-        return typeof v === "number" && isFinite(v) ? v : null;
+        if (typeof v !== "number" || !isFinite(v)) return null;
+        return Number(v.toPrecision(12));
       } catch {
         return null;
       }
@@ -55,14 +56,24 @@ export const calculatorApp: LegacyAppModule = {
         setDisplay("0");
         return;
       }
+      if (k === "DEL") {
+        expr = expr.slice(0, -1);
+        setDisplay(expr);
+        return;
+      }
       if (k === "=") {
+        if (!expr.trim()) return;
         const v = evaluate(expr);
         if (v !== null) {
           if (historyEl) {
-            const li = document.createElement("div");
+            const li = document.createElement("button");
+            li.type = "button";
             li.className = "calc-h-item";
+            li.title = "点击复用结果";
+            li.dataset.result = String(v);
             li.textContent = `${expr} = ${v}`;
             historyEl.prepend(li);
+            while (historyEl.children.length > 20) historyEl.lastElementChild?.remove();
           }
           expr = String(v);
           setDisplay(expr);
@@ -75,11 +86,26 @@ export const calculatorApp: LegacyAppModule = {
       expr += k;
       setDisplay(expr);
     };
+    historyEl?.addEventListener("click", (e) => {
+      const item = (e.target as HTMLElement).closest<HTMLElement>(".calc-h-item");
+      if (!item?.dataset.result) return;
+      expr = item.dataset.result;
+      setDisplay(expr);
+    });
     win.querySelectorAll<HTMLButtonElement>(".calc-key").forEach((b) => b.addEventListener("click", () => push(b.dataset.k ?? "")));
     // 键盘输入（事件从聚焦的后代冒泡到窗口）
     win.tabIndex = -1;
     win.addEventListener("keydown", (e) => {
-      const map: Record<string, string> = { "*": "×", "/": "÷", "-": "−", "+": "+", Enter: "=", "=": "=", Backspace: "C" };
+      const map: Record<string, string> = {
+        "*": "×",
+        "/": "÷",
+        "-": "−",
+        "+": "+",
+        Enter: "=",
+        "=": "=",
+        Backspace: "DEL",
+        Escape: "C",
+      };
       if (/^[0-9.()%]$/.test(e.key)) push(e.key);
       else if (map[e.key]) {
         e.preventDefault();

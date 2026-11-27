@@ -154,12 +154,23 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
   const isStaff = () => Boolean(meta?.viewer?.staff);
   const isAdmin = () => Boolean(meta?.viewer?.admin);
 
+  let metaPromise: Promise<api.CommunityMeta> | null = null;
   const ensureMeta = async () => {
     if (meta) return meta;
-    meta = await api.getMeta();
-    (window as unknown as { __CX_PERMS?: Record<string, string> }).__CX_PERMS = meta.widgetPermissions;
-    applyViewerChrome();
-    return meta;
+    if (!metaPromise) {
+      metaPromise = api
+        .getMeta()
+        .then((result) => {
+          meta = result;
+          (window as unknown as { __CX_PERMS?: Record<string, string> }).__CX_PERMS = result.widgetPermissions;
+          applyViewerChrome();
+          return result;
+        })
+        .finally(() => {
+          metaPromise = null;
+        });
+    }
+    return metaPromise;
   };
 
   const applyViewerChrome = () => {
@@ -508,6 +519,7 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
     if (openPostFromEvent(target)) {
       event.preventDefault();
+      event.stopImmediatePropagation();
       return;
     }
 
@@ -1213,6 +1225,7 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
   /* ---------------- 启动 ---------------- */
   void (async () => {
+    const bootToken = loadToken;
     try {
       await ensureMeta();
       // TS 在 IIFE 里会把 meta 收窄回初始的 null，这里按声明类型读一次
@@ -1222,9 +1235,11 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
       if (metaNow?.registrationMode === "closed") {
         // 关闭注册不影响浏览，只影响登录窗口的加入入口
       }
+      // 防止启动时的异步 loadHome 覆盖用户在 ensureMeta 期间已发起的搜索/详情视图
+      if (loadToken !== bootToken) return;
       await loadHome();
     } catch (error) {
-      showError(error);
+      if (loadToken === bootToken) showError(error);
     }
   })();
 

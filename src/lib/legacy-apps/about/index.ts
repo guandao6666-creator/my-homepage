@@ -35,7 +35,10 @@ export const aboutApp: LegacyAppModule = {
             <div class="about-links">
               <a href="/about/">关于页 →</a>
               <a href="/blog/">全部文章 →</a>
+              <a href="/cycling/">骑行记录 →</a>
+              <a href="/projects/">作品 →</a>
               <a href="/uses/">我用什么 →</a>
+              <a href="https://github.com/guandao6666-creator" target="_blank" rel="noopener">GitHub ↗</a>
             </div>
           </div>`,
 };

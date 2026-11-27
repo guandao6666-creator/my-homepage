@@ -23,7 +23,7 @@ export const SITE = {
     { href: "/about/", label: "关于" },
   ],
   socials: [
-    { href: "https://github.com/", label: "GitHub", icon: "github" },
+    { href: "https://github.com/guandao6666-creator", label: "GitHub", icon: "github" },
     { href: "mailto:guandao6666@gmail.com", label: "Email", icon: "mail" },
   ],
 } as const;

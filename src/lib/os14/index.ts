@@ -14,8 +14,8 @@ import { createSystem } from "./system";
 import { readInstall, META_BY_ID } from "./catalog";
 import { initThemes } from "./themes";
 import { bumpOpen } from "./appcenter";
-import { initWidgetGallery, registerNewWidgets, renderWidgetGallery } from "./widgetstore";
-import { initWorkspaceShortcuts, initWorkspaces, renderWorkspaces } from "./workspaces";
+import { registerNewWidgets } from "./widgetstore";
+import { initWorkspaceShortcuts } from "./workspaces";
 import { initDesktop, terminalCommand } from "./desktop";
 import { readPrefs } from "./prefs";
 import { initPlugins, isInstalled as isPluginInstalled } from "../plugins/registry";
@@ -113,8 +113,8 @@ export const initOs14 = (ctx: Ctx): BootResult => {
         })),
     },
     { id: "themes", title: "主题中心", width: 940, height: 640, glyph: "di-themes", load: lazy(() => import("./themes/app"), (m) => ({ body: m.renderThemeApp, init: (w) => m.initThemeApp(w, ctx) })) },
-    { id: "widgetstore", title: "组件中心", width: 920, height: 620, glyph: "di-widgets", render: renderWidgetGallery, init: initWidgetGallery },
-    { id: "workspaces", title: "工作空间", width: 900, height: 620, glyph: "di-space", render: renderWorkspaces, init: (w) => initWorkspaces(w, ctx) },
+    { id: "widgetstore", title: "组件中心", width: 920, height: 620, glyph: "di-widgets", load: lazy(() => import("./widgetstore-app"), (m) => ({ body: m.renderWidgetGallery, init: m.initWidgetGallery })) },
+    { id: "workspaces", title: "工作空间", width: 900, height: 620, glyph: "di-space", load: lazy(() => import("./workspaces-app"), (m) => ({ body: m.renderWorkspaces, init: (w) => m.initWorkspaces(w, ctx) })) },
 
     {
       id: "perflab",

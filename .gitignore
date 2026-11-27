@@ -60,3 +60,8 @@ src/content/blog/.sync-manifest.json
 # Playwright 本地测试产物（含 trace / 截图，绝不入库）
 test-results/
 playwright-report/
+
+# 本地临时备份与压缩包
+.backups/
+seo-backup-*/
+new-year-gift.zip

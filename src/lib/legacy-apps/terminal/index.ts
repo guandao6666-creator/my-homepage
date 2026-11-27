@@ -47,10 +47,13 @@ export const terminalApp: LegacyAppModule = {
     const COMMANDS = [
       "help",
       "ls",
+      "find",
       "open",
+      "blog",
       "whoami",
       "date",
       "time",
+      "uptime",
       "version",
       "apps",
       "theme",
@@ -110,12 +113,13 @@ export const terminalApp: LegacyAppModule = {
       const arg = rest.join(" ");
       switch (name) {
         case "help":
-          print("ls / open <n>   列出并打开文章");
+          print("ls / find <词> / open <n>  列出、搜索并打开文章");
+          print("blog            切换到纯净博客版");
           print("whoami / about  关于我");
           print("apps            全部应用");
           print("theme <dark|light>  切换外观");
           print("wallpaper <nebula|dusk|deep>  换壁纸");
-          print("date / time     当前时间");
+          print("date / time / uptime  时间与运行状态");
           print("version         系统版本");
           print("neofetch        系统信息");
           print("matrix          黑客帝国");
@@ -125,6 +129,42 @@ export const terminalApp: LegacyAppModule = {
         case "ls":
           data.posts.forEach((post, index) => print(`${String(index + 1).padStart(2, "0")}  ${post.title}`));
           break;
+        case "find": {
+          const q = arg.trim().toLowerCase();
+          if (!q) {
+            print("用法：find <关键词>", "term-error");
+            break;
+          }
+          const hits = data.posts
+            .map((post, index) => ({ post, index }))
+            .filter(
+              ({ post }) =>
+                post.title.toLowerCase().includes(q) ||
+                post.tags.some((t) => t.toLowerCase().includes(q)),
+            );
+          if (!hits.length) {
+            print(`没有找到包含「${arg.trim()}」的文章。`, "term-muted");
+            break;
+          }
+          hits.forEach(({ post, index }) =>
+            print(`${String(index + 1).padStart(2, "0")}  ${post.title}  [${post.tags.join(", ")}]`, "term-ok"),
+          );
+          break;
+        }
+        case "blog":
+          print("正在前往博客首页…", "term-ok");
+          window.location.href = "/home/";
+          break;
+        case "uptime": {
+          const sec = Math.max(1, Math.floor((Date.now() - desktopFacilities.bootedAt) / 1000));
+          const min = Math.floor(sec / 60);
+          const rem = sec % 60;
+          print(
+            `已运行 ${min > 0 ? `${min} 分 ${rem} 秒` : `${rem} 秒`} · 窗口 ${desktopFacilities.openWindowCount()} 个 · 虚拟桌面 ${desktopFacilities.deskCount()} 个`,
+            "term-ok",
+          );
+          break;
+        }
         case "open": {
           const index = Number(rest[0]) - 1;
           const post = data.posts[index];

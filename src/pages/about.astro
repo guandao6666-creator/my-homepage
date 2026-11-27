@@ -156,6 +156,14 @@ const now = [
           <Icon name="mail" size={15} />
           {SITE.email}
         </a>
+        <button class="btn" id="copy-email" type="button" data-email={SITE.email}>
+          <Icon name="copy" size={14} />
+          <span>复制邮箱</span>
+        </button>
+        <a class="btn" href="https://github.com/guandao6666-creator" target="_blank" rel="noopener">
+          <Icon name="github" size={14} />
+          GitHub
+        </a>
         <a class="btn" href="/rss.xml">
           <Icon name="rss" size={14} />
           订阅 RSS
@@ -170,6 +178,26 @@ const now = [
   </div>
   </div>
 </BaseLayout>
+
+<script>
+  (() => {
+    const btn = document.getElementById("copy-email") as HTMLButtonElement | null;
+    if (!btn) return;
+    const label = btn.querySelector("span");
+    const email = btn.dataset.email || "";
+    btn.addEventListener("click", async () => {
+      if (!email || !label) return;
+      try {
+        await navigator.clipboard.writeText(email);
+        label.textContent = "已复制";
+        setTimeout(() => (label.textContent = "复制邮箱"), 1800);
+      } catch {
+        label.textContent = "复制失败";
+        setTimeout(() => (label.textContent = "复制邮箱"), 1800);
+      }
+    });
+  })();
+</script>
 
 <style>
   .hero {

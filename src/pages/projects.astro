@@ -26,13 +26,18 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
   </section>
 
   <div class="wrap">
-    <div class="filters" aria-label="技术栈">
+    <div class="filters" aria-label="技术栈筛选" role="group">
+      <button class="chip is-active" type="button" data-proj-tag="all" aria-pressed="true">
+        全部 ({total})
+      </button>
       {tags.map((tag) => (
-        <span class="chip">{tag}</span>
+        <button class="chip" type="button" data-proj-tag={tag} aria-pressed="false">
+          {tag}
+        </button>
       ))}
     </div>
 
-    <div class="grid">
+    <div class="grid" id="projects-grid">
       {PROJECTS.map((item) => {
         const Wrapper = item.href ? "a" : "div";
         // 站内作品直接跳转，站外才新开标签
@@ -40,6 +45,7 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
         return (
           <Wrapper
             class:list={["card", { "card--link": Boolean(item.href) }]}
+            data-proj-tags={item.tags.join("|")}
             href={item.href}
             target={isExternal ? "_blank" : undefined}
             rel={isExternal ? "noopener" : undefined}
@@ -74,6 +80,30 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
   </div>
 </BaseLayout>
 
+<script>
+  (() => {
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>("[data-proj-tag]")];
+    const cards = [...document.querySelectorAll<HTMLElement>("#projects-grid [data-proj-tags]")];
+    if (!buttons.length || !cards.length) return;
+
+    const apply = (tag: string) => {
+      buttons.forEach((btn) => {
+        const active = btn.dataset.projTag === tag;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      cards.forEach((card) => {
+        const list = (card.dataset.projTags || "").split("|");
+        card.hidden = tag !== "all" && !list.includes(tag);
+      });
+    };
+
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => apply(btn.dataset.projTag || "all"));
+    });
+  })();
+</script>
+
 <style>
   .filters {
     display: flex;
@@ -84,12 +114,29 @@ const tags = [...new Set(PROJECTS.flatMap((item) => item.tags))];
 
   .chip {
     padding: 5px 9px 4px;
+    border: 0;
     font-family: var(--px-pix);
     font-size: 11px;
     letter-spacing: 0.04em;
     color: var(--px-cyan);
     background: var(--px-panel-2);
     box-shadow: inset 2px 2px 0 0 var(--px-slot-lo);
+    cursor: pointer;
+    transition: background-color 0.14s linear, color 0.14s linear;
+  }
+
+  .chip:hover {
+    color: var(--px-gold);
+  }
+
+  .chip.is-active {
+    background: var(--px-gold);
+    color: #161822;
+    box-shadow: none;
+  }
+
+  .card[hidden] {
+    display: none;
   }
 
   .grid {

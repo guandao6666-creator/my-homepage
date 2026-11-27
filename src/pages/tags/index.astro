@@ -51,9 +51,30 @@ const grouped = tags.map((tag) => ({
           ))}
         </div>
 
-        <div class="tag-grid">
+        <div class="tags-toolbar">
+          <input
+            id="tags-search"
+            type="search"
+            placeholder="筛选标签或文章标题…"
+            autocomplete="off"
+            aria-label="筛选标签"
+          />
+          <div class="tags-sort" role="group" aria-label="排序方式">
+            <button class="tags-sort-btn is-active" type="button" data-tags-sort="count" aria-pressed="true">按篇数</button>
+            <button class="tags-sort-btn" type="button" data-tags-sort="name" aria-pressed="false">按名称</button>
+          </div>
+        </div>
+
+        <div class="tag-grid" id="tag-grid">
           {grouped.map((tag) => (
-        <section class="tag-card" id={`tag-${tag.tag}`}>
+        <section
+          class="tag-card"
+          id={`tag-${tag.tag}`}
+          data-tag-card
+          data-tag-name={tag.tag}
+          data-tag-count={tag.count}
+          data-tag-text={`${tag.tag} ${tag.posts.map((p) => p.title).join(" ")}`.toLowerCase()}
+        >
           <header>
             <a class="tag-name" href={`/tags/${encodeURIComponent(tag.tag)}/`}>
               <span class="tag-dot" style={`--hue:${tagHue(tag.tag)}`} aria-hidden="true"></span>
@@ -88,7 +109,98 @@ const grouped = tags.map((tag) => ({
   </div>
 </BaseLayout>
 
+<script>
+  (() => {
+    const grid = document.getElementById("tag-grid");
+    const input = document.getElementById("tags-search") as HTMLInputElement | null;
+    const sortBtns = [...document.querySelectorAll<HTMLButtonElement>("[data-tags-sort]")];
+    if (!grid) return;
+
+    const cards = [...grid.querySelectorAll<HTMLElement>("[data-tag-card]")];
+    const applyFilter = () => {
+      const q = (input?.value ?? "").trim().toLowerCase();
+      for (const card of cards) {
+        card.hidden = Boolean(q) && !(card.dataset.tagText || "").includes(q);
+      }
+    };
+
+    const applySort = (mode: string) => {
+      const sorted = [...cards].sort((a, b) => {
+        if (mode === "name") {
+          return (a.dataset.tagName || "").localeCompare(b.dataset.tagName || "", "zh-CN");
+        }
+        return Number(b.dataset.tagCount || 0) - Number(a.dataset.tagCount || 0);
+      });
+      for (const card of sorted) grid.appendChild(card);
+    };
+
+    input?.addEventListener("input", applyFilter);
+    sortBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.tagsSort || "count";
+        sortBtns.forEach((b) => {
+          const on = b === btn;
+          b.classList.toggle("is-active", on);
+          b.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        applySort(mode);
+      });
+    });
+  })();
+</script>
+
 <style>
+  .tags-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .tags-toolbar input {
+    flex: 1;
+    max-width: 280px;
+    padding: 7px 10px;
+    border: 2px solid var(--px-slot-lo, #1c2c52);
+    background: var(--px-panel-2);
+    color: var(--px-ink, #fff);
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .tags-toolbar input:focus {
+    border-color: var(--px-gold);
+  }
+
+  .tags-sort {
+    display: flex;
+    gap: 6px;
+  }
+
+  .tags-sort-btn {
+    padding: 5px 10px 4px;
+    border: 0;
+    font-family: var(--px-pix);
+    font-size: 11px;
+    color: var(--px-cyan);
+    background: var(--px-panel-2);
+    box-shadow: inset 2px 2px 0 0 var(--px-slot-lo);
+    cursor: pointer;
+  }
+
+  .tags-sort-btn.is-active {
+    background: var(--px-gold);
+    color: #161822;
+    box-shadow: none;
+  }
+
+  .tag-card[hidden] {
+    display: none;
+  }
+
   .tags-empty {
     margin: 0;
     padding: 44px 0 8px;

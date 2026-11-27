@@ -35,6 +35,11 @@ const isActive = (href: string) => {
     </nav>
 
     <div class="header-actions">
+      <button class="search-trigger" id="search-trigger" type="button" aria-label="全站搜索 (Ctrl+K)" title="全站搜索 (Ctrl+K)">
+        <Icon name="search" size={14} />
+        <span class="search-trigger-text">搜索</span>
+        <kbd class="search-trigger-kbd">⌘K</kbd>
+      </button>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换深色模式">
         <span class="theme-icon theme-icon--sun"><Icon name="sun" size={15} /></span>
         <span class="theme-icon theme-icon--moon"><Icon name="moon" size={15} /></span>
@@ -150,6 +155,36 @@ const isActive = (href: string) => {
     gap: 8px;
   }
 
+  .search-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+  }
+
+  .search-trigger:hover {
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+
+  .search-trigger-kbd {
+    font-family: var(--font-mono, monospace);
+    font-size: 10.5px;
+    color: var(--muted);
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--surface-sunk);
+  }
+
   .theme-toggle {
     display: grid;
     place-items: center;
@@ -201,6 +236,15 @@ const isActive = (href: string) => {
     .nav-link {
       padding: 7px 8px;
       font-size: 13.5px;
+    }
+    .search-trigger {
+      width: 32px;
+      padding: 0;
+      justify-content: center;
+    }
+    .search-trigger-text,
+    .search-trigger-kbd {
+      display: none;
     }
   }
 </style>

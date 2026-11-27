@@ -25,9 +25,30 @@ const totalItems = USES.reduce((sum, group) => sum + group.items.length, 0);
   </section>
 
   <div class="wrap">
+    <div class="uses-bar">
+      <div class="uses-pills" role="group" aria-label="分类筛选">
+        <button class="uses-pill is-active" type="button" data-uses-group="all" aria-pressed="true">
+          全部 ({totalItems})
+        </button>
+        {USES.map((group) => (
+          <button class="uses-pill" type="button" data-uses-group={group.title} aria-pressed="false">
+            {group.title} ({group.items.length})
+          </button>
+        ))}
+      </div>
+      <input
+        id="uses-search"
+        class="uses-search"
+        type="search"
+        placeholder="搜索工具或装备…"
+        autocomplete="off"
+        aria-label="搜索工具或装备"
+      />
+    </div>
+
     <div class="groups">
       {USES.map((group) => (
-        <section class="group">
+        <section class="group" data-uses-section={group.title}>
           <div class="group-head">
             <h2>{group.title}</h2>
             {group.caption && <p>{group.caption}</p>}
@@ -35,7 +56,7 @@ const totalItems = USES.reduce((sum, group) => sum + group.items.length, 0);
 
           <ul class="items">
             {group.items.map((item) => (
-              <li>
+              <li data-uses-item data-uses-text={`${item.name} ${item.note} ${group.title}`.toLowerCase()}>
                 <div class="item-name">
                   {item.href ? <a href={item.href}>{item.name}</a> : item.name}
                 </div>
@@ -45,6 +66,7 @@ const totalItems = USES.reduce((sum, group) => sum + group.items.length, 0);
           </ul>
         </section>
       ))}
+      <p class="uses-empty" id="uses-empty" hidden>没有匹配的工具或装备。</p>
     </div>
 
     <p class="foot-note">
@@ -60,7 +82,111 @@ const totalItems = USES.reduce((sum, group) => sum + group.items.length, 0);
   </div>
 </BaseLayout>
 
+<script>
+  (() => {
+    const pills = [...document.querySelectorAll<HTMLButtonElement>("[data-uses-group]")];
+    const input = document.getElementById("uses-search") as HTMLInputElement | null;
+    const sections = [...document.querySelectorAll<HTMLElement>("[data-uses-section]")];
+    const emptyEl = document.getElementById("uses-empty");
+    if (!sections.length) return;
+
+    let activeGroup = "all";
+    const filter = () => {
+      const q = (input?.value ?? "").trim().toLowerCase();
+      let shown = 0;
+      for (const sec of sections) {
+        const groupMatch = activeGroup === "all" || sec.dataset.usesSection === activeGroup;
+        let secShown = 0;
+        for (const item of sec.querySelectorAll<HTMLElement>("[data-uses-item]")) {
+          const match = groupMatch && (!q || (item.dataset.usesText || "").includes(q));
+          item.hidden = !match;
+          if (match) secShown++;
+        }
+        sec.hidden = secShown === 0;
+        shown += secShown;
+      }
+      if (emptyEl) emptyEl.hidden = shown > 0;
+    };
+
+    pills.forEach((pill) => {
+      pill.addEventListener("click", () => {
+        activeGroup = pill.dataset.usesGroup || "all";
+        pills.forEach((p) => {
+          const on = p === pill;
+          p.classList.toggle("is-active", on);
+          p.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        filter();
+      });
+    });
+    input?.addEventListener("input", filter);
+  })();
+</script>
+
 <style>
+  .uses-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 24px 0 6px;
+  }
+
+  .uses-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .uses-pill {
+    padding: 5px 10px 4px;
+    border: 0;
+    font-family: var(--px-pix);
+    font-size: 11px;
+    color: var(--px-cyan);
+    background: var(--px-panel-2);
+    box-shadow: inset 2px 2px 0 0 var(--px-slot-lo);
+    cursor: pointer;
+    transition: background-color 0.14s linear, color 0.14s linear;
+  }
+
+  .uses-pill:hover {
+    color: var(--px-gold);
+  }
+
+  .uses-pill.is-active {
+    background: var(--px-gold);
+    color: #161822;
+    box-shadow: none;
+  }
+
+  .uses-search {
+    min-width: 190px;
+    padding: 7px 10px;
+    border: 2px solid var(--px-slot-lo, #1c2c52);
+    background: var(--px-panel-2);
+    color: var(--px-ink, #fff);
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .uses-search:focus {
+    border-color: var(--px-gold);
+  }
+
+  .uses-empty {
+    padding: 36px 0;
+    color: var(--px-faint);
+    font-size: 14px;
+  }
+
+  .group[hidden],
+  [data-uses-item][hidden] {
+    display: none;
+  }
+
   .groups {
     padding-top: 12px;
   }

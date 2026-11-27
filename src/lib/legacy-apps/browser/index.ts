@@ -25,13 +25,19 @@ export const browserApp: LegacyAppModule = {
               <div class="browser-links">
                 <a class="browser-link" href="/home/">我的博客</a>
                 <a class="browser-link" href="/blog/">文章</a>
-                <a class="browser-link" href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
+                <a class="browser-link" href="/cycling/">骑行</a>
+                <a class="browser-link" href="/projects/">作品</a>
+                <a class="browser-link" href="/archive/">归档</a>
+                <a class="browser-link" href="https://github.com/guandao6666-creator" target="_blank" rel="noreferrer">GitHub</a>
                 <a class="browser-link" href="https://www.bilibili.com/" target="_blank" rel="noreferrer">Bilibili</a>
                 <a class="browser-link" href="https://www.bing.com/" target="_blank" rel="noreferrer">必应</a>
               </div>
               <p class="browser-tip">外部网站会在新标签页打开，浏览器安全策略不允许嵌入第三方页面。</p>
             </div>
-            <p class="browser-sec">历史记录</p>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <p class="browser-sec">历史记录</p>
+              <button class="browser-go" data-browser-clear type="button" style="padding:2px 8px;font-size:11px;opacity:.8">清空</button>
+            </div>
             <div class="browser-history" data-browser-history></div>
           </div>`,
   init: (win, { escapeHtml }) => {
@@ -58,7 +64,7 @@ export const browserApp: LegacyAppModule = {
       const isUrl = /^(https?:\/\/)/i.test(q) || /^[\w-]+(\.[\w-]+)+/.test(q);
       const url = isUrl ? (/^https?:\/\//i.test(q) ? q : `https://${q}`) : `https://www.bing.com/search?q=${encodeURIComponent(q)}`;
       window.open(url, "_blank", "noreferrer");
-      const list = readHistory();
+      const list = readHistory().filter((item) => item.url !== url);
       list.unshift({ url, at: Date.now() });
       try {
         localStorage.setItem(BROWSER_HISTORY_KEY, JSON.stringify(list.slice(0, 30)));
@@ -68,6 +74,14 @@ export const browserApp: LegacyAppModule = {
       paint();
     };
     win.querySelector("[data-browser-go]")?.addEventListener("click", () => go(urlEl?.value ?? ""));
+    win.querySelector("[data-browser-clear]")?.addEventListener("click", () => {
+      try {
+        localStorage.removeItem(BROWSER_HISTORY_KEY);
+      } catch {
+        /* 忽略 */
+      }
+      paint();
+    });
     urlEl?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") go(urlEl.value);
     });

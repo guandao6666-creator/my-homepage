@@ -73,6 +73,12 @@
         background: rgba(255, 255, 255, 0.1);
       }
 
+      a.mb-blog-link {
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+      }
+
       .mb-dropdown {
         position: absolute;
         top: 30px;

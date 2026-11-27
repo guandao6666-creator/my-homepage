@@ -43,7 +43,9 @@ const totalPosts = seriesList.reduce((sum, item) => sum + item.posts.length, 0);
               <a class="series-name" href={`/series/${encodeURIComponent(item.name)}/`}>
                 {item.name}
               </a>
-              <span class="series-meta">{item.posts.length} 篇</span>
+              <span class="series-meta">
+                {item.posts.length} 篇 · 约 {item.posts.reduce((sum, p) => sum + p.minutes, 0)} 分钟
+              </span>
             </header>
 
             <ol>

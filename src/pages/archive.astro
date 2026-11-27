@@ -67,21 +67,31 @@ const firstPost = posts[posts.length - 1];
         </nav>
 
         <div class="timeline">
+          <div class="archive-filter">
+            <input
+              id="archive-search"
+              type="search"
+              placeholder="按标题或标签筛选归档文章…"
+              autocomplete="off"
+              aria-label="筛选归档文章"
+            />
+            <span class="archive-count" id="archive-count">共 {posts.length} 篇</span>
+          </div>
           {groups.map((group) => (
-            <section class="year" id={`y${group.year}`}>
+            <section class="year" id={`y${group.year}`} data-arch-year>
               <h2 class="year-title">
                 {group.year}
                 <span>{group.count} 篇</span>
               </h2>
 
               {group.months.map((month) => (
-                <div class="month">
+                <div class="month" data-arch-month>
                   <h3>{String(month.month).padStart(2, "0")} 月</h3>
                   <ul>
                     {month.posts.map((post) => {
                       const day = String(new Date(post.pubDate).getUTCDate()).padStart(2, "0");
                       return (
-                        <li>
+                        <li data-arch-item data-arch-text={`${post.title} ${post.tags.join(" ")}`.toLowerCase()}>
                           <a href={`/blog/${post.slug}/`}>
                             <time datetime={new Date(post.pubDate).toISOString()}>{day}</time>
                             <span class="title">{post.title}</span>
@@ -95,6 +105,7 @@ const firstPost = posts[posts.length - 1];
               ))}
             </section>
           ))}
+          <p class="empty" id="archive-empty" hidden>没有匹配的归档文章，换个关键词试试。</p>
         </div>
       </div>
     )}
@@ -107,12 +118,81 @@ const firstPost = posts[posts.length - 1];
   </div>
 </BaseLayout>
 
+<script>
+  (() => {
+    const input = document.getElementById("archive-search") as HTMLInputElement | null;
+    const countEl = document.getElementById("archive-count");
+    const emptyEl = document.getElementById("archive-empty");
+    const years = [...document.querySelectorAll<HTMLElement>("[data-arch-year]")];
+    if (!input || !years.length) return;
+
+    const filter = () => {
+      const q = input.value.trim().toLowerCase();
+      let shown = 0;
+      for (const year of years) {
+        let yearShown = 0;
+        for (const month of year.querySelectorAll<HTMLElement>("[data-arch-month]")) {
+          let monthShown = 0;
+          for (const item of month.querySelectorAll<HTMLElement>("[data-arch-item]")) {
+            const match = !q || (item.dataset.archText || "").includes(q);
+            item.hidden = !match;
+            if (match) monthShown++;
+          }
+          month.hidden = monthShown === 0;
+          yearShown += monthShown;
+        }
+        year.hidden = yearShown === 0;
+        shown += yearShown;
+      }
+      if (countEl) countEl.textContent = q ? `匹配 ${shown} 篇` : `共 ${shown} 篇`;
+      if (emptyEl) emptyEl.hidden = shown > 0;
+    };
+
+    input.addEventListener("input", filter);
+  })();
+</script>
+
 <style>
   .archive-layout {
     display: grid;
     grid-template-columns: 110px minmax(0, 1fr);
     gap: 40px;
     padding-top: 32px;
+  }
+
+  .archive-filter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  .archive-filter input {
+    flex: 1;
+    max-width: 340px;
+    padding: 8px 12px;
+    border: 2px solid var(--px-slot-lo, #1c2c52);
+    background: var(--px-panel-2, rgba(16, 26, 52, 0.7));
+    color: var(--px-ink, #fff);
+    font: inherit;
+    font-size: 13.5px;
+    outline: none;
+  }
+
+  .archive-filter input:focus {
+    border-color: var(--px-gold, #f3c65d);
+  }
+
+  .archive-count {
+    font-family: var(--px-pix);
+    font-size: 11.5px;
+    color: var(--px-faint);
+  }
+
+  [data-arch-year][hidden],
+  [data-arch-month][hidden],
+  [data-arch-item][hidden] {
+    display: none;
   }
 
   .year-nav {

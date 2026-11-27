@@ -13,12 +13,19 @@ import Icon from "../components/Icon.astro";
       </p>
       <div class="actions">
         <a class="btn btn--solid" href="/home/">回到首页 <Icon name="arrow-right" size={14} /></a>
+        <button class="btn" type="button" id="nf-search"><Icon name="search" size={14} /> 全站搜索</button>
         <a class="btn" href="/blog/">浏览文章</a>
-        <a class="btn" href="/tags/">标签归档</a>
+        <a class="btn" href="/">桌面 OS</a>
       </div>
     </div>
   </section>
 </BaseLayout>
+
+<script>
+  document.getElementById("nf-search")?.addEventListener("click", () => {
+    document.getElementById("search-trigger")?.click();
+  });
+</script>
 
 <style>
   .notfound {
