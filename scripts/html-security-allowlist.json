@@ -505,6 +505,18 @@
       "file": "src/lib/ui/lazy-css.ts",
       "count": 1,
       "reason": "href 来自 Vite 构建产物路径（import \"x.css?url\" 的返回值），不是用户输入；link 只能指向本站打包资源"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os21/focus.ts",
+      "count": 1,
+      "reason": "2.2 近 7 天柱状图：日期与标签经 escapeHtml，分钟数 / 柱高为本地计算的数字，其余为字面量"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os22/clock.ts",
+      "count": 7,
+      "reason": "2.2 Clock Studio：时区 ID / 城市名来自静态 ZONES 白名单且经 escapeHtml；倒数日标题与日期为用户输入，全部经 escapeHtml（日期另经 /^\\d{4}-\\d{2}-\\d{2}$/ 校验）；秒表与天数为数字，其余为字面量"
     }
   ]
 }

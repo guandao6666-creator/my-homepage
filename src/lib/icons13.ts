@@ -211,6 +211,12 @@ export const ICON_SVG: Record<string, string> = {
     ${A("M24 10.6c1.1 5.6 3.4 8 9 9-5.6 1.1-7.9 3.4-9 9-1.1-5.6-3.4-7.9-9-9 5.6-1 7.9-3.4 9-9Z")}
     ${A("M33.4 28.4c.6 3 1.8 4.2 4.8 4.8-3 .6-4.2 1.8-4.8 4.8-.6-3-1.8-4.2-4.8-4.8 3-.6 4.2-1.8 4.8-4.8Z", 0.62)}
     ${A("M14.2 27.2c.4 2.2 1.4 3.1 3.6 3.6-2.2.4-3.1 1.4-3.6 3.6-.4-2.2-1.4-3.1-3.6-3.6 2.2-.4 3.1-1.4 3.6-3.6Z", 0.45)}`,
+
+  /* 2.2：Clock Studio */
+  clock: `
+    <circle cx="24" cy="24" r="13.6" fill="currentColor"/>
+    <path d="M24 16.4V24l5.2 3.4" stroke="#0b1020" stroke-opacity=".34" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    ${A("M14.6 10.8a3 3 0 0 1 4.2 0l-5.9 5.9a3 3 0 0 1 0-4.2l1.7-1.7ZM33.4 10.8a3 3 0 0 0-4.2 0l5.9 5.9a3 3 0 0 0 0-4.2l-1.7-1.7Z", 0.6)}`,
 };
 
 const CLASS_MAP: Record<string, string> = {
@@ -251,6 +257,8 @@ const CLASS_MAP: Record<string, string> = {
   "di-fresh": "fresh",
   "di-store": "store",
   "di-spark": "spark",
+  // 2.2
+  "di-clock": "clock",
 };
 
 const paint = (glyph: HTMLElement) => {

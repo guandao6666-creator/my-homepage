@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 性能采集与离线队列单元测试（1.9）
  */
 import { describe, expect, it } from "vitest";
@@ -131,6 +131,6 @@ describe("版本常量", () => {
     const pkg = (await import("../../package.json")) as { default?: { version: string } } & { version?: string };
     const version = pkg.default?.version ?? pkg.version;
     expect(OS_VERSION).toBe(version);
-    expect(RELEASE_NAME).toBe("Fluid Workspace");
+    expect(RELEASE_NAME).toBe("Chrono Flow");
   });
 });

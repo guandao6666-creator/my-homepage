@@ -6,8 +6,8 @@
  * 构建前跑一次就能发现漂移。
  */
 
-export const WORKER_VERSION = "2.1.0";
-export const RELEASE_NAME = "Fluid Workspace";
+export const WORKER_VERSION = "2.2.0";
+export const RELEASE_NAME = "Chrono Flow";
 
 /** 供响应头使用：让任何一次线上响应都能对应到具体版本 */
 export const VERSION_HEADER = "x-guandao-version";

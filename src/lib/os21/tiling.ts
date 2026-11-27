@@ -1,5 +1,5 @@
 /**
- * Guandao OS 2.1 · 窗口分屏贴靠 + 全局快捷键 + 快捷键一览面板
+ * Guandao OS 2.1 / 2.2 · 窗口分屏贴靠 + 智能整理 + 全局快捷键 + 快捷键一览面板
  *
  * 快捷键（输入框内自动屏蔽）：
  *   - Alt + ← : 当前窗口左半屏贴靠
@@ -7,23 +7,40 @@
  *   - Alt + ↑ : 最大化 / 还原当前窗口
  *   - Alt + ↓ : 居中当前窗口
  *   - Alt + W : 关闭当前窗口
+ *   - Alt + G : 网格平铺全部可见窗口（2.2）
+ *   - Alt + Shift + G : 层叠排列全部可见窗口（2.2）
  *   - Shift + ? : 打开 / 关闭快捷键一览面板
  *
  * 全部 DOM 均使用 createElement / textContent 构建，无 innerHTML 风险。
  */
 import type { Ctx } from "../os14/core";
 
-export type TileAction = "tile-left" | "tile-right" | "tile-center" | "tile-max" | "tile-close" | "shortcuts";
+export type TileAction =
+  | "tile-left"
+  | "tile-right"
+  | "tile-center"
+  | "tile-max"
+  | "tile-close"
+  | "tile-grid"
+  | "tile-cascade"
+  | "shortcuts";
 
 const SHORTCUT_GROUPS: Array<{ title: string; items: Array<[string, string]> }> = [
   {
-    title: "窗口分屏与管理（2.1 新增）",
+    title: "窗口分屏与管理",
     items: [
       ["Alt + ←", "当前窗口贴靠左半屏"],
       ["Alt + →", "当前窗口贴靠右半屏"],
       ["Alt + ↑", "最大化 / 还原当前窗口"],
       ["Alt + ↓", "将当前窗口居中"],
       ["Alt + W", "关闭当前活动窗口"],
+    ],
+  },
+  {
+    title: "智能整理（2.2 新增）",
+    items: [
+      ["Alt + G", "网格平铺全部可见窗口"],
+      ["Alt + Shift + G", "层叠排列全部可见窗口"],
     ],
   },
   {
@@ -37,13 +54,79 @@ const SHORTCUT_GROUPS: Array<{ title: string; items: Array<[string, string]> }> 
   },
 ];
 
-const getTopWindow = (windowsRoot: HTMLElement): HTMLElement | null => {
+/** 当前桌面上可见（未最小化 / 未隐藏）的窗口，按 z-index 从上到下排序 */
+const getVisibleWindows = (windowsRoot: HTMLElement): HTMLElement[] => {
   const list = Array.from(windowsRoot.querySelectorAll<HTMLElement>(".window")).filter(
-    (w) => !w.classList.contains("is-min") && !w.hidden && w.style.display !== "none",
+    (w) =>
+      !w.classList.contains("is-min") &&
+      !w.classList.contains("is-hidden-space") &&
+      !w.hidden &&
+      w.style.display !== "none" &&
+      getComputedStyle(w).display !== "none",
   );
-  if (!list.length) return null;
   list.sort((a, b) => (Number(b.style.zIndex) || 0) - (Number(a.style.zIndex) || 0));
-  return list[0] ?? null;
+  return list;
+};
+
+const getTopWindow = (windowsRoot: HTMLElement): HTMLElement | null => getVisibleWindows(windowsRoot)[0] ?? null;
+
+/**
+ * 网格布局计算（纯函数，便于单测）：n 个窗口 → 尽量接近正方形的 cols × rows，
+ * 最后一行不足时拉宽填满。返回每个窗口的 { x, y, w, h }。
+ */
+export const gridLayout = (
+  n: number,
+  area: { x: number; y: number; w: number; h: number; gap: number },
+): Array<{ x: number; y: number; w: number; h: number }> => {
+  if (n <= 0) return [];
+  const cols = Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n / cols);
+  const cellH = Math.floor((area.h - area.gap * (rows - 1)) / rows);
+  const out: Array<{ x: number; y: number; w: number; h: number }> = [];
+  for (let i = 0; i < n; i++) {
+    const row = Math.floor(i / cols);
+    const inRow = row === rows - 1 ? n - cols * (rows - 1) : cols;
+    const col = i - row * cols;
+    const cellW = Math.floor((area.w - area.gap * (inRow - 1)) / inRow);
+    out.push({
+      x: area.x + col * (cellW + area.gap),
+      y: area.y + row * (cellH + area.gap),
+      w: cellW,
+      h: cellH,
+    });
+  }
+  return out;
+};
+
+const arrangeGrid = (wins: HTMLElement[]) => {
+  // 按屏幕位置（从上到下、从左到右）排序，整理后窗口相对位置尽量不乱跳
+  const ordered = [...wins].sort((a, b) => a.offsetTop - b.offsetTop || a.offsetLeft - b.offsetLeft);
+  const cells = gridLayout(ordered.length, workArea());
+  ordered.forEach((win, i) => {
+    const c = cells[i];
+    win.classList.remove("is-max");
+    win.style.left = `${c.x}px`;
+    win.style.top = `${c.y}px`;
+    win.style.width = `${c.w}px`;
+    win.style.height = `${c.h}px`;
+  });
+};
+
+const arrangeCascade = (wins: HTMLElement[]) => {
+  const area = workArea();
+  const step = 32;
+  const w = Math.round(Math.min(860, Math.max(420, area.w * 0.6)));
+  const h = Math.round(Math.min(600, Math.max(300, area.h * 0.72)));
+  const maxSteps = Math.max(1, Math.floor(Math.min(area.w - w, area.h - h) / step));
+  // 自底向上排，原先在最上层的窗口仍在最上层、位于层叠末端
+  [...wins].reverse().forEach((win, i) => {
+    const k = i % (maxSteps + 1);
+    win.classList.remove("is-max");
+    win.style.width = `${w}px`;
+    win.style.height = `${h}px`;
+    win.style.left = `${area.x + 20 + k * step}px`;
+    win.style.top = `${area.y + 12 + k * step}px`;
+  });
 };
 
 const workArea = () => {
@@ -107,7 +190,7 @@ export const toggleShortcutCheatsheet = () => {
   backdrop.className = "os21-kbd-backdrop";
   backdrop.setAttribute("role", "dialog");
   backdrop.setAttribute("aria-modal", "true");
-  backdrop.setAttribute("aria-label", "Guandao OS 2.1 快捷键一览");
+  backdrop.setAttribute("aria-label", "Guandao OS 快捷键一览");
   Object.assign(backdrop.style, {
     position: "fixed",
     inset: "0",
@@ -142,10 +225,10 @@ export const toggleShortcutCheatsheet = () => {
 
   const titleWrap = document.createElement("div");
   const h2 = document.createElement("h2");
-  h2.textContent = "Guandao OS 2.1 · 快捷键一览";
+  h2.textContent = "Guandao OS 2.2 · 快捷键一览";
   Object.assign(h2.style, { margin: "0", fontSize: "16px", fontWeight: "650" });
   const sub = document.createElement("p");
-  sub.textContent = "Fluid Workspace · 用键盘高效管理窗口与工作空间";
+  sub.textContent = "Chrono Flow · 用键盘高效管理窗口与工作空间";
   Object.assign(sub.style, { margin: "3px 0 0", fontSize: "12px", opacity: "0.65" });
   titleWrap.append(h2, sub);
 
@@ -231,6 +314,21 @@ export const initOs21Tiling = (ctx: Ctx) => {
       toggleShortcutCheatsheet();
       return;
     }
+    if (action === "tile-grid" || action === "tile-cascade") {
+      const wins = getVisibleWindows(ctx.windows);
+      if (!wins.length) {
+        ctx.toast("当前没有可整理的窗口");
+        return;
+      }
+      if (action === "tile-grid") {
+        arrangeGrid(wins);
+        ctx.toast(`已网格平铺 ${wins.length} 个窗口`);
+      } else {
+        arrangeCascade(wins);
+        ctx.toast(`已层叠排列 ${wins.length} 个窗口`);
+      }
+      return;
+    }
     const win = getTopWindow(ctx.windows);
     if (!win) {
       ctx.toast("当前没有可操作的活动窗口");
@@ -294,6 +392,9 @@ export const initOs21Tiling = (ctx: Ctx) => {
     } else if (e.key.toLowerCase() === "w") {
       e.preventDefault();
       dispatch("tile-close");
+    } else if (e.code === "KeyG" || e.key.toLowerCase() === "g") {
+      e.preventDefault();
+      dispatch(e.shiftKey ? "tile-cascade" : "tile-grid");
     }
   });
 };

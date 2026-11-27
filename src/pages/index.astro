@@ -202,7 +202,7 @@ const data = {
         <span class="mb-brand">
           <span class="mb-logo" aria-hidden="true">管</span>
           <span class="mb-brand-text">Guandao OS</span>
-          <span class="mb-version" id="mb-version">2.1</span>
+          <span class="mb-version" id="mb-version">2.2</span>
         </span>
         <span class="mb-current" id="mb-current" hidden></span>
         <nav class="mb-menu">
@@ -235,6 +235,7 @@ const data = {
               <button type="button" data-menu-action="playground">游乐场</button>
               <button type="button" data-menu-action="workspaces">工作空间</button>
               <button type="button" data-menu-action="focus">番茄专注（Focus Studio）</button>
+              <button type="button" data-menu-action="clock">时光（Clock Studio）</button>
               <button type="button" data-menu-action="tasks">任务与通知</button>
               <button type="button" data-menu-action="continuity">接力中心</button>
               <span class="mb-sep"></span>
@@ -268,6 +269,8 @@ const data = {
               <button type="button" data-menu-action="tile-left">贴靠左半屏（Alt+←）</button>
               <button type="button" data-menu-action="tile-right">贴靠右半屏（Alt+→）</button>
               <button type="button" data-menu-action="tile-center">居中窗口（Alt+↓）</button>
+              <button type="button" data-menu-action="tile-grid">网格平铺全部窗口（Alt+G）</button>
+              <button type="button" data-menu-action="tile-cascade">层叠排列全部窗口（Alt+Shift+G）</button>
               <button type="button" data-menu-action="shortcuts">快捷键一览（?）</button>
               <span class="mb-sep"></span>
               <button type="button" data-menu-action="minimize-all">全部最小化</button>
@@ -3522,11 +3525,16 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
             case "tile-left":
             case "tile-right":
             case "tile-center":
+            case "tile-grid":
+            case "tile-cascade":
             case "shortcuts":
               window.dispatchEvent(new CustomEvent("guandao:os21-action", { detail: action }));
               break;
             case "focus":
               openApp("focus");
+              break;
+            case "clock":
+              openApp("clock");
               break;
             case "restore-all":
               restoreAll();

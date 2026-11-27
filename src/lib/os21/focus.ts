@@ -7,8 +7,21 @@
  *   - 纯本地 Web Audio 柔和白噪音与结束提示音（零音频文件下载）
  *   - 今日专注次数、累计分钟数与专注记录保存在 localStorage（guandao.os21.focus.v1）
  *   - 关闭窗口时彻底释放计时器与音频上下文
+ *   - 2.2：近 7 天专注柱状图；计时中浏览器标签页标题显示剩余时间
  */
 import { escapeHtml, ls, todayKey, type Ctx } from "../os14/core";
+
+/** 近 7 天（含今天）每天的专注分钟数，最早的在前（纯函数，便于单测） */
+export const weeklyMinutes = (logs: Array<{ day: string; min: number }>, now: Date = new Date()) => {
+  const out: Array<{ day: string; label: string; min: number }> = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const day = todayKey(d);
+    const min = logs.filter((l) => l.day === day).reduce((sum, l) => sum + l.min, 0);
+    out.push({ day, label: i === 0 ? "今天" : `${d.getMonth() + 1}/${d.getDate()}`, min });
+  }
+  return out;
+};
 
 const STORAGE_KEY = "guandao.os21.focus.v1";
 
@@ -25,7 +38,7 @@ const MODE_MINUTES: Record<Mode, number> = { focus: 25, short: 5, long: 15 };
 const MODE_LABEL: Record<Mode, string> = { focus: "深度专注", short: "短休息", long: "长休息" };
 
 export const renderFocusStudio = () => `
-  <div class="os21-focus" style="display:grid;grid-template-rows:auto 1fr auto;gap:14px;height:100%;padding:18px 20px;box-sizing:border-box;color:inherit">
+  <div class="os21-focus" style="display:grid;grid-template-rows:auto 1fr auto auto;gap:14px;height:100%;padding:18px 20px;box-sizing:border-box;color:inherit">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <div style="display:flex;gap:6px" data-fs-modes>
         <button type="button" class="g14-btn is-primary" data-fs-mode="focus">深度专注 25m</button>
@@ -64,9 +77,11 @@ export const renderFocusStudio = () => `
       </div>
     </div>
 
+    <div data-fs-week aria-label="近 7 天专注分钟" role="img" style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:74px"></div>
+
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);font-size:12px;opacity:0.8">
       <span data-fs-stats>今日已完成 0 次 · 累计 0 分钟</span>
-      <span style="opacity:0.65">Guandao OS 2.1 · Focus Studio</span>
+      <span style="opacity:0.65">Guandao OS 2.2 · Focus Studio</span>
     </div>
   </div>`;
 
@@ -81,6 +96,21 @@ export const initFocusStudio = (win: HTMLElement, ctx: Ctx): (() => void) => {
   const ambientBtn = win.querySelector<HTMLButtonElement>("[data-fs-ambient]");
   const soundBtn = win.querySelector<HTMLButtonElement>("[data-fs-sound]");
   const modeBtns = Array.from(win.querySelectorAll<HTMLButtonElement>("[data-fs-mode]"));
+  const weekEl = win.querySelector<HTMLElement>("[data-fs-week]");
+  /** 计时开始前的标签页标题；计时中改写为剩余时间，停止 / 关闭窗口时还原 */
+  let savedTitle: string | null = null;
+
+  const syncDocTitle = () => {
+    if (running) {
+      if (savedTitle == null) savedTitle = document.title;
+      const m = String(Math.floor(remainSec / 60)).padStart(2, "0");
+      const s = String(remainSec % 60).padStart(2, "0");
+      document.title = `⏱ ${m}:${s} · ${MODE_LABEL[mode]}`;
+    } else if (savedTitle != null) {
+      document.title = savedTitle;
+      savedTitle = null;
+    }
+  };
 
   const CIRC = 2 * Math.PI * 52;
   let persist = readPersist();
@@ -166,6 +196,26 @@ export const initFocusStudio = (win: HTMLElement, ctx: Ctx): (() => void) => {
     const todayLogs = persist.logs.filter((l) => l.day === today);
     const mins = todayLogs.reduce((sum, l) => sum + l.min, 0);
     statsEl.textContent = `今日已完成 ${todayLogs.length} 次 · 累计 ${mins} 分钟`;
+    paintWeek();
+  };
+
+  const paintWeek = () => {
+    if (!weekEl) return;
+    const week = weeklyMinutes(persist.logs);
+    const peak = Math.max(25, ...week.map((d) => d.min));
+    const total = week.reduce((sum, d) => sum + d.min, 0);
+    weekEl.setAttribute("aria-label", `近 7 天共专注 ${total} 分钟`);
+    weekEl.innerHTML = week
+      .map((d) => {
+        const h = d.min > 0 ? Math.max(6, Math.round((d.min / peak) * 46)) : 3;
+        const today = d.label === "今天";
+        return `<div title="${escapeHtml(d.day)} · ${d.min} 分钟" style="display:grid;justify-items:center;gap:4px">
+          <span style="font-size:10px;opacity:${d.min ? 0.75 : 0.35};font-variant-numeric:tabular-nums">${d.min || ""}</span>
+          <span style="width:100%;max-width:26px;height:${h}px;border-radius:5px;background:${today ? "var(--accent,#6f8cff)" : "rgba(255,255,255,0.22)"}"></span>
+          <span style="font-size:10.5px;opacity:${today ? 0.9 : 0.55}">${escapeHtml(d.label)}</span>
+        </div>`;
+      })
+      .join("");
   };
 
   const paintAudioBtns = () => {
@@ -191,6 +241,7 @@ export const initFocusStudio = (win: HTMLElement, ctx: Ctx): (() => void) => {
       ringEl.style.strokeDashoffset = String((CIRC * (1 - ratio)).toFixed(2));
     }
     if (toggleBtn) toggleBtn.textContent = running ? "暂停" : remainSec < totalSec ? "继续专注" : "开始专注";
+    syncDocTitle();
   };
 
   const stopTimer = () => {

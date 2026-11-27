@@ -94,6 +94,9 @@ body[data-os-theme="light"] .os .desk-icon:hover {
 .di-community {
   background: linear-gradient(180deg, #ffd08a 0%, #d95c7a 55%, #7c4ddb 100%);
 }
+.di-clock {
+  background: linear-gradient(180deg, #ffd59a 0%, #e0794a 100%);
+}
 
 /* ============================================================
    通用控件

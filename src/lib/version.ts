@@ -8,16 +8,16 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.1.0";
+export const OS_VERSION = "2.2.0";
 
 /** 对外展示的版本代号 */
-export const RELEASE_NAME = "Fluid Workspace";
+export const RELEASE_NAME = "Chrono Flow";
 
 /** 中文版本名 */
-export const RELEASE_NAME_ZH = "流畅工作台";
+export const RELEASE_NAME_ZH = "时光心流";
 
 /** 数据导出格式版本（与备份 payload 中的 version 字段一致） */
-export const EXPORT_FORMAT = "guandao-os/2.1";
+export const EXPORT_FORMAT = "guandao-os/2.2";
 
 /**
  * 构建信息。
@@ -46,6 +46,17 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.2.0",
+    name: "Chrono Flow",
+    date: "2026-11-27",
+    notes: [
+      "全新内置应用 Clock Studio（时光）：多时区世界时钟与本地时差、带分圈记录的精确秒表、自定义倒数日（预置 2027 元旦 / 春节）",
+      "窗口智能整理：Alt+G 网格平铺全部可见窗口、Alt+Shift+G 层叠排列，「窗口」菜单同步新增入口",
+      "Focus Studio 升级：近 7 天专注柱状图；计时中浏览器标签页标题实时显示剩余时间，切到别的标签页也能看到进度",
+      "快捷键一览面板新增「智能整理」分组",
+    ],
+  },
   {
     version: "2.1.0",
     name: "Fluid Workspace",

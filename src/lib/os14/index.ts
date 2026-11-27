@@ -116,7 +116,8 @@ export const initOs14 = (ctx: Ctx): BootResult => {
     { id: "themes", title: "主题中心", width: 940, height: 640, glyph: "di-themes", load: lazy(() => import("./themes/app"), (m) => ({ body: m.renderThemeApp, init: (w) => m.initThemeApp(w, ctx) })) },
     { id: "widgetstore", title: "组件中心", width: 920, height: 620, glyph: "di-widgets", load: lazy(() => import("./widgetstore-app"), (m) => ({ body: m.renderWidgetGallery, init: m.initWidgetGallery })) },
     { id: "workspaces", title: "工作空间", width: 900, height: 620, glyph: "di-space", load: lazy(() => import("./workspaces-app"), (m) => ({ body: m.renderWorkspaces, init: (w) => m.initWorkspaces(w, ctx) })) },
-    { id: "focus", title: "Focus Studio", width: 520, height: 500, glyph: "di-tasks", load: lazy(() => import("../os21/focus"), (m) => ({ body: m.renderFocusStudio, init: (w) => m.initFocusStudio(w, ctx) })) },
+    { id: "focus", title: "Focus Studio", width: 520, height: 580, glyph: "di-tasks", load: lazy(() => import("../os21/focus"), (m) => ({ body: m.renderFocusStudio, init: (w) => m.initFocusStudio(w, ctx) })) },
+    { id: "clock", title: "Clock Studio", width: 560, height: 560, glyph: "di-clock", load: lazy(() => import("../os22/clock"), (m) => ({ body: m.renderClockStudio, init: (w) => m.initClockStudio(w, ctx) })) },
 
     {
       id: "perflab",
@@ -329,11 +330,12 @@ export const initOs14 = (ctx: Ctx): BootResult => {
     "continuity",
     "perflab",
     "diagnostics",
-    // 2.0/2.1 平台应用：系统入口，不参与安装 / 卸载
+    // 2.0/2.1/2.2 平台应用：系统入口，不参与安装 / 卸载
     "systemcenter",
     "updatecenter",
     "market",
     "focus",
+    "clock",
   ]);
 
   ctx.setDockFilter((id) => ALWAYS_AVAILABLE.has(id) || sys.isInstalled(id));

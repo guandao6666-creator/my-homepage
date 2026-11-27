@@ -12,7 +12,7 @@
  *   - 归一化顺序必须稳定（数组排序），否则同一份 Manifest 会算出不同摘要
  */
 
-export const OS_VERSION = "2.1.0";
+export const OS_VERSION = "2.2.0";
 export const SDK_VERSION = 1;
 export const MANIFEST_VERSION = 1;
 export const PLUGIN_FORMAT = "guandao-plugin";

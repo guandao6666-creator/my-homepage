@@ -305,7 +305,7 @@ function tabBar() {
 function footerExit() {
   return `<footer class="m-foot">
     <a class="m-foot-link" href="/home/"><span aria-hidden="true">←</span>回博客</a>
-    <p>Guandao OS 2.1 · Fluid Workspace</p>
+    <p>Guandao OS 2.2 · Chrono Flow</p>
   </footer>`;
 }
 
