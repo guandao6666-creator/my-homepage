@@ -329,10 +329,11 @@ export const initOs14 = (ctx: Ctx): BootResult => {
     "continuity",
     "perflab",
     "diagnostics",
-    // 2.0 平台应用：系统入口，不参与安装 / 卸载
+    // 2.0/2.1 平台应用：系统入口，不参与安装 / 卸载
     "systemcenter",
     "updatecenter",
     "market",
+    "focus",
   ]);
 
   ctx.setDockFilter((id) => ALWAYS_AVAILABLE.has(id) || sys.isInstalled(id));

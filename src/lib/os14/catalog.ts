@@ -726,6 +726,26 @@ export const CATALOG: AppMeta[] = [
     changelog: [{ v: "1.2.0", date: "2026-10-12", items: ["浏览器窗口"] }],
     screens: [{ name: "浏览器", hint: "地址栏与快捷入口" }],
   },
+  {
+    id: "focus",
+    name: "番茄专注",
+    glyph: "di-tasks",
+    category: "productivity",
+    version: "2.1.0",
+    author: A,
+    tagline: "沉浸式番茄钟与本地白噪音",
+    desc: "Guandao OS 2.1 新增内置应用：支持 25/5/15 分钟专注与休息预设、SVG 环形倒计时、纯本地 Web Audio 柔和白噪音与每日专注统计。",
+    features: ["25/5/15 分钟预设", "SVG 环形进度条", "本地合成白噪音与提示音", "每日专注次数与分钟统计"],
+    permissions: ["read", "write"],
+    size: "内置",
+    builtin: true,
+    featured: true,
+    isNew: true,
+    hot: 94,
+    release: "2026-11-27",
+    changelog: [{ v: "2.1.0", date: "2026-11-27", items: ["全新 Focus Studio 番茄专注应用"] }],
+    screens: [{ name: "专注计时", hint: "环形倒计时、白噪音开关与今日统计" }],
+  },
 ];
 
 export const META_BY_ID: Record<string, AppMeta> = Object.fromEntries(CATALOG.map((m) => [m.id, m]));
