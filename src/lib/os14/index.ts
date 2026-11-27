@@ -9,7 +9,7 @@
  * 仍然复用 1.0 的窗口系统，没有另起一套 DOM。
  */
 
-import { escapeHtml, ls, uid, type Ctx } from "./core";
+import { escapeHtml, ls, todayKey, uid, type Ctx } from "./core";
 import { createSystem } from "./system";
 import { readInstall, META_BY_ID } from "./catalog";
 import { initThemes } from "./themes";
@@ -387,7 +387,8 @@ export const initOs14 = (ctx: Ctx): BootResult => {
       if (used < limit) return;
       const key = "guandao.os14.storageWarn";
       const last = ls.str(key);
-      const today = new Date().toISOString().slice(0, 10);
+      // 用本地日做 key：UTC 日会让「每天一次」在本地 08:00 才翻页
+      const today = todayKey();
       if (last === today) return;
       ls.setStr(key, today);
       ctx.pushNotif({

@@ -60,7 +60,7 @@
       "kind": "sink",
       "file": "src/lib/mobile/app.ts",
       "count": 3,
-      "reason": "人工复核：render() 中 root.innerHTML / fabFor() 与新增的 footerExit()（纯静态 HTML 字面量，无用户输入插值）；其余未包装插值为受控内部渲染函数（见 HTML-SECURITY.md §7）"
+      "reason": "人工复核 3 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）。2.0.1 复核新增的第 3 处（app.ts:228）是 footerExit() 的静态模板（链接写死 /home/，文案为常量），app.ts:231 是 fabFor() 的 ICONS.plus 常量，均不含用户数据"
     },
     {
       "kind": "url-assign",
@@ -263,8 +263,8 @@
     {
       "kind": "sink",
       "file": "src/lib/os20/apps/market.ts",
-      "count": 6,
-      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量（自动检查：0 处未包装）"
+      "count": 7,
+      "reason": "模板内插值全部经 escapeHtml/escapeAttr/safeUrl 或为字面量；2.0.8 新增的详情栏重绘复用 detail()（已转义）与 emptyDetail() 字面量（自动检查：0 处未包装）"
     },
     {
       "kind": "sink",

@@ -2,6 +2,7 @@
 
 import { ApiError, ok } from "../http.js";
 import { assertSameOrigin, readJson } from "../guards.js";
+import { chunkIds, placeholdersFor } from "../sql.js";
 import { authConfig } from "../auth/config.js";
 import { readSession } from "../auth/session.js";
 import {
@@ -37,6 +38,14 @@ import {
 } from "./util.js";
 
 const PREFIX = "/api/files";
+
+/**
+ * D1 单条语句最多 100 个绑定参数（分块实现见 ../sql.js，与 sync/store.js 共用）。
+ *
+ * 递归删除会把整棵子树展开成 `IN (?, ?, …)`，参数数 = 节点数 + 其它条件参数；
+ * 超过 100 时 D1 直接报 SQL 错误 → 500，而且用户没有办法绕开（只能一个个删子目录）。
+ * 这里按 40 个 id 一块执行，给 userId / 时间戳等参数留足余量。
+ */
 
 export async function handleFilesRequest({ request, env, url, path }) {
   if (path !== PREFIX && !path.startsWith(`${PREFIX}/`)) return null;
@@ -182,11 +191,12 @@ export async function handleFilesRequest({ request, env, url, path }) {
     const file = await getFile(env, userId, id);
     if (!file) throw new ApiError("NOT_FOUND", "文件不存在", 404);
 
-    if (action === "content" && method === "GET") {
-      return contentHandler(env, request, file, false);
+    // HEAD 与 GET 共用元数据逻辑，但 body 必须为空（2.0.9）
+    if (action === "content" && (method === "GET" || method === "HEAD")) {
+      return contentHandler(env, request, file, false, method === "HEAD");
     }
-    if (action === "download" && method === "GET") {
-      return contentHandler(env, request, file, true);
+    if (action === "download" && (method === "GET" || method === "HEAD")) {
+      return contentHandler(env, request, file, true, method === "HEAD");
     }
     if (action === "restore" && method === "POST") {
       if (file.status !== "trash") throw new ApiError("NOT_TRASHED", "文件不在回收站", 409);
@@ -206,6 +216,43 @@ export async function handleFilesRequest({ request, env, url, path }) {
 /* 列表                                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 回收 `pending_delete` 行（2.0.10）。
+ *
+ * R2 删除失败时 permanentDeleteHandler 会把行标成 pending_delete 再抛 502；修复前
+ * 这个状态没有任何读取或重试分支，行与对象会永久留在 R2 里（回收站看不见、
+ * quota 也不统计，用户无法自助清理）。这里在每次列云盘时顺手重试有限条数：
+ * R2 删除成功才删行，失败就保留给下一次，不阻塞列表请求。
+ */
+export async function retryPendingDeletes(env, userId, limit = 20) {
+  const rows = await env.DB.prepare(
+    "SELECT id, r2_key FROM files WHERE user_id = ? AND status = 'pending_delete' ORDER BY updated_at ASC LIMIT ?",
+  )
+    .bind(userId, limit)
+    .all();
+  const items = (rows.results || []).filter((row) => row?.id);
+  if (!items.length) return 0;
+
+  const keys = items.map((row) => row.r2_key).filter(Boolean);
+  try {
+    if (keys.length) await env.FILES.delete(keys);
+  } catch (error) {
+    console.error("[files] pending_delete retry failed:", error?.message ?? error);
+    return 0;
+  }
+
+  let removed = 0;
+  for (const chunk of chunkIds(items.map((row) => row.id))) {
+    await env.DB.prepare(
+      `DELETE FROM files WHERE user_id = ? AND status = 'pending_delete' AND id IN (${placeholdersFor(chunk)})`,
+    )
+      .bind(userId, ...chunk)
+      .run();
+    removed += chunk.length;
+  }
+  return removed;
+}
+
 async function listHandler(env, userId, url) {
   const view = url.searchParams.get("view") || "folder";
   const search = (url.searchParams.get("search") || "").trim().slice(0, 80);
@@ -213,6 +260,9 @@ async function listHandler(env, userId, url) {
   const dir = url.searchParams.get("dir") === "asc" ? "asc" : "desc";
   const limit = Number(url.searchParams.get("limit") || 60);
   const offset = Number(url.searchParams.get("offset") || 0);
+
+  // 顺手清理删除失败的行；失败不影响列表本身
+  await retryPendingDeletes(env, userId).catch(() => undefined);
 
   if (view === "trash") {
     const [rows, folders] = await Promise.all([trashFiles(env, userId), trashFolders(env, userId)]);
@@ -325,6 +375,12 @@ async function uploadHandler(env, userId, request, url) {
     size,
   });
 
+  /*
+   * 占位之后再查一次实际占用（细节见 assertReservedFileQuota）。
+   * 超限时先删占位再返回 507 —— 此时还没写 R2，失败不会留下孤儿对象。
+   */
+  await assertReservedFileQuota(env, userId, id, limit);
+
   try {
     const object = await env.FILES.put(objectKey, body, {
       httpMetadata: { contentType: detected.mime },
@@ -341,16 +397,70 @@ async function uploadHandler(env, userId, request, url) {
   return ok({ file: mapFile(file) }, { status: 201 });
 }
 
+/**
+ * 上传配额的最后一道闸门：pending 行已经写入，复核「合计占用是否超限」。
+ *
+ * 为什么不在预检处一次算完：预检（usage + size）与写入之间有等待，两个并发上传会同时
+ * 通过预检、一起越界。D1 没有事务，所以先把 pending 行占位（usage() 把 pending 计入），
+ * 再求和判定：后到的请求一定能看到先到的 pending 行 —— 并发时只可能「都保守拒绝」或
+ * 「排队通过」，不会一起越界。超限时删除自己的占位再抛 507，此时还没写 R2，不留孤儿对象。
+ *
+ * @param {any} env
+ * @param {string} userId
+ * @param {string} id 本次上传的 pending 文件 id
+ * @param {number} limit 配额字节数
+ * @returns {Promise<number>} 复核时的已用字节数
+ */
+export async function assertReservedFileQuota(env, userId, id, limit) {
+  const reserved = await usage(env, userId);
+  if (reserved.usedBytes > limit) {
+    await deleteFileRow(env, userId, id).catch(() => undefined);
+    throw new ApiError("QUOTA_EXCEEDED", "云端空间不足", 507);
+  }
+  return reserved.usedBytes;
+}
+
 /* ------------------------------------------------------------------ */
 /* 内容 / 下载                                                         */
 /* ------------------------------------------------------------------ */
 
-async function contentHandler(env, request, file, forceDownload) {
+/**
+ * 2.0.9：只解析单区间 Range，才判得了「起点越过文件末尾」。
+ *
+ * R2 的 `get(key, { range: headers })` 遇到不可满足的区间不会抛错，而是回整包 200，
+ * 客户端拿到 200 + 完整内容，会误以为续传成功。RFC 7233 要求 416 + `Content-Range: bytes *\/size`。
+ * 多区间/畸形头按 RFC 允许忽略（退回 200），不在这里拆包。
+ */
+export function parseByteRange(header, total) {
+  if (!header || !Number.isFinite(total) || total <= 0) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match) return null;
+  const [, rawStart, rawEnd] = match;
+  if (!rawStart && !rawEnd) return null;
+
+  let start;
+  let end;
+  if (!rawStart) {
+    const suffix = Number(rawEnd);
+    if (!Number.isFinite(suffix) || suffix <= 0) return null;
+    start = Math.max(0, total - suffix);
+    end = total - 1;
+  } else {
+    start = Number(rawStart);
+    end = rawEnd ? Number(rawEnd) : total - 1;
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (start >= total) return { unsatisfiable: true };
+  if (end < start) return null;
+  return { start, end: Math.min(end, total - 1) };
+}
+
+export async function contentHandler(env, request, file, forceDownload, headOnly = false) {
   if (file.status !== "ready") throw new ApiError("NOT_FOUND", "文件不存在", 404);
 
   const rangeHeader = request.headers.get("range");
-  const object = await env.FILES.get(file.r2_key, rangeHeader ? { range: request.headers } : undefined);
-  if (!object) throw new ApiError("NOT_FOUND", "文件内容不存在", 404);
+  const total = Number(file.size_bytes || 0);
+  const planned = parseByteRange(rangeHeader, total);
 
   const inline = !forceDownload && isInlineSafe(file.mime_type);
   const headers = new Headers({
@@ -360,11 +470,23 @@ async function contentHandler(env, request, file, forceDownload) {
     "x-content-type-options": "nosniff",
     "accept-ranges": "bytes",
   });
-  const etag = object.httpEtag || file.etag;
+  const etag = file.etag;
   if (etag) headers.set("etag", etag);
 
+  // 起点越界：不读 R2，直接 416，否则客户端会把整包 200 当成续传成功
+  if (planned && planned.unsatisfiable) {
+    headers.set("content-range", `bytes */${total}`);
+    headers.set("content-length", "0");
+    return new Response(null, { status: 416, headers });
+  }
+
+  const object = await env.FILES.get(file.r2_key, rangeHeader ? { range: request.headers } : undefined);
+  if (!object) throw new ApiError("NOT_FOUND", "文件内容不存在", 404);
+
+  if (object.httpEtag) headers.set("etag", object.httpEtag);
+
   let status = 200;
-  let length = Number(object.size || file.size_bytes);
+  let length = Number(object.size || total);
   if (rangeHeader && object.range) {
     status = 206;
     const offset = Number(object.range.offset || 0);
@@ -374,7 +496,8 @@ async function contentHandler(env, request, file, forceDownload) {
   }
   headers.set("content-length", String(length));
 
-  return new Response(object.body, { status, headers });
+  // HEAD 只回元数据：body 必须是 null，否则运行时会把整段内容也读出来
+  return new Response(headOnly ? null : object.body, { status, headers });
 }
 
 /* ------------------------------------------------------------------ */
@@ -402,14 +525,17 @@ async function permanentDeleteHandler(env, userId, file) {
 async function deleteFolderHandler(env, userId, folder, url) {
   const recursive = url.searchParams.get("recursive") === "1";
   const tree = await folderTree(env, userId, folder.id);
-  const placeholders = tree.map(() => "?").join(",");
+  const chunks = chunkIds(tree);
 
-  const fileCountRow = await env.DB.prepare(
-    `SELECT COUNT(*) AS total FROM files WHERE user_id = ? AND parent_id IN (${placeholders}) AND status = 'ready'`,
-  )
-    .bind(userId, ...tree)
-    .first();
-  const fileCount = Number(fileCountRow?.total || 0);
+  let fileCount = 0;
+  for (const chunk of chunks) {
+    const fileCountRow = await env.DB.prepare(
+      `SELECT COUNT(*) AS total FROM files WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)}) AND status = 'ready'`,
+    )
+      .bind(userId, ...chunk)
+      .first();
+    fileCount += Number(fileCountRow?.total || 0);
+  }
   const childFolders = tree.length - 1;
 
   if (!recursive && (fileCount > 0 || childFolders > 0)) {
@@ -421,18 +547,22 @@ async function deleteFolderHandler(env, userId, folder, url) {
   }
 
   const now = Date.now();
-  await env.DB.prepare(
-    `UPDATE folders SET deleted_at = ?, trash_group = ? WHERE user_id = ? AND id IN (${placeholders})`,
-  )
-    .bind(now, folder.id, userId, ...tree)
-    .run();
+  await env.DB.batch(
+    chunks.map((chunk) =>
+      env.DB.prepare(
+        `UPDATE folders SET deleted_at = ?, trash_group = ? WHERE user_id = ? AND id IN (${placeholdersFor(chunk)})`,
+      ).bind(now, folder.id, userId, ...chunk),
+    ),
+  );
 
-  await env.DB.prepare(
-    `UPDATE files SET status = 'trash', deleted_at = ?, trash_group = ?, updated_at = ?
-      WHERE user_id = ? AND parent_id IN (${placeholders}) AND status = 'ready'`,
-  )
-    .bind(now, folder.id, now, userId, ...tree)
-    .run();
+  await env.DB.batch(
+    chunks.map((chunk) =>
+      env.DB.prepare(
+        `UPDATE files SET status = 'trash', deleted_at = ?, trash_group = ?, updated_at = ?
+          WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)}) AND status = 'ready'`,
+      ).bind(now, folder.id, now, userId, ...chunk),
+    ),
+  );
 
   await logEvent(env, userId, "trash_folder", folder.id, { files: fileCount, folders: childFolders });
   return ok({ trashed: true, files: fileCount, folders: childFolders });
@@ -469,14 +599,18 @@ async function permanentFolderHandler(env, userId, folder) {
   if (!folder.deleted_at) throw new ApiError("NOT_TRASHED", "请先将文件夹移入回收站", 409);
 
   const tree = await folderTree(env, userId, folder.id);
-  const placeholders = tree.map(() => "?").join(",");
+  const chunks = chunkIds(tree);
 
-  const rows = await env.DB.prepare(
-    `SELECT id, r2_key FROM files WHERE user_id = ? AND parent_id IN (${placeholders})`,
-  )
-    .bind(userId, ...tree)
-    .all();
-  const files = rows.results || [];
+  // 分块查文件：整棵大目录同样会超过 D1 的 100 绑定参数上限
+  const files = [];
+  for (const chunk of chunks) {
+    const rows = await env.DB.prepare(
+      `SELECT id, r2_key FROM files WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)})`,
+    )
+      .bind(userId, ...chunk)
+      .all();
+    files.push(...(rows.results || []));
+  }
   const keys = files.map((row) => row.r2_key).filter(Boolean);
 
   for (let i = 0; i < keys.length; i += 500) {
@@ -484,19 +618,29 @@ async function permanentFolderHandler(env, userId, folder) {
       await env.FILES.delete(keys.slice(i, i + 500));
     } catch (error) {
       console.error("[files] folder delete r2 failed:", error?.message ?? error);
-      await env.DB.prepare(
-        `UPDATE files SET status = 'pending_delete' WHERE user_id = ? AND parent_id IN (${placeholders})`,
-      )
-        .bind(userId, ...tree)
-        .run();
+      await env.DB.batch(
+        chunks.map((chunk) =>
+          env.DB.prepare(
+            `UPDATE files SET status = 'pending_delete' WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)})`,
+          ).bind(userId, ...chunk),
+        ),
+      );
       throw new ApiError("DELETE_FAILED", "R2 删除失败，已保留重试状态", 502);
     }
   }
 
-  await env.DB.batch([
-    env.DB.prepare(`DELETE FROM files WHERE user_id = ? AND parent_id IN (${placeholders})`).bind(userId, ...tree),
-    env.DB.prepare(`DELETE FROM folders WHERE user_id = ? AND id IN (${placeholders})`).bind(userId, ...tree),
-  ]);
+  await env.DB.batch(
+    chunks.flatMap((chunk) => [
+      env.DB.prepare(`DELETE FROM files WHERE user_id = ? AND parent_id IN (${placeholdersFor(chunk)})`).bind(
+        userId,
+        ...chunk,
+      ),
+      env.DB.prepare(`DELETE FROM folders WHERE user_id = ? AND id IN (${placeholdersFor(chunk)})`).bind(
+        userId,
+        ...chunk,
+      ),
+    ]),
+  );
 
   await logEvent(env, userId, "permanent_delete_folder", folder.id, { files: files.length });
   return ok({ deleted: true, files: files.length });

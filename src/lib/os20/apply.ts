@@ -12,6 +12,7 @@
 import type { Kernel } from "../core/kernel";
 import type { Ctx } from "../os14/core";
 import { readPrefs, patchPrefs } from "../os14/prefs";
+import { normalizeNotificationVolume } from "./notify-volume";
 
 type Api13 = {
   cfg: () => Record<string, unknown>;
@@ -55,7 +56,11 @@ export function applySettings(kernel: Kernel, ctx: Ctx, options: { silent?: bool
     if (appearance.radius !== radius) look.radius = radius;
 
     const accent = String(values["appearance.accent"] ?? "auto");
-    if (accent !== "auto" && appearance.accent !== accent) {
+    // 「跟随壁纸」必须显式告诉 os13：否则 os13 只能在收到固定色时关闭取色，
+    // 却没法把取色重新打开（2.0.5 前选回 auto 会静默失效）。
+    if (accent === "auto") {
+      if (appearance.autoAccent !== true) look.accentAuto = true;
+    } else if (appearance.accent !== accent) {
       look.accent = accent;
     }
 
@@ -125,7 +130,8 @@ export function applySettings(kernel: Kernel, ctx: Ctx, options: { silent?: bool
   try {
     const prefs = readPrefs();
     const nextDnd = Boolean(values["notifications.dnd"]);
-    const nextVolume = Math.max(0, Math.min(100, Number(values["notifications.volume"]) || 45));
+    // 0 是合法的「静音」，不能用 `|| 45` 回落（2.0.8）。
+    const nextVolume = normalizeNotificationVolume(values["notifications.volume"]);
     if (prefs.dnd !== nextDnd || prefs.volume !== nextVolume) {
       patchPrefs({ dnd: nextDnd, volume: nextVolume });
       applied.push("notifications.dnd", "notifications.volume");

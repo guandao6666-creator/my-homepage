@@ -1,8 +1,8 @@
-> **Phase 1.6 更新（2026-11-07）**：本文件描述的是本地 scripts/db-backup.mjs（wrangler 导出）方案，仍可用于本地/应急；生产每日独立 R2 归档改用 Workers Workflow + D1 REST API，见 [operations/D1-BACKUP.md](operations/D1-BACKUP.md)。本阶段未启用生产 Workflow。
+> **Phase 1.6 更新（2026-11-07；2026-11-21 复核）**：本文件描述的是本地 scripts/db-backup.mjs（wrangler 导出）方案，仍可用于本地/应急；生产每日独立 R2 归档已改用 Workers Workflow + D1 REST API，**2026-11-21 复核确认已启用并连续成功**（实例 `d1-backup-2026-11-20`：SQL 614,792 B、加密对象 614,808 B、SHA-256 匹配），见 [operations/D1-BACKUP.md](operations/D1-BACKUP.md)。GitHub Actions 的 `db-backup.yml` 仍是额外一层，因缺 Secrets 暂未启用。
 
 # D1 整库备份与恢复
 
-**状态**：脚本与本地验证完成；**生产每日自动备份尚未启用**（缺 GitHub Secrets / R2 上传授权）。
+**状态**：本地脚本与验证完成；**生产每日自动备份已由 Workers Workflow 承担**（2026-11-21 复核）；GitHub Actions 的 `db-backup.yml` 仍缺 3 个 Secrets（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` / `D1_BACKUP_KEY`），未启用。
 **重要**：Guandao OS 的“用户备份”是应用级数据备份，**不是** D1 整库备份。
 
 ---

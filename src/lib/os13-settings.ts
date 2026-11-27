@@ -4,7 +4,7 @@
  * 从 src/lib/os13.ts 拆分出 600 余行面板渲染与事件绑定代码，
  * 仅在用户打开「设置 / 个性化」窗口时按需下载，显著降低首屏入口 JS 体积。
  */
-import { safeUrl } from "./html";
+import { wallCardHtml } from "./os13/wall-card";
 import { WALLPAPERS, WALL_CATEGORY_LABEL, type Wallpaper } from "./wallpapers";
 import type { Os13Context } from "./os13";
 
@@ -433,16 +433,16 @@ export function mountOs13Settings(
     const filtered = list.filter((w) => cat === "all" || w.cat === cat);
     grid.innerHTML = filtered
       .map((w) => {
-        const active = cfg.wall.id === w.id;
-        const fav = cfg.wall.favorites.includes(w.id);
-        const thumb = "custom" in w ? objUrls.get(w.id) ?? "" : (w as Wallpaper).thumb;
-        return `<button class="wall-card ${active ? "is-active" : ""}" type="button" data-wall-id="${w.id}" title="${w.name}">
-          ${thumb ? `<img src="${safeUrl(thumb, { allowBlob: true })}" alt="${w.name}" loading="lazy" decoding="async" />` : `<span class="wc-void">自定义</span>`}
-          <span class="wc-name">${w.name}</span>
-          <span class="wc-fav ${fav ? "is-on" : ""}" data-fav="${w.id}" role="button" aria-label="收藏">★</span>
-          ${"custom" in w ? `<span class="wc-del" data-del="${w.id}" role="button" aria-label="删除">✕</span>` : ""}
-          ${active ? `<span class="wc-check">✓</span>` : ""}
-        </button>`;
+        const custom = "custom" in w;
+        return wallCardHtml(
+          {
+            id: w.id,
+            name: w.name,
+            thumb: custom ? objUrls.get(w.id) ?? "" : (w as Wallpaper).thumb,
+            custom,
+          },
+          { active: cfg.wall.id === w.id, favorite: cfg.wall.favorites.includes(w.id) },
+        );
       })
       .join("");
     grid.dataset.cat = cat;
@@ -672,8 +672,7 @@ export function mountOs13Settings(
             } catch {
               /* 忽略 */
             }
-            void bridge.clearIdb();
-            window.location.reload();
+            void bridge.clearIdb().then(() => window.location.reload());
           }
           break;
         default:

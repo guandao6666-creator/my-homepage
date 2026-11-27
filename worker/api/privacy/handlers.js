@@ -1157,8 +1157,9 @@ async function deleteAccountHandler(env, request, user, userId) {
   if (!ticket || ticket.user_id !== userId) {
     throw new ApiError("REAUTH_REQUIRED", "重新验证已过期，请重新验证", 403);
   }
-  await consumeReauthTicket(env, ticket.id);
 
+  // 2.0.6 审计：票据原本在下面三条 409 前置检查之前就被消费，用户碰到“正在删除/导出/
+  // 备份”时只能重新走 GitHub 授权。先检查、最后消费，票据只在真正开始删除时作废。
   if (await activeDeletion(env, userId)) {
     throw new ApiError("DELETION_IN_PROGRESS", "已有删除任务正在执行", 409);
   }
@@ -1172,6 +1173,9 @@ async function deleteAccountHandler(env, request, user, userId) {
     .bind(userId)
     .first();
   if (activeBackup) throw new ApiError("BACKUP_RUNNING", "备份正在执行，请等待完成", 409);
+
+  // 前置检查都过了，才把一次性票据作废（并在此之后不再有会返回 409 的分支）。
+  await consumeReauthTicket(env, ticket.id);
 
   await markUserPendingDeletion(env, userId);
   const auditId = await createDeletionAudit(env, userId, ["pending", "files", "backups", "account"]);

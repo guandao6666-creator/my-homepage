@@ -26,8 +26,9 @@ import { avatarHtml, bytesText, coverHtml, esc, roleBadge, safeHex, safeWallId, 
      ============================================================ */
 
 export const loadDetailImpl = async (ctx: CommunityContext, id: string) => {
-    ctx.setView({ kind: "detail", id });
+    // 先占号再改视图：将来 setView 若带上副作用，也不会出现「视图已变、号还没占」的窗口期。
     const token = ctx.nextToken();
+    ctx.setView({ kind: "detail", id });
     ctx.setBody(skeleton("正在读取作品与内容包…"));
     try {
       await ctx.ensureMeta();
@@ -45,6 +46,10 @@ export const loadDetailImpl = async (ctx: CommunityContext, id: string) => {
       }
       const comments = await api.getComments(id, 1, 12);
       if (ctx.isStale(token)) return;
+      // 双保险：即使 body 被别的 loader 抢先重画（token 已过期但调用方没走 isStale），
+      // 也不要把旧详情覆盖到新视图上；视图已经切到别的作品时同样放弃。
+      const view = ctx.getView();
+      if (view.kind !== "detail" || view.id !== id) return;
       ctx.setDetailCache({ data, manifest, comments, commentsPage: 1 });
 
       if (data.post.status === "published") {
@@ -353,9 +358,14 @@ const renderCommentComposer = (ctx: CommunityContext) => {
 export const refreshCommentsImpl = async (ctx: CommunityContext, page = 1) => {
     const detailCache = ctx.getDetailCache();
     if (!detailCache) return;
-    const comments = await api.getComments(detailCache.data.post.id, page, 12);
-    detailCache.comments = comments;
-    detailCache.commentsPage = page;
+    // 记住发起请求时是哪个作品：await 期间用户可能已经返回列表并打开别的作品，
+    // 回来时不能再把 A 的评论写进 B 的缓存与面板（旧实现完全没有校验）。
+    const postId = detailCache.data.post.id;
+    const comments = await api.getComments(postId, page, 12);
+    const current = ctx.getDetailCache();
+    if (!current || current.data.post.id !== postId) return;
+    current.comments = comments;
+    current.commentsPage = page;
     const panel = ctx.win.querySelector<HTMLElement>("[data-comments-panel]");
     if (panel) panel.innerHTML = renderComments(comments);
   };

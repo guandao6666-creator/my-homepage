@@ -14,13 +14,13 @@ export const SCRIPT_HASHES = [
   "sha256-90qh2lJnAsjQcKHlT5r5rrLtwQaIY0/cUrooyVc6AXg=",
   "sha256-HNywJjjdSnUUws9hO9p4ViCaT2Uw5Bcsk2l1C4jkifs=",
   "sha256-Ms2GP6ENoJ/ybd21+GshCF9L2l59eELKRgxWQXNjBoo=",
-  "sha256-QlTtPy1fWN/QE0JlSDA+ZDu+QGzppoAb6BGDxV9v5cI=",
   "sha256-R+cNOyONRQ2V+UUON882UfkM1s+9XibXiYAGAQxpJhE=",
   "sha256-VKKeJ4mM+KOPLPaTPKOBSo1qMtSa5kVKVCBbXkMTkCk=",
   "sha256-WdKZj/crq5ZMR/tZNeHnAVdayGbxXj3hka6MDw2K+Qo=",
   "sha256-fUz7oVlLRtyNb4i4gBcA6y4Ea/x4SgXYRDcOWAWqqFM=",
   "sha256-fgtUQFb5jaN1g6kZYwKBYFSvZtn+57iJokW9hbuxx5M=",
   "sha256-fpe2tqEpOuYD1HAN6jABHvPboOMdUdn03nha7Lj8ci4=",
+  "sha256-hHu015hqkpHk5PmMub8sMPE14qch9kUMabrhtbwKJqA=",
   "sha256-i3Qr+nsSa72XHT0mffN9Y/Yy70C8g/7so4mPI29bH2o=",
   "sha256-yZBdC4B5OtLAPq4R4DAVPStA6Pj9b3lMklRP7sbbdhs="
 ];

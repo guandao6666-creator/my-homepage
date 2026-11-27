@@ -33,9 +33,11 @@ import {
   estimateQuotaDelta,
   listByIds,
   listChanges,
+  listChangesPage,
   listIndex,
   userQuotaStats,
 } from "./store.js";
+import { parseSyncCursor } from "./cursor.js";
 
 const PREFIX = "/api/sync";
 const MAX_BATCH = 100;
@@ -79,17 +81,22 @@ export async function handleSyncRequest({ request, env, url, path }) {
       const ids = idsParam.split(",").map((id) => id.trim()).filter(Boolean);
       if (ids.length > 200) throw new ApiError("TOO_MANY_IDS", "一次最多拉取 200 条", 400);
       const changes = await listByIds(env, userId, domain, ids);
-      return ok({ domain, serverTime: Date.now(), changes, hasMore: false });
+      return ok({ domain, serverTime: Date.now(), changes, hasMore: false, nextCursor: null });
     }
 
     const since = Number(url.searchParams.get("since")) || 0;
     const limit = Number(url.searchParams.get("limit")) || 300;
-    const changes = await listChanges(env, userId, domain, { since, limit });
+    const cursorText = url.searchParams.get("cursor");
+    const cursor = cursorText == null || cursorText === "" ? null : parseSyncCursor(cursorText);
+    if (cursorText && !cursor) throw new ApiError("INVALID_CURSOR", "同步游标格式不正确，请使用上次响应里的 nextCursor", 400);
+    const page = await listChangesPage(env, userId, domain, { since, limit }, cursor);
     return ok({
       domain,
       serverTime: Date.now(),
-      changes,
-      hasMore: changes.length >= Math.min(500, limit),
+      changes: page.changes,
+      hasMore: page.changes.length >= Math.min(500, Math.max(1, limit)),
+      // 新增字段：客户端带上它继续翻页，才能保证同毫秒多条变更不被跳过。
+      nextCursor: page.nextCursor,
     });
   }
 
@@ -142,6 +149,17 @@ export async function handleSyncRequest({ request, env, url, path }) {
     const conflicts = [];
     for (const change of changes) {
       const result = await applyChange(env, userId, domain, change);
+      if (result.outcome === "quota") {
+        /*
+         * 预检之后的并发越界：写语句里的配额闸门拒绝了这一条。
+         *
+         * 这一批里排在前面、已经成功写入的条目不会回滚（D1 没有事务），客户端收到 409
+         * 会整批重推；重推时那些条目带着旧 baseRevision，会以 conflict 形式返回服务端
+         * 版本，客户端合并后收敛，不会丢数据。所以这里不回填 applied 数量，保持 409
+         * 的 details 契约只含 scope/current/limit。
+         */
+        throw quotaGuardError(result.scope, result.current, result.limit);
+      }
       if (result.outcome === "conflict") conflicts.push(result.entity);
       else applied.push(result.entity);
     }
@@ -156,6 +174,30 @@ function requireDomain(url) {
   const domain = String(url.searchParams.get("domain") ?? "");
   if (!isSyncDomain(domain)) throw new ApiError("UNKNOWN_DOMAIN", "不支持的数据类型", 400);
   return domain;
+}
+
+/**
+ * 写入阶段的配额闸门（预检之后被并发请求越界时触发）。
+ *
+ * 文案与推送前的预检保持一致，客户端按 code=QUOTA_EXCEEDED 处理即可；details 只带
+ * scope/current/limit，不带「哪几条已写入」，因为整批重推会以 conflict 收敛。
+ * @param {"entities"|"tombstones"} scope
+ * @param {number} current
+ * @param {number} limit
+ */
+function quotaGuardError(scope, current, limit) {
+  if (scope === "tombstones") {
+    return new ApiError("QUOTA_EXCEEDED", `云端删除记录过多（上限 ${limit} 条），请稍后重试`, 409, {
+      scope,
+      current,
+      limit,
+    });
+  }
+  return new ApiError("QUOTA_EXCEEDED", `云端同步记录已达上限（${limit} 条），请先删除一些内容再同步`, 409, {
+    scope,
+    current,
+    limit,
+  });
 }
 
 /**

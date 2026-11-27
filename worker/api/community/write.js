@@ -9,6 +9,7 @@
  */
 
 import { ApiError, ok } from "../http.js";
+import { chunkIds, placeholdersFor } from "../sql.js";
 import { sha256Hex } from "../auth/crypto.js";
 import {
   assertCommentAllowed,
@@ -800,6 +801,13 @@ export async function deletePost({ env, viewer, id }) {
     env.DB.prepare(
       "UPDATE community_assets SET status = 'deleting', post_id = NULL WHERE post_id = ? AND status = 'ready'",
     ).bind(id),
+    // 2.0.6 审计：作者删除时关联举报不结算，会留下 open 举报；后续处理举报时
+    // 旧代码能把 deleted 作品改回 hidden（admin.js 已加 deleted 守卫，这里补结算）。
+    env.DB.prepare(
+      `UPDATE community_reports
+          SET status = 'resolved', resolution = ?, reviewer_id = ?, reviewed_at = ?
+        WHERE target_type = 'post' AND target_id = ? AND status IN ('open', 'reviewing')`,
+    ).bind("作品已被删除", viewer.id, Date.now(), id),
   ]);
   await audit(env, {
     actorId: viewer.id,
@@ -811,11 +819,24 @@ export async function deletePost({ env, viewer, id }) {
   return ok({ deleted: true });
 }
 
+/**
+ * 2.0.9：被版主下架的作品，作者不能自己重新发布。旧实现只挡 published，
+ * hidden 会继续走到发布 UPDATE：把状态改回 published（或被要求审核时改回待审核），
+ * 同时 moderation_note 被清空——等于作者一键撤掉下架决定，还抹掉了下架原因。
+ * 恢复只能由版主在审核中心执行 restore（见 review-policy 的状态矩阵）。
+ */
+export function assertAuthorPublishAllowed(status) {
+  if (status === "hidden") {
+    throw new ApiError("POST_HIDDEN", "作品已被版主下架，不能自行重新发布；如有异议请联系审核", 409);
+  }
+}
+
 export async function publishPost({ env, request, viewer, id }) {
   const settings = await assertPublishingAllowed(env, viewer.id);
   const { row, isOwner } = await loadPost(env, id, viewer);
   if (!isOwner) throw new ApiError("FORBIDDEN", "只能发布自己的作品", 403);
   if (row.status === "published") return ok({ post: (await loadPost(env, id, viewer)).post, message: "作品已经发布" });
+  assertAuthorPublishAllowed(row.status);
   const body = await readJson(request, 320 * 1024);
 
   let manifest = null;
@@ -1482,13 +1503,18 @@ export async function markNotifications({ env, request, viewer }) {
       .bind(now, viewer.id)
       .run();
   } else if (Array.isArray(body?.ids) && body.ids.length) {
-    const ids = body.ids.filter((id) => UUID.test(String(id))).slice(0, 100);
+    // 一次最多处理 200 条：客户端「单条通知」场景远小于这个数，
+    // 但也不能让异常客户端用 500 个 id 把单条 UPDATE 撑过 D1 的 100 参数上限。
+    const ids = body.ids.filter((id) => UUID.test(String(id))).slice(0, 200);
     if (!ids.length) return ok({ unread: await unreadNotificationCount(env, viewer.id) });
-    await env.DB.prepare(
-      `UPDATE community_notifications SET read_at = ? WHERE user_id = ? AND id IN (${ids.map(() => "?").join(", ")})`,
-    )
-      .bind(now, viewer.id, ...ids)
-      .run();
+    // 分块写：一条 UPDATE 的绑定是 now + user_id + N 个 id，N=99 就会超出 100。
+    for (const chunk of chunkIds(ids)) {
+      await env.DB.prepare(
+        `UPDATE community_notifications SET read_at = ? WHERE user_id = ? AND id IN (${placeholdersFor(chunk)})`,
+      )
+        .bind(now, viewer.id, ...chunk)
+        .run();
+    }
   }
   return ok({ unread: await unreadNotificationCount(env, viewer.id) });
 }

@@ -19,6 +19,7 @@ import { THEMES, applyTheme, themeById } from "../../os14/themes";
 import { WALLPAPERS, wallpaperById } from "../../wallpapers";
 import { workspaceList, applyWorkspace } from "../../os14/workspaces";
 import { OS_VERSION, RELEASE_NAME_ZH } from "../../version";
+import { buildOnboardingPatch, isTypingTarget } from "./onboarding-patch";
 
 type StepId = "welcome" | "mode" | "personalize" | "device" | "apps" | "workspace" | "complete";
 
@@ -183,6 +184,10 @@ export function openOnboarding(input: OnboardingInput): Promise<{ completed: boo
   }
   // 用户是否在本轮真正点过「运行模式」。跳过引导时如果没点过，就不写 system.mode。
   let modeTouched = false;
+  // 2.0.8：只有用户真正点过程序坞位置，才允许在收尾时改写 dock。
+  // 之前无条件把 dock.autohide 固定传成关闭，会把用户已开启的
+  // 「自动隐藏」关掉，并且与 settings.v1 中的 autohide 分叉，下一次设置变更又抖回来。
+  let dockTouched = false;
   // 「桌面应用」步骤的初始勾选 = 当前桌面已有的快捷方式，避免一进一出一键清空桌面
   if (!Array.isArray(choices.apps) || choices.apps.length === 0) {
     choices.apps = appOptions()
@@ -371,25 +376,29 @@ export function openOnboarding(input: OnboardingInput): Promise<{ completed: boo
     };
 
     /** 把当前选择落到系统上（跳过时也执行，保证「跳过」不是「什么都没发生」） */
-    const commitChoices = async (completed: boolean) => {
+    const commitChoices = async () => {
       try {
         if (choices.theme && choices.theme !== "default") {
           const theme = themeById(choices.theme);
           if (theme) applyTheme(theme, { silent: true });
         }
         if (choices.wallpaper) ctx.api13.setWallpaper(choices.wallpaper);
-        ctx.api13.applyLook({
-          dock: { pos: choices.dock as "bottom" | "left" | "right", autohide: false },
-          preset: "custom",
-        });
-        const patch: Record<string, unknown> = {
-          "desktop.dock.position": choices.dock,
-          "desktop.iconLabels": choices.iconLabels,
-          "desktop.clockSeconds": choices.clockSeconds,
-        };
-        // 只有「完成引导」或用户主动点过模式卡片时才写 system.mode；
-        // 直接跳过不应该改变现有运行模式（尤其是已登录的 Cloud Mode）。
-        if (completed || modeTouched) patch["system.mode"] = choices.mode;
+        // 2.0.8：只改用户点过的「位置」，不传 autohide——跳过引导不能关掉自动隐藏。
+        if (dockTouched) {
+          ctx.api13.applyLook({
+            dock: { pos: choices.dock as "bottom" | "left" | "right" },
+            preset: "custom",
+          });
+        }
+        const patch = buildOnboardingPatch(
+          {
+            dock: choices.dock,
+            iconLabels: choices.iconLabels,
+            clockSeconds: choices.clockSeconds,
+            mode: choices.mode as "local" | "cloud",
+          },
+          { dockTouched, modeTouched },
+        );
         kernel.settings.update(patch as Parameters<typeof kernel.settings.update>[0]);
         document.documentElement.dataset.clockSeconds = choices.clockSeconds ? "1" : "0";
         const icons = document.querySelector<HTMLElement>(".desk-icons");
@@ -412,8 +421,13 @@ export function openOnboarding(input: OnboardingInput): Promise<{ completed: boo
       }
     };
 
+    // 2.0.8：收尾只执行一次。帮助层 260ms 的离场动画期间按钮仍可能被连点，
+    // 之前会重复 applyWorkspace / 重复 emit onboarding:done。
+    let finishing = false;
     const finish = async (completed: boolean) => {
-      await commitChoices(completed);
+      if (finishing) return;
+      finishing = true;
+      await commitChoices();
       writeState(kernel, {
         completed,
         completedAt: completed ? Date.now() : null,
@@ -448,6 +462,7 @@ export function openOnboarding(input: OnboardingInput): Promise<{ completed: boo
 
       const dockButton = target.closest<HTMLElement>("[data-dock]");
       if (dockButton) {
+        dockTouched = true;
         choices.dock = dockButton.dataset.dock ?? "bottom";
         host.querySelectorAll("[data-dock]").forEach((node) => node.classList.toggle("is-active", node === dockButton));
         ctx.api13.applyLook({ dock: { pos: choices.dock as "bottom" | "left" | "right" }, preset: "custom" });
@@ -522,9 +537,12 @@ export function openOnboarding(input: OnboardingInput): Promise<{ completed: boo
       }
     });
 
-    // 键盘：Esc 跳过（明确告知「跳过」的语义）
+    // 键盘：Esc 跳过（明确告知「跳过」的语义）。
+    // 2.0.8：输入框里按 Esc 往往只是想关输入法/取消输入，不能把整个引导跳过。
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") void finish(true);
+      if (event.key !== "Escape") return;
+      if (isTypingTarget(event.target)) return;
+      void finish(true);
     };
     document.addEventListener("keydown", onKey);
 

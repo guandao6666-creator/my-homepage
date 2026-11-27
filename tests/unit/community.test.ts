@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import * as community from "../../src/lib/os14/community";
+import { pickPageButton } from "../../src/lib/os14/community/interactions";
 import { clampText, esc, bytesText, timeAgo } from "../../src/lib/os14/community/ui";
 import { notificationBody, notificationTitle } from "../../src/lib/os14/community/notifications";
 
@@ -76,5 +77,35 @@ describe("社区模块 · 通知文案（批次 2 搬出闭包）", () => {
 
   it("payload 为空时不崩溃", () => {
     expect(typeof notificationBody(item("comment"))).toBe("string");
+  });
+});
+
+describe("社区模块 · 分页点击判定（2.0.1 · P1-8 回归）", () => {
+  /**
+   * vitest 这里是 node 环境（没有 jsdom），用最小桩代替真实 DOM：
+   * 桩只回答一个问题——`closest("button[data-page]")` 返回什么。
+   * 这正是 click 代理当年做错的那一步。
+   */
+  const stubTarget = (button: { dataset: Record<string, string | undefined> } | null) =>
+    ({
+      closest: (selector: string) => (selector === "button[data-page]" ? button : null),
+    }) as unknown as HTMLElement;
+
+  it("点分页按钮（数字）才算翻页", () => {
+    const button = { dataset: { page: "2" } };
+    expect(pickPageButton(stubTarget(button))).toBe(button);
+  });
+
+  it("外壳写在 <html> 上的 data-page=\"desktop\" 不参与判定", () => {
+    // 旧实现用裸 [data-page] 取最近祖先，会命中 <html>；
+    // 新实现只认 button[data-page]，非按钮元素根本不会命中。
+    expect(pickPageButton(stubTarget(null))).toBeNull();
+  });
+
+  it("data-page 不是数字时不算翻页", () => {
+    expect(pickPageButton(stubTarget({ dataset: { page: "desktop" } }))).toBeNull();
+    expect(pickPageButton(stubTarget({ dataset: { page: "" } }))).toBeNull();
+    expect(pickPageButton(stubTarget({ dataset: {} }))).toBeNull();
+    expect(pickPageButton(stubTarget({ dataset: { page: "2abc" } }))).toBeNull();
   });
 });

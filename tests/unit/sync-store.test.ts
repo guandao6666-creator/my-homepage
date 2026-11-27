@@ -19,6 +19,10 @@ import {
   purgeExpiredTombstones,
   userQuotaStats,
 } from "../../worker/api/sync/store.js";
+import {
+  MAX_ENTITIES_PER_USER,
+  MAX_TOMBSTONES_PER_USER,
+} from "../../worker/api/sync/limits.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MIGRATION_0014 = readFileSync(new URL("../../migrations/0014_sync.sql", import.meta.url), "utf8");
@@ -258,6 +262,129 @@ describe("applyChange 乐观锁", () => {
   });
 });
 
+/**
+ * 并发闸门：让两个 applyChange 都先「读完当前 revision」再一起进入写入。
+ *
+ * 2.0.4 之前 applyChange 是「SELECT → JS 判冲突 → INSERT ON CONFLICT DO UPDATE」，
+ * 两个并发请求会读到同一个 revision、都判定不冲突，后写者整条覆盖先写者，
+ * 而且两边拿到同一个 revision 号（客户端不会进入冲突流程）。这个 wrapper 把那段
+ * 窗口稳定复现出来，用来验证「判 + 写」已经合并成一条带条件的 SQL。
+ */
+class RacingD1 {
+  private waiting = 0;
+  private release!: () => void;
+  private readonly gate: Promise<void>;
+
+  constructor(private readonly inner: FakeD1) {
+    this.gate = new Promise((resolve) => {
+      this.release = resolve;
+    });
+  }
+
+  prepare(sql: string) {
+    const currentRead = /^\s*SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at\s+FROM sync_entities/i.test(
+      sql,
+    );
+    return {
+      bind: (...params: SqlValue[]) => {
+        const bound = this.inner.prepare(sql).bind(...params);
+        return {
+          first: async () => {
+            const row = await bound.first();
+            if (currentRead) {
+              this.waiting += 1;
+              if (this.waiting >= 2) this.release();
+              await this.gate;
+            }
+            return row;
+          },
+          all: () => bound.all(),
+          run: () => bound.run(),
+        };
+      },
+    };
+  }
+}
+
+describe("applyChange 并发（2.0.4 修复回归）", () => {
+  let db: DatabaseSync;
+  let inner: FakeD1;
+  let shared: { DB: FakeD1 } | null;
+
+  beforeEach(() => {
+    db = createDatabase();
+    inner = new FakeD1(db);
+    shared = null;
+  });
+
+  const racingEnv = () => {
+    shared ??= { DB: new RacingD1(inner) as unknown as FakeD1 };
+    return shared;
+  };
+
+  it("两个并发更新基于同一 revision：一条写入、一条冲突，后写者不覆盖先写者", async () => {
+    insertEntity(db, { id: "race", revision: 1, payload: JSON.stringify({ v: "base" }), updatedAt: 1000 });
+
+    const [left, right] = await Promise.all([
+      applyChange(racingEnv(), USER_A, "notes", {
+        id: "race",
+        baseRevision: 1,
+        updatedAt: 2000,
+        payload: { v: "A" },
+      }),
+      applyChange(racingEnv(), USER_A, "notes", {
+        id: "race",
+        baseRevision: 1,
+        updatedAt: 3000,
+        payload: { v: "B" },
+      }),
+    ]);
+
+    const applied = [left, right].filter((result) => result.outcome === "applied");
+    const conflicts = [left, right].filter((result) => result.outcome === "conflict");
+
+    expect(applied).toHaveLength(1);
+    expect(conflicts).toHaveLength(1);
+
+    const row = readEntity(db, USER_A, "notes", "race") as Row;
+    const winner = asEntity(applied[0].entity);
+    expect(Number(row.revision)).toBe(2);
+    expect(row.payload_json).toBe(JSON.stringify(winner.payload));
+
+    // 冲突一方必须看到对方已经写入的版本，而不是「两个都成功」
+    const loser = asEntity(conflicts[0].entity);
+    expect(loser.revision).toBe(2);
+    expect(loser.payload).toEqual(winner.payload);
+  });
+
+  it("两个并发首次推送同一实体：只插入一条，另一条判冲突", async () => {
+    const [left, right] = await Promise.all([
+      applyChange(racingEnv(), USER_A, "notes", {
+        id: "fresh",
+        baseRevision: 0,
+        updatedAt: 2000,
+        payload: { v: "A" },
+      }),
+      applyChange(racingEnv(), USER_A, "notes", {
+        id: "fresh",
+        baseRevision: 0,
+        updatedAt: 3000,
+        payload: { v: "B" },
+      }),
+    ]);
+
+    const applied = [left, right].filter((result) => result.outcome === "applied");
+    const conflicts = [left, right].filter((result) => result.outcome === "conflict");
+    expect(applied).toHaveLength(1);
+    expect(conflicts).toHaveLength(1);
+
+    const row = readEntity(db, USER_A, "notes", "fresh") as Row;
+    expect(Number(row.revision)).toBe(1);
+    expect(row.payload_json).toBe(JSON.stringify(asEntity(applied[0].entity).payload));
+    expect(asEntity(conflicts[0].entity).revision).toBe(1);
+  });
+});
+
 describe("墓碑 TTL 清理与防复活", () => {
   let db: DatabaseSync;
   let env: { DB: FakeD1 };
@@ -467,6 +594,76 @@ describe("配额与统计", () => {
     ]);
 
     expect(delta).toEqual({ entities: 2, tombstones: 0 });
+  });
+
+  /**
+   * 配额闸门必须落在写语句里。
+   *
+   * 2.0.4 之前 push 是「预检 → 逐条写」：两个并发请求都看到还剩 1 个名额，各自写入成功，
+   * 于是超过 5000 实体 / 2000 墓碑上限。这里直接构造「只剩一个名额」的局面，验证只有
+   * 一个请求能写进去，另一个拿到 quota 结果，且库里计数停在上限。
+   */
+  it("并发推送只剩一个实体名额：一条写入、一条以 quota 返回，计数不越界", async () => {
+    const seed = db.prepare(
+      `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
+       VALUES (?, 'notes', ?, 1, 0, ?, 1000, NULL)`,
+    );
+    for (let i = 0; i < MAX_ENTITIES_PER_USER - 1; i += 1) {
+      seed.run(USER_A, `seed-${i}`, JSON.stringify({ i }));
+    }
+
+    const [left, right] = await Promise.all([
+      applyChange(env, USER_A, "notes", { id: "last-a", baseRevision: 0, updatedAt: 2000, payload: { v: "A" } }),
+      applyChange(env, USER_A, "notes", { id: "last-b", baseRevision: 0, updatedAt: 2000, payload: { v: "B" } }),
+    ]);
+
+    const applied = [left, right].filter((result) => result.outcome === "applied");
+    const quota = [left, right].filter((result) => result.outcome === "quota");
+    expect(applied).toHaveLength(1);
+    expect(quota).toHaveLength(1);
+    expect(quota[0]).toMatchObject({
+      scope: "entities",
+      current: MAX_ENTITIES_PER_USER,
+      limit: MAX_ENTITIES_PER_USER,
+    });
+    expect((await userQuotaStats(env, USER_A)).entityCount).toBe(MAX_ENTITIES_PER_USER);
+  });
+
+  it("墓碑名额耗尽时把活实体改成墓碑：返回 quota，实体保持原样", async () => {
+    const seedTomb = db.prepare(
+      `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
+       VALUES (?, 'notes', ?, 1, 1, NULL, 1000, 1000)`,
+    );
+    for (let i = 0; i < MAX_TOMBSTONES_PER_USER - 1; i += 1) {
+      seedTomb.run(USER_A, `tomb-${i}`);
+    }
+    insertEntity(db, { id: "live-x", payload: JSON.stringify({ v: 1 }), updatedAt: 1000 });
+    insertEntity(db, { id: "live-y", payload: JSON.stringify({ v: 2 }), updatedAt: 1000 });
+
+    // 第 2000 个墓碑刚好占满上限，允许写入
+    const last = await applyChange(env, USER_A, "notes", {
+      id: "live-x",
+      baseRevision: 1,
+      deleted: true,
+      updatedAt: 2000,
+    });
+    expect(last.outcome).toBe("applied");
+
+    // 再删一条就超限：必须被写语句里的闸门挡下，且原行不被改动
+    const blocked = await applyChange(env, USER_A, "notes", {
+      id: "live-y",
+      baseRevision: 1,
+      deleted: true,
+      updatedAt: 3000,
+    });
+    expect(blocked).toMatchObject({
+      outcome: "quota",
+      scope: "tombstones",
+      current: MAX_TOMBSTONES_PER_USER,
+      limit: MAX_TOMBSTONES_PER_USER,
+    });
+    expect(readEntity(db, USER_A, "notes", "live-y")).toMatchObject({ deleted: 0, revision: 1 });
+    expect((await userQuotaStats(env, USER_A)).tombstoneCount).toBe(MAX_TOMBSTONES_PER_USER);
   });
 });
 

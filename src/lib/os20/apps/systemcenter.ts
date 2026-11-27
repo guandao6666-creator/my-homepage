@@ -996,7 +996,8 @@ const view = () => {
 };
 
 export const renderSystemCenter = () =>
-  shell("systemcenter", TABS.map(([id, label, icon]) => [id, label, icon]), `<div data-sc-host></div>`, "系统设置");
+  // 2.0.9：tab 是模块级状态，重开窗口时侧栏高亮必须跟上，否则内容在「系统」、高亮却在「外观」。
+  shell("systemcenter", TABS.map(([id, label, icon]) => [id, label, icon]), `<div data-sc-host></div>`, "系统设置", tab);
 
 export const initSystemCenter = (win: HTMLElement, ctx: Ctx, sys: Sys, kernelArg?: Kernel): (() => void) => {
   const kernel = kernelArg ?? getOs20()?.kernel ?? null;
@@ -1258,7 +1259,26 @@ export const initSystemCenter = (win: HTMLElement, ctx: Ctx, sys: Sys, kernelArg
     }
   });
 
+  /**
+   * 数值滑杆只在 pointerup 落盘会丢掉键盘调整（方向键、Home/End 只触发 input+change，
+   * 不触发 pointerup），关闭窗口后修改静默消失。统一走这个提交函数，并按值去重，
+   * 指针拖动时 pointerup 与 change 都会来一次，不会重复写设置。
+   */
+  const commitNumberSetting = (range: HTMLInputElement) => {
+    const id = range.dataset.setNumber ?? "";
+    if (!id) return;
+    const next = Number(range.value);
+    if (kernel.settings.get(id) === next) return;
+    kernel.settings.set(id, next);
+    apply();
+  };
+
   win.addEventListener("change", (event) => {
+    const range = (event.target as HTMLElement).closest<HTMLInputElement>("[data-set-number]");
+    if (range) {
+      commitNumberSetting(range);
+      return;
+    }
     const selectElement = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-set-select]");
     if (selectElement) {
       const id = selectElement.dataset.setSelect ?? "";
@@ -1281,16 +1301,14 @@ export const initSystemCenter = (win: HTMLElement, ctx: Ctx, sys: Sys, kernelArg
   win.addEventListener("pointerup", (event) => {
     const range = (event.target as HTMLElement).closest<HTMLInputElement>("[data-set-number]");
     if (!range) return;
-    const id = range.dataset.setNumber ?? "";
-    kernel.settings.set(id, Number(range.value));
-    apply();
+    commitNumberSetting(range);
   });
 
   bindTabs(win, (next) => {
     tab = (TABS.some(([id]) => id === next) ? next : "appearance") as Tab;
     if (tab === "plugins") void refreshPlugins();
     paint();
-  });
+  }, tab);
 
   paint();
   void refreshPlugins();

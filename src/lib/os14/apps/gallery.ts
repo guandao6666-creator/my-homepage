@@ -13,6 +13,7 @@ export const stylesReady = ensureCss(cssUrl1);
  */
 
 import { safeUrl } from "../../html";
+import { createSlideshow } from "../../os13/slideshow";
 import {
   compressImage,
   escapeHtml,
@@ -122,7 +123,11 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
   const root = win.querySelector<HTMLElement>("[data-ga14]");
   if (!root) return () => undefined;
   let st = read();
-  let slideTimer = 0;
+  // 幻灯片：tick 通过可变引用指向真正「打开下一张」的函数（openLightbox 在下方定义）
+  let slideTick: () => void = () => undefined;
+  const slideshow = createSlideshow(() => slideTick());
+  // 灯箱的 keydown 必须可摘：以前每次打开都 addEventListener，且只在下次按键时才自移除
+  let lightboxKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   const grid = root.querySelector<HTMLElement>("[data-ga-grid]");
   const albumsEl = root.querySelector<HTMLElement>("[data-ga-albums]");
   const search = root.querySelector<HTMLInputElement>("[data-ga-search]");
@@ -185,6 +190,11 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
     if (!p) return;
     const url = await urlOf(p.blobKey);
     const existing = root.querySelector(".ga14-lightbox");
+    // 先摘掉上一张灯箱的键盘监听：以前每切一张就多挂一个，闭着灯箱按方向键还会翻旧列表
+    if (lightboxKeyHandler) {
+      win.removeEventListener("keydown", lightboxKeyHandler);
+      lightboxKeyHandler = null;
+    }
     existing?.remove();
     const box = document.createElement("div");
     box.className = "ga14-lightbox";
@@ -208,12 +218,21 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
       const next = list[(idx + dir + list.length) % list.length];
       if (next) void openLightbox(next.id);
     };
+    // 关闭灯箱必须同时停幻灯片并摘监听：否则 Esc 关掉后 4.2 秒又被弹回来
+    const closeLightbox = () => {
+      box.remove();
+      slideshow.stop();
+      if (keyHandler) {
+        win.removeEventListener("keydown", keyHandler);
+        if (lightboxKeyHandler === keyHandler) lightboxKeyHandler = null;
+      }
+      st.ui.lightbox = "";
+      write(st);
+    };
     box.addEventListener("click", (e) => {
       const t = e.target as HTMLElement;
       if (t.closest("[data-lb-close]") || t === box) {
-        box.remove();
-        st.ui.lightbox = "";
-        write(st);
+        closeLightbox();
         return;
       }
       if (t.closest("[data-lb-prev]")) step(-1);
@@ -221,7 +240,7 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
       if (t.closest("[data-lb-fav]")) {
         p.fav = !p.fav;
         write(st);
-        box.remove();
+        closeLightbox();
         void openLightbox(p.id);
         void paint();
       }
@@ -239,20 +258,25 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
           urls.delete(p.blobKey);
           st.photos = st.photos.filter((x) => x.id !== p.id);
           write(st);
-          box.remove();
+          closeLightbox();
           await paint();
         });
       }
     });
     const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeLightbox();
+        return;
+      }
       if (!box.isConnected) {
+        if (lightboxKeyHandler === keyHandler) lightboxKeyHandler = null;
         win.removeEventListener("keydown", keyHandler);
         return;
       }
-      if (e.key === "Escape") box.remove();
       if (e.key === "ArrowLeft") step(-1);
       if (e.key === "ArrowRight") step(1);
     };
+    lightboxKeyHandler = keyHandler;
     win.addEventListener("keydown", keyHandler);
   };
 
@@ -369,14 +393,13 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
         return;
       }
       let i = 0;
-      const show = () => {
+      slideTick = () => {
         const p = list[i % list.length];
         i++;
         void openLightbox(p.id);
       };
-      show();
-      window.clearInterval(slideTimer);
-      slideTimer = window.setInterval(show, 4200);
+      slideTick();
+      slideshow.start();
       ctx.toast("幻灯片开始，按 Esc 关闭当前图片");
       return;
     }
@@ -392,7 +415,8 @@ export const initGallery = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
   void paint();
   return () => {
-    window.clearInterval(slideTimer);
+    slideshow.stop();
+    if (lightboxKeyHandler) win.removeEventListener("keydown", lightboxKeyHandler);
     for (const url of urls.values()) URL.revokeObjectURL(url);
     urls.clear();
   };

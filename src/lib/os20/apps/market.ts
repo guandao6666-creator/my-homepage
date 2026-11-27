@@ -16,6 +16,8 @@ export const stylesReady = ensureCss(cssUrl1);
  */
 
 import { safeUrl } from "../../html";
+import { marketThumbHtml } from "../market-thumb";
+import { resolveSelection } from "./market-selection";
 import {
   badge,
   bindTabs,
@@ -93,13 +95,14 @@ const refreshData = () => {
   if (!hub) return;
   const current = state.selected;
   const list = hub.search(state.query, state.kind);
-  if (current && !list.some((item) => keyOf(item) === current)) state.selected = "";
+  // 2.0.8：过滤后不再可见的选中项必须清空，否则详情栏与「安装」会指向看不见的旧对象
+  state.selected = resolveSelection(current, list.map(keyOf));
 };
 
 const card = (item: MarketItem) => `
   <article class="os20-mk-card ${state.selected === keyOf(item) ? "is-active" : ""}" data-item="${esc(keyOf(item))}" tabindex="0">
-    <div class="os20-mk-thumb" ${item.preview ? `style="background-image:url('${esc(item.preview)}')"` : ""}>
-      ${item.preview ? "" : iconHtml(item)}
+    <div class="os20-mk-thumb">
+      ${item.preview ? marketThumbHtml(item.preview) || iconHtml(item) : iconHtml(item)}
       ${item.installed ? `<span class="os20-mk-badge">已安装</span>` : ""}
     </div>
     <div class="os20-mk-body">
@@ -207,6 +210,9 @@ const list = () => {
   return `<div class="os20-mk-grid">${items.map(card).join("")}</div>`;
 };
 
+const emptyDetail = () =>
+  `<aside class="os20-mk-detail is-empty"><p>选择左侧任意一张卡片查看详情。</p><p class="g14-hint">安装前会依次检查来源、版本、兼容性、Manifest 与权限。</p></aside>`;
+
 const body = () => {
   const counts: Record<Kind, number> = (hub?.counts() ?? { all: 0 }) as Record<Kind, number>;
   const selected = state.selected && hub ? hub.search("", "all").find((item) => keyOf(item) === state.selected) : null;
@@ -242,7 +248,7 @@ const body = () => {
 
       <div class="os20-mk-layout">
         <div class="os20-mk-list">${list()}</div>
-        ${selected ? detail(selected) : `<aside class="os20-mk-detail is-empty"><p>选择左侧任意一张卡片查看详情。</p><p class="g14-hint">安装前会依次检查来源、版本、兼容性、Manifest 与权限。</p></aside>`}
+        ${selected ? detail(selected) : emptyDetail()}
       </div>
     </div>`;
 };
@@ -289,7 +295,8 @@ const installOverlay = () => {
 };
 
 export const renderMarket = () =>
-  shell("market", KINDS.map(([id, label, icon]) => [id, label, icon]), `<div data-mk-host></div>`, "市场");
+  // 2.0.9：state.kind 跨窗口保留，重开时侧栏高亮要与内容一致（同 systemcenter）。
+  shell("market", KINDS.map(([id, label, icon]) => [id, label, icon]), `<div data-mk-host></div>`, "市场", state.kind);
 
 export const initMarket = (win: HTMLElement, ctx: Ctx, sys: Sys): (() => void) => {
   ctxRef = ctx;
@@ -462,6 +469,13 @@ export const initMarket = (win: HTMLElement, ctx: Ctx, sys: Sys): (() => void) =
     refreshData();
     const listHost = host.querySelector<HTMLElement>(".os20-mk-list");
     if (listHost) listHost.innerHTML = list();
+    // 2.0.8：过滤可能让当前选中项消失；详情栏只重绘列表会继续显示旧作品，
+    // 安装按钮随后按空 id 静默失效，所以这里必须同时重绘右侧详情栏。
+    const detailHost = host.querySelector<HTMLElement>(".os20-mk-detail");
+    if (detailHost) {
+      const item = state.selected ? findItem(state.selected) : null;
+      detailHost.outerHTML = item ? detail(item) : emptyDetail();
+    }
   });
 
   bindTabs(win, (next) => {
@@ -470,7 +484,7 @@ export const initMarket = (win: HTMLElement, ctx: Ctx, sys: Sys): (() => void) =
       state.selected = "";
       paint();
     }
-  });
+  }, state.kind);
 
   paint();
   return () => {

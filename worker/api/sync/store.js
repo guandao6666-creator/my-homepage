@@ -22,27 +22,56 @@ import {
 /** 保持旧导出兼容：HTTP 层与历史脚本从 store.js 取域白名单。 */
 export { SYNC_DOMAINS, isSyncDomain } from "./limits.js";
 
+/** 单条 SQL 的绑定参数上限按 D1 的 100 保守留余量；分块实现统一在 ../sql.js。 */
+import { ID_CHUNK_SIZE, chunkIds } from "../sql.js";
+import { formatSyncCursor } from "./cursor.js";
+
 const MAX_INDEX_ROWS = 10000;
-/** 单条 SQL 的绑定参数上限按 D1 的 100 保守留余量。 */
-const ID_CHUNK_SIZE = 40;
 /** 多行台账写入：5 列 × 15 行 = 75 个参数。 */
 const LEDGER_INSERT_CHUNK = 15;
 /** 多行墓碑删除：3 列 × 20 行 = 60 个参数（再加 cutoff）。 */
 const TOMBSTONE_DELETE_CHUNK = 20;
 
-/** 增量拉取（updated_at > since），按时间升序，便于客户端顺序应用 */
-export async function listChanges(env, userId, domain, { since = 0, limit = 300 } = {}) {
+/**
+ * 增量拉取（按 (updated_at, entity_id) 游标分页），按时间升序，便于客户端顺序应用。
+ *
+ * 2.0.11：裸 `since` 在分页边界会漏掉「与上一页最后一条同毫秒」的其余变更——台账时间戳是
+ * 毫秒整数，同一毫秒写入多条时 `updated_at > since` 全被跳过。这里用元组比较补齐 tiebreak；
+ * 不带游标时退回旧的 `since` 语义，老客户端行为不变。
+ *
+ * @param {{ since?: number, limit?: number }} options 旧参数（since 语义保持兼容）
+ * @param {{ updatedAt: number, entityId: string } | null} cursor 新增游标；null 时按 since 分页
+ */
+export async function listChangesPage(env, userId, domain, { since = 0, limit = 300 } = {}, cursor = null) {
+  const bounded = Math.min(500, Math.max(1, Number(limit) || 300));
+  const where = cursor
+    ? "user_id = ? AND domain = ? AND (updated_at > ? OR (updated_at = ? AND entity_id > ?))"
+    : "user_id = ? AND domain = ? AND updated_at > ?";
+  const binds = cursor
+    ? [userId, domain, cursor.updatedAt, cursor.updatedAt, cursor.entityId, bounded]
+    : [userId, domain, Number(since) || 0, bounded];
+
   const rows = await env.DB.prepare(
     `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
        FROM sync_entities
-      WHERE user_id = ? AND domain = ? AND updated_at > ?
+      WHERE ${where}
       ORDER BY updated_at ASC, entity_id ASC
       LIMIT ?`,
   )
-    .bind(userId, domain, Number(since) || 0, Math.min(500, Math.max(1, Number(limit) || 300)))
+    .bind(...binds)
     .all();
 
-  return (rows.results || []).map(mapRow);
+  const results = rows.results || [];
+  return {
+    changes: results.map(mapRow),
+    nextCursor: results.length ? formatSyncCursor(results[results.length - 1]) : null,
+  };
+}
+
+/** 保持 2.0.10 及更早调用方的返回形状：只要 changes 数组。 */
+export async function listChanges(env, userId, domain, options = {}, cursor = null) {
+  const page = await listChangesPage(env, userId, domain, options, cursor);
+  return page.changes;
 }
 
 /** 按 id 批量取实体（客户端按索引 diff 后只拉需要的） */
@@ -51,7 +80,7 @@ export async function listByIds(env, userId, domain, ids) {
   if (!list.length) return [];
 
   const found = [];
-  for (const chunk of chunkArray(list, ID_CHUNK_SIZE)) {
+  for (const chunk of chunkIds(list, ID_CHUNK_SIZE)) {
     const placeholders = chunk.map(() => "?").join(", ");
     const rows = await env.DB.prepare(
       `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
@@ -90,8 +119,25 @@ export async function listIndex(env, userId, domain) {
 }
 
 /**
+ * 统计用户的活实体数或墓碑数（配额闸门被挡下时用于确认「确实是配额问题」）。
+ * 单独抽出来是因为 UPDATE / INSERT 两条分支都要用，且必须只在 changes=0 时跑一次，
+ * 避免每次写入都多一次 COUNT。
+ * @param {any} env
+ * @param {string} userId
+ * @param {"entities"|"tombstones"} scope
+ */
+async function countKind(env, userId, scope) {
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM sync_entities WHERE user_id = ? AND deleted = ?",
+  )
+    .bind(userId, scope === "entities" ? 0 : 1)
+    .first();
+  return Number(row?.n) || 0;
+}
+
+/**
  * 乐观锁写入。
- * @returns {{ outcome: "applied"|"conflict", entity: object }}
+ * @returns {{ outcome: "applied"|"conflict"|"quota", scope?: string, current?: number, limit?: number, entity?: object }}
  */
 export async function applyChange(env, userId, domain, change) {
   const id = String(change.id);
@@ -134,18 +180,132 @@ export async function applyChange(env, userId, domain, change) {
   const nextUpdatedAt = Math.max(updatedAt, Number(current?.updated_at) || 0) + 1;
   const nextDeletedAt = deleted ? nextUpdatedAt : null;
 
-  await env.DB.prepare(
-    `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (user_id, domain, entity_id) DO UPDATE SET
-       revision = excluded.revision,
-       deleted = excluded.deleted,
-       payload_json = excluded.payload_json,
-       updated_at = excluded.updated_at,
-       deleted_at = excluded.deleted_at`,
-  )
-    .bind(userId, domain, id, nextRevision, deleted ? 1 : 0, payload, nextUpdatedAt, nextDeletedAt)
-    .run();
+  /*
+   * 乐观锁必须落在「写」这一条 SQL 上。
+   *
+   * 2.0.4 之前是「SELECT 读 revision → JS 判冲突 → INSERT ... ON CONFLICT DO UPDATE」：
+   * 两个并发 push 都读到同一个 revision，都判定不冲突，写入时后到者整条覆盖先到者，
+   * 且两边拿到同一个 revision 号 —— 客户端以为自己同步成功，编辑永久消失且不会被
+   * 后续 pull 判成冲突。D1 只保证单条语句原子，所以这里用带 `revision = ?` 条件的
+   * UPDATE（或带 NOT EXISTS 的 INSERT）把「判」和「写」合成一条语句，再按 changes 判胜负。
+   */
+  /*
+   * 配额也必须落在「写」这一条 SQL 上。
+   *
+   * 2.0.4 之前 push 是「userQuotaStats 预检 → 逐条 applyChange」：两个并发请求都看到
+   * 「还剩 1 条额度」，各自写入成功，于是超过 5000 实体 / 2000 墓碑上限。预检保留下来
+   * 做快速失败，但真正守门的是下面的条件子查询：只有当前计数仍低于上限才允许写。
+   * 子查询和写语句一起执行，D1 保证单条语句原子，所以并发下最多只有一个请求抢到最后一个名额。
+   */
+  const currentDeleted = Number(current?.deleted) === 1;
+  const addsEntity = !deleted && (!current || currentDeleted);
+  const addsTombstone = deleted && (!current || !currentDeleted);
+  const quotaScope = addsEntity ? "entities" : addsTombstone ? "tombstones" : null;
+  const quotaLimit = addsEntity ? MAX_ENTITIES_PER_USER : addsTombstone ? MAX_TOMBSTONES_PER_USER : 0;
+  const quotaGuard = quotaScope
+    ? ` AND (SELECT COUNT(*) FROM sync_entities WHERE user_id = ? AND deleted = ${addsEntity ? 0 : 1}) < ?`
+    : "";
+  const quotaBinds = quotaScope ? [userId, quotaLimit] : [];
+
+  if (current) {
+    const updated = await env.DB.prepare(
+      `UPDATE sync_entities
+          SET revision = ?, deleted = ?, payload_json = ?, updated_at = ?, deleted_at = ?
+        WHERE user_id = ? AND domain = ? AND entity_id = ? AND revision = ?${quotaGuard}`,
+    )
+      .bind(
+        nextRevision,
+        deleted ? 1 : 0,
+        payload,
+        nextUpdatedAt,
+        nextDeletedAt,
+        userId,
+        domain,
+        id,
+        currentRevision,
+        ...quotaBinds,
+      )
+      .run();
+
+    if (Number(updated?.meta?.changes ?? 0) === 0) {
+      // 配额挡下时行并没有被改（revision 仍是读到的那个），不能当冲突返回给客户端。
+      if (quotaScope) {
+        const blocked = await countKind(env, userId, quotaScope);
+        if (blocked >= quotaLimit) {
+          return { outcome: "quota", scope: quotaScope, current: blocked, limit: quotaLimit };
+        }
+      }
+      // 读完之后被其它请求抢先写入：按冲突返回对方的最新版本，让客户端合并。
+      const fresh = await env.DB.prepare(
+        `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
+           FROM sync_entities WHERE user_id = ? AND domain = ? AND entity_id = ?`,
+      )
+        .bind(userId, domain, id)
+        .first();
+      if (fresh) return { outcome: "conflict", entity: mapRow(fresh) };
+      // 极端情况：并发清理把行删了。按「不存在」重新走一遍台账判断。
+      const ledger = await env.DB.prepare(
+        `SELECT revision, deleted_at FROM sync_tombstone_ledger
+          WHERE user_id = ? AND domain = ? AND entity_id = ?`,
+      )
+        .bind(userId, domain, id)
+        .first();
+      if (ledger && (Number(ledger.revision) || 0) > baseRevision) {
+        const ledgerRevision = Number(ledger?.revision) || 0;
+        const deletedAt = Number(ledger?.deleted_at) || 0;
+        return {
+          outcome: "conflict",
+          entity: { id, revision: ledgerRevision, deleted: true, updatedAt: deletedAt, deletedAt },
+        };
+      }
+      return {
+        outcome: "conflict",
+        entity: { id, revision: nextRevision, deleted: false, updatedAt: nextUpdatedAt, payload: change.payload ?? null },
+      };
+    }
+  } else {
+    // 插入同样要防并发：两个请求都读到「不存在」时，只允许一个插进去。
+    // 配额闸门也放在这条 INSERT 里：新实体/新墓碑必须还有名额。
+    const inserted = await env.DB.prepare(
+      `INSERT INTO sync_entities (user_id, domain, entity_id, revision, deleted, payload_json, updated_at, deleted_at)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE NOT EXISTS (
+          SELECT 1 FROM sync_entities WHERE user_id = ? AND domain = ? AND entity_id = ?
+        )${quotaGuard}`,
+    )
+      .bind(
+        userId,
+        domain,
+        id,
+        nextRevision,
+        deleted ? 1 : 0,
+        payload,
+        nextUpdatedAt,
+        nextDeletedAt,
+        userId,
+        domain,
+        id,
+        ...quotaBinds,
+      )
+      .run();
+
+    if (Number(inserted?.meta?.changes ?? 0) === 0) {
+      const fresh = await env.DB.prepare(
+        `SELECT entity_id, revision, deleted, payload_json, updated_at, deleted_at
+           FROM sync_entities WHERE user_id = ? AND domain = ? AND entity_id = ?`,
+      )
+        .bind(userId, domain, id)
+        .first();
+      if (fresh) return { outcome: "conflict", entity: mapRow(fresh) };
+      // 没插进去、也没有同 id 的行：只可能是配额闸门挡下的（例如并发抢最后一个名额）。
+      if (quotaScope) {
+        const blocked = await countKind(env, userId, quotaScope);
+        if (blocked >= quotaLimit) {
+          return { outcome: "quota", scope: quotaScope, current: blocked, limit: quotaLimit };
+        }
+      }
+    }
+  }
 
   if (deleted) {
     // 台账只增不减：即使墓碑之后被物理清理，也能拦住旧终端的「复活」推送。
@@ -227,7 +387,7 @@ export async function estimateQuotaDelta(env, userId, domain, changes) {
   const existing = new Map();
   const ledger = new Map();
 
-  for (const chunk of chunkArray(ids, ID_CHUNK_SIZE)) {
+  for (const chunk of chunkIds(ids, ID_CHUNK_SIZE)) {
     const placeholders = chunk.map(() => "?").join(", ");
     const rows = await env.DB.prepare(
       `SELECT entity_id, deleted FROM sync_entities
@@ -300,7 +460,7 @@ export async function purgeExpiredTombstones(env, options = {}) {
   if (!batch.length) return { scanned: 0, purged: 0, cutoff };
 
   // 1) 先确保台账记录了这批墓碑（0014 时代的墓碑删除时还没有台账）。
-  for (const chunk of chunkArray(batch, LEDGER_INSERT_CHUNK)) {
+  for (const chunk of chunkIds(batch, LEDGER_INSERT_CHUNK)) {
     const placeholders = chunk.map(() => "(?, ?, ?, ?, ?)").join(", ");
     const params = chunk.flatMap((row) => [
       row.user_id,
@@ -319,7 +479,7 @@ export async function purgeExpiredTombstones(env, options = {}) {
 
   // 2) 再按主键删除（用 OR 主键谓词，兼容 D1 与内存 SQLite 的批量参数上限）。
   let purged = 0;
-  for (const chunk of chunkArray(batch, TOMBSTONE_DELETE_CHUNK)) {
+  for (const chunk of chunkIds(batch, TOMBSTONE_DELETE_CHUNK)) {
     const predicates = chunk.map(() => "(user_id = ? AND domain = ? AND entity_id = ?)").join(" OR ");
     const params = [cutoff, ...chunk.flatMap((row) => [row.user_id, row.domain, row.entity_id])];
     const result = await env.DB.prepare(
@@ -367,8 +527,3 @@ function mapRow(row) {
   };
 }
 
-function chunkArray(list, size) {
-  const chunks = [];
-  for (let i = 0; i < list.length; i += size) chunks.push(list.slice(i, i + size));
-  return chunks;
-}

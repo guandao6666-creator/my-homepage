@@ -62,6 +62,7 @@ import {
   installVersionImpl,
   newVersionFlowImpl,
   openPostFromEventImpl,
+  pickPageButton,
   refreshPostButtonsImpl,
   submitReportImpl,
   toggleFavoriteImpl,
@@ -121,7 +122,18 @@ export const renderCommunity = () => {
   );
 };
 
+/**
+ * 窗口 → 上一次 init 的卸载函数。
+ *
+ * 外壳的崩溃重试 / 工作区恢复有极小的概率对同一个窗口再次 mount；若不先
+ * 摘掉旧监听，就会挂两套 click 代理，一次点击同时发起两个 loader、互相判定
+ * stale（2.0.0 期间的 P1-8 排查中曾把它当作竞态来源）。这里用 WeakMap 做幂等，
+ * 不往 DOM 上写标记，窗口回收后自动失效。
+ */
+const disposers = new WeakMap<HTMLElement, () => void>();
+
 export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
+  disposers.get(win)?.();
   const root = win.querySelector<HTMLElement>(".g14-shell") ?? win;
   const body = win.querySelector<HTMLElement>("[data-cx-body]");
   const searchInput = win.querySelector<HTMLInputElement>("[data-cx-search]");
@@ -131,6 +143,9 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
   let view: ViewState = { kind: "tab", tab: "home" };
   let layout: "grid" | "list" = ls.str(LAYOUT_KEY) === "list" ? "list" : "grid";
   let loadToken = 0;
+  // 卸载后（窗口关闭 / 被新实例顶掉）旧实例必须停止写 DOM：
+  // 卸载只摘监听器，已经飞出去的 await 仍会回来。
+  let disposed = false;
   let explore = { type: "", category: "", sort: "latest", page: 1 };
   let searchState = { q: "", type: "", sort: "latest", page: 1 };
   let creatorsSort = "active";
@@ -216,6 +231,7 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
   };
 
   const setBody = (html: string) => {
+    if (disposed) return;
     body.innerHTML = html;
     body.scrollTop = 0;
   };
@@ -501,7 +517,8 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
     // 只认分页按钮。OS 外壳会在 <html> 上写 data-page="desktop"，用裸
     // [data-page] 会把「点卡片 / 点空白」全部当成翻页，直接跳去发现页。
-    const page = target.closest<HTMLButtonElement>("button[data-page]");
+    // 2.0.1 起选择器与数字校验收敛到 pickPageButton（见 interactions.ts）。
+    const page = pickPageButton(target);
     if (page) {
       event.preventDefault();
       const next = Number(page.dataset.page) || 1;
@@ -536,7 +553,17 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
         window.dispatchEvent(new CustomEvent("guandao:open-community-join"));
         break;
       case "retry":
-        void (view.kind === "tab" ? loadHome() : loadDetail((view as { id?: string }).id || ""));
+        // 旧实现只有 tab/detail 两个分支：创作者页把 id 当作品 id、搜索页传空串，
+        // 「重试」反而把用户带到 404。按当前视图重新分派。
+        if (view.kind === "detail") void loadDetail(view.id);
+        else if (view.kind === "creator") void loadCreator(view.id);
+        else if (view.kind === "search") void loadSearch(view.q);
+        else if (view.kind === "tab") {
+          if (view.tab === "explore") void loadExplore("");
+          else if (view.tab === "creators") void loadCreators();
+          else if (view.tab === "creations") void loadCreations("works");
+          else void loadHome();
+        } else void loadHome();
         break;
       case "explore-all":
         explore = { type: "", category: "", sort: "latest", page: 1 };
@@ -761,6 +788,11 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
         break;
       case "review-approve":
         if (actionEl?.dataset.id) void reviewModeration(actionEl.dataset.id, "approve");
+        break;
+      case "review-restore":
+        // 已隐藏的内容用“恢复”，服务端只让 hidden → published 走这条；
+        // 和 approve 分开，避免把作者撤回的 draft 也当成“恢复”。
+        if (actionEl?.dataset.id) void reviewModeration(actionEl.dataset.id, "restore");
         break;
       case "review-reject":
         if (actionEl?.dataset.id) void reviewModeration(actionEl.dataset.id, "reject");
@@ -1228,6 +1260,7 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
     const bootToken = loadToken;
     try {
       await ensureMeta();
+      if (disposed) return;
       // TS 在 IIFE 里会把 meta 收窄回初始的 null，这里按声明类型读一次
       const metaNow = meta as api.CommunityMeta | null;
       const mark = win.querySelector<HTMLElement>(".g14-side-title");
@@ -1243,9 +1276,13 @@ export const initCommunity = (win: HTMLElement, ctx: Ctx): (() => void) => {
     }
   })();
 
-  return () => {
+  const dispose = () => {
+    disposed = true;
     loadToken++;
     window.removeEventListener("guandao:community-change", onCommunityChange);
+    if (disposers.get(win) === dispose) disposers.delete(win);
   };
+  disposers.set(win, dispose);
+  return dispose;
 };
 

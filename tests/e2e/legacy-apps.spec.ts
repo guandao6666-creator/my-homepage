@@ -258,10 +258,15 @@ test.describe("Phase 2.2 · 第二批迁移（外壳能力接口化）", () => {
     await openApp(page, "draw");
 
     const win = page.locator('.window[data-app="draw"]');
-    await expect(win.locator("#draw-text")).toHaveText("每天可以抽一张，明天再来");
+    // 2.0.1 校正：未抽时正文是「每天可以抽一张」，按钮才是「抽一张」；
+    // 抽完后正文换成抽签语、按钮文案变成「明天再来」（src/lib/legacy-apps/draw/index.ts:24/40-41）。
+    // 旧断言把「，明天再来」当成正文，是 1.x 文案的残留。
+    await expect(win.locator("#draw-text")).toHaveText("每天可以抽一张");
+    await expect(win.locator("#draw-btn")).toHaveText("抽一张");
     await win.locator("#draw-btn").click();
     await expect(win.locator("#draw-mark")).not.toHaveText("?", { timeout: 5_000 });
-    await expect(win.locator("#draw-text")).not.toHaveText("每天可以抽一张，明天再来");
+    await expect(win.locator("#draw-btn")).toHaveText("明天再来");
+    await expect(win.locator("#draw-text")).not.toHaveText("每天可以抽一张");
 
     const saved = await page.evaluate(() => window.localStorage.getItem("guandao.draw.v1"));
     expect(saved, "抽签结果应写入 guandao.draw.v1").toBeTruthy();
@@ -370,7 +375,16 @@ test.describe("Phase 2.2 · 第二批迁移（外壳能力接口化）", () => {
     const win = page.locator('.window[data-app="council"]');
     await expect(win.locator("#council-status")).not.toHaveText("正在加载…", { timeout: 12_000 });
     await expect(win.locator("#council-status")).not.toBeEmpty();
-    await expect(win.locator("#council-auth .auth-form")).toBeVisible();
+    // 议题来自构建期数据（src/lib/legacy-apps/council/index.ts:86-92）。
+    // 构建时没连上数据库就没有议题，此时产品按设计走空态并提前 return，
+    // 不该再渲染登录框（:117-131）。两种情况都要有明确终态，不能停在加载中。
+    const items = win.locator("#council-list .council-item");
+    if ((await items.count()) > 0) {
+      await expect(win.locator("#council-auth .auth-form")).toBeVisible();
+    } else {
+      await expect(win.locator("#council-status")).toHaveText("暂无议题");
+      await expect(win.locator("#council-list .council-empty")).toContainText("没有议题数据");
+    }
     await closeApp(page, "council");
   });
 
@@ -388,13 +402,27 @@ test.describe("Phase 2.2 · 第二批迁移（外壳能力接口化）", () => {
   });
 
   test("社交名片：加载态结束，离线时列表有明确空态", async ({ page }) => {
+    // 这个应用读的是 Supabase（src/lib/legacy-apps/social/index.ts:54-55、172-215），
+    // 不是本站 /api/*，所以断本站路由没用。云端没配置时文案是「云端没接上」，
+    // 配置了但请求失败是「连不上，关掉重开试试」；只有云端真的返回空才出现
+    // 「还没有别的访客留下名字。」。三种都是确定的终态，断言按终态分支，
+    // 不把「必须离线」写死在不成立的假设上。
     await bootDesktop(page);
     await openApp(page, "social");
 
     const win = page.locator('.window[data-app="social"]');
-    await expect(win.locator("#social-count")).not.toHaveText("正在加载…", { timeout: 12_000 });
-    await expect(win.locator("#social-count")).not.toBeEmpty();
-    await expect(win.locator("#social-list .social-empty")).toContainText("还没有别的访客");
+    const count = win.locator("#social-count");
+    await expect(count).not.toHaveText("正在加载…", { timeout: 12_000 });
+    await expect(count).not.toBeEmpty();
+
+    const settled = (await count.innerText()).trim();
+    if (/云端没接上|连不上/.test(settled)) {
+      // 离线终态：计数给出明确原因，列表里不能出现编造的访客。
+      await expect(win.locator("#social-list .social-row")).toHaveCount(0);
+    } else {
+      // 云端可达：要么有访客行，要么是空态文案，二选一，不能一直空着。
+      await expect(win.locator("#social-list .social-row, #social-list .social-empty").first()).toBeVisible();
+    }
     await closeApp(page, "social");
   });
 

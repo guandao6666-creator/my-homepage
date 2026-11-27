@@ -25,6 +25,7 @@ import {
   type Ctx,
 } from "../core";
 import { sendToDevice } from "../../continuity/ui";
+import { normalizeNotes } from "./notes-model";
 import { recordTombstone } from "../../sync/tombstones";
 
 export type NoteDoc = {
@@ -114,6 +115,9 @@ const migrateLegacy = (state: NoteState): NoteState => {
 const read = (): NoteState => {
   const raw = ls.get<NoteState | null>(KEY, null);
   if (raw && raw.v === 1 && Array.isArray(raw.notes)) {
+    // 旧版本写下的记录可能缺 tags/body；旧代码会直接 n.tags.join() 崩掉整页，
+    // 这里先归一化（npm notes-model 的单测覆盖了缺字段与坏记录）。
+    raw.notes = normalizeNotes(raw.notes);
     if (!raw.ui) raw.ui = { folder: "all", noteId: raw.notes[0]?.id ?? "", mode: "edit" };
     return raw;
   }

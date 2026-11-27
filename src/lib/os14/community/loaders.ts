@@ -468,7 +468,7 @@ export const loadNotifications = async (ctx: CommunityContext, page = ctx.getNot
                 .join("")}</div>`
             : ctx.emptyState("还没有通知", "发布作品、关注创作者后，这里会有新动态。", "◔")
         }
-        ${pageNav(page, result.items.length >= result.limit, result.items.length, "条通知")} 
+        ${pageNav(page, result.items.length >= result.limit, page === 1 && result.items.length < result.limit ? result.items.length : null, "条通知")} 
       `);
     } catch (error) {
       if (!ctx.isStale(token)) ctx.showError(error);

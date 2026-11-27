@@ -16,6 +16,7 @@
  */
 
 import type { MigrationStep } from "../core/migrations";
+import { legacyLayoutSnapshotForViewport } from "./legacy-layout";
 import { idb } from "../os14/core";
 import type { StorageManager } from "../core/storage";
 import { OS_VERSION } from "../version";
@@ -220,13 +221,14 @@ export const LOCAL_MIGRATION_STEPS: MigrationStep[] = [
         context.storage.legacyStr("guandao.os.state.v1"),
         {},
       );
-      context.storage.write("layout.v2", {
-        schemaVersion: 2,
-        at: Date.now(),
-        viewport: { width: 0, height: 0 },
-        windows: state.windows ?? {},
-        legacy: true,
-      });
+      // 迁移必须带上真实视口：2.0.5 之前写 `viewport: {width: 0, height: 0}`，
+      // `isSnapshot()` 会把它当成合法 2.0 快照，`rescaleSnapshot()` 拿 0 当分母，
+      // 窗口位置全被压到屏幕角落（见 legacy-layout.ts 的说明）。
+      const viewport = {
+        width: typeof window === "undefined" ? 1440 : window.innerWidth || 1440,
+        height: typeof window === "undefined" ? 900 : window.innerHeight || 900,
+      };
+      context.storage.write("layout.v2", legacyLayoutSnapshotForViewport(state.windows, viewport));
     },
   },
   {

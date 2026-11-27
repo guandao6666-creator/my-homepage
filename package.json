@@ -87,6 +87,6 @@
     "satori": "^0.63.2",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7",
-    "wrangler": "^4.157.0"
+    "wrangler": "^4.166.0"
   }
 }

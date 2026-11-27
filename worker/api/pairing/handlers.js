@@ -154,17 +154,38 @@ export async function handlePairingRequest({ request, env, url, path }) {
 
     const token = randomToken(32);
     const now = Date.now();
-    await createSessionRow(env, {
-      userId: pairing.user_id,
-      tokenHash: await sha256Hex(token),
-      deviceId: pairing.target_device_id,
-      userAgent: pairing.target_user_agent || request.headers.get("user-agent") || "",
-    });
-    await env.DB.prepare(
+
+    // 2.0.4：先占位再发 Session。旧写法是「无条件 createSessionRow，最后才 UPDATE 状态且不看
+    // meta.changes」——两个并发轮询都能走到这里，各自签发一个 Session，最终都带着有效 Cookie。
+    // 把状态转换作为唯一闸门：UPDATE 成功（changes === 1）的请求才拥有签发权，
+    // 另一个请求直接按「已发放」返回，不会再产生第二条 Session。
+    const claimed = await env.DB.prepare(
       "UPDATE device_pairings SET status = 'completed', completed_at = ? WHERE id = ? AND status = 'confirmed'",
     )
       .bind(now, pairing.id)
       .run();
+    if (Number(claimed?.meta?.changes ?? 0) === 0) {
+      return ok({ status: "completed", paired: true, alreadyDelivered: true });
+    }
+
+    try {
+      await createSessionRow(env, {
+        userId: pairing.user_id,
+        tokenHash: await sha256Hex(token),
+        deviceId: pairing.target_device_id,
+        userAgent: pairing.target_user_agent || request.headers.get("user-agent") || "",
+      });
+    } catch (error) {
+      // 占位成功但 Session 写入失败：把状态退回去，避免留下「已完成却永远拿不到 Session」
+      // 的死状态（客户端会一直收到 alreadyDelivered，原设备也看不到可重试的入口）。
+      await env.DB.prepare(
+        "UPDATE device_pairings SET status = 'confirmed', completed_at = NULL WHERE id = ? AND status = 'completed'",
+      )
+        .bind(pairing.id)
+        .run()
+        .catch(() => undefined);
+      throw error;
+    }
 
     await logActivity(env, {
       userId: pairing.user_id,

@@ -87,6 +87,8 @@ export class WindowManager {
   private errors: Array<{ at: number; op: string; appId: string; message: string }> = [];
   private offClosed: (() => void) | null = null;
   private closedListeners = new Set<(appId: string) => void>();
+  /** 同一次关闭可能同时来自 Shell 的 before-close 回调与 close() 的返回值，用它去重 */
+  private notifiedCloses = new Set<string>();
 
   constructor(options: WindowManagerOptions) {
     this.shell = options.shell;
@@ -99,8 +101,7 @@ export class WindowManager {
     this.persistFn = options.persist;
     this.loadFn = options.load;
     this.offClosed = this.shell.onClosed((appId) => {
-      this.notifyClosed(appId);
-      this.emitFn("window:closed", { appId });
+      this.notifyClosedOnce(appId);
     });
   }
 
@@ -128,10 +129,7 @@ export class WindowManager {
   close(appId: string): boolean {
     return this.safe("close", appId, () => {
       const closed = this.shell.close(appId);
-      if (closed) {
-        this.notifyClosed(appId);
-        this.emitFn("window:closed", { appId });
-      }
+      if (closed) this.notifyClosedOnce(appId);
       return closed;
     }, false);
   }
@@ -367,6 +365,20 @@ export class WindowManager {
     } catch {
       /* 日志失败不影响主流程 */
     }
+  }
+
+  /**
+   * 2.0.11：窗口关闭只通知一次。
+   * 为什么：Shell 的 before-close 回调与 close() 的返回值描述的是同一次关闭，
+   * 原先两条路各自 notifyClosed + emit，订阅者会重复清理、布局被重复保存。
+   * 用集合在同一个微任务内去重，之后真正的再次关闭仍会重新通知。
+   */
+  private notifyClosedOnce(appId: string): void {
+    if (!appId || this.notifiedCloses.has(appId)) return;
+    this.notifiedCloses.add(appId);
+    queueMicrotask(() => this.notifiedCloses.delete(appId));
+    this.notifyClosed(appId);
+    this.emitFn("window:closed", { appId });
   }
 
   private notifyClosed(appId: string): void {

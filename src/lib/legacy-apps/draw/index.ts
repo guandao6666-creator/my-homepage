@@ -9,6 +9,15 @@ import { DRAW_BONUS, DRAW_QUOTES } from "./quotes";
 
 const DRAW_KEY = "guandao.draw.v1";
 
+/**
+ * 本地日历日（yyyy-mm-dd）。
+ *
+ * 抽奖按「本机日历日」重置。以前用 `toISOString()` 取的是 UTC 日：
+ * 东八区 00:00–08:00 会被当成前一天，用户可在本地零点后再抽一次、
+ * 08:00 才真正重置。这里改成取本地日期分量，和任务/日历用的是同一套口径。
+ */
+export const drawDateKey = (now: Date = new Date()): string =>
+  `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
 export const drawApp: LegacyAppModule = {
   id: "draw",
@@ -31,7 +40,8 @@ export const drawApp: LegacyAppModule = {
     const btn = win.querySelector("#draw-btn") as HTMLButtonElement | null;
     if (!card || !mark || !text || !btn) return;
 
-    const today = new Date().toISOString().slice(0, 10);
+    // 打开窗口时先看今天（本地日）是否已经抽过
+    const today = drawDateKey();
 
     const show = (content: string, isBonus: boolean) => {
       mark.textContent = isBonus ? "★" : "“";
@@ -62,7 +72,9 @@ export const drawApp: LegacyAppModule = {
         const isBonus = Math.random() < 0.1;
         const content = isBonus ? DRAW_BONUS : DRAW_QUOTES[Math.floor(Math.random() * DRAW_QUOTES.length)];
 
-        localStorage.setItem(DRAW_KEY, JSON.stringify({ date: today, text: content, bonus: isBonus }));
+        // 用「点下去这一刻」的本地日：窗口跨过零点还开着时，不能把昨天的日期写进去
+        // （否则第二天重开窗口会再抽一次）
+        localStorage.setItem(DRAW_KEY, JSON.stringify({ date: drawDateKey(), text: content, bonus: isBonus }));
         show(content, isBonus);
 
         if (isBonus) achievements.unlock("draw");

@@ -50,7 +50,7 @@ import {
   signEd25519,
 } from "../shared/plugin-signature.js";
 
-const CLI_VERSION = "2.0.0";
+const CLI_VERSION = "2.2.0";
 const BINARY_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "woff", "woff2", "ttf", "otf"]);
 const IGNORED = new Set(["node_modules", ".git", "dist", ".DS_Store"]);
 
@@ -574,7 +574,7 @@ async function createCommand(dir, flags) {
     repository: "",
     changelog: "第一个版本。",
     screenshots: [],
-    compatibility: { minimumOSVersion: "2.0.0", sdkVersion: 1 },
+    compatibility: { minimumOSVersion: "2.0.1", sdkVersion: 1 },
     networkDomains: [],
     dependencies: [],
   };

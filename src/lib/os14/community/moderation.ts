@@ -58,7 +58,8 @@ export const loadModerationImpl = async (ctx: CommunityContext) => {
                           <div class="cx-mod-meta"><span>作者 ${esc(post.author.displayName)}</span><span>v${esc(post.version)}</span><span>举报 ${post.reportCount}</span><span>${timeAgo(post.createdAt)}</span></div>
                           ${post.moderationNote ? `<p class="cx-modnote">备注：${esc(post.moderationNote)}</p>` : ""}
                           <div class="cx-mod-actions">
-                            ${post.status !== "published" ? `<button class="cx-btn is-small is-primary" type="button" data-action="review-approve" data-id="${esc(post.id)}">通过</button>` : ""}
+                            ${post.status === "hidden" ? `<button class="cx-btn is-small is-primary" type="button" data-action="review-restore" data-id="${esc(post.id)}">恢复</button>` : ""}
+                            ${["pending_review", "rejected"].includes(post.status) ? `<button class="cx-btn is-small is-primary" type="button" data-action="review-approve" data-id="${esc(post.id)}">通过</button>` : ""}
                             ${post.status === "pending_review" ? `<button class="cx-btn is-small" type="button" data-action="review-reject" data-id="${esc(post.id)}">拒绝</button>` : ""}
                             ${post.status === "published" ? `<button class="cx-btn is-small" type="button" data-action="review-hide" data-id="${esc(post.id)}">隐藏</button>` : ""}
                             ${post.status === "published" ? `<button class="cx-btn is-small is-ghost" type="button" data-action="feature" data-id="${esc(post.id)}" data-featured="${post.featured ? "1" : "0"}">${post.featured ? "取消精选" : "设为精选"}</button>` : ""}
