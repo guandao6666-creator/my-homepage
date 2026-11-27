@@ -23,6 +23,7 @@ import { startContinuity } from "../continuity/ui";
 
 import { OS_VERSION } from "../version";
 import { installOs20 } from "../os20/bridge";
+import { initOs21Tiling } from "../os21/tiling";
 import type { Kernel } from "../core/kernel";
 
 /** 2.0 内核实例（延迟读取，避免与 os20/bridge 形成循环依赖） */
@@ -115,6 +116,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
     { id: "themes", title: "主题中心", width: 940, height: 640, glyph: "di-themes", load: lazy(() => import("./themes/app"), (m) => ({ body: m.renderThemeApp, init: (w) => m.initThemeApp(w, ctx) })) },
     { id: "widgetstore", title: "组件中心", width: 920, height: 620, glyph: "di-widgets", load: lazy(() => import("./widgetstore-app"), (m) => ({ body: m.renderWidgetGallery, init: m.initWidgetGallery })) },
     { id: "workspaces", title: "工作空间", width: 900, height: 620, glyph: "di-space", load: lazy(() => import("./workspaces-app"), (m) => ({ body: m.renderWorkspaces, init: (w) => m.initWorkspaces(w, ctx) })) },
+    { id: "focus", title: "Focus Studio", width: 520, height: 500, glyph: "di-tasks", load: lazy(() => import("../os21/focus"), (m) => ({ body: m.renderFocusStudio, init: (w) => m.initFocusStudio(w, ctx) })) },
 
     {
       id: "perflab",
@@ -348,6 +350,7 @@ export const initOs14 = (ctx: Ctx): BootResult => {
   initPlugins(ctx);
   startContinuity(ctx);
   initWorkspaceShortcuts(ctx);
+  initOs21Tiling(ctx);
   registerNewWidgets(ctx);
   initDesktop(ctx);
 

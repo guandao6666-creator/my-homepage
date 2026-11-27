@@ -24,7 +24,7 @@ export const terminalApp: LegacyAppModule = {
   body: () => `
           <div class="term">
             <div class="term-out" id="term-out">
-              <p class="term-line term-muted">Guandao OS 2.0 · 输入 help 看可用命令</p>
+              <p class="term-line term-muted">Guandao OS 2.1 · 输入 help 看可用命令</p>
             </div>
             <label class="term-input-row">
               <span class="term-prompt">~ $</span>
@@ -81,7 +81,7 @@ export const terminalApp: LegacyAppModule = {
       const info = [
         `${data.site.author}@guandao.xin`,
         "-----------------",
-        "OS: Guandao OS 2.0 (The Platform Era)",
+        "OS: Guandao OS 2.1 (Fluid Workspace)",
         "引擎: Astro 静态渲染",
         `运行窗口: ${desktopFacilities.openWindowCount()}`,
         `虚拟桌面: ${desktopFacilities.deskCount()}`,

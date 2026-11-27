@@ -8,16 +8,16 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.0.0";
+export const OS_VERSION = "2.1.0";
 
 /** 对外展示的版本代号 */
-export const RELEASE_NAME = "The Platform Era";
+export const RELEASE_NAME = "Fluid Workspace";
 
 /** 中文版本名 */
-export const RELEASE_NAME_ZH = "平台时代";
+export const RELEASE_NAME_ZH = "流畅工作台";
 
 /** 数据导出格式版本（与备份 payload 中的 version 字段一致） */
-export const EXPORT_FORMAT = "guandao-os/2.0";
+export const EXPORT_FORMAT = "guandao-os/2.1";
 
 /**
  * 构建信息。
@@ -46,6 +46,19 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.1.0",
+    name: "Fluid Workspace",
+    date: "2026-11-27",
+    notes: [
+      "窗口分屏贴靠与快捷键 2.1：Alt+←/→/↑/↓/W 快速分屏、居中、最大化与关闭，Shift+? 唤起快捷键一览",
+      "全新内置应用 Focus Studio（番茄专注）：SVG 环形进度、25/5/15 分钟预设、本地合成白噪音与每日专注统计",
+      "性能架构升级：个性化设置 2.0、组件中心与工作空间 UI 全面改为按需懒加载，入口 JS 降至 401 KB",
+      "桌面内置应用升级：文章窗口支持实时搜索与标签筛选、计算器支持逐字退格/精度修正/历史复用、终端新增 find/blog/uptime",
+      "社区稳定性升级：修复 P1-8 并发竞态与详情页「← 返回」保留搜索/分类上下文",
+      "博客体验升级：全站 ⌘K 命令面板、文章字号切换与 [/] 切篇、作品/归档/装备/标签页实时筛选与排序",
+    ],
+  },
   {
     version: "2.0.0",
     name: "The Platform Era",
