@@ -77,14 +77,26 @@
     {
       "kind": "sink",
       "file": "src/lib/os13.ts",
-      "count": 8,
-      "reason": "人工复核 5 处未包装插值：数字计数 / 内部渲染函数返回的受控 HTML / 已校验常量（见 HTML-SECURITY.md §7）"
+      "count": 6,
+      "reason": "人工复核：桌面组件与控制中心模板；设置 2.0 面板的 2 处 innerHTML 已拆出至 os13-settings.ts（见 HTML-SECURITY.md §7）"
     },
     {
       "kind": "url-assign",
       "file": "src/lib/os13.ts",
-      "count": 3,
-      "reason": "URL 来源为 URL.createObjectURL（blob:）、内部 API 路径或常量，属系统控制；属性赋值不经过 HTML 解析"
+      "count": 2,
+      "reason": "URL 来源为 URL.createObjectURL（blob:）或系统资源；导出备份的 1 处 blob 赋值已拆出至 os13-settings.ts"
+    },
+    {
+      "kind": "sink",
+      "file": "src/lib/os13-settings.ts",
+      "count": 2,
+      "reason": "从 os13.ts 迁出的设置 2.0 窗口 UI（body.innerHTML 与壁纸画廊 grid.innerHTML，图片 URL 经 safeUrl 校验，其余为受控内部配置模板）"
+    },
+    {
+      "kind": "url-assign",
+      "file": "src/lib/os13-settings.ts",
+      "count": 1,
+      "reason": "从 os13.ts 迁出：导出本地设置备份使用 URL.createObjectURL(blob) 创建下载链接"
     },
     {
       "kind": "sink",
