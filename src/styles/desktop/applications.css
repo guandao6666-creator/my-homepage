@@ -26,9 +26,14 @@
 
       .side-item {
         display: block;
+        width: 100%;
         padding: 6px 9px;
+        border: 0;
         border-radius: 7px;
+        background: transparent;
+        font: inherit;
         font-size: 12px;
+        text-align: left;
         color: rgba(255, 255, 255, 0.62);
       }
 
@@ -37,14 +42,21 @@
         color: #fff;
       }
 
-      a.side-item {
+      a.side-item,
+      button.side-item {
         cursor: pointer;
         text-decoration: none;
         transition: background-color 0.16s ease, color 0.16s ease;
       }
 
-      a.side-item:hover {
+      a.side-item:hover,
+      button.side-item:hover {
         background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+      }
+
+      button.side-item.is-active:hover {
+        background: rgba(111, 140, 255, 0.3);
         color: #fff;
       }
 

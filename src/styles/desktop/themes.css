@@ -188,7 +188,8 @@
         background: rgba(111, 140, 255, 0.2);
         color: #26307e;
       }
-      [data-os-theme="light"] a.side-item:hover {
+      [data-os-theme="light"] a.side-item:hover,
+      [data-os-theme="light"] button.side-item:hover {
         background: rgba(20, 24, 40, 0.06);
         color: #1c2030;
       }
