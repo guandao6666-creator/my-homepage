@@ -1,16 +1,18 @@
 /**
  * 计算器（calc）· 对应 index.astro 原 `renderCalc` / `initCalc`。
  *
- * 无外部依赖、无持久化。键盘监听挂在窗口元素上，
- * 窗口移除后随 DOM 一起回收，因此无需 cleanup。
+ * 2.3 修复：改用 `evaluateMath` 递归下降解析器取代 `new Function(...)`，
+ * 彻底修复生产环境严格 CSP（无 `'unsafe-eval'`）拦截导致计算全部报「错误」的缺陷；
+ * 同时补充面板 `⌫` 退格键与键盘焦点防护（避免焦点留在按钮上按 Enter 重复触发 click）。
  */
+import { evaluateMath } from "../../os23/math";
 import type { LegacyAppModule } from "../types";
 
 export const calculatorApp: LegacyAppModule = {
   id: "calc",
   title: "计算器",
-  width: 300,
-  height: 470,
+  width: 310,
+  height: 480,
   glyph: "di-calc",
   body: () => `
           <div class="calc">
@@ -18,15 +20,15 @@ export const calculatorApp: LegacyAppModule = {
             <div class="calc-history" id="calc-history"></div>
             <div class="calc-pad">
               ${[
-                ["C", "(", ")", "÷"],
+                ["C", "⌫", "(", "÷"],
                 ["7", "8", "9", "×"],
                 ["4", "5", "6", "−"],
                 ["1", "2", "3", "+"],
-                ["0", ".", "%", "="],
+                ["0", ".", ")", "="],
               ]
                 .map((row) =>
                   row
-                    .map((k) => `<button class="calc-key ${"÷×−+=".includes(k) ? "is-op" : ""} ${k === "C" ? "is-clear" : ""}" data-k="${k}">${k}</button>`)
+                    .map((k) => `<button type="button" class="calc-key ${"÷×−+=".includes(k) ? "is-op" : ""} ${k === "C" || k === "⌫" ? "is-clear" : ""}" data-k="${k}">${k}</button>`)
                     .join(""),
                 )
                 .join("")}
@@ -39,31 +41,20 @@ export const calculatorApp: LegacyAppModule = {
     const setDisplay = (v: string) => {
       if (display) display.textContent = v || "0";
     };
-    const evaluate = (s: string) => {
-      const clean = s.replace(/×/g, "*").replace(/−/g, "-").replace(/÷/g, "/").replace(/%/g, "/100");
-      if (!/^[\d+\-*/.() ]+$/.test(clean)) return null;
-      try {
-        const v = Function('"use strict";return(' + clean + ")")();
-        if (typeof v !== "number" || !isFinite(v)) return null;
-        return Number(v.toPrecision(12));
-      } catch {
-        return null;
-      }
-    };
     const push = (k: string) => {
       if (k === "C") {
         expr = "";
         setDisplay("0");
         return;
       }
-      if (k === "DEL") {
+      if (k === "DEL" || k === "⌫") {
         expr = expr.slice(0, -1);
         setDisplay(expr);
         return;
       }
       if (k === "=") {
         if (!expr.trim()) return;
-        const v = evaluate(expr);
+        const v = evaluateMath(expr);
         if (v !== null) {
           if (historyEl) {
             const li = document.createElement("button");
@@ -92,10 +83,16 @@ export const calculatorApp: LegacyAppModule = {
       expr = item.dataset.result;
       setDisplay(expr);
     });
-    win.querySelectorAll<HTMLButtonElement>(".calc-key").forEach((b) => b.addEventListener("click", () => push(b.dataset.k ?? "")));
+    win.querySelectorAll<HTMLButtonElement>(".calc-key").forEach((b) =>
+      b.addEventListener("click", () => {
+        push(b.dataset.k ?? "");
+        b.blur();
+      }),
+    );
     // 键盘输入（事件从聚焦的后代冒泡到窗口）
     win.tabIndex = -1;
     win.addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const map: Record<string, string> = {
         "*": "×",
         "/": "÷",
@@ -106,8 +103,10 @@ export const calculatorApp: LegacyAppModule = {
         Backspace: "DEL",
         Escape: "C",
       };
-      if (/^[0-9.()%]$/.test(e.key)) push(e.key);
-      else if (map[e.key]) {
+      if (/^[0-9.()%^]$/.test(e.key)) {
+        e.preventDefault();
+        push(e.key);
+      } else if (map[e.key]) {
         e.preventDefault();
         push(map[e.key]);
       }

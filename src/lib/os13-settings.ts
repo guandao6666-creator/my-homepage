@@ -6,6 +6,7 @@
  */
 import { wallCardHtml } from "./os13/wall-card";
 import { WALLPAPERS, WALL_CATEGORY_LABEL, type Wallpaper } from "./wallpapers";
+import { EXPORT_FORMAT, OS_VERSION, RELEASE_NAME } from "./version";
 import type { Os13Context } from "./os13";
 
 export type Os13Preset = {
@@ -374,14 +375,14 @@ export function mountOs13Settings(
     return `
     <section class="s-panel" data-panel="system">
       <h2>系统</h2>
-      <p class="s-sub">Guandao OS 1.3 · Beyond the Desktop</p>
+      <p class="s-sub">Guandao OS ${OS_VERSION} · ${RELEASE_NAME}</p>
       <div class="s-card s-info">
-        <div><span>版本</span><b>1.3</b></div>
-        <div><span>代号</span><b>Beyond the Desktop</b></div>
+        <div><span>版本</span><b>${OS_VERSION}</b></div>
+        <div><span>代号</span><b>${RELEASE_NAME}</b></div>
         <div><span>壁纸</span><b>${WALLPAPERS.length} 张本地资源 + ${cfg.custom.length} 张自定义</b></div>
         <div><span>本地数据</span><b>${(bytes / 1024).toFixed(1)} KB · ${count} 项</b></div>
         <div><span>自定义壁纸</span><b>${(customBytes / 1024 / 1024).toFixed(2)} MB（IndexedDB）</b></div>
-        <div><span>渲染</span><b>Astro 静态 · 无后端依赖</b></div>
+        <div><span>渲染</span><b>Astro 静态 · Cloudflare Worker</b></div>
       </div>
       <div class="s-actions">
         <button class="s-btn" type="button" data-act="export">导出备份</button>
@@ -400,7 +401,7 @@ export function mountOs13Settings(
       <aside class="s13-side">
         <div class="s13-id">
           <span class="s13-mark">管</span>
-          <span><b>个性化</b><i>Guandao OS 1.3</i></span>
+          <span><b>个性化</b><i>Guandao OS ${OS_VERSION}</i></span>
         </div>
         <nav class="s13-tabs">
           ${TABS.map(([id, name, ico]) => `<button type="button" class="${bridge.getTab() === id ? "is-active" : ""}" data-tab="${id}"><span>${ico}</span>${name}</button>`).join("")}
@@ -654,12 +655,12 @@ export function mountOs13Settings(
               data[k] = raw;
             }
           }
-          const payload = { version: "guandao-os/1.3", exportedAt: new Date().toISOString(), data };
+          const payload = { version: EXPORT_FORMAT, exportedAt: new Date().toISOString(), data };
           const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = `guandao-os13-${new Date().toISOString().slice(0, 10)}.json`;
+          a.download = `guandao-os-${new Date().toISOString().slice(0, 10)}.json`;
           a.click();
           URL.revokeObjectURL(url);
           bridge.pushToast("设置已导出");

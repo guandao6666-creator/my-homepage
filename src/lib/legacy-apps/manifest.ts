@@ -124,8 +124,8 @@ export const LEGACY_APP_MANIFEST: readonly LegacyAppManifestEntry[] = [
   {
     id: "calc",
     title: "计算器",
-    width: 300,
-    height: 470,
+    width: 310,
+    height: 480,
     glyph: "di-calc",
     load: () => import("./calc").then((m) => m.calculatorApp),
   },
@@ -140,8 +140,8 @@ export const LEGACY_APP_MANIFEST: readonly LegacyAppManifestEntry[] = [
   {
     id: "terminal",
     title: "终端",
-    width: 560,
-    height: 360,
+    width: 580,
+    height: 380,
     glyph: "di-term",
     load: () => import("./terminal").then((m) => m.terminalApp),
   },

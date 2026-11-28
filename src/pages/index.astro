@@ -202,7 +202,7 @@ const data = {
         <span class="mb-brand">
           <span class="mb-logo" aria-hidden="true">管</span>
           <span class="mb-brand-text">Guandao OS</span>
-          <span class="mb-version" id="mb-version">2.2</span>
+          <span class="mb-version" id="mb-version">2.3</span>
         </span>
         <span class="mb-current" id="mb-current" hidden></span>
         <nav class="mb-menu">
@@ -236,6 +236,11 @@ const data = {
               <button type="button" data-menu-action="workspaces">工作空间</button>
               <button type="button" data-menu-action="focus">番茄专注（Focus Studio）</button>
               <button type="button" data-menu-action="clock">时光（Clock Studio）</button>
+              <button type="button" data-menu-action="devtools">开发工具箱（Dev Studio）</button>
+              <button type="button" data-menu-action="habits">习惯打卡（Habit Tracker）</button>
+              <button type="button" data-menu-action="sketch">灵感画板（Canvas Pad）</button>
+              <button type="button" data-menu-action="converter">换算工坊（Converter）</button>
+              <button type="button" data-menu-action="clipboard">剪贴板与快捷片段（Alt+V）</button>
               <button type="button" data-menu-action="tasks">任务与通知</button>
               <button type="button" data-menu-action="continuity">接力中心</button>
               <span class="mb-sep"></span>
@@ -269,6 +274,11 @@ const data = {
               <button type="button" data-menu-action="tile-left">贴靠左半屏（Alt+←）</button>
               <button type="button" data-menu-action="tile-right">贴靠右半屏（Alt+→）</button>
               <button type="button" data-menu-action="tile-center">居中窗口（Alt+↓）</button>
+              <button type="button" data-menu-action="tile-tl">左上 1/4 屏（Alt+Shift+←）</button>
+              <button type="button" data-menu-action="tile-tr">右上 1/4 屏（Alt+Shift+↑）</button>
+              <button type="button" data-menu-action="tile-bl">左下 1/4 屏（Alt+Shift+↓）</button>
+              <button type="button" data-menu-action="tile-br">右下 1/4 屏（Alt+Shift+→）</button>
+              <button type="button" data-menu-action="tile-pin">置顶 / 取消置顶窗口（Alt+P）</button>
               <button type="button" data-menu-action="tile-grid">网格平铺全部窗口（Alt+G）</button>
               <button type="button" data-menu-action="tile-cascade">层叠排列全部窗口（Alt+Shift+G）</button>
               <button type="button" data-menu-action="shortcuts">快捷键一览（?）</button>
@@ -722,8 +732,9 @@ const data = {
 import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
       import gamesCssUrl from "../styles/desktop/games.css?url";
       import { ensureCss } from "../lib/ui/lazy-css";
-      // 2.3：HTML 转义统一入口
+      // 2.3：HTML 转义统一入口 + 零 eval 算术解析（供 Spotlight 即时计算）
       import { escapeHtml, safeUrl } from "../lib/html";
+      import { evaluateMath, isLikelyMathQuery } from "../lib/os23/math";
 
       (() => {
         // 移动端在模块加载前已被内联脚本带走；这里再兜一次，并写入 data-shell。
@@ -1879,6 +1890,18 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
               return hook?.terminal?.(name) ?? null;
             },
             makeId: () => makeId(),
+            openAppById: (query) => {
+              const q = query.trim().toLowerCase();
+              if (!q) return null;
+              const entries = Object.entries(APPS);
+              const hit =
+                entries.find(([id]) => id.toLowerCase() === q) ??
+                entries.find(([, app]) => app.title.toLowerCase() === q) ??
+                entries.find(([id, app]) => id.toLowerCase().includes(q) || app.title.toLowerCase().includes(q));
+              if (!hit) return null;
+              openApp(hit[0]);
+              return hit[1].title;
+            },
           },
           auth: {
             formHtml: () => authFormHtml(),
@@ -1908,7 +1931,9 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
         /* ---------------- 窗口系统 ---------------- */
 
         const focusWin = (win: HTMLElement) => {
-          win.style.zIndex = String(++zTop);
+          if (zTop > 4800) zTop = 100;
+          const nextZ = ++zTop;
+          win.style.zIndex = String(win.dataset.pinned === "1" ? 5000 + nextZ : nextZ);
           windows.querySelectorAll(".window").forEach((el) => el.classList.toggle("is-front", el === win));
         };
 
@@ -3525,16 +3550,24 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
             case "tile-left":
             case "tile-right":
             case "tile-center":
+            case "tile-tl":
+            case "tile-tr":
+            case "tile-bl":
+            case "tile-br":
+            case "tile-pin":
             case "tile-grid":
             case "tile-cascade":
+            case "clipboard":
             case "shortcuts":
               window.dispatchEvent(new CustomEvent("guandao:os21-action", { detail: action }));
               break;
             case "focus":
-              openApp("focus");
-              break;
             case "clock":
-              openApp("clock");
+            case "devtools":
+            case "habits":
+            case "sketch":
+            case "converter":
+              openApp(action);
               break;
             case "restore-all":
               restoreAll();
@@ -3727,12 +3760,21 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
         const spotIndex = (): SpotItem[] => {
           const items: SpotItem[] = [];
           for (const [id, app] of Object.entries(APPS)) {
-            items.push({ title: app.title, subtitle: "应用", kind: "应用", action: () => openApp(id) });
+            const blocked = APP_GUARD.blocked(id);
+            items.push({
+              title: app.title,
+              subtitle: blocked ? "应用 · 未安装（点击前往应用中心）" : "应用",
+              kind: "应用",
+              action: () => openApp(id),
+            });
           }
           for (const post of DATA.posts) {
             items.push({ title: post.title, subtitle: `文章 · ${post.date}`, kind: "文章", action: () => { location.href = post.href; } });
           }
           const settings: [string, () => void][] = [
+            ["打开剪贴板与快捷片段（Alt+V）", () => window.dispatchEvent(new CustomEvent("guandao:os21-action", { detail: "clipboard" }))],
+            ["置顶 / 取消置顶当前窗口（Alt+P）", () => window.dispatchEvent(new CustomEvent("guandao:os21-action", { detail: "tile-pin" }))],
+            ["网格平铺全部窗口（Alt+G）", () => window.dispatchEvent(new CustomEvent("guandao:os21-action", { detail: "tile-grid" }))],
             ["切换深色 / 浅色", () => toggleOsTheme()],
             ["更换壁纸", () => nextWallpaper()],
             ["导出数据备份", () => exportData()],
@@ -3740,9 +3782,86 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
             ["打开设置", () => openApp("settings")],
           ];
           for (const [label, fn] of settings) {
-            items.push({ title: label, subtitle: "系统设置", kind: "设置", action: fn });
+            items.push({ title: label, subtitle: "系统快捷操作", kind: "操作", action: fn });
           }
           return items;
+        };
+
+        /** 2.3：在 Spotlight 中穿透检索本地笔记与待办任务，并支持即时算式求值 */
+        const spotDynamicHits = (rawQuery: string): SpotItem[] => {
+          const out: SpotItem[] = [];
+          const q = rawQuery.trim();
+          if (!q) return out;
+          if (isLikelyMathQuery(q)) {
+            const val = evaluateMath(q);
+            if (val !== null) {
+              out.push({
+                title: `= ${val}`,
+                subtitle: `${q} · 回车复制计算结果`,
+                kind: "计算",
+                action: () => {
+                  void navigator.clipboard?.writeText(String(val));
+                  (window as unknown as { GOS14?: { ctx?: { toast?: (msg: string) => void } } }).GOS14?.ctx?.toast?.(
+                    `已复制计算结果：${val}`,
+                  );
+                },
+              });
+            }
+          }
+          const lower = q.toLowerCase();
+          try {
+            const noteRaw = JSON.parse(localStorage.getItem("guandao.os14.notes.v1") || "null") as {
+              notes?: Array<{ id?: string; title?: string; body?: string; tags?: string[] }>;
+              ui?: { noteId?: string };
+            } | null;
+            if (Array.isArray(noteRaw?.notes)) {
+              for (const n of noteRaw.notes) {
+                const title = String(n.title || "").trim() || String(n.body || "").split("\n")[0]?.replace(/^#+\s*/, "").slice(0, 36) || "未命名笔记";
+                const hay = `${title}\n${n.body ?? ""}\n${(n.tags ?? []).join(" ")}`.toLowerCase();
+                if (hay.includes(lower) && n.id) {
+                  const noteId = n.id;
+                  out.push({
+                    title,
+                    subtitle: `笔记 · ${String(n.body ?? "").replace(/\s+/g, " ").slice(0, 42) || "空白"}`,
+                    kind: "笔记",
+                    action: () => {
+                      try {
+                        const cur = JSON.parse(localStorage.getItem("guandao.os14.notes.v1") || "null");
+                        if (cur && cur.ui) {
+                          cur.ui.noteId = noteId;
+                          localStorage.setItem("guandao.os14.notes.v1", JSON.stringify(cur));
+                        }
+                      } catch {}
+                      openApp("notes");
+                      window.dispatchEvent(new CustomEvent("guandao:notes-sync"));
+                    },
+                  });
+                  if (out.length >= 6) break;
+                }
+              }
+            }
+          } catch {}
+          try {
+            const taskRaw = JSON.parse(localStorage.getItem("guandao.os14.tasks.v1") || "null") as {
+              tasks?: Array<{ title?: string; note?: string; done?: boolean }>;
+            } | null;
+            if (Array.isArray(taskRaw?.tasks)) {
+              for (const t of taskRaw.tasks) {
+                const title = String(t.title ?? "").trim();
+                if (!title) continue;
+                if (`${title} ${t.note ?? ""}`.toLowerCase().includes(lower)) {
+                  out.push({
+                    title,
+                    subtitle: `任务 · ${t.done ? "已完成" : "进行中"}`,
+                    kind: "任务",
+                    action: () => openApp("tasks"),
+                  });
+                  if (out.length >= 8) break;
+                }
+              }
+            }
+          } catch {}
+          return out;
         };
 
         let spotItems: SpotItem[] = [];
@@ -3770,9 +3889,12 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
         };
 
         const spotRefresh = () => {
-          const q = (spotInput?.value ?? "").trim().toLowerCase();
+          const raw = spotInput?.value ?? "";
+          const q = raw.trim().toLowerCase();
           const all = spotIndex();
-          spotItems = (q ? all.filter((i) => (i.title + i.subtitle).toLowerCase().includes(q)) : all).slice(0, 12);
+          const dyn = spotDynamicHits(raw);
+          const matched = q ? all.filter((i) => (i.title + i.subtitle).toLowerCase().includes(q)) : all;
+          spotItems = [...dyn, ...matched].slice(0, 14);
           spotActive = 0;
           renderSpot();
         };
@@ -3824,7 +3946,7 @@ import { DRAW_QUOTES } from "../lib/legacy-apps/draw/quotes";
         });
 
         document.addEventListener("keydown", (e) => {
-          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+          if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k") {
             e.preventDefault();
             if (spotlightEl?.hidden) openSpot();
             else closeSpot();

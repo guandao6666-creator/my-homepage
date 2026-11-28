@@ -71,12 +71,13 @@ function d1Json(sql) {
   return JSON.parse(raw.slice(start))[0]?.results ?? [];
 }
 
-/** QA 清理审计事件：只写事件类型，不含用户内容/Token。 */
+/** QA 清理审计事件：映射到线上表 CHECK 允许的删除审计类型，并在 metadata 标记 stage=qa_cleanup。 */
 function logQaEvent(eventType) {
+  const mapped = eventType === "qa_cleanup_started" ? "data_deletion_started" : "data_deletion_completed";
   try {
     d1(
       `INSERT INTO security_events (id, user_id, event_type, device_id, result, metadata_json, created_at)
-       VALUES ('${randomUUID()}', NULL, '${eventType}', NULL, 'success', NULL, ${Date.now()});`,
+       VALUES ('${randomUUID()}', NULL, '${mapped}', NULL, 'success', '{"stage":"qa_cleanup"}', ${Date.now()});`,
     );
   } catch {
     /* 审计失败不阻塞清理 */

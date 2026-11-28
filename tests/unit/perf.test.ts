@@ -131,6 +131,6 @@ describe("版本常量", () => {
     const pkg = (await import("../../package.json")) as { default?: { version: string } } & { version?: string };
     const version = pkg.default?.version ?? pkg.version;
     expect(OS_VERSION).toBe(version);
-    expect(RELEASE_NAME).toBe("Chrono Flow");
+    expect(RELEASE_NAME).toBe("Studio Horizon");
   });
 });

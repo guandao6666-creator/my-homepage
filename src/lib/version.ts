@@ -8,16 +8,16 @@
  * 两边由 scripts/check-version.mjs 在 CI 中强制一致。
  */
 
-export const OS_VERSION = "2.2.0";
+export const OS_VERSION = "2.3.0";
 
 /** 对外展示的版本代号 */
-export const RELEASE_NAME = "Chrono Flow";
+export const RELEASE_NAME = "Studio Horizon";
 
 /** 中文版本名 */
-export const RELEASE_NAME_ZH = "时光心流";
+export const RELEASE_NAME_ZH = "创想视界";
 
 /** 数据导出格式版本（与备份 payload 中的 version 字段一致） */
-export const EXPORT_FORMAT = "guandao-os/2.2";
+export const EXPORT_FORMAT = "guandao-os/2.3";
 
 /**
  * 构建信息。
@@ -46,6 +46,23 @@ export const BUILD_INFO = {
 
 /** 2.0 的更新历史（真实发布记录，供更新中心展示；不抓取伪造数据） */
 export const RELEASES: Array<{ version: string; name: string; date: string; notes: string[] }> = [
+  {
+    version: "2.3.0",
+    name: "Studio Horizon",
+    date: "2026-11-28",
+    notes: [
+      "全新内置应用 Dev Studio（开发者工具箱）：JSON 格式化/排序/压缩与校验、Base64/URL 双向编解码、时间戳互转、SHA-256 摘要与 UUID 批量生成",
+      "全新内置应用 Habit Tracker（习惯打卡）：每日打卡、连续天数 Streak 计算与近 28 天热力格矩阵",
+      "全新内置应用 Canvas Pad（灵感画板）：高分屏平滑手绘、多画笔粗细/调色板/橡皮擦、15 步撤销重做与 PNG 导出",
+      "全新内置应用 Converter（换算工坊）：长度/重量/温度/存储容量双向换算，以及 HEX/RGB/HSL 色彩互转与 WCAG 对比度检测",
+      "窗口置顶（Alt+P）与四角 1/4 屏象限贴靠（Alt+Shift+方向键）：置顶窗口独立层级并显示徽标",
+      "剪贴板与快捷片段面板（Alt+V）：自动记录桌面内复制文本（忽略密码框），支持常用片段收藏置顶与一键清空",
+      "Spotlight 2.3 升级：支持算式即时求值与回车复制，并可穿透检索本地笔记与待办任务一键直达",
+      "Guandao Notes 2.3 升级：新增「分屏」实时 Markdown 对照预览、字数/行数/预计阅读时长统计与一键复制全文",
+      "Focus Studio 2.3 升级：支持 1~120 分钟自定义时长，新增白噪音/窗外细雨/篝火低频三种本地合成声景与音量调节",
+      "终端 2.3 升级与多项缺陷修复：终端新增 calc 与 open <应用ID>；修复生产严格 CSP 下计算器 new Function 求值报错、窗口分屏类名错配、任务搜索打断中文输入法组词、2.0 应用清单漏登及个性化设置旧版本号残留等 8 项问题",
+    ],
+  },
   {
     version: "2.2.0",
     name: "Chrono Flow",

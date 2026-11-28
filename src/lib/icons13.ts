@@ -217,6 +217,24 @@ export const ICON_SVG: Record<string, string> = {
     <circle cx="24" cy="24" r="13.6" fill="currentColor"/>
     <path d="M24 16.4V24l5.2 3.4" stroke="#0b1020" stroke-opacity=".34" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
     ${A("M14.6 10.8a3 3 0 0 1 4.2 0l-5.9 5.9a3 3 0 0 1 0-4.2l1.7-1.7ZM33.4 10.8a3 3 0 0 0-4.2 0l5.9 5.9a3 3 0 0 0 0-4.2l-1.7-1.7Z", 0.6)}`,
+
+  /* 2.3：Dev Studio / Habit Tracker / Canvas Pad / Converter */
+  code: `
+    <path d="M18.5 16.5 11.5 24l7 7.5M29.5 16.5 36.5 24l-7 7.5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M26.5 14 21.5 34" stroke="currentColor" stroke-opacity=".62" stroke-width="2.8" stroke-linecap="round"/>`,
+
+  habit: `
+    <circle cx="24" cy="24" r="13.4" fill="currentColor" opacity=".28"/>
+    <path d="M24 10.6a13.4 13.4 0 1 1-9.5 3.9" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+    <path d="m18.5 24.4 3.8 3.8 7.8-8" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+
+  brush: `
+    ${A("M31.6 11.6a3.4 3.4 0 0 1 4.8 4.8L23.8 29l-4.8-4.8 12.6-12.6Z")}
+    ${A("M17.6 25.8 22.2 30.4c-1.8 3.6-5.2 5.4-9.8 5.2 1.2-2.2 1.4-4.1 1.6-5.6.3-2 1.6-3.5 3.6-4.2Z", 0.72)}`,
+
+  convert: `
+    <path d="M13 18.5h20l-4.5-4.5M35 29.5H15l4.5 4.5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    ${A("M24 21.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Z", 0.55)}`,
 };
 
 const CLASS_MAP: Record<string, string> = {
@@ -259,6 +277,11 @@ const CLASS_MAP: Record<string, string> = {
   "di-spark": "spark",
   // 2.2
   "di-clock": "clock",
+  // 2.3
+  "di-code": "code",
+  "di-habit": "habit",
+  "di-brush": "brush",
+  "di-convert": "convert",
 };
 
 const paint = (glyph: HTMLElement) => {

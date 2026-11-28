@@ -43,7 +43,7 @@ type NoteState = {
   v: 1;
   folders: Array<{ id: string; name: string }>;
   notes: NoteDoc[];
-  ui: { folder: string; noteId: string; mode: "edit" | "preview" };
+  ui: { folder: string; noteId: string; mode: "edit" | "preview" | "split" };
 };
 
 const KEY = "guandao.os14.notes.v1";
@@ -142,6 +142,13 @@ const countWords = (text: string) => {
   const cn = (text.match(/[\u4e00-\u9fa5]/g) ?? []).length;
   const en = (text.replace(/[\u4e00-\u9fa5]/g, " ").match(/[A-Za-z0-9]+/g) ?? []).length;
   return cn + en;
+};
+
+const noteStatsText = (body: string) => {
+  const words = countWords(body);
+  const lines = body ? body.split("\n").length : 0;
+  const mins = words === 0 ? 0 : Math.max(1, Math.ceil(words / 320));
+  return `${words} 字 · ${lines} 行 · 约 ${mins} 分钟阅读`;
 };
 
 const folderName = (st: NoteState, id: string) =>
@@ -256,15 +263,18 @@ export const initNotes = (win: HTMLElement, ctx: Ctx): (() => void) => {
       editorEl.innerHTML = `<div class="n14-editor-empty"><span>✎</span><p>选一篇笔记，或者新建一篇。</p><button class="g14-btn is-primary" type="button" data-n-new>新建笔记</button></div>`;
       return;
     }
-    const words = countWords(note.body);
+    const mode = state.ui.mode;
+    const previewHtml = renderMarkdown(note.body) || "<p class='n14-blank'>这篇笔记还没有内容。</p>";
     editorEl.innerHTML = `
       <div class="n14-ed-bar">
         <span class="n14-ed-folder">${escapeHtml(folderName(state, note.folder))}</span>
         <div class="n14-ed-acts">
           <div class="n14-seg">
-            <button type="button" data-n-mode="edit" class="${state.ui.mode === "edit" ? "is-active" : ""}">编辑</button>
-            <button type="button" data-n-mode="preview" class="${state.ui.mode === "preview" ? "is-active" : ""}">预览</button>
+            <button type="button" data-n-mode="edit" class="${mode === "edit" ? "is-active" : ""}">编辑</button>
+            <button type="button" data-n-mode="split" class="${mode === "split" ? "is-active" : ""}">分屏</button>
+            <button type="button" data-n-mode="preview" class="${mode === "preview" ? "is-active" : ""}">预览</button>
           </div>
+          <button type="button" class="n14-icon" data-n-copy title="复制全文">⧉</button>
           <button type="button" class="n14-icon" data-n-pin title="置顶">${note.pinned ? "★" : "☆"}</button>
           <button type="button" class="n14-icon" data-n-send title="发送到设备">⇥</button>
           <button type="button" class="n14-icon" data-n-export title="导出 Markdown">↓</button>
@@ -277,12 +287,17 @@ export const initNotes = (win: HTMLElement, ctx: Ctx): (() => void) => {
         <input class="n14-taginput" data-n-taginput placeholder="+ 标签" maxlength="16" />
       </div>
       ${
-        state.ui.mode === "edit"
+        mode === "edit"
           ? `<textarea class="n14-body" data-n-body spellcheck="false" placeholder="用 Markdown 写点什么…">${escapeHtml(note.body)}</textarea>`
-          : `<div class="n14-preview md-body">${renderMarkdown(note.body) || "<p class='n14-blank'>这篇笔记还没有内容。</p>"}</div>`
+          : mode === "split"
+            ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0;flex:1;overflow:hidden">
+                <textarea class="n14-body" data-n-body spellcheck="false" placeholder="左侧写 Markdown，右侧实时预览…" style="border-right:1px solid var(--g-line)">${escapeHtml(note.body)}</textarea>
+                <div class="n14-preview md-body" data-n-live-preview style="overflow:auto">${previewHtml}</div>
+              </div>`
+            : `<div class="n14-preview md-body">${previewHtml}</div>`
       }
       <div class="n14-ed-foot">
-        <span>${words} 字</span>
+        <span data-n-stats>${noteStatsText(note.body)}</span>
         <span data-n-saved>${dirty ? "正在保存…" : `已保存 · ${fmtDateTime(note.updatedAt)}`}</span>
       </div>`;
   };
@@ -430,9 +445,21 @@ export const initNotes = (win: HTMLElement, ctx: Ctx): (() => void) => {
 
     const mode = t.closest<HTMLElement>("[data-n-mode]");
     if (mode) {
-      state.ui.mode = (mode.dataset.nMode as "edit" | "preview") ?? "edit";
+      const m = mode.dataset.nMode;
+      state.ui.mode = m === "preview" || m === "split" ? m : "edit";
       write(state);
       paintEditor();
+      return;
+    }
+
+    if (t.closest("[data-n-copy]")) {
+      const note = current();
+      if (!note) return;
+      const full = `${note.title ? `# ${note.title}\n\n` : ""}${note.body}`;
+      void navigator.clipboard?.writeText(full).then(
+        () => ctx.toast("已复制全文到剪贴板"),
+        () => ctx.toast("复制失败，请手动复制"),
+      );
       return;
     }
 
@@ -528,8 +555,10 @@ export const initNotes = (win: HTMLElement, ctx: Ctx): (() => void) => {
     if (t.matches("[data-n-body]")) {
       note.body = (t as HTMLTextAreaElement).value;
       touch(note);
-      const words = root.querySelector<HTMLElement>(".n14-ed-foot span");
-      if (words) words.textContent = `${countWords(note.body)} 字`;
+      const stats = root.querySelector<HTMLElement>("[data-n-stats]");
+      if (stats) stats.textContent = noteStatsText(note.body);
+      const live = root.querySelector<HTMLElement>("[data-n-live-preview]");
+      if (live) live.innerHTML = renderMarkdown(note.body) || "<p class='n14-blank'>这篇笔记还没有内容。</p>";
       return;
     }
   });

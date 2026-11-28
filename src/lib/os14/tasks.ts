@@ -79,14 +79,20 @@ const taskRow = (t: Task) => `
     </div>
   </div>`;
 
-const tasksView = () => {
-  const stats = taskStore.stats();
+const filteredTaskListHtml = () => {
   let list = taskStore.list();
   if (filter === "open") list = list.filter((t) => !t.done);
   if (filter === "done") list = list.filter((t) => t.done);
   if (cat !== "all") list = list.filter((t) => t.category === cat);
   const q = query.trim().toLowerCase();
   if (q) list = list.filter((t) => `${t.title} ${t.note}`.toLowerCase().includes(q));
+  return list.length
+    ? list.map(taskRow).join("")
+    : emptyState(filter === "done" ? "还没有完成的任务" : "这里没有任务", "新建一个，或者换个筛选条件。", "✓");
+};
+
+const tasksView = () => {
+  const stats = taskStore.stats();
 
   return `
     <div class="g14-scroll">
@@ -99,7 +105,7 @@ const tasksView = () => {
       </div>
       <div class="tk14-bar">
         <div class="g14-seg" data-tk-filter>
-          ${(["open", "all", "done"] as const).map((k) => `<button type="button" data-f="${k}" class="${filter === k ? "is-active" : ""}">${k === "open" ? "进行中" : k === "all" ? "全部" : "已完成"}</button>`).join("")}
+          ${(["open", "all", "done"] as const).map((k) => `<button type="button" data-f="${k}" class="${filter === k ? "is-active" : ""}">${k === k && k === "open" ? "进行中" : k === "all" ? "全部" : "已完成"}</button>`).join("")}
         </div>
         <div class="g14-chip-row">
           <button class="g14-chip ${cat === "all" ? "is-active" : ""}" type="button" data-tk-cat="all">全部</button>
@@ -107,8 +113,8 @@ const tasksView = () => {
         </div>
         <input class="tk14-search" data-tk-search placeholder="搜索任务…" value="${escapeHtml(query)}" />
       </div>
-      <div class="tk14-list">
-        ${list.length ? list.map(taskRow).join("") : emptyState(filter === "done" ? "还没有完成的任务" : "这里没有任务", "新建一个，或者换个筛选条件。", "✓")}
+      <div class="tk14-list" data-tk-list>
+        ${filteredTaskListHtml()}
       </div>
       ${stats.done ? `<div class="tk14-foot"><button class="g14-btn is-ghost" type="button" data-task-clear>清除已完成 (${stats.done})</button></div>` : ""}
     </div>`;
@@ -342,25 +348,30 @@ export const initTasks = (win: HTMLElement, ctx: Ctx): (() => void) => {
     }
   });
 
+  // 2.3 修复：只局部更新 [data-tk-list]，避免每次按键重建 <input> 打断中文输入法（IME）组词
+  const paintListOnly = () => {
+    const listEl = host.querySelector<HTMLElement>("[data-tk-list]");
+    if (listEl) listEl.innerHTML = filteredTaskListHtml();
+  };
+
+  let composing = false;
+  win.addEventListener("compositionstart", (e) => {
+    if ((e.target as HTMLElement).closest("[data-tk-search]")) composing = true;
+  });
+  win.addEventListener("compositionend", (e) => {
+    const s = (e.target as HTMLElement).closest<HTMLInputElement>("[data-tk-search]");
+    if (!s) return;
+    composing = false;
+    query = s.value;
+    paintListOnly();
+  });
+
   win.addEventListener("input", (e) => {
     const s = (e.target as HTMLElement).closest<HTMLInputElement>("[data-tk-search]");
     if (!s) return;
     query = s.value;
-    const caret = s.selectionStart ?? query.length;
-    const scroll = host.querySelector<HTMLElement>(".g14-scroll");
-    const top = scroll?.scrollTop ?? 0;
-    paint();
-    const next = host.querySelector<HTMLElement>(".g14-scroll");
-    if (next) next.scrollTop = top;
-    const input = host.querySelector<HTMLInputElement>("[data-tk-search]");
-    if (input) {
-      input.focus();
-      try {
-        input.setSelectionRange(caret, caret);
-      } catch {
-        /* number 类型没有 setSelectionRange */
-      }
-    }
+    if (composing || (e as InputEvent).isComposing) return;
+    paintListOnly();
   });
 
   win.addEventListener("change", (e) => {

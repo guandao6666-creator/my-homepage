@@ -96,6 +96,11 @@ export type LegacyShellPort = {
    * 复用外壳已有的 `crypto.randomUUID` 兼容实现，避免模块里再抄一份。
    */
   makeId(): string;
+  /**
+   * 2.3：按应用 id 或标题打开桌面应用窗口（供终端 `open <appId>` 使用）。
+   * 成功找到并触发打开返回匹配到的标题，未找到返回 null。
+   */
+  openAppById?(query: string): string | null;
 };
 
 /**
